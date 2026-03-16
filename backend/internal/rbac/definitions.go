@@ -1,0 +1,184 @@
+package rbac
+
+type RoleKey struct {
+	Name   string
+	Module string
+}
+
+type RoleDefinition struct {
+	Name        string
+	Module      string
+	Description string
+}
+
+type PermissionDefinition struct {
+	Name        string
+	Module      string
+	Resource    string
+	Action      string
+	Description string
+}
+
+var modules = []string{"operational", "hris", "marketing"}
+
+var defaultPermissions = []PermissionDefinition{
+	{Name: "operational:project:view", Module: "operational", Resource: "project", Action: "view", Description: "View operational projects"},
+	{Name: "operational:project:create", Module: "operational", Resource: "project", Action: "create", Description: "Create operational projects"},
+	{Name: "operational:project:edit", Module: "operational", Resource: "project", Action: "edit", Description: "Edit operational projects"},
+	{Name: "operational:project:delete", Module: "operational", Resource: "project", Action: "delete", Description: "Delete operational projects"},
+	{Name: "operational:task:view", Module: "operational", Resource: "task", Action: "view", Description: "View operational tasks"},
+	{Name: "operational:task:create", Module: "operational", Resource: "task", Action: "create", Description: "Create operational tasks"},
+	{Name: "operational:task:edit", Module: "operational", Resource: "task", Action: "edit", Description: "Edit operational tasks"},
+	{Name: "operational:task:delete", Module: "operational", Resource: "task", Action: "delete", Description: "Delete operational tasks"},
+	{Name: "operational:assignment:view", Module: "operational", Resource: "assignment", Action: "view", Description: "View assignment rules"},
+	{Name: "operational:assignment:create", Module: "operational", Resource: "assignment", Action: "create", Description: "Create assignment rules"},
+	{Name: "operational:assignment:edit", Module: "operational", Resource: "assignment", Action: "edit", Description: "Edit assignment rules"},
+	{Name: "operational:assignment:delete", Module: "operational", Resource: "assignment", Action: "delete", Description: "Delete assignment rules"},
+	{Name: "hris:employee:view", Module: "hris", Resource: "employee", Action: "view", Description: "View employee data"},
+	{Name: "hris:employee:create", Module: "hris", Resource: "employee", Action: "create", Description: "Create employee data"},
+	{Name: "hris:employee:edit", Module: "hris", Resource: "employee", Action: "edit", Description: "Edit employee data"},
+	{Name: "hris:employee:delete", Module: "hris", Resource: "employee", Action: "delete", Description: "Delete employee data"},
+	{Name: "hris:salary:view", Module: "hris", Resource: "salary", Action: "view", Description: "View salary data"},
+	{Name: "hris:salary:edit", Module: "hris", Resource: "salary", Action: "edit", Description: "Edit salary data"},
+	{Name: "hris:bonus:view", Module: "hris", Resource: "bonus", Action: "view", Description: "View bonus data"},
+	{Name: "hris:bonus:create", Module: "hris", Resource: "bonus", Action: "create", Description: "Create bonus entries"},
+	{Name: "hris:bonus:edit", Module: "hris", Resource: "bonus", Action: "edit", Description: "Edit bonus entries"},
+	{Name: "hris:bonus:approve", Module: "hris", Resource: "bonus", Action: "approve", Description: "Approve bonus entries"},
+	{Name: "hris:subscription:view", Module: "hris", Resource: "subscription", Action: "view", Description: "View subscriptions"},
+	{Name: "hris:subscription:create", Module: "hris", Resource: "subscription", Action: "create", Description: "Create subscriptions"},
+	{Name: "hris:subscription:edit", Module: "hris", Resource: "subscription", Action: "edit", Description: "Edit subscriptions"},
+	{Name: "hris:subscription:delete", Module: "hris", Resource: "subscription", Action: "delete", Description: "Delete subscriptions"},
+	{Name: "hris:finance:view", Module: "hris", Resource: "finance", Action: "view", Description: "View finance entries"},
+	{Name: "hris:finance:create", Module: "hris", Resource: "finance", Action: "create", Description: "Create finance entries"},
+	{Name: "hris:finance:edit", Module: "hris", Resource: "finance", Action: "edit", Description: "Edit finance entries"},
+	{Name: "hris:finance:approve", Module: "hris", Resource: "finance", Action: "approve", Description: "Approve finance entries"},
+	{Name: "hris:reimbursement:view", Module: "hris", Resource: "reimbursement", Action: "view", Description: "View reimbursements"},
+	{Name: "hris:reimbursement:create", Module: "hris", Resource: "reimbursement", Action: "create", Description: "Create reimbursements"},
+	{Name: "hris:reimbursement:edit", Module: "hris", Resource: "reimbursement", Action: "edit", Description: "Edit reimbursements"},
+	{Name: "hris:reimbursement:approve", Module: "hris", Resource: "reimbursement", Action: "approve", Description: "Approve reimbursements"},
+	{Name: "marketing:campaign:view", Module: "marketing", Resource: "campaign", Action: "view", Description: "View campaigns"},
+	{Name: "marketing:campaign:create", Module: "marketing", Resource: "campaign", Action: "create", Description: "Create campaigns"},
+	{Name: "marketing:campaign:edit", Module: "marketing", Resource: "campaign", Action: "edit", Description: "Edit campaigns"},
+	{Name: "marketing:campaign:delete", Module: "marketing", Resource: "campaign", Action: "delete", Description: "Delete campaigns"},
+	{Name: "marketing:metric:view", Module: "marketing", Resource: "metric", Action: "view", Description: "View ad metrics"},
+	{Name: "marketing:metric:create", Module: "marketing", Resource: "metric", Action: "create", Description: "Create ad metrics"},
+	{Name: "marketing:metric:edit", Module: "marketing", Resource: "metric", Action: "edit", Description: "Edit ad metrics"},
+	{Name: "marketing:metric:delete", Module: "marketing", Resource: "metric", Action: "delete", Description: "Delete ad metrics"},
+	{Name: "marketing:leads:view", Module: "marketing", Resource: "leads", Action: "view", Description: "View leads"},
+	{Name: "marketing:leads:create", Module: "marketing", Resource: "leads", Action: "create", Description: "Create leads"},
+	{Name: "marketing:leads:edit", Module: "marketing", Resource: "leads", Action: "edit", Description: "Edit leads"},
+	{Name: "marketing:leads:delete", Module: "marketing", Resource: "leads", Action: "delete", Description: "Delete leads"},
+}
+
+func DefaultRoles() []RoleDefinition {
+	roles := []RoleDefinition{
+		{
+			Name:        "super_admin",
+			Description: "Global full access to all modules and settings",
+		},
+	}
+
+	for _, module := range modules {
+		roles = append(roles,
+			RoleDefinition{Name: "admin", Module: module, Description: "Module administrator with full CRUD access"},
+			RoleDefinition{Name: "manager", Module: module, Description: "Module manager with view and approval access"},
+			RoleDefinition{Name: "staff", Module: module, Description: "Module staff with limited self-service CRUD access"},
+			RoleDefinition{Name: "viewer", Module: module, Description: "Module viewer with read-only access"},
+		)
+	}
+
+	return roles
+}
+
+func DefaultPermissions() []PermissionDefinition {
+	return defaultPermissions
+}
+
+func DefaultRolesForNewUser(existingUsers int64) []RoleKey {
+	if existingUsers == 0 {
+		return []RoleKey{{Name: "super_admin"}}
+	}
+
+	return []RoleKey{
+		{Name: "viewer", Module: "operational"},
+		{Name: "viewer", Module: "hris"},
+		{Name: "viewer", Module: "marketing"},
+	}
+}
+
+func PermissionNamesForRole(role RoleDefinition) []string {
+	if role.Name == "super_admin" {
+		names := make([]string, 0, len(defaultPermissions))
+		for _, permission := range defaultPermissions {
+			names = append(names, permission.Name)
+		}
+
+		return names
+	}
+
+	modulePermissions := make([]PermissionDefinition, 0)
+	for _, permission := range defaultPermissions {
+		if permission.Module == role.Module {
+			modulePermissions = append(modulePermissions, permission)
+		}
+	}
+
+	names := make([]string, 0)
+	for _, permission := range modulePermissions {
+		switch role.Name {
+		case "admin":
+			names = append(names, permission.Name)
+		case "manager":
+			if permission.Action == "view" || permission.Action == "approve" || managerCanEdit(permission) {
+				names = append(names, permission.Name)
+			}
+		case "staff":
+			if staffCanAccess(permission) {
+				names = append(names, permission.Name)
+			}
+		case "viewer":
+			if viewerCanAccess(permission) {
+				names = append(names, permission.Name)
+			}
+		}
+	}
+
+	return names
+}
+
+func managerCanEdit(permission PermissionDefinition) bool {
+	if permission.Action != "edit" {
+		return false
+	}
+
+	if permission.Module == "hris" && permission.Resource == "salary" {
+		return true
+	}
+
+	return permission.Resource != "assignment"
+}
+
+func staffCanAccess(permission PermissionDefinition) bool {
+	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus") {
+		return false
+	}
+
+	switch permission.Action {
+	case "view", "create", "edit":
+		return true
+	default:
+		return false
+	}
+}
+
+func viewerCanAccess(permission PermissionDefinition) bool {
+	if permission.Action != "view" {
+		return false
+	}
+
+	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus") {
+		return false
+	}
+
+	return true
+}
