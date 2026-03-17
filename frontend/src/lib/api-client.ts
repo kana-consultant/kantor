@@ -35,6 +35,15 @@ export async function requestJSON<TData>(
   init: RequestInit = {},
   token?: string,
 ): Promise<TData> {
+  const payload = await requestEnvelope<TData>(path, init, token);
+  return payload.data;
+}
+
+export async function requestEnvelope<TData>(
+  path: string,
+  init: RequestInit = {},
+  token?: string,
+): Promise<ApiSuccess<TData>> {
   const headers = new Headers(init.headers);
 
   if (token) {
@@ -61,7 +70,7 @@ export async function requestJSON<TData>(
     throw new ApiError(response.status, "Request failed");
   }
 
-  return payload.data;
+  return payload;
 }
 
 export async function postJSON<TData, TBody>(

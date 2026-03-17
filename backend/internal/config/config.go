@@ -20,6 +20,7 @@ type Config struct {
 	JWTRefreshExpiry time.Duration
 	CORSOrigins      []string
 	SeedSuperAdmin   SeedSuperAdminConfig
+	SeedDemoUsers    SeedDemoUsersConfig
 }
 
 type SeedSuperAdminConfig struct {
@@ -27,6 +28,20 @@ type SeedSuperAdminConfig struct {
 	Email    string
 	Password string
 	FullName string
+}
+
+type SeedDemoUsersConfig struct {
+	Enabled bool
+	Staff   SeedUserConfig
+	Viewer  SeedUserConfig
+}
+
+type SeedUserConfig struct {
+	Email      string
+	Password   string
+	FullName   string
+	Department string
+	Skills     []string
 }
 
 func Load() (Config, error) {
@@ -48,6 +63,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	demoUsersEnabled, err := parseBool("SEED_DEMO_USERS_ENABLED", appEnv != "production")
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		AppEnv:           appEnv,
 		Port:             getEnv("PORT", "8080"),
@@ -61,6 +81,23 @@ func Load() (Config, error) {
 			Email:    getEnv("SEED_SUPERADMIN_EMAIL", "superadmin@kantor.local"),
 			Password: getEnv("SEED_SUPERADMIN_PASSWORD", "Password123!"),
 			FullName: getEnv("SEED_SUPERADMIN_FULL_NAME", "Seeded Super Admin"),
+		},
+		SeedDemoUsers: SeedDemoUsersConfig{
+			Enabled: demoUsersEnabled,
+			Staff: SeedUserConfig{
+				Email:      getEnv("SEED_STAFF_EMAIL", "staff.ops@kantor.local"),
+				Password:   getEnv("SEED_STAFF_PASSWORD", "Password123!"),
+				FullName:   getEnv("SEED_STAFF_FULL_NAME", "Operational Staff"),
+				Department: getEnv("SEED_STAFF_DEPARTMENT", "engineering"),
+				Skills:     splitCSV(getEnv("SEED_STAFF_SKILLS", "frontend,kanban")),
+			},
+			Viewer: SeedUserConfig{
+				Email:      getEnv("SEED_VIEWER_EMAIL", "viewer.ops@kantor.local"),
+				Password:   getEnv("SEED_VIEWER_PASSWORD", "Password123!"),
+				FullName:   getEnv("SEED_VIEWER_FULL_NAME", "Operational Viewer"),
+				Department: getEnv("SEED_VIEWER_DEPARTMENT", "finance"),
+				Skills:     splitCSV(getEnv("SEED_VIEWER_SKILLS", "qa,reporting")),
+			},
 		},
 	}
 
@@ -79,6 +116,16 @@ func Load() (Config, error) {
 
 		if strings.TrimSpace(cfg.SeedSuperAdmin.FullName) == "" {
 			return Config{}, errors.New("SEED_SUPERADMIN_FULL_NAME is required when seed is enabled")
+		}
+	}
+
+	if cfg.SeedDemoUsers.Enabled {
+		if strings.TrimSpace(cfg.SeedDemoUsers.Staff.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Staff.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Staff.FullName) == "" {
+			return Config{}, errors.New("SEED_STAFF_EMAIL, SEED_STAFF_PASSWORD, and SEED_STAFF_FULL_NAME are required when demo seeds are enabled")
+		}
+
+		if strings.TrimSpace(cfg.SeedDemoUsers.Viewer.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Viewer.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Viewer.FullName) == "" {
+			return Config{}, errors.New("SEED_VIEWER_EMAIL, SEED_VIEWER_PASSWORD, and SEED_VIEWER_FULL_NAME are required when demo seeds are enabled")
 		}
 	}
 

@@ -1,5 +1,17 @@
 export const permissions = {
   operationalOverview: "operational:project:view",
+  operationalProjectView: "operational:project:view",
+  operationalProjectCreate: "operational:project:create",
+  operationalProjectEdit: "operational:project:edit",
+  operationalProjectDelete: "operational:project:delete",
+  operationalKanbanView: "operational:kanban:view",
+  operationalKanbanCreate: "operational:kanban:create",
+  operationalKanbanEdit: "operational:kanban:edit",
+  operationalKanbanDelete: "operational:kanban:delete",
+  operationalAssignmentView: "operational:assignment:view",
+  operationalAssignmentCreate: "operational:assignment:create",
+  operationalAssignmentEdit: "operational:assignment:edit",
+  operationalAssignmentDelete: "operational:assignment:delete",
   hrisOverview: "hris:employee:view",
   marketingOverview: "marketing:campaign:view",
 } as const;

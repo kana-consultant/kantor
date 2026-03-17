@@ -5,8 +5,8 @@ import { Topbar } from "@/components/layout/topbar";
 
 export function PageShell({ children }: PropsWithChildren) {
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1600px] gap-6 p-4 lg:p-6">
-      <div className="hidden w-72 shrink-0 lg:block">
+    <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-6 p-4 lg:p-6">
+      <div className="hidden w-80 shrink-0 xl:block">
         <Sidebar />
       </div>
 

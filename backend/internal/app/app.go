@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -21,11 +22,14 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
+	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
+	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
 )
 
 type App struct {
@@ -70,6 +74,28 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		}
 	}
 
+	if cfg.SeedDemoUsers.Enabled {
+		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
+			Email:      cfg.SeedDemoUsers.Staff.Email,
+			FullName:   cfg.SeedDemoUsers.Staff.FullName,
+			Department: stringPointer(cfg.SeedDemoUsers.Staff.Department),
+			Skills:     cfg.SeedDemoUsers.Staff.Skills,
+		}, []rbac.RoleKey{{Name: "staff", Module: "operational"}}, cfg.SeedDemoUsers.Staff.Password); err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("seed staff demo user: %w", err)
+		}
+
+		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
+			Email:      cfg.SeedDemoUsers.Viewer.Email,
+			FullName:   cfg.SeedDemoUsers.Viewer.FullName,
+			Department: stringPointer(cfg.SeedDemoUsers.Viewer.Department),
+			Skills:     cfg.SeedDemoUsers.Viewer.Skills,
+		}, []rbac.RoleKey{{Name: "viewer", Module: "operational"}}, cfg.SeedDemoUsers.Viewer.Password); err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("seed viewer demo user: %w", err)
+		}
+	}
+
 	application := &App{
 		cfg: cfg,
 		db:  pool,
@@ -96,6 +122,15 @@ func (a *App) Close() {
 func (a *App) buildRouter(authService *authservice.Service) http.Handler {
 	router := chi.NewRouter()
 	authHandler := authhandler.New(authService)
+	projectsRepository := operationalrepo.NewProjectsRepository(a.db)
+	kanbanRepository := operationalrepo.NewKanbanRepository(a.db)
+	assignmentRulesRepository := operationalrepo.NewAssignmentRulesRepository(a.db)
+	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
+	kanbanService := operationalservice.NewKanbanService(kanbanRepository)
+	assignmentRulesService := operationalservice.NewAssignmentRulesService(assignmentRulesRepository)
+	projectsHandler := operationalhandler.NewProjectsHandler(projectsService)
+	kanbanHandler := operationalhandler.NewKanbanHandler(kanbanService)
+	assignmentRulesHandler := operationalhandler.NewAssignmentRulesHandler(assignmentRulesService)
 
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
@@ -134,6 +169,12 @@ func (a *App) buildRouter(authService *authservice.Service) http.Handler {
 						"message": "Operational overview is protected by RBAC middleware",
 					}, nil)
 				})
+
+				module.Route("/projects", projectsHandler.RegisterRoutes)
+				module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
+				module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
+				module.Route("/projects/{projectID}/assignment-rules", assignmentRulesHandler.RegisterRuleRoutes)
+				module.With(platformmiddleware.RBACMiddleware("operational:assignment:edit")).Post("/projects/{projectID}/tasks/{taskID}/auto-assign", assignmentRulesHandler.AutoAssignTask)
 			})
 
 			protected.Route("/hris", func(module chi.Router) {
@@ -213,4 +254,12 @@ func resolveMigrationsPath() (string, error) {
 	}
 
 	return "", errors.New("migrations directory not found")
+}
+
+func stringPointer(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }

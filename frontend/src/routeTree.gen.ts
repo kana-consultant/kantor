@@ -17,6 +17,9 @@ import { Route as AuthenticatedForbiddenRouteImport } from './routes/_authentica
 import { Route as AuthenticatedOperationalIndexRouteImport } from './routes/_authenticated/operational/index'
 import { Route as AuthenticatedMarketingIndexRouteImport } from './routes/_authenticated/marketing/index'
 import { Route as AuthenticatedHrisIndexRouteImport } from './routes/_authenticated/hris/index'
+import { Route as AuthenticatedOperationalAutomationRouteImport } from './routes/_authenticated/operational/automation'
+import { Route as AuthenticatedOperationalProjectsIndexRouteImport } from './routes/_authenticated/operational/projects/index'
+import { Route as AuthenticatedOperationalProjectsProjectIdRouteImport } from './routes/_authenticated/operational/projects/$projectId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -59,24 +62,48 @@ const AuthenticatedHrisIndexRoute = AuthenticatedHrisIndexRouteImport.update({
   path: '/hris/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedOperationalAutomationRoute =
+  AuthenticatedOperationalAutomationRouteImport.update({
+    id: '/operational/automation',
+    path: '/operational/automation',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOperationalProjectsIndexRoute =
+  AuthenticatedOperationalProjectsIndexRouteImport.update({
+    id: '/operational/projects/',
+    path: '/operational/projects/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOperationalProjectsProjectIdRoute =
+  AuthenticatedOperationalProjectsProjectIdRouteImport.update({
+    id: '/operational/projects/$projectId',
+    path: '/operational/projects/$projectId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
+  '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/hris/': typeof AuthenticatedHrisIndexRoute
   '/marketing/': typeof AuthenticatedMarketingIndexRoute
   '/operational/': typeof AuthenticatedOperationalIndexRoute
+  '/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/operational/projects/': typeof AuthenticatedOperationalProjectsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
+  '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/hris': typeof AuthenticatedHrisIndexRoute
   '/marketing': typeof AuthenticatedMarketingIndexRoute
   '/operational': typeof AuthenticatedOperationalIndexRoute
+  '/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/operational/projects': typeof AuthenticatedOperationalProjectsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -85,9 +112,12 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/_authenticated/forbidden': typeof AuthenticatedForbiddenRoute
+  '/_authenticated/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/_authenticated/hris/': typeof AuthenticatedHrisIndexRoute
   '/_authenticated/marketing/': typeof AuthenticatedMarketingIndexRoute
   '/_authenticated/operational/': typeof AuthenticatedOperationalIndexRoute
+  '/_authenticated/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/_authenticated/operational/projects/': typeof AuthenticatedOperationalProjectsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -96,18 +126,24 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/forbidden'
+    | '/operational/automation'
     | '/hris/'
     | '/marketing/'
     | '/operational/'
+    | '/operational/projects/$projectId'
+    | '/operational/projects/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/register'
     | '/forbidden'
+    | '/operational/automation'
     | '/hris'
     | '/marketing'
     | '/operational'
+    | '/operational/projects/$projectId'
+    | '/operational/projects'
   id:
     | '__root__'
     | '/'
@@ -115,9 +151,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/_authenticated/forbidden'
+    | '/_authenticated/operational/automation'
     | '/_authenticated/hris/'
     | '/_authenticated/marketing/'
     | '/_authenticated/operational/'
+    | '/_authenticated/operational/projects/$projectId'
+    | '/_authenticated/operational/projects/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -185,21 +224,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHrisIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/operational/automation': {
+      id: '/_authenticated/operational/automation'
+      path: '/operational/automation'
+      fullPath: '/operational/automation'
+      preLoaderRoute: typeof AuthenticatedOperationalAutomationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/operational/projects/': {
+      id: '/_authenticated/operational/projects/'
+      path: '/operational/projects'
+      fullPath: '/operational/projects/'
+      preLoaderRoute: typeof AuthenticatedOperationalProjectsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/operational/projects/$projectId': {
+      id: '/_authenticated/operational/projects/$projectId'
+      path: '/operational/projects/$projectId'
+      fullPath: '/operational/projects/$projectId'
+      preLoaderRoute: typeof AuthenticatedOperationalProjectsProjectIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
   AuthenticatedForbiddenRoute: typeof AuthenticatedForbiddenRoute
+  AuthenticatedOperationalAutomationRoute: typeof AuthenticatedOperationalAutomationRoute
   AuthenticatedHrisIndexRoute: typeof AuthenticatedHrisIndexRoute
   AuthenticatedMarketingIndexRoute: typeof AuthenticatedMarketingIndexRoute
   AuthenticatedOperationalIndexRoute: typeof AuthenticatedOperationalIndexRoute
+  AuthenticatedOperationalProjectsProjectIdRoute: typeof AuthenticatedOperationalProjectsProjectIdRoute
+  AuthenticatedOperationalProjectsIndexRoute: typeof AuthenticatedOperationalProjectsIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedForbiddenRoute: AuthenticatedForbiddenRoute,
+  AuthenticatedOperationalAutomationRoute:
+    AuthenticatedOperationalAutomationRoute,
   AuthenticatedHrisIndexRoute: AuthenticatedHrisIndexRoute,
   AuthenticatedMarketingIndexRoute: AuthenticatedMarketingIndexRoute,
   AuthenticatedOperationalIndexRoute: AuthenticatedOperationalIndexRoute,
+  AuthenticatedOperationalProjectsProjectIdRoute:
+    AuthenticatedOperationalProjectsProjectIdRoute,
+  AuthenticatedOperationalProjectsIndexRoute:
+    AuthenticatedOperationalProjectsIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

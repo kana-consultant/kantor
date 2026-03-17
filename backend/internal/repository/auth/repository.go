@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -24,6 +25,8 @@ type CreateUserParams struct {
 	Email        string
 	PasswordHash string
 	FullName     string
+	Department   *string
+	Skills       []string
 }
 
 type CreateRefreshTokenParams struct {
@@ -54,24 +57,28 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 	}()
 
 	query := `
-		INSERT INTO users (email, password_hash, full_name, is_active)
-		VALUES ($1, $2, $3, TRUE)
+		INSERT INTO users (email, password_hash, full_name, department, skills, is_active)
+		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]), TRUE)
 		ON CONFLICT (email)
 		DO UPDATE SET
 			password_hash = EXCLUDED.password_hash,
 			full_name = EXCLUDED.full_name,
+			department = EXCLUDED.department,
+			skills = EXCLUDED.skills,
 			is_active = TRUE,
 			updated_at = NOW()
-		RETURNING id::text, email, password_hash, full_name, avatar_url, is_active, created_at, updated_at
+		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
 	`
 
 	var user model.User
-	err = tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName).Scan(
+	err = tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName, nullableText(params.Department), params.Skills).Scan(
 		&user.ID,
 		&user.Email,
 		&user.PasswordHash,
 		&user.FullName,
 		&user.AvatarURL,
+		&user.Department,
+		&user.Skills,
 		&user.IsActive,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -103,18 +110,20 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 	}()
 
 	query := `
-		INSERT INTO users (email, password_hash, full_name)
-		VALUES ($1, $2, $3)
-		RETURNING id::text, email, password_hash, full_name, avatar_url, is_active, created_at, updated_at
+		INSERT INTO users (email, password_hash, full_name, department, skills)
+		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]))
+		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
 	`
 
 	var user model.User
-	err = tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName).Scan(
+	err = tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName, nullableText(params.Department), params.Skills).Scan(
 		&user.ID,
 		&user.Email,
 		&user.PasswordHash,
 		&user.FullName,
 		&user.AvatarURL,
+		&user.Department,
+		&user.Skills,
 		&user.IsActive,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -136,7 +145,7 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.User, error) {
 	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, is_active, created_at, updated_at
+		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -148,6 +157,8 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 		&user.PasswordHash,
 		&user.FullName,
 		&user.AvatarURL,
+		&user.Department,
+		&user.Skills,
 		&user.IsActive,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -165,7 +176,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 
 func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User, error) {
 	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, is_active, created_at, updated_at
+		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -177,6 +188,8 @@ func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User
 		&user.PasswordHash,
 		&user.FullName,
 		&user.AvatarURL,
+		&user.Department,
+		&user.Skills,
 		&user.IsActive,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -372,4 +385,17 @@ func (r *Repository) assignRoleKeys(ctx context.Context, tx pgx.Tx, userID strin
 	}
 
 	return nil
+}
+
+func nullableText(value *string) interface{} {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return ""
+	}
+
+	return trimmed
 }

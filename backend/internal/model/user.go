@@ -8,6 +8,8 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	FullName     string    `json:"full_name"`
 	AvatarURL    *string   `json:"avatar_url,omitempty"`
+	Department   *string   `json:"department,omitempty"`
+	Skills       []string  `json:"skills,omitempty"`
 	IsActive     bool      `json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

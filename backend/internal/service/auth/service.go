@@ -42,17 +42,29 @@ func New(repo *authrepo.Repository, cfg config.Config) *Service {
 }
 
 func (s *Service) EnsureSeedSuperAdmin(ctx context.Context, email string, password string, fullName string) error {
-	passwordHash, err := backendauth.HashPassword(password)
+	return s.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
+		Email:        strings.ToLower(strings.TrimSpace(email)),
+		PasswordHash: "",
+		FullName:     strings.TrimSpace(fullName),
+	}, []rbac.RoleKey{{Name: "super_admin"}}, password)
+}
+
+func (s *Service) EnsureSeedUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey, rawPassword string) error {
+	passwordHash, err := backendauth.HashPassword(rawPassword)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.repo.EnsureUserWithRoles(ctx, authrepo.CreateUserParams{
-		Email:        strings.ToLower(strings.TrimSpace(email)),
-		PasswordHash: passwordHash,
-		FullName:     strings.TrimSpace(fullName),
-	}, []rbac.RoleKey{{Name: "super_admin"}})
+	params.Email = strings.ToLower(strings.TrimSpace(params.Email))
+	params.PasswordHash = passwordHash
+	params.FullName = strings.TrimSpace(params.FullName)
 
+	if params.Department != nil {
+		trimmed := strings.TrimSpace(*params.Department)
+		params.Department = &trimmed
+	}
+
+	_, err = s.repo.EnsureUserWithRoles(ctx, params, roles)
 	return err
 }
 
