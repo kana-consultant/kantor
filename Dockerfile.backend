@@ -15,6 +15,7 @@ FROM alpine:3.22
 WORKDIR /app/backend
 
 RUN adduser -D -H appuser && apk add --no-cache ca-certificates
+RUN mkdir -p /app/data/uploads && chown -R appuser:appuser /app/data
 
 COPY --from=build /out/server /usr/local/bin/server
 COPY backend/migrations ./migrations

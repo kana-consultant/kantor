@@ -29,6 +29,7 @@ services:
       PORT: ${PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev}@db:5432/${POSTGRES_DB:-internal_platform}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-change-me}
+      UPLOADS_DIR: /app/data/uploads
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-168h}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
@@ -49,6 +50,8 @@ services:
       SEED_VIEWER_SKILLS: ${SEED_VIEWER_SKILLS:-qa,reporting}
     ports:
       - "8080:8080"
+    volumes:
+      - uploads_data:/app/data/uploads
 
   frontend:
     build:
@@ -65,3 +68,4 @@ services:
 
 volumes:
   pgdata:
+  uploads_data:

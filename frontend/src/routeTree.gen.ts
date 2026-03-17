@@ -18,8 +18,15 @@ import { Route as AuthenticatedOperationalIndexRouteImport } from './routes/_aut
 import { Route as AuthenticatedMarketingIndexRouteImport } from './routes/_authenticated/marketing/index'
 import { Route as AuthenticatedHrisIndexRouteImport } from './routes/_authenticated/hris/index'
 import { Route as AuthenticatedOperationalAutomationRouteImport } from './routes/_authenticated/operational/automation'
+import { Route as AuthenticatedHrisSubscriptionsRouteImport } from './routes/_authenticated/hris/subscriptions'
+import { Route as AuthenticatedHrisFinanceRouteImport } from './routes/_authenticated/hris/finance'
+import { Route as AuthenticatedHrisDepartmentsRouteImport } from './routes/_authenticated/hris/departments'
 import { Route as AuthenticatedOperationalProjectsIndexRouteImport } from './routes/_authenticated/operational/projects/index'
+import { Route as AuthenticatedHrisReimbursementsIndexRouteImport } from './routes/_authenticated/hris/reimbursements/index'
+import { Route as AuthenticatedHrisEmployeesIndexRouteImport } from './routes/_authenticated/hris/employees/index'
 import { Route as AuthenticatedOperationalProjectsProjectIdRouteImport } from './routes/_authenticated/operational/projects/$projectId'
+import { Route as AuthenticatedHrisReimbursementsReimbursementIdRouteImport } from './routes/_authenticated/hris/reimbursements/$reimbursementId'
+import { Route as AuthenticatedHrisEmployeesEmployeeIdRouteImport } from './routes/_authenticated/hris/employees/$employeeId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -68,10 +75,40 @@ const AuthenticatedOperationalAutomationRoute =
     path: '/operational/automation',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedHrisSubscriptionsRoute =
+  AuthenticatedHrisSubscriptionsRouteImport.update({
+    id: '/hris/subscriptions',
+    path: '/hris/subscriptions',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedHrisFinanceRoute =
+  AuthenticatedHrisFinanceRouteImport.update({
+    id: '/hris/finance',
+    path: '/hris/finance',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedHrisDepartmentsRoute =
+  AuthenticatedHrisDepartmentsRouteImport.update({
+    id: '/hris/departments',
+    path: '/hris/departments',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedOperationalProjectsIndexRoute =
   AuthenticatedOperationalProjectsIndexRouteImport.update({
     id: '/operational/projects/',
     path: '/operational/projects/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedHrisReimbursementsIndexRoute =
+  AuthenticatedHrisReimbursementsIndexRouteImport.update({
+    id: '/hris/reimbursements/',
+    path: '/hris/reimbursements/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedHrisEmployeesIndexRoute =
+  AuthenticatedHrisEmployeesIndexRouteImport.update({
+    id: '/hris/employees/',
+    path: '/hris/employees/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedOperationalProjectsProjectIdRoute =
@@ -80,17 +117,36 @@ const AuthenticatedOperationalProjectsProjectIdRoute =
     path: '/operational/projects/$projectId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedHrisReimbursementsReimbursementIdRoute =
+  AuthenticatedHrisReimbursementsReimbursementIdRouteImport.update({
+    id: '/hris/reimbursements/$reimbursementId',
+    path: '/hris/reimbursements/$reimbursementId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedHrisEmployeesEmployeeIdRoute =
+  AuthenticatedHrisEmployeesEmployeeIdRouteImport.update({
+    id: '/hris/employees/$employeeId',
+    path: '/hris/employees/$employeeId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
+  '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
+  '/hris/finance': typeof AuthenticatedHrisFinanceRoute
+  '/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
   '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/hris/': typeof AuthenticatedHrisIndexRoute
   '/marketing/': typeof AuthenticatedMarketingIndexRoute
   '/operational/': typeof AuthenticatedOperationalIndexRoute
+  '/hris/employees/$employeeId': typeof AuthenticatedHrisEmployeesEmployeeIdRoute
+  '/hris/reimbursements/$reimbursementId': typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   '/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/hris/employees/': typeof AuthenticatedHrisEmployeesIndexRoute
+  '/hris/reimbursements/': typeof AuthenticatedHrisReimbursementsIndexRoute
   '/operational/projects/': typeof AuthenticatedOperationalProjectsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -98,11 +154,18 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
+  '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
+  '/hris/finance': typeof AuthenticatedHrisFinanceRoute
+  '/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
   '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/hris': typeof AuthenticatedHrisIndexRoute
   '/marketing': typeof AuthenticatedMarketingIndexRoute
   '/operational': typeof AuthenticatedOperationalIndexRoute
+  '/hris/employees/$employeeId': typeof AuthenticatedHrisEmployeesEmployeeIdRoute
+  '/hris/reimbursements/$reimbursementId': typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   '/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/hris/employees': typeof AuthenticatedHrisEmployeesIndexRoute
+  '/hris/reimbursements': typeof AuthenticatedHrisReimbursementsIndexRoute
   '/operational/projects': typeof AuthenticatedOperationalProjectsIndexRoute
 }
 export interface FileRoutesById {
@@ -112,11 +175,18 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/_authenticated/forbidden': typeof AuthenticatedForbiddenRoute
+  '/_authenticated/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
+  '/_authenticated/hris/finance': typeof AuthenticatedHrisFinanceRoute
+  '/_authenticated/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
   '/_authenticated/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/_authenticated/hris/': typeof AuthenticatedHrisIndexRoute
   '/_authenticated/marketing/': typeof AuthenticatedMarketingIndexRoute
   '/_authenticated/operational/': typeof AuthenticatedOperationalIndexRoute
+  '/_authenticated/hris/employees/$employeeId': typeof AuthenticatedHrisEmployeesEmployeeIdRoute
+  '/_authenticated/hris/reimbursements/$reimbursementId': typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   '/_authenticated/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/_authenticated/hris/employees/': typeof AuthenticatedHrisEmployeesIndexRoute
+  '/_authenticated/hris/reimbursements/': typeof AuthenticatedHrisReimbursementsIndexRoute
   '/_authenticated/operational/projects/': typeof AuthenticatedOperationalProjectsIndexRoute
 }
 export interface FileRouteTypes {
@@ -126,11 +196,18 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/forbidden'
+    | '/hris/departments'
+    | '/hris/finance'
+    | '/hris/subscriptions'
     | '/operational/automation'
     | '/hris/'
     | '/marketing/'
     | '/operational/'
+    | '/hris/employees/$employeeId'
+    | '/hris/reimbursements/$reimbursementId'
     | '/operational/projects/$projectId'
+    | '/hris/employees/'
+    | '/hris/reimbursements/'
     | '/operational/projects/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -138,11 +215,18 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/forbidden'
+    | '/hris/departments'
+    | '/hris/finance'
+    | '/hris/subscriptions'
     | '/operational/automation'
     | '/hris'
     | '/marketing'
     | '/operational'
+    | '/hris/employees/$employeeId'
+    | '/hris/reimbursements/$reimbursementId'
     | '/operational/projects/$projectId'
+    | '/hris/employees'
+    | '/hris/reimbursements'
     | '/operational/projects'
   id:
     | '__root__'
@@ -151,11 +235,18 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/_authenticated/forbidden'
+    | '/_authenticated/hris/departments'
+    | '/_authenticated/hris/finance'
+    | '/_authenticated/hris/subscriptions'
     | '/_authenticated/operational/automation'
     | '/_authenticated/hris/'
     | '/_authenticated/marketing/'
     | '/_authenticated/operational/'
+    | '/_authenticated/hris/employees/$employeeId'
+    | '/_authenticated/hris/reimbursements/$reimbursementId'
     | '/_authenticated/operational/projects/$projectId'
+    | '/_authenticated/hris/employees/'
+    | '/_authenticated/hris/reimbursements/'
     | '/_authenticated/operational/projects/'
   fileRoutesById: FileRoutesById
 }
@@ -231,11 +322,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOperationalAutomationRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/hris/subscriptions': {
+      id: '/_authenticated/hris/subscriptions'
+      path: '/hris/subscriptions'
+      fullPath: '/hris/subscriptions'
+      preLoaderRoute: typeof AuthenticatedHrisSubscriptionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hris/finance': {
+      id: '/_authenticated/hris/finance'
+      path: '/hris/finance'
+      fullPath: '/hris/finance'
+      preLoaderRoute: typeof AuthenticatedHrisFinanceRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hris/departments': {
+      id: '/_authenticated/hris/departments'
+      path: '/hris/departments'
+      fullPath: '/hris/departments'
+      preLoaderRoute: typeof AuthenticatedHrisDepartmentsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/operational/projects/': {
       id: '/_authenticated/operational/projects/'
       path: '/operational/projects'
       fullPath: '/operational/projects/'
       preLoaderRoute: typeof AuthenticatedOperationalProjectsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hris/reimbursements/': {
+      id: '/_authenticated/hris/reimbursements/'
+      path: '/hris/reimbursements'
+      fullPath: '/hris/reimbursements/'
+      preLoaderRoute: typeof AuthenticatedHrisReimbursementsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hris/employees/': {
+      id: '/_authenticated/hris/employees/'
+      path: '/hris/employees'
+      fullPath: '/hris/employees/'
+      preLoaderRoute: typeof AuthenticatedHrisEmployeesIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/operational/projects/$projectId': {
@@ -245,28 +371,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOperationalProjectsProjectIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/hris/reimbursements/$reimbursementId': {
+      id: '/_authenticated/hris/reimbursements/$reimbursementId'
+      path: '/hris/reimbursements/$reimbursementId'
+      fullPath: '/hris/reimbursements/$reimbursementId'
+      preLoaderRoute: typeof AuthenticatedHrisReimbursementsReimbursementIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hris/employees/$employeeId': {
+      id: '/_authenticated/hris/employees/$employeeId'
+      path: '/hris/employees/$employeeId'
+      fullPath: '/hris/employees/$employeeId'
+      preLoaderRoute: typeof AuthenticatedHrisEmployeesEmployeeIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
   AuthenticatedForbiddenRoute: typeof AuthenticatedForbiddenRoute
+  AuthenticatedHrisDepartmentsRoute: typeof AuthenticatedHrisDepartmentsRoute
+  AuthenticatedHrisFinanceRoute: typeof AuthenticatedHrisFinanceRoute
+  AuthenticatedHrisSubscriptionsRoute: typeof AuthenticatedHrisSubscriptionsRoute
   AuthenticatedOperationalAutomationRoute: typeof AuthenticatedOperationalAutomationRoute
   AuthenticatedHrisIndexRoute: typeof AuthenticatedHrisIndexRoute
   AuthenticatedMarketingIndexRoute: typeof AuthenticatedMarketingIndexRoute
   AuthenticatedOperationalIndexRoute: typeof AuthenticatedOperationalIndexRoute
+  AuthenticatedHrisEmployeesEmployeeIdRoute: typeof AuthenticatedHrisEmployeesEmployeeIdRoute
+  AuthenticatedHrisReimbursementsReimbursementIdRoute: typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   AuthenticatedOperationalProjectsProjectIdRoute: typeof AuthenticatedOperationalProjectsProjectIdRoute
+  AuthenticatedHrisEmployeesIndexRoute: typeof AuthenticatedHrisEmployeesIndexRoute
+  AuthenticatedHrisReimbursementsIndexRoute: typeof AuthenticatedHrisReimbursementsIndexRoute
   AuthenticatedOperationalProjectsIndexRoute: typeof AuthenticatedOperationalProjectsIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedForbiddenRoute: AuthenticatedForbiddenRoute,
+  AuthenticatedHrisDepartmentsRoute: AuthenticatedHrisDepartmentsRoute,
+  AuthenticatedHrisFinanceRoute: AuthenticatedHrisFinanceRoute,
+  AuthenticatedHrisSubscriptionsRoute: AuthenticatedHrisSubscriptionsRoute,
   AuthenticatedOperationalAutomationRoute:
     AuthenticatedOperationalAutomationRoute,
   AuthenticatedHrisIndexRoute: AuthenticatedHrisIndexRoute,
   AuthenticatedMarketingIndexRoute: AuthenticatedMarketingIndexRoute,
   AuthenticatedOperationalIndexRoute: AuthenticatedOperationalIndexRoute,
+  AuthenticatedHrisEmployeesEmployeeIdRoute:
+    AuthenticatedHrisEmployeesEmployeeIdRoute,
+  AuthenticatedHrisReimbursementsReimbursementIdRoute:
+    AuthenticatedHrisReimbursementsReimbursementIdRoute,
   AuthenticatedOperationalProjectsProjectIdRoute:
     AuthenticatedOperationalProjectsProjectIdRoute,
+  AuthenticatedHrisEmployeesIndexRoute: AuthenticatedHrisEmployeesIndexRoute,
+  AuthenticatedHrisReimbursementsIndexRoute:
+    AuthenticatedHrisReimbursementsIndexRoute,
   AuthenticatedOperationalProjectsIndexRoute:
     AuthenticatedOperationalProjectsIndexRoute,
 }

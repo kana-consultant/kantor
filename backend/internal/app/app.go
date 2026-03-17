@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -22,20 +23,28 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
+	hrishandler "github.com/kana-consultant/kantor/backend/internal/handler/hris"
+	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
+	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 	"github.com/kana-consultant/kantor/backend/internal/response"
+	"github.com/kana-consultant/kantor/backend/internal/security"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
+	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
+	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
 )
 
 type App struct {
-	cfg    config.Config
-	db     *pgxpool.Pool
-	router http.Handler
+	cfg              config.Config
+	db               *pgxpool.Pool
+	router           http.Handler
+	backgroundCancel context.CancelFunc
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -52,6 +61,11 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	if err := runMigrations(cfg.DatabaseURL); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("run migrations: %w", err)
+	}
+
+	if err := ensureRuntimeDirectories(cfg); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("prepare runtime directories: %w", err)
 	}
 
 	if err := rbac.SeedDefaults(ctx, pool); err != nil {
@@ -96,11 +110,44 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		}
 	}
 
-	application := &App{
-		cfg: cfg,
-		db:  pool,
-	}
-	application.router = application.buildRouter(authService)
+	projectsRepository := operationalrepo.NewProjectsRepository(pool)
+	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
+	assignmentRulesRepository := operationalrepo.NewAssignmentRulesRepository(pool)
+	employeesRepository := hrisrepo.NewEmployeesRepository(pool)
+	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
+	compensationRepository := hrisrepo.NewCompensationRepository(pool)
+	financeRepository := hrisrepo.NewFinanceRepository(pool)
+	reimbursementsRepository := hrisrepo.NewReimbursementsRepository(pool)
+	subscriptionsRepository := hrisrepo.NewSubscriptionsRepository(pool)
+	notificationsRepository := notificationsrepo.New(pool)
+	encrypter := security.NewEncrypter(cfg.DataEncryptionKey)
+
+	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
+	kanbanService := operationalservice.NewKanbanService(kanbanRepository)
+	assignmentRulesService := operationalservice.NewAssignmentRulesService(assignmentRulesRepository)
+	employeesService := hrisservice.NewEmployeesService(employeesRepository)
+	departmentsService := hrisservice.NewDepartmentsService(departmentsRepository, employeesRepository)
+	compensationService := hrisservice.NewCompensationService(compensationRepository, employeesRepository, encrypter)
+	financeService := hrisservice.NewFinanceService(financeRepository)
+	notificationsService := notificationsservice.New(notificationsRepository)
+	reimbursementsService := hrisservice.NewReimbursementsService(reimbursementsRepository, employeesRepository, authRepository, notificationsService)
+	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter)
+
+	application := &App{cfg: cfg, db: pool}
+	application.router = application.buildRouter(
+		authService,
+		operationalhandler.NewProjectsHandler(projectsService),
+		operationalhandler.NewKanbanHandler(kanbanService),
+		operationalhandler.NewAssignmentRulesHandler(assignmentRulesService),
+		hrishandler.NewEmployeesHandler(employeesService),
+		hrishandler.NewDepartmentsHandler(departmentsService),
+		hrishandler.NewCompensationHandler(compensationService),
+		hrishandler.NewFinanceHandler(financeService),
+		hrishandler.NewReimbursementsHandler(reimbursementsService, cfg.UploadsDir),
+		hrishandler.NewSubscriptionsHandler(subscriptionsService),
+		notificationshandler.New(notificationsService),
+	)
+	application.startBackgroundJobs(subscriptionsService)
 
 	return application, nil
 }
@@ -114,23 +161,29 @@ func (a *App) DB() *pgxpool.Pool {
 }
 
 func (a *App) Close() {
+	if a.backgroundCancel != nil {
+		a.backgroundCancel()
+	}
 	if a.db != nil {
 		a.db.Close()
 	}
 }
 
-func (a *App) buildRouter(authService *authservice.Service) http.Handler {
+func (a *App) buildRouter(
+	authService *authservice.Service,
+	projectsHandler *operationalhandler.ProjectsHandler,
+	kanbanHandler *operationalhandler.KanbanHandler,
+	assignmentRulesHandler *operationalhandler.AssignmentRulesHandler,
+	employeesHandler *hrishandler.EmployeesHandler,
+	departmentsHandler *hrishandler.DepartmentsHandler,
+	compensationHandler *hrishandler.CompensationHandler,
+	financeHandler *hrishandler.FinanceHandler,
+	reimbursementsHandler *hrishandler.ReimbursementsHandler,
+	subscriptionsHandler *hrishandler.SubscriptionsHandler,
+	notificationsHandler *notificationshandler.Handler,
+) http.Handler {
 	router := chi.NewRouter()
 	authHandler := authhandler.New(authService)
-	projectsRepository := operationalrepo.NewProjectsRepository(a.db)
-	kanbanRepository := operationalrepo.NewKanbanRepository(a.db)
-	assignmentRulesRepository := operationalrepo.NewAssignmentRulesRepository(a.db)
-	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
-	kanbanService := operationalservice.NewKanbanService(kanbanRepository)
-	assignmentRulesService := operationalservice.NewAssignmentRulesService(assignmentRulesRepository)
-	projectsHandler := operationalhandler.NewProjectsHandler(projectsService)
-	kanbanHandler := operationalhandler.NewKanbanHandler(kanbanService)
-	assignmentRulesHandler := operationalhandler.NewAssignmentRulesHandler(assignmentRulesService)
 
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
@@ -149,6 +202,7 @@ func (a *App) buildRouter(authService *authservice.Service) http.Handler {
 			"status": "ok",
 		}, nil)
 	})
+	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.cfg.UploadsDir))))
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", authHandler.RegisterRoutes)
@@ -161,6 +215,7 @@ func (a *App) buildRouter(authService *authservice.Service) http.Handler {
 		r.Group(func(protected chi.Router) {
 			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken))
 			protected.Get("/auth/me", authHandler.Me)
+			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
 
 			protected.Route("/operational", func(module chi.Router) {
 				module.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/overview", func(w http.ResponseWriter, r *http.Request) {
@@ -184,6 +239,16 @@ func (a *App) buildRouter(authService *authservice.Service) http.Handler {
 						"message": "HRIS overview is protected by RBAC middleware",
 					}, nil)
 				})
+
+				module.Route("/employees", employeesHandler.RegisterRoutes)
+				module.Route("/departments", departmentsHandler.RegisterRoutes)
+				module.Route("/employees/{employeeID}/salaries", compensationHandler.RegisterSalaryRoutes)
+				module.Route("/employees/{employeeID}/bonuses", compensationHandler.RegisterBonusRoutes)
+				module.With(platformmiddleware.RBACMiddleware("hris:bonus:approve")).Patch("/bonuses/{bonusID}/approve", compensationHandler.ApproveBonus)
+				module.With(platformmiddleware.RBACMiddleware("hris:bonus:approve")).Patch("/bonuses/{bonusID}/reject", compensationHandler.RejectBonus)
+				module.Route("/finance", financeHandler.RegisterRoutes)
+				module.Route("/reimbursements", reimbursementsHandler.RegisterRoutes)
+				module.Route("/subscriptions", subscriptionsHandler.RegisterRoutes)
 			})
 
 			protected.Route("/marketing", func(module chi.Router) {
@@ -198,6 +263,26 @@ func (a *App) buildRouter(authService *authservice.Service) http.Handler {
 	})
 
 	return router
+}
+
+func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService) {
+	ctx, cancel := context.WithCancel(context.Background())
+	a.backgroundCancel = cancel
+
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+
+		_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now())
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickAt := <-ticker.C:
+				_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt)
+			}
+		}
+	}()
 }
 
 func runMigrations(databaseURL string) error {
@@ -254,6 +339,14 @@ func resolveMigrationsPath() (string, error) {
 	}
 
 	return "", errors.New("migrations directory not found")
+}
+
+func ensureRuntimeDirectories(cfg config.Config) error {
+	if err := os.MkdirAll(cfg.UploadsDir, 0o755); err != nil {
+		return fmt.Errorf("create uploads dir: %w", err)
+	}
+
+	return nil
 }
 
 func stringPointer(value string) *string {

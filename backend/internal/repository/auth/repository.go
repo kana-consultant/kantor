@@ -353,6 +353,64 @@ func (r *Repository) CountUsers(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
+func (r *Repository) ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error) {
+	query := `
+		SELECT DISTINCT users.id::text
+		FROM users
+		INNER JOIN user_roles ON user_roles.user_id = users.id
+		INNER JOIN roles ON roles.id = user_roles.role_id
+		WHERE roles.name = $1 AND COALESCE(roles.module, '') = $2
+		ORDER BY users.id::text
+	`
+
+	rows, err := r.db.Query(ctx, query, roleName, module)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]string, 0)
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		items = append(items, userID)
+	}
+
+	return items, rows.Err()
+}
+
+func (r *Repository) ListUserIDsByRoleAndDepartment(ctx context.Context, roleName string, module string, department string) ([]string, error) {
+	query := `
+		SELECT DISTINCT users.id::text
+		FROM users
+		INNER JOIN user_roles ON user_roles.user_id = users.id
+		INNER JOIN roles ON roles.id = user_roles.role_id
+		WHERE roles.name = $1
+			AND COALESCE(roles.module, '') = $2
+			AND COALESCE(users.department, '') = $3
+		ORDER BY users.id::text
+	`
+
+	rows, err := r.db.Query(ctx, query, roleName, module, department)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]string, 0)
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		items = append(items, userID)
+	}
+
+	return items, rows.Err()
+}
+
 func (r *Repository) assignRoleKeys(ctx context.Context, tx pgx.Tx, userID string, roles []rbac.RoleKey) error {
 	if len(roles) == 0 {
 		return nil

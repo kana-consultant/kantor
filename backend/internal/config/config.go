@@ -12,15 +12,17 @@ import (
 )
 
 type Config struct {
-	AppEnv           string
-	Port             string
-	DatabaseURL      string
-	JWTSecret        string
-	JWTAccessExpiry  time.Duration
-	JWTRefreshExpiry time.Duration
-	CORSOrigins      []string
-	SeedSuperAdmin   SeedSuperAdminConfig
-	SeedDemoUsers    SeedDemoUsersConfig
+	AppEnv            string
+	Port              string
+	DatabaseURL       string
+	JWTSecret         string
+	DataEncryptionKey string
+	UploadsDir        string
+	JWTAccessExpiry   time.Duration
+	JWTRefreshExpiry  time.Duration
+	CORSOrigins       []string
+	SeedSuperAdmin    SeedSuperAdminConfig
+	SeedDemoUsers     SeedDemoUsersConfig
 }
 
 type SeedSuperAdminConfig struct {
@@ -58,6 +60,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	jwtSecret := getEnv("JWT_SECRET", "change-me")
+	dataEncryptionKey := getEnv("DATA_ENCRYPTION_KEY", jwtSecret)
+
 	seedEnabled, err := parseBool("SEED_SUPERADMIN_ENABLED", appEnv != "production")
 	if err != nil {
 		return Config{}, err
@@ -69,13 +74,15 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		AppEnv:           appEnv,
-		Port:             getEnv("PORT", "8080"),
-		DatabaseURL:      os.Getenv("DATABASE_URL"),
-		JWTSecret:        getEnv("JWT_SECRET", "change-me"),
-		JWTAccessExpiry:  accessExpiry,
-		JWTRefreshExpiry: refreshExpiry,
-		CORSOrigins:      splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),
+		AppEnv:            appEnv,
+		Port:              getEnv("PORT", "8080"),
+		DatabaseURL:       os.Getenv("DATABASE_URL"),
+		JWTSecret:         jwtSecret,
+		DataEncryptionKey: dataEncryptionKey,
+		UploadsDir:        getEnv("UPLOADS_DIR", "uploads"),
+		JWTAccessExpiry:   accessExpiry,
+		JWTRefreshExpiry:  refreshExpiry,
+		CORSOrigins:       splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),
 		SeedSuperAdmin: SeedSuperAdminConfig{
 			Enabled:  seedEnabled,
 			Email:    getEnv("SEED_SUPERADMIN_EMAIL", "superadmin@kantor.local"),

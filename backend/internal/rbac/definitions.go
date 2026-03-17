@@ -42,7 +42,12 @@ var defaultPermissions = []PermissionDefinition{
 	{Name: "hris:employee:create", Module: "hris", Resource: "employee", Action: "create", Description: "Create employee data"},
 	{Name: "hris:employee:edit", Module: "hris", Resource: "employee", Action: "edit", Description: "Edit employee data"},
 	{Name: "hris:employee:delete", Module: "hris", Resource: "employee", Action: "delete", Description: "Delete employee data"},
+	{Name: "hris:department:view", Module: "hris", Resource: "department", Action: "view", Description: "View departments"},
+	{Name: "hris:department:create", Module: "hris", Resource: "department", Action: "create", Description: "Create departments"},
+	{Name: "hris:department:edit", Module: "hris", Resource: "department", Action: "edit", Description: "Edit departments"},
+	{Name: "hris:department:delete", Module: "hris", Resource: "department", Action: "delete", Description: "Delete departments"},
 	{Name: "hris:salary:view", Module: "hris", Resource: "salary", Action: "view", Description: "View salary data"},
+	{Name: "hris:salary:create", Module: "hris", Resource: "salary", Action: "create", Description: "Create salary records"},
 	{Name: "hris:salary:edit", Module: "hris", Resource: "salary", Action: "edit", Description: "Edit salary data"},
 	{Name: "hris:bonus:view", Module: "hris", Resource: "bonus", Action: "view", Description: "View bonus data"},
 	{Name: "hris:bonus:create", Module: "hris", Resource: "bonus", Action: "create", Description: "Create bonus entries"},
@@ -133,7 +138,7 @@ func PermissionNamesForRole(role RoleDefinition) []string {
 		case "admin":
 			names = append(names, permission.Name)
 		case "manager":
-			if permission.Action == "view" || permission.Action == "approve" || managerCanEdit(permission) {
+			if permission.Action == "view" || permission.Action == "approve" || managerCanEdit(permission) || managerCanCreate(permission) {
 				names = append(names, permission.Name)
 			}
 		case "staff":
@@ -160,6 +165,18 @@ func managerCanEdit(permission PermissionDefinition) bool {
 	}
 
 	return permission.Resource != "assignment"
+}
+
+func managerCanCreate(permission PermissionDefinition) bool {
+	if permission.Action != "create" {
+		return false
+	}
+
+	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus" || permission.Resource == "reimbursement") {
+		return true
+	}
+
+	return false
 }
 
 func staffCanAccess(permission PermissionDefinition) bool {

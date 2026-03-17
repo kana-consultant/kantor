@@ -18,7 +18,7 @@ export function PageShell({ children }: PropsWithChildren) {
       <div
         className={cn(
           "hidden shrink-0 lg:block",
-          isDesktopCollapsed ? "w-[6rem]" : "w-[18rem] xl:w-[20rem]",
+          isDesktopCollapsed ? "w-[5.75rem]" : "w-[19rem] xl:w-[21rem]",
         )}
       >
         <Sidebar collapsed={isDesktopCollapsed} onToggleCollapse={toggleDesktopCollapsed} />
@@ -33,7 +33,7 @@ export function PageShell({ children }: PropsWithChildren) {
       />
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[18rem] max-w-[88vw] p-4 transition-transform lg:hidden",
+          "fixed inset-y-0 left-0 z-50 w-[19rem] max-w-[90vw] p-4 transition-transform lg:hidden",
           isMobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
