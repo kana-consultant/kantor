@@ -24,18 +24,21 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	hrishandler "github.com/kana-consultant/kantor/backend/internal/handler/hris"
+	marketinghandler "github.com/kana-consultant/kantor/backend/internal/handler/marketing"
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
+	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	"github.com/kana-consultant/kantor/backend/internal/security"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
+	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
 	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
 )
@@ -108,6 +111,26 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 			pool.Close()
 			return nil, fmt.Errorf("seed viewer demo user: %w", err)
 		}
+
+		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
+			Email:      cfg.SeedDemoUsers.MarketingStaff.Email,
+			FullName:   cfg.SeedDemoUsers.MarketingStaff.FullName,
+			Department: stringPointer(cfg.SeedDemoUsers.MarketingStaff.Department),
+			Skills:     cfg.SeedDemoUsers.MarketingStaff.Skills,
+		}, []rbac.RoleKey{{Name: "staff", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingStaff.Password); err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("seed marketing staff demo user: %w", err)
+		}
+
+		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
+			Email:      cfg.SeedDemoUsers.MarketingViewer.Email,
+			FullName:   cfg.SeedDemoUsers.MarketingViewer.FullName,
+			Department: stringPointer(cfg.SeedDemoUsers.MarketingViewer.Department),
+			Skills:     cfg.SeedDemoUsers.MarketingViewer.Skills,
+		}, []rbac.RoleKey{{Name: "viewer", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingViewer.Password); err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("seed marketing viewer demo user: %w", err)
+		}
 	}
 
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
@@ -119,6 +142,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	financeRepository := hrisrepo.NewFinanceRepository(pool)
 	reimbursementsRepository := hrisrepo.NewReimbursementsRepository(pool)
 	subscriptionsRepository := hrisrepo.NewSubscriptionsRepository(pool)
+	campaignsRepository := marketingrepo.NewCampaignsRepository(pool)
+	adsMetricsRepository := marketingrepo.NewAdsMetricsRepository(pool)
+	leadsRepository := marketingrepo.NewLeadsRepository(pool)
 	notificationsRepository := notificationsrepo.New(pool)
 	encrypter := security.NewEncrypter(cfg.DataEncryptionKey)
 
@@ -132,6 +158,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	notificationsService := notificationsservice.New(notificationsRepository)
 	reimbursementsService := hrisservice.NewReimbursementsService(reimbursementsRepository, employeesRepository, authRepository, notificationsService)
 	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter)
+	campaignsService := marketingservice.NewCampaignsService(campaignsRepository, authRepository, notificationsService)
+	adsMetricsService := marketingservice.NewAdsMetricsService(adsMetricsRepository)
+	leadsService := marketingservice.NewLeadsService(leadsRepository, authRepository, notificationsService)
 
 	application := &App{cfg: cfg, db: pool}
 	application.router = application.buildRouter(
@@ -145,6 +174,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		hrishandler.NewFinanceHandler(financeService),
 		hrishandler.NewReimbursementsHandler(reimbursementsService, cfg.UploadsDir),
 		hrishandler.NewSubscriptionsHandler(subscriptionsService),
+		marketinghandler.NewCampaignsHandler(campaignsService, cfg.UploadsDir),
+		marketinghandler.NewAdsMetricsHandler(adsMetricsService),
+		marketinghandler.NewLeadsHandler(leadsService),
 		notificationshandler.New(notificationsService),
 	)
 	application.startBackgroundJobs(subscriptionsService)
@@ -180,6 +212,9 @@ func (a *App) buildRouter(
 	financeHandler *hrishandler.FinanceHandler,
 	reimbursementsHandler *hrishandler.ReimbursementsHandler,
 	subscriptionsHandler *hrishandler.SubscriptionsHandler,
+	campaignsHandler *marketinghandler.CampaignsHandler,
+	adsMetricsHandler *marketinghandler.AdsMetricsHandler,
+	leadsHandler *marketinghandler.LeadsHandler,
 	notificationsHandler *notificationshandler.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
@@ -258,6 +293,11 @@ func (a *App) buildRouter(
 						"message": "Marketing overview is protected by RBAC middleware",
 					}, nil)
 				})
+
+				module.Route("/campaigns", campaignsHandler.RegisterRoutes)
+				module.Route("/ads-metrics", adsMetricsHandler.RegisterRoutes)
+				module.Route("/leads", leadsHandler.RegisterRoutes)
+				module.Route("/columns", campaignsHandler.RegisterColumnRoutes)
 			})
 		})
 	})

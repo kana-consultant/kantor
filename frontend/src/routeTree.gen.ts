@@ -18,6 +18,10 @@ import { Route as AuthenticatedOperationalIndexRouteImport } from './routes/_aut
 import { Route as AuthenticatedMarketingIndexRouteImport } from './routes/_authenticated/marketing/index'
 import { Route as AuthenticatedHrisIndexRouteImport } from './routes/_authenticated/hris/index'
 import { Route as AuthenticatedOperationalAutomationRouteImport } from './routes/_authenticated/operational/automation'
+import { Route as AuthenticatedMarketingLeadsRouteImport } from './routes/_authenticated/marketing/leads'
+import { Route as AuthenticatedMarketingDashboardRouteImport } from './routes/_authenticated/marketing/dashboard'
+import { Route as AuthenticatedMarketingCampaignsRouteImport } from './routes/_authenticated/marketing/campaigns'
+import { Route as AuthenticatedMarketingAdsMetricsRouteImport } from './routes/_authenticated/marketing/ads-metrics'
 import { Route as AuthenticatedHrisSubscriptionsRouteImport } from './routes/_authenticated/hris/subscriptions'
 import { Route as AuthenticatedHrisFinanceRouteImport } from './routes/_authenticated/hris/finance'
 import { Route as AuthenticatedHrisDepartmentsRouteImport } from './routes/_authenticated/hris/departments'
@@ -73,6 +77,30 @@ const AuthenticatedOperationalAutomationRoute =
   AuthenticatedOperationalAutomationRouteImport.update({
     id: '/operational/automation',
     path: '/operational/automation',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMarketingLeadsRoute =
+  AuthenticatedMarketingLeadsRouteImport.update({
+    id: '/marketing/leads',
+    path: '/marketing/leads',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMarketingDashboardRoute =
+  AuthenticatedMarketingDashboardRouteImport.update({
+    id: '/marketing/dashboard',
+    path: '/marketing/dashboard',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMarketingCampaignsRoute =
+  AuthenticatedMarketingCampaignsRouteImport.update({
+    id: '/marketing/campaigns',
+    path: '/marketing/campaigns',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMarketingAdsMetricsRoute =
+  AuthenticatedMarketingAdsMetricsRouteImport.update({
+    id: '/marketing/ads-metrics',
+    path: '/marketing/ads-metrics',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedHrisSubscriptionsRoute =
@@ -138,6 +166,10 @@ export interface FileRoutesByFullPath {
   '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/hris/finance': typeof AuthenticatedHrisFinanceRoute
   '/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
+  '/marketing/ads-metrics': typeof AuthenticatedMarketingAdsMetricsRoute
+  '/marketing/campaigns': typeof AuthenticatedMarketingCampaignsRoute
+  '/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
+  '/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
   '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/hris/': typeof AuthenticatedHrisIndexRoute
   '/marketing/': typeof AuthenticatedMarketingIndexRoute
@@ -157,6 +189,10 @@ export interface FileRoutesByTo {
   '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/hris/finance': typeof AuthenticatedHrisFinanceRoute
   '/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
+  '/marketing/ads-metrics': typeof AuthenticatedMarketingAdsMetricsRoute
+  '/marketing/campaigns': typeof AuthenticatedMarketingCampaignsRoute
+  '/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
+  '/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
   '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/hris': typeof AuthenticatedHrisIndexRoute
   '/marketing': typeof AuthenticatedMarketingIndexRoute
@@ -178,6 +214,10 @@ export interface FileRoutesById {
   '/_authenticated/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/_authenticated/hris/finance': typeof AuthenticatedHrisFinanceRoute
   '/_authenticated/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
+  '/_authenticated/marketing/ads-metrics': typeof AuthenticatedMarketingAdsMetricsRoute
+  '/_authenticated/marketing/campaigns': typeof AuthenticatedMarketingCampaignsRoute
+  '/_authenticated/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
+  '/_authenticated/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
   '/_authenticated/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/_authenticated/hris/': typeof AuthenticatedHrisIndexRoute
   '/_authenticated/marketing/': typeof AuthenticatedMarketingIndexRoute
@@ -199,6 +239,10 @@ export interface FileRouteTypes {
     | '/hris/departments'
     | '/hris/finance'
     | '/hris/subscriptions'
+    | '/marketing/ads-metrics'
+    | '/marketing/campaigns'
+    | '/marketing/dashboard'
+    | '/marketing/leads'
     | '/operational/automation'
     | '/hris/'
     | '/marketing/'
@@ -218,6 +262,10 @@ export interface FileRouteTypes {
     | '/hris/departments'
     | '/hris/finance'
     | '/hris/subscriptions'
+    | '/marketing/ads-metrics'
+    | '/marketing/campaigns'
+    | '/marketing/dashboard'
+    | '/marketing/leads'
     | '/operational/automation'
     | '/hris'
     | '/marketing'
@@ -238,6 +286,10 @@ export interface FileRouteTypes {
     | '/_authenticated/hris/departments'
     | '/_authenticated/hris/finance'
     | '/_authenticated/hris/subscriptions'
+    | '/_authenticated/marketing/ads-metrics'
+    | '/_authenticated/marketing/campaigns'
+    | '/_authenticated/marketing/dashboard'
+    | '/_authenticated/marketing/leads'
     | '/_authenticated/operational/automation'
     | '/_authenticated/hris/'
     | '/_authenticated/marketing/'
@@ -322,6 +374,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOperationalAutomationRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/marketing/leads': {
+      id: '/_authenticated/marketing/leads'
+      path: '/marketing/leads'
+      fullPath: '/marketing/leads'
+      preLoaderRoute: typeof AuthenticatedMarketingLeadsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/marketing/dashboard': {
+      id: '/_authenticated/marketing/dashboard'
+      path: '/marketing/dashboard'
+      fullPath: '/marketing/dashboard'
+      preLoaderRoute: typeof AuthenticatedMarketingDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/marketing/campaigns': {
+      id: '/_authenticated/marketing/campaigns'
+      path: '/marketing/campaigns'
+      fullPath: '/marketing/campaigns'
+      preLoaderRoute: typeof AuthenticatedMarketingCampaignsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/marketing/ads-metrics': {
+      id: '/_authenticated/marketing/ads-metrics'
+      path: '/marketing/ads-metrics'
+      fullPath: '/marketing/ads-metrics'
+      preLoaderRoute: typeof AuthenticatedMarketingAdsMetricsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/hris/subscriptions': {
       id: '/_authenticated/hris/subscriptions'
       path: '/hris/subscriptions'
@@ -393,6 +473,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedHrisDepartmentsRoute: typeof AuthenticatedHrisDepartmentsRoute
   AuthenticatedHrisFinanceRoute: typeof AuthenticatedHrisFinanceRoute
   AuthenticatedHrisSubscriptionsRoute: typeof AuthenticatedHrisSubscriptionsRoute
+  AuthenticatedMarketingAdsMetricsRoute: typeof AuthenticatedMarketingAdsMetricsRoute
+  AuthenticatedMarketingCampaignsRoute: typeof AuthenticatedMarketingCampaignsRoute
+  AuthenticatedMarketingDashboardRoute: typeof AuthenticatedMarketingDashboardRoute
+  AuthenticatedMarketingLeadsRoute: typeof AuthenticatedMarketingLeadsRoute
   AuthenticatedOperationalAutomationRoute: typeof AuthenticatedOperationalAutomationRoute
   AuthenticatedHrisIndexRoute: typeof AuthenticatedHrisIndexRoute
   AuthenticatedMarketingIndexRoute: typeof AuthenticatedMarketingIndexRoute
@@ -410,6 +494,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedHrisDepartmentsRoute: AuthenticatedHrisDepartmentsRoute,
   AuthenticatedHrisFinanceRoute: AuthenticatedHrisFinanceRoute,
   AuthenticatedHrisSubscriptionsRoute: AuthenticatedHrisSubscriptionsRoute,
+  AuthenticatedMarketingAdsMetricsRoute: AuthenticatedMarketingAdsMetricsRoute,
+  AuthenticatedMarketingCampaignsRoute: AuthenticatedMarketingCampaignsRoute,
+  AuthenticatedMarketingDashboardRoute: AuthenticatedMarketingDashboardRoute,
+  AuthenticatedMarketingLeadsRoute: AuthenticatedMarketingLeadsRoute,
   AuthenticatedOperationalAutomationRoute:
     AuthenticatedOperationalAutomationRoute,
   AuthenticatedHrisIndexRoute: AuthenticatedHrisIndexRoute,

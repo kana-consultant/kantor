@@ -27,7 +27,11 @@ interface NavItem {
     | "/hris/finance"
     | "/hris/reimbursements"
     | "/hris/subscriptions"
-    | "/marketing";
+    | "/marketing"
+    | "/marketing/dashboard"
+    | "/marketing/campaigns"
+    | "/marketing/ads-metrics"
+    | "/marketing/leads";
   label: string;
   caption: string;
   icon: typeof LayoutDashboard;
@@ -118,6 +122,34 @@ const sections: NavSection[] = [
         icon: Megaphone,
         permission: permissions.marketingOverview,
       },
+      {
+        to: "/marketing/dashboard",
+        label: "Dashboard",
+        caption: "Overview and top ROAS",
+        icon: LayoutDashboard,
+        permission: permissions.marketingOverview,
+      },
+      {
+        to: "/marketing/campaigns",
+        label: "Campaigns",
+        caption: "Board and execution tracker",
+        icon: FolderKanban,
+        permission: permissions.marketingCampaignView,
+      },
+      {
+        to: "/marketing/ads-metrics",
+        label: "Ads Metrics",
+        caption: "Spent, ROAS, CTR, and export",
+        icon: LayoutDashboard,
+        permission: permissions.marketingAdsMetricsView,
+      },
+      {
+        to: "/marketing/leads",
+        label: "Leads",
+        caption: "Pipeline and sales tracking",
+        icon: Users,
+        permission: permissions.marketingLeadsView,
+      },
     ],
   },
 ];
@@ -148,7 +180,11 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
       item.to === "/operational/projects" ||
       item.to === "/hris/employees" ||
       item.to === "/hris/finance" ||
-      item.to === "/hris/reimbursements",
+      item.to === "/hris/reimbursements" ||
+      item.to === "/marketing/dashboard" ||
+      item.to === "/marketing/campaigns" ||
+      item.to === "/marketing/ads-metrics" ||
+      item.to === "/marketing/leads",
     )
     .slice(0, 3)
 

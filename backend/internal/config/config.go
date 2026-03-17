@@ -33,9 +33,11 @@ type SeedSuperAdminConfig struct {
 }
 
 type SeedDemoUsersConfig struct {
-	Enabled bool
-	Staff   SeedUserConfig
-	Viewer  SeedUserConfig
+	Enabled         bool
+	Staff           SeedUserConfig
+	Viewer          SeedUserConfig
+	MarketingStaff  SeedUserConfig
+	MarketingViewer SeedUserConfig
 }
 
 type SeedUserConfig struct {
@@ -105,6 +107,20 @@ func Load() (Config, error) {
 				Department: getEnv("SEED_VIEWER_DEPARTMENT", "finance"),
 				Skills:     splitCSV(getEnv("SEED_VIEWER_SKILLS", "qa,reporting")),
 			},
+			MarketingStaff: SeedUserConfig{
+				Email:      getEnv("SEED_MARKETING_STAFF_EMAIL", "staff.marketing@kantor.local"),
+				Password:   getEnv("SEED_MARKETING_STAFF_PASSWORD", "Password123!"),
+				FullName:   getEnv("SEED_MARKETING_STAFF_FULL_NAME", "Marketing Staff"),
+				Department: getEnv("SEED_MARKETING_STAFF_DEPARTMENT", "marketing"),
+				Skills:     splitCSV(getEnv("SEED_MARKETING_STAFF_SKILLS", "copywriting,ads,crm")),
+			},
+			MarketingViewer: SeedUserConfig{
+				Email:      getEnv("SEED_MARKETING_VIEWER_EMAIL", "viewer.marketing@kantor.local"),
+				Password:   getEnv("SEED_MARKETING_VIEWER_PASSWORD", "Password123!"),
+				FullName:   getEnv("SEED_MARKETING_VIEWER_FULL_NAME", "Marketing Viewer"),
+				Department: getEnv("SEED_MARKETING_VIEWER_DEPARTMENT", "marketing"),
+				Skills:     splitCSV(getEnv("SEED_MARKETING_VIEWER_SKILLS", "reporting")),
+			},
 		},
 	}
 
@@ -133,6 +149,14 @@ func Load() (Config, error) {
 
 		if strings.TrimSpace(cfg.SeedDemoUsers.Viewer.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Viewer.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Viewer.FullName) == "" {
 			return Config{}, errors.New("SEED_VIEWER_EMAIL, SEED_VIEWER_PASSWORD, and SEED_VIEWER_FULL_NAME are required when demo seeds are enabled")
+		}
+
+		if strings.TrimSpace(cfg.SeedDemoUsers.MarketingStaff.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingStaff.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingStaff.FullName) == "" {
+			return Config{}, errors.New("SEED_MARKETING_STAFF_EMAIL, SEED_MARKETING_STAFF_PASSWORD, and SEED_MARKETING_STAFF_FULL_NAME are required when demo seeds are enabled")
+		}
+
+		if strings.TrimSpace(cfg.SeedDemoUsers.MarketingViewer.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingViewer.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingViewer.FullName) == "" {
+			return Config{}, errors.New("SEED_MARKETING_VIEWER_EMAIL, SEED_MARKETING_VIEWER_PASSWORD, and SEED_MARKETING_VIEWER_FULL_NAME are required when demo seeds are enabled")
 		}
 	}
 
