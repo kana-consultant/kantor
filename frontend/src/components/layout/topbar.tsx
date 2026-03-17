@@ -1,8 +1,9 @@
-import { ArrowRight, FolderKanban, LogOut, Sparkles } from "lucide-react";
+import { ArrowRight, FolderKanban, LogOut, PanelLeft, PanelLeftClose, Sparkles } from "lucide-react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useSidebarStore } from "@/stores/sidebar-store";
 import { logout } from "@/services/auth";
 
 const pageMetadata = [
@@ -44,6 +45,7 @@ export function Topbar() {
     select: (state) => state.location.pathname,
   });
   const { user, roles } = useAuth();
+  const { isDesktopCollapsed, toggleDesktopCollapsed, toggleMobileOpen } = useSidebarStore();
 
   const page = pageMetadata.find((item) => item.match(pathname)) ?? {
     eyebrow: "Workspace",
@@ -60,6 +62,26 @@ export function Topbar() {
     <header className="rounded-[30px] border border-border/80 bg-card/80 p-5 shadow-panel backdrop-blur">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
         <div>
+          <div className="mb-4 flex items-center gap-2">
+            <Button
+              className="lg:hidden"
+              onClick={toggleMobileOpen}
+              size="icon"
+              type="button"
+              variant="outline"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              className="hidden lg:inline-flex"
+              onClick={toggleDesktopCollapsed}
+              size="icon"
+              type="button"
+              variant="outline"
+            >
+              {isDesktopCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.28em] text-muted-foreground">
             <span>{page.eyebrow}</span>
             <span>/</span>
