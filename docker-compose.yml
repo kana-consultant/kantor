@@ -1,3 +1,7 @@
+x-backend-env-file: &backend-env-file
+  env_file:
+    - .env
+
 services:
   db:
     image: postgres:16-alpine
@@ -6,10 +10,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-internal_platform}
       POSTGRES_USER: ${POSTGRES_USER:-dev}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    expose:
+      - "5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-internal_platform}"]
       interval: 10s
@@ -21,49 +25,33 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     restart: unless-stopped
+    <<: *backend-env-file
     depends_on:
       db:
         condition: service_healthy
     environment:
-      APP_ENV: ${APP_ENV:-development}
-      PORT: ${PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev}@db:5432/${POSTGRES_DB:-internal_platform}?sslmode=disable
-      JWT_SECRET: ${JWT_SECRET:-change-me}
-      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
       UPLOADS_DIR: /app/data/uploads
-      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
-      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-168h}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      SEED_SUPERADMIN_ENABLED: ${SEED_SUPERADMIN_ENABLED:-true}
-      SEED_SUPERADMIN_EMAIL: ${SEED_SUPERADMIN_EMAIL:-superadmin@kantor.local}
-      SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD:-Password123!}
-      SEED_SUPERADMIN_FULL_NAME: ${SEED_SUPERADMIN_FULL_NAME:-Seeded Super Admin}
-      SEED_DEMO_USERS_ENABLED: ${SEED_DEMO_USERS_ENABLED:-true}
-      SEED_STAFF_EMAIL: ${SEED_STAFF_EMAIL:-staff.ops@kantor.local}
-      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-Password123!}
-      SEED_STAFF_FULL_NAME: ${SEED_STAFF_FULL_NAME:-Operational Staff}
-      SEED_STAFF_DEPARTMENT: ${SEED_STAFF_DEPARTMENT:-engineering}
-      SEED_STAFF_SKILLS: ${SEED_STAFF_SKILLS:-frontend,kanban}
-      SEED_VIEWER_EMAIL: ${SEED_VIEWER_EMAIL:-viewer.ops@kantor.local}
-      SEED_VIEWER_PASSWORD: ${SEED_VIEWER_PASSWORD:-Password123!}
-      SEED_VIEWER_FULL_NAME: ${SEED_VIEWER_FULL_NAME:-Operational Viewer}
-      SEED_VIEWER_DEPARTMENT: ${SEED_VIEWER_DEPARTMENT:-finance}
-      SEED_VIEWER_SKILLS: ${SEED_VIEWER_SKILLS:-qa,reporting}
-    ports:
-      - "8080:8080"
     volumes:
       - uploads_data:/app/data/uploads
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
+        VITE_API_BASE_URL: /api/v1
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "3000:80"
 

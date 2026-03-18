@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -258,6 +260,17 @@ func (a *App) buildRouter(
 			"status": "ok",
 		}, nil)
 	})
+	router.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := a.db.Ping(ctx); err != nil {
+			response.WriteError(w, http.StatusServiceUnavailable, "DB_UNHEALTHY", "Database is not reachable", nil)
+			return
+		}
+		response.WriteJSON(w, http.StatusOK, map[string]string{
+			"status": "ok",
+		}, nil)
+	})
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", authHandler.RegisterRoutes)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -317,16 +330,26 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 	a.backgroundCancel = cancel
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("background job panicked", "panic", r, "stack", string(debug.Stack()))
+			}
+		}()
+
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now())
+		if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now()); err != nil {
+			slog.Error("subscription alert generation failed", "error", err)
+		}
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case tickAt := <-ticker.C:
-				_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt)
+				if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt); err != nil {
+					slog.Error("subscription alert generation failed", "error", err, "tick", tickAt)
+				}
 			}
 		}
 	}()
