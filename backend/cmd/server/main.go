@@ -11,6 +11,7 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/app"
 	"github.com/kana-consultant/kantor/backend/internal/config"
+	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 )
 
 func main() {
@@ -64,5 +65,5 @@ func configureLogger(appEnv string) {
 	} else {
 		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	}
-	slog.SetDefault(slog.New(handler))
+	slog.SetDefault(slog.New(platformmiddleware.NewContextHandler(handler)))
 }
