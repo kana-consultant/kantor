@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export interface ApiSuccess<TData> {
   success: true;
   data: TData;
@@ -27,8 +29,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
+const API_BASE_URL = env.VITE_API_BASE_URL;
 
 export async function requestJSON<TData>(
   path: string,

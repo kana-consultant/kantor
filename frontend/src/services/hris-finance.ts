@@ -1,4 +1,5 @@
 import { getJSON, postJSON, requestEnvelope, requestJSON } from "@/lib/api-client";
+import { env } from "@/lib/env";
 import { getStoredSession } from "@/stores/auth-store";
 import type {
   FinanceCategory,
@@ -149,7 +150,7 @@ export async function exportFinanceCSV(year: number, month?: string) {
   }
 
   const response = await fetch(
-    `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1"}/hris/finance/export?${query.toString()}`,
+    `${env.VITE_API_BASE_URL}/hris/finance/export?${query.toString()}`,
     {
       method: "GET",
       headers: {
