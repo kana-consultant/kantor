@@ -371,13 +371,13 @@ func (r *Repository) IncrementFailedLoginAttempts(ctx context.Context, userID st
 		UPDATE users
 		SET failed_login_attempts = failed_login_attempts + 1,
 			locked_until = CASE
-				WHEN failed_login_attempts + 1 >= $2 THEN NOW() + $3::interval
+				WHEN failed_login_attempts + 1 >= $2 THEN NOW() + ($3 || ' seconds')::interval
 				ELSE locked_until
 			END,
 			updated_at = NOW()
 		WHERE id = $1
 	`
-	_, err := r.db.Exec(ctx, query, userID, maxAttempts, lockDuration.String())
+	_, err := r.db.Exec(ctx, query, userID, maxAttempts, int(lockDuration.Seconds()))
 	return err
 }
 

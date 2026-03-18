@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -115,12 +116,18 @@ func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent s
 		return AuthResult{}, ErrInactiveUser
 	}
 
+	// Always run bcrypt before checking lock status to prevent
+	// timing oracle that reveals whether an account is locked.
+	passwordErr := backendauth.ComparePassword(user.PasswordHash, input.Password)
+
 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now().UTC()) {
 		return AuthResult{}, ErrAccountLocked
 	}
 
-	if err := backendauth.ComparePassword(user.PasswordHash, input.Password); err != nil {
-		_ = s.repo.IncrementFailedLoginAttempts(ctx, user.ID, maxFailedLoginAttempts, accountLockDuration)
+	if passwordErr != nil {
+		if err := s.repo.IncrementFailedLoginAttempts(ctx, user.ID, maxFailedLoginAttempts, accountLockDuration); err != nil {
+			slog.Error("failed to increment login attempts", "error", err, "user_id", user.ID)
+		}
 		return AuthResult{}, ErrInvalidCredentials
 	}
 
