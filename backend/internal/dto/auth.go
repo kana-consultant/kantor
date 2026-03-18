@@ -11,6 +11,11 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required,min=8"`
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
+}
+
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }

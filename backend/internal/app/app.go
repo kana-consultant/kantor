@@ -269,6 +269,7 @@ func (a *App) buildRouter(
 		r.Group(func(protected chi.Router) {
 			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken))
 			protected.Get("/auth/me", authHandler.Me)
+			protected.Post("/auth/change-password", authHandler.ChangePassword)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
 
