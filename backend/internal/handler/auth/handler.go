@@ -130,14 +130,8 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := h.readRefreshTokenCookie(r)
-	if err != nil {
-		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Refresh token cookie is missing", nil)
-		return
-	}
-
-	if err := h.service.Logout(r.Context(), refreshToken); err != nil {
-		h.writeAuthError(w, err)
-		return
+	if err == nil {
+		_ = h.service.Logout(r.Context(), refreshToken)
 	}
 
 	h.clearRefreshTokenCookie(w)
@@ -152,7 +146,7 @@ func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
 		MaxAge:   int(h.refreshExpiry.Seconds()),
 		HttpOnly: true,
 		Secure:   h.cookieSecure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -164,7 +158,7 @@ func (h *Handler) clearRefreshTokenCookie(w http.ResponseWriter) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   h.cookieSecure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
