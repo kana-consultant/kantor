@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 
-import { ArrowRight, Bell, FolderKanban, LogOut, PanelLeft, PanelLeftClose, Sparkles } from "lucide-react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Bell, ChevronDown, LogOut, PanelLeft, PanelLeftClose } from "lucide-react";
+import { useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/stores/sidebar-store";
@@ -14,75 +13,80 @@ import { listNotifications, markAllNotificationsRead, markNotificationRead, noti
 const pageMetadata = [
   {
     match: (pathname: string) => pathname.startsWith("/operational/projects"),
-    eyebrow: "Operational Boards",
-    title: "Project delivery workspace",
-    summary: "Kelola board, anggota project, dan automation tanpa pindah URL manual.",
+    title: "Projects",
+    module: "OPERASIONAL"
   },
   {
     match: (pathname: string) => pathname.startsWith("/operational/automation"),
-    eyebrow: "Operational Automation",
-    title: "Assignment rules",
-    summary: "Atur auto assign rules per project dari satu jalur navigasi yang jelas.",
+    title: "Automation",
+    module: "OPERASIONAL"
   },
   {
     match: (pathname: string) => pathname.startsWith("/operational"),
-    eyebrow: "Operational",
-    title: "Workflow hub",
-    summary: "Pilih board, automation, dan jalur kerja utama tim operasional.",
+    title: "Overview",
+    module: "OPERASIONAL"
   },
   {
     match: (pathname: string) => pathname.startsWith("/hris/employees"),
-    eyebrow: "HRIS Employees",
-    title: "People directory",
-    summary: "Kelola data karyawan, profil, dan fondasi kompensasi dari satu alur kerja.",
+    title: "Employees",
+    module: "HRIS"
   },
   {
     match: (pathname: string) => pathname.startsWith("/hris/departments"),
-    eyebrow: "HRIS Departments",
-    title: "Department structure",
-    summary: "Atur department, deskripsi fungsi, dan penanggung jawab team.",
+    title: "Departments",
+    module: "HRIS"
   },
   {
     match: (pathname: string) => pathname.startsWith("/hris/reimbursements"),
-    eyebrow: "HRIS Reimbursements",
-    title: "Reimbursement workflow",
-    summary: "Submit claim, review approval timeline, dan cek payout status dari satu alur kerja.",
+    title: "Reimbursements",
+    module: "HRIS"
   },
   {
     match: (pathname: string) => pathname.startsWith("/hris/finance"),
-    eyebrow: "HRIS Finance",
-    title: "Finance operations",
-    summary: "Monitor income, outcome, approval flow, dan tren bulanan dari satu workspace.",
+    title: "Finance",
+    module: "HRIS"
   },
   {
     match: (pathname: string) => pathname.startsWith("/hris/subscriptions"),
-    eyebrow: "HRIS Subscriptions",
-    title: "Subscription tracker",
-    summary: "Pantau biaya tool, renewal date, dan alert langganan aktif perusahaan.",
+    title: "Subscriptions",
+    module: "HRIS"
   },
   {
     match: (pathname: string) => pathname.startsWith("/hris"),
-    eyebrow: "HRIS",
-    title: "People and finance",
-    summary: "Ruang kerja HR, compensation, dan finance operations.",
+    title: "Overview",
+    module: "HRIS"
+  },
+  {
+    match: (pathname: string) => pathname.startsWith("/marketing/campaigns"),
+    title: "Campaigns",
+    module: "MARKETING"
+  },
+  {
+    match: (pathname: string) => pathname.startsWith("/marketing/leads"),
+    title: "Leads",
+    module: "MARKETING"
+  },
+  {
+    match: (pathname: string) => pathname.startsWith("/marketing/ads-metrics"),
+    title: "Ads Metrics",
+    module: "MARKETING"
   },
   {
     match: (pathname: string) => pathname.startsWith("/marketing"),
-    eyebrow: "Marketing",
-    title: "Campaign control room",
-    summary: "Pantau pipeline campaign, leads, dan metrik performance.",
+    title: "Overview",
+    module: "MARKETING"
   },
 ];
 
 export function Topbar() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
   const { user, roles } = useAuth();
   const { isDesktopCollapsed, toggleDesktopCollapsed, toggleMobileOpen } = useSidebarStore();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const notificationsQuery = useQuery({
     queryKey: notificationsKeys.list({ page: 1, perPage: 8 }),
@@ -105,14 +109,13 @@ export function Topbar() {
   });
 
   const page = pageMetadata.find((item) => item.match(pathname)) ?? {
-    eyebrow: "Workspace",
-    title: "Internal platform",
-    summary: "Workspace terpadu untuk modul operasional, HRIS, dan marketing.",
+    title: "Internal Platform",
+    module: "KANTOR Workspace"
   };
 
   const handleLogout = () => {
     logout();
-    void navigate({ to: "/login" });
+    window.location.href = "/login";
   };
 
   const notificationItems = notificationsQuery.data?.items ?? [];
@@ -122,149 +125,140 @@ export function Topbar() {
   );
 
   return (
-    <header className="rounded-[30px] border border-border/80 bg-card/80 p-5 shadow-panel backdrop-blur">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <div className="mb-4 flex items-center gap-2">
-            <Button
-              className="lg:hidden"
-              onClick={toggleMobileOpen}
-              size="icon"
-              type="button"
-              variant="outline"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              className="hidden lg:inline-flex"
-              onClick={toggleDesktopCollapsed}
-              size="icon"
-              type="button"
-              variant="outline"
-            >
-              {isDesktopCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.28em] text-muted-foreground">
-            <span>{page.eyebrow}</span>
-            <span>/</span>
-            <span>{pathname.replace(/^\//, "") || "home"}</span>
-          </div>
-          <h2 className="mt-3 text-3xl font-bold">{page.title}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{page.summary}</p>
+    <header className="flex h-[64px] items-center justify-between px-6 bg-surface border-b border-border z-10 sticky top-0">
+      <div className="flex items-center gap-4">
+        {/* Mobile Toggle */}
+        <button
+          className="lg:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-surface-muted text-text-secondary transition-colors"
+          onClick={toggleMobileOpen}
+          aria-label="Open sidebar"
+        >
+          <PanelLeft className="w-5 h-5" />
+        </button>
+
+        {/* Desktop Toggle */}
+        <button
+          className="hidden lg:flex items-center justify-center w-8 h-8 rounded-md hover:bg-surface-muted text-text-secondary transition-colors"
+          onClick={toggleDesktopCollapsed}
+          aria-label="Toggle sidebar"
+        >
+          {isDesktopCollapsed ? <PanelLeft className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+        </button>
+
+        {/* Breadcrumb / Title */}
+        <div className="flex items-center gap-2 text-[14px]">
+          <span className="text-text-secondary font-[500] uppercase tracking-wider text-[12px]">{page.module}</span>
+          <span className="text-border mx-1">/</span>
+          <span className="text-text-primary font-[600] text-[16px]">{page.title}</span>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <Link
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/80 px-5 text-sm font-medium transition hover:bg-muted"
-            to="/operational/projects"
+      <div className="flex items-center gap-2">
+        {/* Notifications */}
+        <div className="relative">
+          <button
+            className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-surface-muted text-text-secondary transition-colors"
+            onClick={() => {
+              setIsNotificationsOpen((value) => !value);
+              setIsProfileOpen(false);
+            }}
+            aria-label="Toggle notifications"
           >
-            <FolderKanban className="h-4 w-4" />
-            Open projects
-          </Link>
-          <div className="flex items-center gap-3 rounded-full border border-border bg-background/80 px-4 py-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-              {initials(user?.full_name ?? "Guest")}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{user?.full_name ?? "Guest"}</p>
-              <p className="truncate text-xs text-muted-foreground">{roles[0] ?? "no-role"}</p>
-            </div>
-            <Sparkles className="h-4 w-4 text-primary" />
-          </div>
-          <div className="relative">
-            <Button
-              className="relative"
-              onClick={() => setIsNotificationsOpen((value) => !value)}
-              size="icon"
-              type="button"
-              variant="outline"
-            >
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 ? (
-                <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                  {unreadCount}
-                </span>
-              ) : null}
-            </Button>
+            <Bell className="w-5 h-5" strokeWidth={1.5} />
+            {unreadCount > 0 ? (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-priority-high rounded-full border-2 border-surface"></span>
+            ) : null}
+          </button>
 
-            {isNotificationsOpen ? (
-              <div className="absolute right-0 top-14 z-50 w-[22rem] rounded-[28px] border border-border bg-card p-4 shadow-panel">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Notifications</p>
-                    <h3 className="mt-2 text-lg font-semibold">Recent updates</h3>
+          {isNotificationsOpen ? (
+            <div className="absolute right-0 top-12 w-80 rounded-[12px] border border-border bg-surface shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-muted">
+                <h3 className="font-[600] text-[14px] text-text-primary">Notifications</h3>
+                <button
+                  disabled={markAllMutation.isPending || unreadCount === 0}
+                  onClick={() => markAllMutation.mutate()}
+                  className="text-[12px] font-[500] text-ops hover:text-ops-hover disabled:opacity-50 disabled:hover:text-ops transition-colors"
+                >
+                  Mark all as read
+                </button>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {notificationItems.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm text-text-secondary">
+                    No new notifications.
                   </div>
-                  <Button
-                    disabled={markAllMutation.isPending || unreadCount === 0}
-                    onClick={() => markAllMutation.mutate()}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Read all
-                  </Button>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {notificationItems.length === 0 ? (
-                    <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-                      Belum ada notifikasi.
-                    </div>
-                  ) : (
-                    notificationItems.map((item) => (
+                ) : (
+                  <div className="divide-y divide-border">
+                    {notificationItems.map((item) => (
                       <button
-                        className={cn(
-                          "block w-full rounded-[22px] border p-4 text-left transition",
-                          item.is_read ? "border-border/60 bg-background/60" : "border-primary/30 bg-primary/5",
-                        )}
                         key={item.id}
+                        className={cn(
+                          "w-full text-left px-4 py-3 hover:bg-surface-muted transition-colors flex items-start gap-3",
+                          !item.is_read ? "bg-ops-light/30" : ""
+                        )}
                         onClick={() => {
                           if (!item.is_read) {
                             markReadMutation.mutate(item.id);
                           }
                         }}
-                        type="button"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold">{item.title}</p>
-                            <p className="mt-1 text-sm text-muted-foreground">{item.message}</p>
-                          </div>
-                          {!item.is_read ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" /> : null}
+                        {!item.is_read && <span className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-ops" />}
+                        <div>
+                          <p className={cn("text-[13px] text-text-primary", !item.is_read ? "font-[600]" : "font-[500]")}>{item.title}</p>
+                          <p className="mt-1 text-[12px] text-text-secondary line-clamp-2">{item.message}</p>
+                          <p className="mt-2 text-[11px] text-text-tertiary">
+                            {new Date(item.created_at).toLocaleString("id-ID")}
+                          </p>
                         </div>
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          {new Date(item.created_at).toLocaleString("id-ID")}
-                        </p>
                       </button>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : null}
-          </div>
-          <Button onClick={handleLogout} size="sm" variant="ghost">
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Profile Dropdown */}
+        <div className="relative ml-2">
+          <button 
+            className="flex items-center gap-2 hover:bg-surface-muted py-1.5 pl-1.5 pr-2.5 rounded-full transition-colors"
+            onClick={() => {
+              setIsProfileOpen(!isProfileOpen);
+              setIsNotificationsOpen(false);
+            }}
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ops text-[13px] font-[600] text-white">
+              {initials(user?.full_name ?? "Guest")}
+            </div>
+            <div className="hidden md:block text-left">
+              <p className="text-[13px] font-[600] text-text-primary leading-none">{user?.full_name ?? "Guest"}</p>
+            </div>
+            <ChevronDown className="w-4 h-4 text-text-secondary ml-1 hidden md:block" strokeWidth={2} />
+          </button>
+
+          {isProfileOpen && (
+             <div className="absolute right-0 top-12 w-56 rounded-[12px] border border-border bg-surface shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2">
+                <div className="px-4 py-3 border-b border-border bg-surface-muted">
+                   <p className="text-[14px] font-[600] text-text-primary truncate">{user?.full_name ?? "Guest"}</p>
+                   <p className="text-[12px] text-text-secondary mt-0.5 truncate">{user?.email ?? "guest@kantor.local"}</p>
+                   <div className="mt-2 inline-flex items-center rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-[600] uppercase tracking-wider text-text-secondary">
+                     {roles[0] ?? "Viewer"}
+                   </div>
+                </div>
+                <div className="p-1">
+                   <button 
+                     onClick={handleLogout}
+                     className="w-full flex items-center gap-2 px-3 py-2 text-[13px] font-[500] text-priority-high hover:bg-priority-high/10 rounded-[6px] transition-colors"
+                   >
+                     <LogOut className="w-4 h-4" />
+                     Logout
+                   </button>
+                </div>
+             </div>
+          )}
         </div>
       </div>
-
-      {pathname === "/operational" || pathname === "/operational/" ? (
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-            to="/operational/projects"
-          >
-            Go to Boards
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-background/80 px-5 text-sm font-medium transition hover:bg-muted"
-            to="/operational/automation"
-          >
-            Review automation
-          </Link>
-        </div>
-      ) : null}
     </header>
   );
 }

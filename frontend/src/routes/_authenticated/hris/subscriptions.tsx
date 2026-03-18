@@ -7,6 +7,7 @@ import { PermissionGate } from "@/components/shared/permission-gate";
 import { SubscriptionForm } from "@/components/shared/subscription-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
@@ -92,17 +93,17 @@ function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-border pb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">HRIS subscriptions</p>
-            <h3 className="mt-2 text-3xl font-bold">Subscription tracking</h3>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-hr mb-1">HRIS subscriptions</p>
+            <h3 className="text-[28px] font-[700] text-text-primary">Subscription tracking</h3>
+            <p className="mt-2 max-w-2xl text-[14px] text-text-secondary leading-relaxed">
               Kelola tool berlangganan, biaya bulanan/tahunan, PIC, serta alert renewal mendekati jatuh tempo.
             </p>
           </div>
 
           <PermissionGate permission={permissions.hrisSubscriptionCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)}>
+            <Button onClick={() => setIsCreateOpen((value) => !value)} variant="hr">
               {isCreateOpen ? "Close form" : "Add subscription"}
             </Button>
           </PermissionGate>
@@ -110,32 +111,51 @@ function SubscriptionsPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <SummaryCard label="Total monthly" value={formatIDR(summaryQuery.data?.total_monthly_cost ?? 0)} />
-        <SummaryCard label="Total yearly" value={formatIDR(summaryQuery.data?.total_yearly_cost ?? 0)} />
-        <SummaryCard label="Active subscriptions" value={String(summaryQuery.data?.active_count ?? 0)} />
+        {summaryQuery.isLoading ? (
+          <>
+            <Card className="p-5 border border-border shadow-sm bg-surface">
+              <Skeleton className="h-3 w-[100px] bg-muted/60 mb-2" />
+              <Skeleton className="h-8 w-[140px] bg-muted/60" />
+            </Card>
+            <Card className="p-5 border border-border shadow-sm bg-surface">
+              <Skeleton className="h-3 w-[100px] bg-muted/60 mb-2" />
+              <Skeleton className="h-8 w-[140px] bg-muted/60" />
+            </Card>
+            <Card className="p-5 border border-border shadow-sm bg-surface">
+              <Skeleton className="h-3 w-[100px] bg-muted/60 mb-2" />
+              <Skeleton className="h-8 w-[140px] bg-muted/60" />
+            </Card>
+          </>
+        ) : (
+          <>
+            <SummaryCard label="Total monthly" value={formatIDR(summaryQuery.data?.total_monthly_cost ?? 0)} />
+            <SummaryCard label="Total yearly" value={formatIDR(summaryQuery.data?.total_yearly_cost ?? 0)} />
+            <SummaryCard label="Active subscriptions" value={String(summaryQuery.data?.active_count ?? 0)} />
+          </>
+        )}
       </div>
 
-      <Card className="p-6">
-        <div className="flex items-center justify-between gap-4">
+      <Card className="p-6 border-hr/30">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Renewal alerts</p>
-            <h4 className="mt-2 text-2xl font-bold">Unread alerts</h4>
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">Renewal alerts</p>
+            <h4 className="text-[20px] font-[700] text-text-primary">Unread alerts</h4>
           </div>
-          <div className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
+          <div className="rounded-[6px] border border-hr/20 bg-hr/10 px-2 py-0.5 text-[12px] font-[700] uppercase tracking-wider text-hr self-start sm:self-auto">
             {unreadAlerts.length} unread
           </div>
         </div>
-        <div className="mt-4 space-y-3">
+        <div className="mt-5 space-y-3">
           {unreadAlerts.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
+            <div className="rounded-[12px] border border-dashed border-border bg-surface-muted p-4 text-[13px] text-text-secondary">
               Tidak ada alert renewal baru.
             </div>
           ) : (
             unreadAlerts.map((alert) => (
-              <div className="flex flex-col gap-3 rounded-[22px] border border-border/70 bg-background/70 p-4 md:flex-row md:items-center md:justify-between" key={alert.id}>
+              <div className="flex flex-col gap-3 rounded-[12px] border border-border bg-surface-muted p-4 md:flex-row md:items-center md:justify-between" key={alert.id}>
                 <div>
-                  <p className="text-sm font-semibold">{alert.subscription_name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[14px] font-[600] text-text-primary">{alert.subscription_name}</p>
+                  <p className="text-[13px] text-text-secondary mt-1">
                     {alertLabel(alert.alert_type)} · {new Date(alert.created_at).toLocaleString()}
                   </p>
                 </div>
@@ -179,15 +199,38 @@ function SubscriptionsPage() {
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        {(subscriptionsQuery.data ?? []).map((subscription) => (
-          <Card className="p-6" key={subscription.id}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{subscription.category}</p>
-                <h4 className="mt-2 text-2xl font-bold">{subscription.name}</h4>
-                <p className="mt-2 text-sm text-muted-foreground">{subscription.vendor}</p>
+        {subscriptionsQuery.isLoading ? (
+          [1, 2, 3, 4].map((i) => (
+            <Card className="p-6 border border-border bg-surface shadow-sm" key={i}>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-[100px] bg-muted/60" />
+                  <Skeleton className="h-6 w-[200px] bg-muted/60" />
+                  <Skeleton className="h-4 w-[150px] bg-muted/60" />
+                </div>
+                <Skeleton className="h-5 w-[80px] rounded-[6px] bg-muted/60" />
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${renewalTone(subscription.renewal_date)}`}>
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                 <Skeleton className="h-16 w-full rounded-[12px] bg-muted/60" />
+                 <Skeleton className="h-16 w-full rounded-[12px] bg-muted/60" />
+                 <Skeleton className="h-16 w-full rounded-[12px] bg-muted/60" />
+                 <Skeleton className="h-16 w-full rounded-[12px] bg-muted/60" />
+              </div>
+              <div className="mt-5 flex gap-3">
+                <Skeleton className="h-9 w-[80px] rounded-[6px] bg-muted/60" />
+                <Skeleton className="h-9 w-[80px] rounded-[6px] bg-muted/60" />
+              </div>
+            </Card>
+          ))
+        ) : (subscriptionsQuery.data ?? []).map((subscription) => (
+          <Card className="p-6 border border-border bg-surface shadow-sm" key={subscription.id}>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">{subscription.category}</p>
+                <h4 className="text-[20px] font-[700] text-text-primary">{subscription.name}</h4>
+                <p className="mt-1 text-[13px] text-text-secondary">{subscription.vendor}</p>
+              </div>
+              <span className={`rounded-[6px] border px-2 py-0.5 text-[10px] font-[700] uppercase tracking-wider self-start ${renewalTone(subscription.renewal_date)}`}>
                 {subscription.status}
               </span>
             </div>
@@ -199,7 +242,7 @@ function SubscriptionsPage() {
               <InfoCard label="Category" value={subscription.category} />
             </div>
 
-            {subscription.description ? <p className="mt-5 text-sm text-muted-foreground">{subscription.description}</p> : null}
+            {subscription.description ? <p className="mt-5 text-[13px] text-text-secondary">{subscription.description}</p> : null}
 
             <div className="mt-5 flex flex-wrap gap-3">
               <PermissionGate permission={permissions.hrisSubscriptionEdit}>
@@ -220,7 +263,7 @@ function SubscriptionsPage() {
       </div>
 
       {(subscriptionsQuery.data ?? []).length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">Belum ada subscription yang tercatat.</Card>
+        <Card className="p-8 text-center text-[14px] text-text-secondary border-dashed">Belum ada subscription yang tercatat.</Card>
       ) : null}
     </div>
   );
@@ -232,18 +275,18 @@ async function invalidateSubscriptionQueries(queryClient: ReturnType<typeof useQ
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="p-6">
-      <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-      <h4 className="mt-3 text-2xl font-bold">{value}</h4>
+    <Card className="p-5 border border-border shadow-sm bg-surface">
+      <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">{label}</p>
+      <p className="mt-2 text-[24px] font-[700] text-text-primary leading-none">{value}</p>
     </Card>
   );
 }
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-border/70 bg-background/70 p-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-sm font-semibold">{value}</p>
+    <div className="rounded-[12px] border border-border bg-surface-muted p-4">
+      <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">{label}</p>
+      <p className="mt-2 text-[14px] font-[600] text-text-primary">{value}</p>
     </div>
   );
 }
@@ -282,15 +325,15 @@ function alertLabel(alertType: string) {
 function renewalTone(renewalDate: string) {
   const diffDays = Math.ceil((new Date(renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (diffDays <= 1) {
-    return "bg-red-100 text-red-700";
+    return "border-priority-high/20 bg-priority-high/10 text-priority-high";
   }
   if (diffDays <= 7) {
-    return "bg-orange-100 text-orange-700";
+    return "border-amber-500/20 bg-amber-500/10 text-amber-700";
   }
   if (diffDays <= 30) {
-    return "bg-amber-100 text-amber-700";
+    return "border-yellow-500/20 bg-yellow-500/10 text-yellow-700";
   }
-  return "bg-secondary text-secondary-foreground";
+  return "border-border bg-surface-muted text-text-secondary";
 }
 
 function formatIDR(value: number) {

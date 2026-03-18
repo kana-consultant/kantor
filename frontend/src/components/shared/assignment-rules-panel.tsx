@@ -17,6 +17,7 @@ import {
   updateAssignmentRule,
 } from "@/services/operational-assignment-rules";
 import type { AssignmentRule, AssignmentRuleFormValues } from "@/types/assignment";
+import { cn } from "@/lib/utils";
 
 const ruleSchema = z.object({
   rule_type: z.enum(["by_department", "by_skill", "by_workload"]),
@@ -38,7 +39,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const [editingRule, setEditingRule] = useState<AssignmentRule | null>(null);
   const form = useForm<AssignmentRuleFormValues>({
-    resolver: zodResolver(ruleSchema),
+    resolver: zodResolver(ruleSchema) as any,
     defaultValues: emptyRuleForm,
   });
 
@@ -88,14 +89,16 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
     form.reset(mapRuleToForm(editingRule));
   }, [editingRule, form]);
 
+  const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10 disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
     <div className="space-y-6">
-      <Card className="p-8">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
+      <Card className="p-6">
+        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
           Assignment settings
         </p>
-        <h4 className="mt-2 text-2xl font-bold">Auto assign rules</h4>
-        <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
+        <h4 className="text-[20px] font-[700] text-text-primary leading-tight">Auto assign rules</h4>
+        <p className="mt-2 max-w-3xl text-[13px] text-text-secondary">
           Rule akan dievaluasi berdasarkan priority kecil ke besar. Untuk `by_workload`,
           backend memilih member project dengan workload paling rendah.
         </p>
@@ -103,7 +106,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
 
       <PermissionGate
         fallback={
-          <Card className="p-6 text-sm text-muted-foreground">
+          <Card className="p-6 text-[13px] font-[500] text-text-tertiary">
             You do not have permission to manage assignment rules.
           </Card>
         }
@@ -111,7 +114,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
       >
         <Card className="p-6">
           <form
-            className="space-y-4"
+            className="space-y-5"
             onSubmit={form.handleSubmit((values) => {
               if (editingRule) {
                 updateMutation.mutate(values);
@@ -121,13 +124,13 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
               createMutation.mutate(values);
             })}
           >
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium" htmlFor="rule-type">
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="grid gap-1.5">
+                <label className="text-[13px] font-[500] text-text-secondary" htmlFor="rule-type">
                   Rule type
                 </label>
                 <select
-                  className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                  className={formControlClass}
                   id="rule-type"
                   {...form.register("rule_type")}
                 >
@@ -137,20 +140,21 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
                 </select>
               </div>
 
-              <div className="grid gap-2">
-                <label className="text-sm font-medium" htmlFor="rule-priority">
+              <div className="grid gap-1.5">
+                <label className="text-[13px] font-[500] text-text-secondary" htmlFor="rule-priority">
                   Priority
                 </label>
-                <Input id="rule-priority" min={1} type="number" {...form.register("priority")} />
+                <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="rule-priority" min={1} type="number" {...form.register("priority")} />
               </div>
             </div>
 
             {ruleType !== "by_workload" ? (
-              <div className="grid gap-2">
-                <label className="text-sm font-medium" htmlFor="rule-config-value">
+              <div className="grid gap-1.5">
+                <label className="text-[13px] font-[500] text-text-secondary" htmlFor="rule-config-value">
                   {ruleType === "by_department" ? "Department" : "Skill"}
                 </label>
                 <Input
+                  className="focus-visible:border-ops focus-visible:ring-ops/10"
                   id="rule-config-value"
                   placeholder={ruleType === "by_department" ? "design" : "frontend"}
                   {...form.register("config_value")}
@@ -158,26 +162,27 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
               </div>
             ) : null}
 
-            <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium" htmlFor="rule-role">
+            <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
+              <div className="grid gap-1.5">
+                <label className="text-[13px] font-[500] text-text-secondary" htmlFor="rule-role">
                   Role in project
                 </label>
                 <Input
+                  className="focus-visible:border-ops focus-visible:ring-ops/10"
                   id="rule-role"
                   placeholder="Optional: designer, lead, qa"
                   {...form.register("role_in_project")}
                 />
               </div>
 
-              <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm font-medium">
-                <input type="checkbox" {...form.register("is_active")} />
-                Active
+              <label className="flex items-center gap-3 rounded-[6px] border border-border bg-surface-muted px-4 h-[44px] text-[13px] font-[600] text-text-primary cursor-pointer hover:bg-border/50 transition-colors">
+                <input className="w-4 h-4 rounded text-ops focus:ring-ops" type="checkbox" {...form.register("is_active")} />
+                Active Rule
               </label>
             </div>
 
-            <div className="flex gap-3">
-              <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button variant="ops" disabled={createMutation.isPending || updateMutation.isPending} type="submit">
                 {createMutation.isPending || updateMutation.isPending
                   ? "Saving..."
                   : editingRule
@@ -188,7 +193,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
                 <Button
                   onClick={() => setEditingRule(null)}
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                 >
                   Cancel
                 </Button>
@@ -199,29 +204,31 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
       </PermissionGate>
 
       {rulesQuery.error instanceof Error ? (
-        <Card className="p-6 text-sm text-red-700">{rulesQuery.error.message}</Card>
+        <Card className="p-6 text-[13px] font-[500] text-priority-high border-priority-high/20 bg-priority-high/5">{rulesQuery.error.message}</Card>
       ) : null}
 
       <div className="space-y-4">
         {rulesQuery.data?.map((rule) => (
-          <Card className="p-6" key={rule.id}>
+          <Card className="p-5 transition hover:shadow-card" key={rule.id}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
+                <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-secondary">
                   {rule.rule_type.replaceAll("_", " ")}
                 </p>
-                <h5 className="mt-2 text-xl font-semibold">Priority #{rule.priority}</h5>
-                <p className="mt-3 text-sm text-muted-foreground">
+                <h5 className="mt-1 text-[16px] font-[600] text-text-primary">Priority #{rule.priority}</h5>
+                <p className="mt-2 text-[13px] text-text-secondary">
                   {describeRule(rule)}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <span className="rounded-full bg-secondary px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+              <div className="flex items-center gap-3">
+                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-[600] uppercase tracking-wider border", 
+                  rule.is_active ? "bg-ops-light/50 text-ops border-ops/20" : "bg-surface-muted text-text-secondary border-border" 
+                )}>
                   {rule.is_active ? "active" : "inactive"}
                 </span>
                 <PermissionGate permission={permissions.operationalAssignmentEdit}>
-                  <Button onClick={() => setEditingRule(rule)} size="sm" variant="outline">
+                  <Button onClick={() => setEditingRule(rule)} size="sm" variant="secondary">
                     Edit
                   </Button>
                 </PermissionGate>
@@ -245,11 +252,11 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
         ))}
 
         {rulesQuery.isLoading ? (
-          <Card className="p-6">Loading assignment rules...</Card>
+          <Card className="p-6 text-[13px] text-text-secondary font-[500]">Loading assignment rules...</Card>
         ) : null}
 
         {rulesQuery.data?.length === 0 ? (
-          <Card className="p-6 text-sm text-muted-foreground">
+          <Card className="p-8 text-center text-[13px] text-text-secondary font-[500] border-dashed">
             No assignment rules yet. Create one to enable auto assign from the Kanban board.
           </Card>
         ) : null}

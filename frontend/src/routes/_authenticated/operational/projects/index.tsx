@@ -8,6 +8,7 @@ import { ProjectsTable } from "@/components/shared/projects-table";
 import { useRBAC } from "@/hooks/use-rbac";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
 import {
@@ -64,20 +65,20 @@ function ProjectsListPage() {
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-border pb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
               Operational boards
             </p>
-            <h3 className="mt-2 text-3xl font-bold">Projects</h3>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
+            <h3 className="text-[28px] font-[700] text-text-primary">Projects</h3>
+            <p className="mt-2 max-w-2xl text-[14px] text-text-secondary leading-relaxed">
               Halaman ini sekarang berfungsi sebagai board directory. User bisa scan project,
               buka board utama, atau langsung masuk ke automation rules dari kartu project.
             </p>
           </div>
 
           <PermissionGate permission={permissions.operationalProjectCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)}>
+            <Button onClick={() => setIsCreateOpen((value) => !value)} variant="ops">
               {isCreateOpen ? "Close form" : "Create project"}
             </Button>
           </PermissionGate>
@@ -171,15 +172,40 @@ function ProjectsListPage() {
         <Card className="p-6 text-sm text-red-700">{projectsQuery.error.message}</Card>
       ) : null}
 
-      <ProjectsTable
-        canDelete={hasPermission(permissions.operationalProjectDelete)}
-        deletingId={deleteMutation.isPending ? deleteMutation.variables ?? null : null}
-        onDelete={(projectId) => deleteMutation.mutate(projectId)}
-        projects={projectsQuery.data?.items ?? []}
-      />
+      {projectsQuery.isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card className="p-5 flex flex-col gap-4" key={i}>
+              <div className="flex items-start gap-3">
+                <Skeleton className="h-10 w-10 shrink-0 bg-muted/60" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-1/2 bg-muted/60" />
+                  <Skeleton className="h-3 w-1/4 bg-muted/60" />
+                </div>
+              </div>
+              <Skeleton className="h-10 w-full bg-muted/60" />
+              <div className="grid grid-cols-2 gap-2">
+                <Skeleton className="h-12 w-full bg-muted/60" />
+                <Skeleton className="h-12 w-full bg-muted/60" />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Skeleton className="h-9 w-1/2 bg-muted/60" />
+                <Skeleton className="h-9 w-1/2 bg-muted/60" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <ProjectsTable
+          canDelete={hasPermission(permissions.operationalProjectDelete)}
+          deletingId={deleteMutation.isPending ? deleteMutation.variables ?? null : null}
+          onDelete={(projectId) => deleteMutation.mutate(projectId)}
+          projects={projectsQuery.data?.items ?? []}
+        />
+      )}
 
-      <Card className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-muted-foreground">
+      <Card className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between mt-6">
+        <p className="text-[14px] font-[500] text-text-secondary">
           Page {meta?.page ?? filters.page} of{" "}
           {meta ? Math.max(1, Math.ceil(meta.total / meta.per_page)) : 1} · Total{" "}
           {meta?.total ?? 0} projects

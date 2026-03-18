@@ -72,17 +72,17 @@ function DepartmentsPage() {
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-border pb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Organization structure</p>
-            <h3 className="mt-2 text-3xl font-bold">Departments</h3>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-hr mb-1">Organization structure</p>
+            <h3 className="text-[28px] font-[700] text-text-primary">Departments</h3>
+            <p className="mt-2 max-w-2xl text-[14px] text-text-secondary leading-relaxed">
               Atur department, deskripsi fungsi, dan penanggung jawab utama tiap team di HRIS.
             </p>
           </div>
 
           <PermissionGate permission={permissions.hrisDepartmentCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)}>
+            <Button onClick={() => setIsCreateOpen((value) => !value)} variant="hr">
               {isCreateOpen ? "Close form" : "Add department"}
             </Button>
           </PermissionGate>
@@ -124,28 +124,28 @@ function DepartmentsPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         {(departmentsQuery.data ?? []).map((department) => (
-          <Card className="p-6" key={department.id}>
-            <div className="flex items-start justify-between gap-4">
+          <Card className="p-6 border border-border bg-surface shadow-sm" key={department.id}>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Department</p>
-                <h4 className="mt-2 text-2xl font-bold">{department.name}</h4>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">Department</p>
+                <h4 className="text-[20px] font-[700] text-text-primary">{department.name}</h4>
+                <p className="mt-2 text-[13px] text-text-secondary leading-relaxed">
                   {department.description || "Belum ada deskripsi fungsi untuk department ini."}
                 </p>
               </div>
-              <div className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+              <div className="rounded-[6px] border border-border bg-surface-muted px-2 py-0.5 text-[10px] font-[700] uppercase tracking-wider text-text-secondary self-start">
                 {department.head_name ? "Head assigned" : "No head"}
               </div>
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <div className="rounded-[22px] border border-border/70 bg-background/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Department head</p>
-                <p className="mt-2 text-sm font-semibold">{department.head_name || "-"}</p>
+              <div className="rounded-[12px] border border-border bg-surface-muted p-4">
+                <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">Department head</p>
+                <p className="mt-2 text-[14px] font-[600] text-text-primary">{department.head_name || "-"}</p>
               </div>
-              <div className="rounded-[22px] border border-border/70 bg-background/70 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Created at</p>
-                <p className="mt-2 text-sm font-semibold">{new Date(department.created_at).toLocaleDateString()}</p>
+              <div className="rounded-[12px] border border-border bg-surface-muted p-4">
+                <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">Created at</p>
+                <p className="mt-2 text-[14px] font-[600] text-text-primary">{new Date(department.created_at).toLocaleDateString()}</p>
               </div>
             </div>
 
@@ -168,7 +168,7 @@ function DepartmentsPage() {
       </div>
 
       {(departmentsQuery.data ?? []).length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">Belum ada department yang tercatat.</Card>
+        <Card className="p-8 text-center text-[14px] text-text-secondary border-dashed">Belum ada department yang tercatat.</Card>
       ) : null}
     </div>
   );

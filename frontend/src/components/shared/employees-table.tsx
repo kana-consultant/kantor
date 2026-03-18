@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
+import { Users } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import type { Employee } from "@/types/hris";
+import { cn } from "@/lib/utils";
 
 interface EmployeesTableProps {
   employees: Employee[];
@@ -11,41 +13,58 @@ interface EmployeesTableProps {
 }
 
 export function EmployeesTable({ employees, canDelete, deletingId, onDelete }: EmployeesTableProps) {
+  if (employees.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center rounded-[12px] border-2 border-dashed border-border bg-surface-muted/50">
+        <Users className="w-10 h-10 text-text-tertiary mb-3" strokeWidth={1.5} />
+        <h3 className="text-[14px] font-[600] text-text-primary">No employees found</h3>
+        <p className="mt-1 text-[13px] text-text-secondary">
+          No employees match the current filter criteria.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <Card className="overflow-hidden border-border/70 bg-card/85">
+    <Card className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-muted/60 text-left text-muted-foreground">
-            <tr>
-              <th className="px-5 py-4 font-medium">Nama</th>
-              <th className="px-5 py-4 font-medium">Posisi</th>
-              <th className="px-5 py-4 font-medium">Department</th>
-              <th className="px-5 py-4 font-medium">Status</th>
-              <th className="px-5 py-4 font-medium">Tanggal join</th>
-              <th className="px-5 py-4 font-medium">Action</th>
+        <table className="min-w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-surface-muted border-y border-border">
+              <th className="px-5 py-3 text-[13px] font-[600] text-text-secondary uppercase tracking-wider">Nama</th>
+              <th className="px-5 py-3 text-[13px] font-[600] text-text-secondary uppercase tracking-wider">Posisi</th>
+              <th className="px-5 py-3 text-[13px] font-[600] text-text-secondary uppercase tracking-wider">Department</th>
+              <th className="px-5 py-3 text-[13px] font-[600] text-text-secondary uppercase tracking-wider">Status</th>
+              <th className="px-5 py-3 text-[13px] font-[600] text-text-secondary uppercase tracking-wider">Tanggal join</th>
+              <th className="px-5 py-3 text-[13px] font-[600] text-text-secondary uppercase tracking-wider">Action</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {employees.map((employee) => (
-              <tr className="border-t border-border/70" key={employee.id}>
+              <tr className="hover:bg-surface-muted transition-colors" key={employee.id}>
                 <td className="px-5 py-4">
                   <div>
-                    <p className="font-semibold">{employee.full_name}</p>
-                    <p className="text-xs text-muted-foreground">{employee.email}</p>
+                    <p className="text-[14px] font-[600] text-text-primary">{employee.full_name}</p>
+                    <p className="text-[12px] text-text-secondary mt-0.5">{employee.email}</p>
                   </div>
                 </td>
-                <td className="px-5 py-4">{employee.position}</td>
-                <td className="px-5 py-4">{employee.department || "-"}</td>
+                <td className="px-5 py-4 text-[14px] font-[500] text-text-primary">{employee.position}</td>
+                <td className="px-5 py-4 text-[14px] font-[500] text-text-primary">{employee.department || "-"}</td>
                 <td className="px-5 py-4">
-                  <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary-foreground">
+                  <span className={cn(
+                    "inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-[600] uppercase tracking-wider border",
+                    employee.employment_status.toLowerCase() === 'active' || employee.employment_status.toLowerCase() === 'aktif'
+                      ? "bg-hr-light/50 text-hr border-hr/20" 
+                      : "bg-surface-muted text-text-secondary border-border"
+                  )}>
                     {employee.employment_status}
                   </span>
                 </td>
-                <td className="px-5 py-4">{new Date(employee.date_joined).toLocaleDateString()}</td>
+                <td className="px-5 py-4 text-[14px] font-[500] text-text-primary">{new Date(employee.date_joined).toLocaleDateString("id-ID")}</td>
                 <td className="px-5 py-4">
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex items-center gap-4">
                     <Link
-                      className="text-sm font-medium text-primary hover:underline"
+                      className="text-[13px] font-[600] text-hr hover:text-hr-hover transition-colors"
                       params={{ employeeId: employee.id }}
                       to="/hris/employees/$employeeId"
                     >
@@ -53,7 +72,7 @@ export function EmployeesTable({ employees, canDelete, deletingId, onDelete }: E
                     </Link>
                     {canDelete ? (
                       <button
-                        className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                        className="text-[13px] font-[500] text-text-tertiary hover:text-priority-high transition-colors disabled:opacity-50"
                         disabled={deletingId === employee.id}
                         onClick={() => onDelete(employee.id)}
                         type="button"
@@ -68,10 +87,6 @@ export function EmployeesTable({ employees, canDelete, deletingId, onDelete }: E
           </tbody>
         </table>
       </div>
-
-      {employees.length === 0 ? (
-        <div className="p-8 text-center text-sm text-muted-foreground">Belum ada karyawan untuk filter saat ini.</div>
-      ) : null}
     </Card>
   );
 }

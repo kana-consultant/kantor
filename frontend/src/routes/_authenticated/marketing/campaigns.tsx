@@ -10,6 +10,7 @@ import { PermissionGate } from "@/components/shared/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
 import {
   campaignMatchesFilters,
@@ -233,11 +234,11 @@ function MarketingCampaignsPage() {
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between border-b border-border pb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Marketing workspace</p>
-            <h3 className="mt-2 text-3xl font-bold">Campaigns</h3>
-            <p className="mt-3 max-w-3xl text-muted-foreground">
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-mkt mb-1">Marketing workspace</p>
+            <h3 className="text-[28px] font-[700] text-text-primary">Campaigns</h3>
+            <p className="mt-2 max-w-3xl text-[14px] text-text-secondary leading-relaxed">
               Kelola campaign dari board utama atau table view, pindahkan antar stage,
               dan buka drawer detail untuk brief, attachment, dan context eksekusi.
             </p>
@@ -253,7 +254,7 @@ function MarketingCampaignsPage() {
               Table view
             </Button>
             <PermissionGate permission={permissions.marketingCampaignCreate}>
-              <Button onClick={() => setIsComposerOpen((value) => !value)}>
+              <Button onClick={() => setIsComposerOpen((value) => !value)} variant="mkt">
                 <Plus className="mr-2 h-4 w-4" />
                 {isComposerOpen ? "Close composer" : "New campaign"}
               </Button>
@@ -347,6 +348,57 @@ function MarketingCampaignsPage() {
             }
           />
         </PermissionGate>
+      ) : campaignsQuery.isLoading ? (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[14px]">
+              <thead className="border-b border-border bg-surface-muted text-[12px] font-[600] text-text-tertiary uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-4 font-medium h-[45px]">Campaign</th>
+                  <th className="px-5 py-4 font-medium h-[45px]">Channel</th>
+                  <th className="px-5 py-4 font-medium h-[45px]">Budget</th>
+                  <th className="px-5 py-4 font-medium h-[45px]">PIC</th>
+                  <th className="px-5 py-4 font-medium h-[45px]">Timeline</th>
+                  <th className="px-5 py-4 font-medium h-[45px]">Status</th>
+                  <th className="px-5 py-4 font-medium h-[45px]">Assets</th>
+                  <th className="px-5 py-4 font-medium h-[45px]">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-surface">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <tr className="transition-colors hover:bg-surface-muted/50 group" key={i}>
+                    <td className="px-5 py-4 space-y-2">
+                       <Skeleton className="h-4 w-[160px] bg-muted/60" />
+                       <Skeleton className="h-3 w-[200px] bg-muted/60" />
+                    </td>
+                    <td className="px-5 py-4">
+                       <Skeleton className="h-6 w-[80px] rounded-full bg-muted/60" />
+                    </td>
+                    <td className="px-5 py-4">
+                       <Skeleton className="h-4 w-[100px] bg-muted/60" />
+                    </td>
+                    <td className="px-5 py-4">
+                       <Skeleton className="h-4 w-[90px] bg-muted/60" />
+                    </td>
+                    <td className="px-5 py-4">
+                       <Skeleton className="h-4 w-[150px] bg-muted/60" />
+                    </td>
+                    <td className="px-5 py-4">
+                       <Skeleton className="h-5 w-[70px] rounded-[6px] bg-muted/60" />
+                    </td>
+                    <td className="px-5 py-4">
+                       <Skeleton className="h-4 w-[20px] bg-muted/60" />
+                    </td>
+                    <td className="px-5 py-4 flex gap-2">
+                       <Skeleton className="h-8 w-[60px] rounded-[6px] bg-muted/60" />
+                       <Skeleton className="h-8 w-[60px] rounded-[6px] bg-muted/60" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       ) : (
         <CampaignsTable
           campaigns={tableItems}
@@ -424,9 +476,9 @@ function MarketingCampaignsPage() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="p-5">
-      <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-3 text-2xl font-bold">{value}</p>
+    <Card className="p-5 border border-border shadow-sm bg-surface">
+      <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">{label}</p>
+      <p className="mt-2 text-[24px] font-[700] text-text-primary leading-none">{value}</p>
     </Card>
   );
 }
@@ -447,8 +499,8 @@ function CampaignsTable({
   return (
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-border/70 bg-muted/50 text-muted-foreground">
+        <table className="w-full text-left text-[14px]">
+          <thead className="border-b border-border bg-surface-muted text-[12px] font-[600] text-text-tertiary uppercase tracking-wider">
             <tr>
               <th className="px-5 py-4 font-medium">Campaign</th>
               <th className="px-5 py-4 font-medium">Channel</th>
@@ -460,41 +512,41 @@ function CampaignsTable({
               <th className="px-5 py-4 font-medium">Action</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border bg-surface">
             {campaigns.map((campaign) => {
               const channel = channelMeta(campaign.channel);
               const ChannelIcon = channel.icon;
               return (
-                <tr className="border-b border-border/60" key={campaign.id}>
-                  <td className="px-5 py-4">
+                <tr className="transition-colors hover:bg-surface-muted/50 group" key={campaign.id}>
+                  <td className="px-5 py-4 align-top">
                     <button className="text-left" onClick={() => onOpen(campaign)} type="button">
-                      <p className="font-semibold">{campaign.name}</p>
-                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{campaign.description || "Open detail drawer for attachments and brief."}</p>
+                      <p className="font-[600] text-[15px] text-text-primary group-hover:text-mkt transition-colors">{campaign.name}</p>
+                      <p className="mt-1 line-clamp-1 text-[13px] text-text-secondary w-[16rem]">{campaign.description || "Open detail drawer for attachments and brief."}</p>
                     </button>
                   </td>
-                  <td className="px-5 py-4">
-                    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${channel.badgeClassName}`}>
+                  <td className="px-5 py-4 align-top">
+                    <span className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[11px] font-[700] uppercase tracking-wider ${channel.badgeClassName}`}>
                       <ChannelIcon className="h-3.5 w-3.5" />
                       {channel.label}
                     </span>
                   </td>
-                  <td className="px-5 py-4 font-medium">{formatIDR(campaign.budget_amount)}</td>
-                  <td className="px-5 py-4">{campaign.pic_employee_name ?? "Unassigned"}</td>
-                  <td className="px-5 py-4 text-muted-foreground">{new Date(campaign.start_date).toLocaleDateString()} - {new Date(campaign.end_date).toLocaleDateString()}</td>
-                  <td className="px-5 py-4">
-                    <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+                  <td className="px-5 py-4 align-top font-[600] text-[14px] text-text-primary">{formatIDR(campaign.budget_amount)}</td>
+                  <td className="px-5 py-4 align-top text-[13px] font-[500] text-text-primary">{campaign.pic_employee_name ?? "Unassigned"}</td>
+                  <td className="px-5 py-4 align-top text-[13px] text-text-secondary">{new Date(campaign.start_date).toLocaleDateString()} - {new Date(campaign.end_date).toLocaleDateString()}</td>
+                  <td className="px-5 py-4 align-top">
+                    <span className="rounded-[6px] border border-border bg-surface-muted px-2 py-0.5 text-[10px] font-[700] uppercase tracking-wider text-text-secondary">
                       {formatCampaignStatus(campaign.status)}
                     </span>
                   </td>
-                  <td className="px-5 py-4">{campaign.attachment_count}</td>
-                  <td className="px-5 py-4">
-                    <div className="flex gap-3">
+                  <td className="px-5 py-4 align-top text-[13px] font-[500] text-text-primary">{campaign.attachment_count}</td>
+                  <td className="px-5 py-4 align-top">
+                    <div className="flex gap-2">
                       <Button onClick={() => onOpen(campaign)} size="sm" variant="outline">
                         Open
                       </Button>
                       {canDelete ? (
                         <Button disabled={deletingId === campaign.id} onClick={() => onDelete(campaign.id)} size="sm" variant="ghost">
-                          {deletingId === campaign.id ? "Deleting..." : "Delete"}
+                           {deletingId === campaign.id ? "Deleting..." : "Delete"}
                         </Button>
                       ) : null}
                     </div>

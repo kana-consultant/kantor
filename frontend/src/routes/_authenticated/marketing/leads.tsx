@@ -9,10 +9,10 @@ import { z } from "zod";
 
 import { MarketingLeadsPipeline } from "@/components/shared/marketing-leads-pipeline";
 import { PermissionGate } from "@/components/shared/permission-gate";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatIDR } from "@/lib/currency";
 import { formatLeadStatus, leadSourceMeta, leadSourceOptions, leadStatusOptions } from "@/lib/marketing";
 import { permissions } from "@/lib/permissions";
@@ -231,26 +231,26 @@ function MarketingLeadsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-8">
+      <Card className="border-mkt/20 bg-gradient-to-br from-mkt/10 via-background to-background p-8">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Marketing CRM</p>
-            <h3 className="mt-2 text-3xl font-bold">Leads pipeline</h3>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-mkt">Marketing CRM</p>
+            <h3 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Leads pipeline</h3>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               Lacak lead dari kontak pertama sampai won atau lost, lengkap dengan assigned sales, nilai estimasi, dan history follow-up.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setActiveView("pipeline")} variant={activeView === "pipeline" ? "default" : "outline"}>
+            <Button onClick={() => setActiveView("pipeline")} variant={activeView === "pipeline" ? "mkt" : "outline"}>
               <FolderKanban className="mr-2 h-4 w-4" />
               Pipeline
             </Button>
-            <Button onClick={() => setActiveView("table")} variant={activeView === "table" ? "default" : "outline"}>
+            <Button onClick={() => setActiveView("table")} variant={activeView === "table" ? "mkt" : "outline"}>
               <LayoutList className="mr-2 h-4 w-4" />
               Table view
             </Button>
             <PermissionGate permission={permissions.marketingLeadsCreate}>
-              <Button onClick={() => setShowForm((value) => !value)}>
+              <Button onClick={() => setShowForm((value) => !value)} variant="mkt">
                 <Plus className="mr-2 h-4 w-4" />
                 {showForm ? "Close form" : "New lead"}
               </Button>
@@ -308,10 +308,10 @@ function MarketingLeadsPage() {
       </Card>
 
       {showForm ? (
-        <Card className="p-6">
+        <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
           <div className="mb-5">
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Lead form</p>
-            <h4 className="mt-2 text-2xl font-bold">{editingLead ? "Edit lead" : "Create lead"}</h4>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Lead form</p>
+            <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{editingLead ? "Edit lead" : "Create lead"}</h4>
           </div>
           <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit}>
             <Input {...form.register("name")} placeholder="Lead name" />
@@ -343,7 +343,7 @@ function MarketingLeadsPage() {
             <Input {...form.register("company_name")} placeholder="Company name" />
             <Input className="lg:col-span-2" {...form.register("notes")} placeholder="Lead notes or qualification summary" />
             <div className="flex flex-wrap gap-3 lg:col-span-2">
-              <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
+              <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit" variant="mkt">
                 {editingLead ? "Save changes" : "Create lead"}
               </Button>
               <Button
@@ -363,10 +363,10 @@ function MarketingLeadsPage() {
       ) : null}
 
       {showImport ? (
-        <Card className="p-6">
+        <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
           <div className="mb-5">
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Bulk import</p>
-            <h4 className="mt-2 text-2xl font-bold">Import leads from CSV</h4>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Bulk import</p>
+            <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Import leads from CSV</h4>
             <p className="mt-2 text-sm text-muted-foreground">
               Format kolom: `name, phone, email, source_channel, pipeline_status, assigned_to, notes, company_name, estimated_value`
             </p>
@@ -404,8 +404,59 @@ function MarketingLeadsPage() {
           onLeadOpen={(lead) => setSelectedLeadId(lead.id)}
           onMoveLead={(leadId, pipelineStatus) => moveMutation.mutateAsync({ leadId, status: pipelineStatus }).then(() => undefined)}
         />
+      ) : leadsQuery.isLoading ? (
+        <Card className="overflow-hidden border-border/60 bg-background/50 backdrop-blur-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/60 text-left">
+                <tr>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Lead</th>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Source</th>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Campaign</th>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Assigned</th>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Estimated value</th>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Status</th>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Updated</th>
+                  <th className="px-4 py-3 font-semibold h-[45px]">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <tr className="border-t border-border/70" key={i}>
+                    <td className="px-4 py-3 space-y-2">
+                       <Skeleton className="h-4 w-[120px] bg-muted/60" />
+                       <Skeleton className="h-3 w-[80px] bg-muted/60" />
+                    </td>
+                    <td className="px-4 py-3">
+                       <Skeleton className="h-6 w-[80px] rounded-full bg-muted/60" />
+                    </td>
+                    <td className="px-4 py-3">
+                       <Skeleton className="h-4 w-[100px] bg-muted/60" />
+                    </td>
+                    <td className="px-4 py-3">
+                       <Skeleton className="h-4 w-[90px] bg-muted/60" />
+                    </td>
+                    <td className="px-4 py-3">
+                       <Skeleton className="h-4 w-[110px] bg-muted/60" />
+                    </td>
+                    <td className="px-4 py-3">
+                       <Skeleton className="h-6 w-[70px] rounded-full bg-muted/60" />
+                    </td>
+                    <td className="px-4 py-3">
+                       <Skeleton className="h-4 w-[80px] bg-muted/60" />
+                    </td>
+                    <td className="px-4 py-3 flex gap-2">
+                       <Skeleton className="h-8 w-[60px] rounded-md bg-muted/60" />
+                       <Skeleton className="h-8 w-[60px] rounded-md bg-muted/60" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden border-border/60 bg-background/50 backdrop-blur-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/60 text-left">
@@ -517,11 +568,11 @@ function LeadDetailDrawer({
   return (
     <div className="fixed inset-0 z-50 bg-foreground/25 backdrop-blur-sm">
       <button className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} type="button" />
-      <Card className="absolute inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col rounded-none border-l border-border/80 p-6 shadow-2xl">
+      <Card className="absolute inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col rounded-none border-l border-border/80 bg-background p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-border/70 pb-5">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Lead detail</p>
-            <h4 className="mt-2 text-2xl font-bold">{lead?.name ?? "Loading..."}</h4>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Lead detail</p>
+            <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{lead?.name ?? "Loading..."}</h4>
           </div>
           <Button onClick={onClose} size="sm" variant="outline">Close</Button>
         </div>
@@ -542,24 +593,24 @@ function LeadDetailDrawer({
               <DetailRow label="Assigned" value={lead.assigned_to_name ?? "Unassigned"} />
               <DetailRow label="Estimated value" value={formatIDR(lead.estimated_value)} />
               <DetailRow label="Contact" value={lead.phone || lead.email || "No contact"} />
-              <Card className="p-4">
-                <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">Notes</p>
+              <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mkt">Notes</p>
                 <p className="mt-3 text-sm text-muted-foreground">{lead.notes || "No notes yet."}</p>
               </Card>
             </>
           ) : null}
 
-          <Card className="p-4">
-            <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">Add follow-up</p>
-            <div className="mt-3 flex gap-3">
+          <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mkt">Add follow-up</p>
+            <div className="mt-4 flex gap-3">
               <Input onChange={(event) => onActivityNoteChange(event.target.value)} placeholder="Follow-up note" value={activityNote} />
-              <Button onClick={onAddActivity}>Add note</Button>
+              <Button onClick={onAddActivity} variant="mkt">Add note</Button>
             </div>
           </Card>
 
-          <Card className="p-4">
-            <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">Activity timeline</p>
-            <div className="mt-4 space-y-3">
+          <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mkt">Activity timeline</p>
+            <div className="mt-5 space-y-3">
               {activities.map((activity) => (
                 <div className="rounded-[18px] border border-border/70 bg-background/70 p-3" key={activity.id}>
                   <p className="text-sm font-semibold">{activity.description}</p>
@@ -579,9 +630,9 @@ function LeadDetailDrawer({
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="p-5">
-      <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-3 text-2xl font-bold">{value}</p>
+    <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm transition-all hover:border-mkt/30 hover:shadow-sm">
+      <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-4 text-3xl font-bold tracking-tight text-foreground">{value}</p>
     </Card>
   );
 }

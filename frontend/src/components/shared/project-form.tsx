@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { ProjectFormValues } from "@/types/project";
+import { cn } from "@/lib/utils";
 
 const projectFormSchema = z.object({
   name: z.string().min(3, "Project name must contain at least 3 characters"),
@@ -53,33 +54,35 @@ export function ProjectForm({
     defaultValues: defaultValues ?? baseValues,
   });
 
+  const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10 disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
     <Card className="p-6">
       <div className="mb-6">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
-          Project form
+        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
+          Project Form
         </p>
-        <h3 className="mt-2 text-2xl font-bold">{title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+        <h3 className="text-[20px] font-[700] text-text-primary leading-tight">{title}</h3>
+        <p className="mt-1 text-[13px] text-text-secondary">{description}</p>
       </div>
 
-      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
         <Field error={errors.name?.message} label="Project name">
-          <Input {...register("name")} placeholder="Q2 Operational Revamp" />
+          <Input className="focus-visible:border-ops focus-visible:ring-ops/10" {...register("name")} placeholder="Q2 Operational Revamp" />
         </Field>
 
         <Field error={errors.description?.message} label="Description">
           <textarea
-            className="min-h-28 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(formControlClass, "min-h-[96px] py-3")}
             {...register("description")}
             placeholder="Short brief about objectives, scope, and owners."
           />
         </Field>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-3">
           <Field error={errors.status?.message} label="Status">
             <select
-              className="flex h-12 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               {...register("status")}
             >
               <option value="draft">Draft</option>
@@ -92,7 +95,7 @@ export function ProjectForm({
 
           <Field error={errors.priority?.message} label="Priority">
             <select
-              className="flex h-12 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               {...register("priority")}
             >
               <option value="low">Low</option>
@@ -103,12 +106,12 @@ export function ProjectForm({
           </Field>
 
           <Field error={errors.deadline?.message} label="Deadline">
-            <Input {...register("deadline")} type="date" />
+            <Input className="focus-visible:border-ops focus-visible:ring-ops/10" {...register("deadline")} type="date" />
           </Field>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Button disabled={isSubmitting} type="submit">
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button variant="ops" disabled={isSubmitting} type="submit">
             {isSubmitting ? "Saving..." : submitLabel}
           </Button>
           {onCancel ? (
@@ -130,10 +133,10 @@ interface FieldProps {
 
 function Field({ label, error, children }: FieldProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+    <div className="space-y-1.5 flex flex-col">
+      <label className="text-[13px] font-[500] text-text-secondary">{label}</label>
       {children}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{error}</p> : null}
     </div>
   );
 }

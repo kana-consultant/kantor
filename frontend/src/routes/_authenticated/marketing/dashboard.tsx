@@ -74,9 +74,9 @@ function MarketingDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-8">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Marketing dashboard</p>
-        <h3 className="mt-2 text-3xl font-bold">Overview lintas campaign, ads, dan leads</h3>
+      <Card className="border-mkt/20 bg-gradient-to-br from-mkt/10 via-background to-background p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Marketing dashboard</p>
+        <h3 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Overview lintas campaign, ads, dan leads</h3>
         <p className="mt-3 max-w-3xl text-muted-foreground">
           Satu layar untuk melihat distribusi status campaign, perbandingan spend bulan ini,
           funnel leads, dan campaign dengan ROAS terbaik.
@@ -91,9 +91,9 @@ function MarketingDashboardPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr,1fr]">
-        <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Campaign status</p>
-          <h4 className="mt-2 text-2xl font-bold">Status distribution</h4>
+        <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Campaign status</p>
+          <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Status distribution</h4>
           <div className="mt-6 h-[300px]">
             <ResponsiveContainer height="100%" width="100%">
               <PieChart>
@@ -102,7 +102,7 @@ function MarketingDashboardPage() {
                     <Cell fill={chartColors[index % chartColors.length]} key={row.label} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => value.toLocaleString("id-ID")} />
+                <Tooltip formatter={(value: any) => value.toLocaleString("id-ID")} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -119,9 +119,9 @@ function MarketingDashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Top campaigns</p>
-          <h4 className="mt-2 text-2xl font-bold">Top 5 by ROAS</h4>
+        <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Top campaigns</p>
+          <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Top 5 by ROAS</h4>
           <div className="mt-5 space-y-3">
             {topCampaigns.length > 0 ? (
               topCampaigns.map((row) => (
@@ -146,9 +146,9 @@ function MarketingDashboardPage() {
         </Card>
       </div>
 
-      <Card className="p-6">
-        <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Leads funnel</p>
-        <h4 className="mt-2 text-2xl font-bold">Pipeline from new to won</h4>
+      <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Leads funnel</p>
+        <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Pipeline from new to won</h4>
         <div className="mt-5 space-y-3">
           {funnelRows.map((row) => {
             const percentage = totalLeads > 0 ? (row.lead_count / totalLeads) * 100 : 0;
@@ -180,9 +180,9 @@ function MarketingDashboardPage() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="p-5">
-      <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-3 text-2xl font-bold">{value}</p>
+    <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm transition-all hover:border-mkt/30 hover:shadow-sm">
+      <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-4 text-3xl font-bold tracking-tight text-foreground">{value}</p>
     </Card>
   );
 }

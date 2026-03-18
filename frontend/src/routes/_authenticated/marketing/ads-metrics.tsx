@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
 import { adsMetricPlatformOptions, adsPlatformMeta } from "@/lib/marketing";
@@ -233,20 +234,20 @@ function AdsMetricsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-8">
+      <Card className="border-mkt/20 bg-gradient-to-br from-mkt/10 via-background to-background p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Marketing analytics</p>
-            <h3 className="mt-2 text-3xl font-bold">Ads spent and performance metrics</h3>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-mkt">Marketing analytics</p>
+            <h3 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Ads spent and performance metrics</h3>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               Input performa campaign manual, pantau ROAS dan CTR per periode, lalu export data tanpa pindah tool.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setActiveTab("input")} variant={activeTab === "input" ? "default" : "outline"}>
+            <Button onClick={() => setActiveTab("input")} variant={activeTab === "input" ? "mkt" : "outline"}>
               Input Data
             </Button>
-            <Button onClick={() => setActiveTab("dashboard")} variant={activeTab === "dashboard" ? "default" : "outline"}>
+            <Button onClick={() => setActiveTab("dashboard")} variant={activeTab === "dashboard" ? "mkt" : "outline"}>
               Dashboard
             </Button>
           </div>
@@ -299,6 +300,7 @@ function AdsMetricsPage() {
                     setShowForm((value) => !value);
                     setShowBatchForm(false);
                   }}
+                  variant="mkt"
                 >
                   {showForm ? "Close form" : "New entry"}
                 </Button>
@@ -318,10 +320,10 @@ function AdsMetricsPage() {
           </Card>
 
           {showForm ? (
-            <Card className="p-6">
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
               <div className="mb-5">
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Single entry</p>
-                <h4 className="mt-2 text-2xl font-bold">{editingMetric ? "Edit ads metric" : "Add ads metric"}</h4>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Single entry</p>
+                <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{editingMetric ? "Edit ads metric" : "Add ads metric"}</h4>
               </div>
               <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmitMetric}>
                 <select className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm" {...form.register("campaign_id")}>
@@ -351,7 +353,7 @@ function AdsMetricsPage() {
                   <p className="text-sm text-red-700 lg:col-span-2">{form.formState.errors.period_end.message}</p>
                 ) : null}
                 <div className="flex flex-wrap gap-3 lg:col-span-2">
-                  <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
+                  <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit" variant="mkt">
                     {editingMetric ? "Save changes" : "Save entry"}
                   </Button>
                   <Button
@@ -371,11 +373,11 @@ function AdsMetricsPage() {
           ) : null}
 
           {showBatchForm ? (
-            <Card className="p-6">
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Bulk input</p>
-                  <h4 className="mt-2 text-2xl font-bold">Multiple ads metric rows</h4>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Bulk input</p>
+                  <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Multiple ads metric rows</h4>
                 </div>
                 <Button onClick={() => setBatchRows((previous) => [...previous, { ...defaultMetricForm }])} variant="outline">
                   Add row
@@ -414,7 +416,7 @@ function AdsMetricsPage() {
                 ))}
               </div>
               <div className="mt-5 flex flex-wrap gap-3">
-                <Button disabled={batchMutation.isPending} onClick={() => batchMutation.mutate(batchRows)} type="button">
+                <Button disabled={batchMutation.isPending} onClick={() => batchMutation.mutate(batchRows)} type="button" variant="mkt">
                   Submit batch
                 </Button>
                 <Button
@@ -431,11 +433,67 @@ function AdsMetricsPage() {
             </Card>
           ) : null}
 
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-muted/60 text-left">
-                  <tr>
+          {metricsQuery.isLoading ? (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/60 text-left">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold h-[45px]">Campaign</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">Platform</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">Period</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">Spent</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">Revenue</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">CPR</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">ROAS</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">CTR</th>
+                      <th className="px-4 py-3 font-semibold h-[45px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <tr className="border-t border-border/70" key={i}>
+                        <td className="px-4 py-3 space-y-2">
+                          <Skeleton className="h-4 w-[140px] bg-muted/60" />
+                          <Skeleton className="h-3 w-[180px] bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Skeleton className="h-6 w-[80px] rounded-full bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Skeleton className="h-4 w-[110px] bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Skeleton className="h-4 w-[90px] bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Skeleton className="h-4 w-[90px] bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Skeleton className="h-4 w-[70px] bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Skeleton className="h-4 w-[50px] bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <Skeleton className="h-4 w-[50px] bg-muted/60" />
+                        </td>
+                        <td className="px-4 py-3 flex gap-2">
+                          <Skeleton className="h-8 w-[50px] rounded-[6px] bg-muted/60" />
+                          <Skeleton className="h-8 w-[60px] rounded-[6px] bg-muted/60" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/60 text-left">
+                    <tr>
                     <th className="px-4 py-3 font-semibold">Campaign</th>
                     <th className="px-4 py-3 font-semibold">Platform</th>
                     <th className="px-4 py-3 font-semibold">Period</th>
@@ -516,6 +574,7 @@ function AdsMetricsPage() {
               </table>
             </div>
           </Card>
+          )}
 
           {metrics.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">Belum ada ads metrics yang dicatat untuk filter ini.</Card>
@@ -557,9 +616,14 @@ function AdsMetricsPage() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
-            <Card className="p-6">
-              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Campaign comparison</p>
-              <h4 className="mt-2 text-2xl font-bold">Spent vs revenue per campaign</h4>
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Campaign comparison</p>
+              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Spent vs revenue per campaign</h4>
+              {campaignSummaryQuery.isLoading ? (
+                <div className="mt-6 h-[320px]">
+                  <Skeleton className="h-full w-full bg-muted/60 rounded-[12px]" />
+                </div>
+              ) : (
               <div className="mt-6 h-[320px]">
                 <ResponsiveContainer height="100%" width="100%">
                   <BarChart data={campaignRows.slice(0, 8)}>
@@ -572,12 +636,23 @@ function AdsMetricsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </Card>
 
-            <Card className="p-6">
-              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Platform mix</p>
-              <h4 className="mt-2 text-2xl font-bold">Spent breakdown</h4>
-              <div className="mt-6 h-[260px]">
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Platform mix</p>
+              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Spent breakdown</h4>
+              {platformSummaryQuery.isLoading ? (
+                <div className="mt-6 space-y-4">
+                  <Skeleton className="h-[260px] w-full bg-muted/60 rounded-full mx-auto max-w-[260px]" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-[46px] w-full bg-muted/60 rounded-[18px]" />
+                    <Skeleton className="h-[46px] w-full bg-muted/60 rounded-[18px]" />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-6 h-[260px]">
                 <ResponsiveContainer height="100%" width="100%">
                   <PieChart>
                     <Pie cx="50%" cy="50%" data={platformRows} dataKey="total_spent" innerRadius={55} outerRadius={90} paddingAngle={3}>
@@ -600,13 +675,20 @@ function AdsMetricsPage() {
                   </div>
                 ))}
               </div>
+              </>
+              )}
             </Card>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
-            <Card className="p-6">
-              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Trendline</p>
-              <h4 className="mt-2 text-2xl font-bold">Monthly CTR and ROAS</h4>
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Trendline</p>
+              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Monthly CTR and ROAS</h4>
+              {monthlySummaryQuery.isLoading ? (
+                <div className="mt-6 h-[320px]">
+                  <Skeleton className="h-full w-full bg-muted/60 rounded-[12px]" />
+                </div>
+              ) : (
               <div className="mt-6 h-[320px]">
                 <ResponsiveContainer height="100%" width="100%">
                   <LineChart data={monthlyRows}>
@@ -620,11 +702,19 @@ function AdsMetricsPage() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </Card>
 
-            <Card className="p-6">
-              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Ranking</p>
-              <h4 className="mt-2 text-2xl font-bold">Best ROAS campaigns</h4>
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Ranking</p>
+              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Best ROAS campaigns</h4>
+              {campaignSummaryQuery.isLoading ? (
+                <div className="mt-5 space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                     <Skeleton className="h-[74px] w-full bg-muted/60 rounded-[22px]" key={i} />
+                  ))}
+                </div>
+              ) : (
               <div className="mt-5 space-y-3">
                 {campaignRows.slice(0, 8).map((row) => (
                   <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={row.group_key}>
@@ -638,6 +728,7 @@ function AdsMetricsPage() {
                   </div>
                 ))}
               </div>
+              )}
             </Card>
           </div>
         </div>
@@ -654,9 +745,9 @@ function AdsMetricsPage() {
 
 function SummaryMetricCard({ label, value, toneClass }: { label: string; value: string; toneClass?: string }) {
   return (
-    <Card className="p-6">
-      <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-      <h4 className={`mt-3 text-2xl font-bold ${toneClass ?? ""}`}>{value}</h4>
+    <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm transition-all hover:border-mkt/30 hover:shadow-sm">
+      <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <h4 className={`mt-4 text-3xl font-bold tracking-tight ${toneClass ?? "text-foreground"}`}>{value}</h4>
     </Card>
   );
 }

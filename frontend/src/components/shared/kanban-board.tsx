@@ -344,13 +344,13 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden p-6">
+      <Card className="p-6">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Board view</p>
-              <h4 className="mt-2 text-2xl font-bold">Project execution board</h4>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+              <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">Board view</p>
+              <h4 className="text-[20px] font-[700] text-text-primary leading-tight">Project execution board</h4>
+              <p className="mt-1 max-w-3xl text-[13px] text-text-secondary">
                 Kelola task proyek dalam satu board, pindahkan kartu antar tahap kerja, dan gunakan filter tanpa keluar dari halaman ini.
               </p>
             </div>
@@ -358,15 +358,16 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             <PermissionGate permission={permissions.operationalKanbanCreate}>
               <div className="flex w-full flex-col items-stretch gap-3 xl:w-auto xl:items-end">
                 {isColumnComposerOpen ? (
-                  <div className="w-full rounded-[28px] border border-border/70 bg-background/95 p-4 shadow-panel xl:w-[25rem]">
+                  <div className="w-full rounded-[12px] border border-border bg-surface p-4 shadow-panel xl:w-[25rem]">
                     <div className="grid gap-3">
                       <Input
+                        className="focus-visible:border-ops focus-visible:ring-ops/10 h-[44px]"
                         onChange={(event) => setColumnDraft((current) => ({ ...current, name: event.target.value }))}
                         placeholder="List name"
                         value={columnDraft.name}
                       />
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Accent color</p>
+                        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-secondary">Accent color</p>
                         <div className="flex flex-wrap gap-2">
                           {columnColorOptions.map((color) => (
                             <button
@@ -383,7 +384,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
                           ))}
                         </div>
                       </div>
-                      <div className="flex flex-wrap justify-end gap-3">
+                      <div className="flex flex-wrap justify-end gap-3 pt-2">
                         <Button
                           onClick={() => {
                             setIsColumnComposerOpen(false);
@@ -391,11 +392,11 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
                             setBoardError(null);
                           }}
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                         >
                           Cancel
                         </Button>
-                        <Button disabled={createColumnMutation.isPending} onClick={handleCreateColumn} type="button">
+                        <Button variant="ops" disabled={createColumnMutation.isPending} onClick={handleCreateColumn} type="button">
                           {createColumnMutation.isPending ? "Adding..." : "Add list"}
                         </Button>
                       </div>
@@ -404,6 +405,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
                 ) : null}
 
                 <Button
+                  variant="ops"
                   className="xl:self-end"
                   onClick={() => {
                     setBoardError(null);
@@ -419,7 +421,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 
           <div className="grid gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
           <select
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
             onChange={(event) => setFilters((current) => ({ ...current, assignee: event.target.value }))}
             value={filters.assignee}
           >
@@ -431,7 +433,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             ))}
           </select>
           <select
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
             onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
             value={filters.priority}
           >
@@ -442,11 +444,13 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             <option value="critical">Critical</option>
           </select>
           <Input
+            className="h-[44px] focus-visible:border-ops focus-visible:ring-ops/10"
             onChange={(event) => setFilters((current) => ({ ...current, label: event.target.value }))}
             placeholder="Filter by label"
             value={filters.label}
           />
           <Input
+            className="h-[44px] focus-visible:border-ops focus-visible:ring-ops/10"
             onChange={(event) => setFilters((current) => ({ ...current, dueDate: event.target.value }))}
             type="date"
             value={filters.dueDate}
@@ -460,7 +464,8 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
                   dueDate: "",
                 })
               }
-              variant="outline"
+              variant="secondary"
+              className="h-[44px]"
             >
               Clear {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
             </Button>
@@ -468,7 +473,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
         </div>
       </Card>
 
-      {boardError ? <Card className="p-4 text-sm text-red-700">{boardError}</Card> : null}
+      {boardError ? <Card className="p-4 text-[13px] font-[500] text-priority-high border-priority-high/20 bg-priority-high/5">{boardError}</Card> : null}
 
       <DndContext
         collisionDetection={closestCorners}
@@ -754,35 +759,35 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
   };
 
   return (
-    <div className="w-[22rem] shrink-0" ref={sortable.setNodeRef} style={style}>
-      <Card className={cn("flex h-full min-h-[38rem] flex-col rounded-[26px] border-border/70 bg-muted/55 p-4", sortable.isDragging && "opacity-70")}>
+    <div className="w-[320px] shrink-0" ref={sortable.setNodeRef} style={style}>
+      <Card className={cn("flex flex-col h-full min-h-[500px] border-border bg-surface-muted p-4 shadow-sm", sortable.isDragging && "opacity-70")}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               {...sortable.attributes}
               {...sortable.listeners}
-              className="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs uppercase tracking-[0.24em] text-muted-foreground"
+              className="rounded-[6px] border border-border bg-background px-2 py-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-secondary hover:bg-surface-muted transition-colors cursor-grab"
               type="button"
             >
               Drag
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: props.column.color ?? "#94A3B8" }} />
-                <h5 className="font-semibold">{props.column.name}</h5>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: props.column.color ?? "#94A3B8" }} />
+                <h5 className="font-[600] text-[14px] text-text-primary truncate max-w-[120px]">{props.column.name}</h5>
               </div>
-              <p className="text-xs text-muted-foreground">{props.tasks.length} cards</p>
+              <p className="text-[12px] font-[500] text-text-tertiary">{props.tasks.length} cards</p>
             </div>
           </div>
 
           <PermissionGate permission={permissions.operationalKanbanEdit}>
             <div className="flex gap-2">
-              <Button onClick={props.onEditColumn} size="sm" variant="outline">
+              <Button onClick={props.onEditColumn} size="sm" variant="secondary" className="h-7 px-2 text-[11px]">
                 Edit
               </Button>
               <PermissionGate permission={permissions.operationalKanbanDelete}>
-                <Button onClick={props.onDeleteColumn} size="sm" variant="ghost">
-                  Delete
+                <Button onClick={props.onDeleteColumn} size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
+                   Delete
                 </Button>
               </PermissionGate>
             </div>
@@ -791,17 +796,18 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
 
         {props.editingId === props.column.id ? (
           <div className="mt-4 grid gap-3">
-            <Input onChange={(event) => props.onColumnNameChange(event.target.value)} value={props.editingForm.name} />
+            <Input className="focus-visible:border-ops focus-visible:ring-ops/10" onChange={(event) => props.onColumnNameChange(event.target.value)} value={props.editingForm.name} />
             <Input
+              className="h-[44px] w-full p-1 cursor-pointer focus-visible:border-ops focus-visible:ring-ops/10"
               onChange={(event) => props.onColumnColorChange(event.target.value)}
               type="color"
               value={props.editingForm.color}
             />
             <div className="flex gap-3">
-              <Button onClick={props.onSaveColumnEdit} size="sm">
+              <Button onClick={props.onSaveColumnEdit} size="sm" variant="ops">
                 Save
               </Button>
-              <Button onClick={props.onCancelEdit} size="sm" variant="outline">
+              <Button onClick={props.onCancelEdit} size="sm" variant="ghost">
                 Cancel
               </Button>
             </div>
@@ -821,24 +827,25 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
           </SortableContext>
 
           {props.tasks.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-border/80 bg-background/70 px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-[12px] border border-dashed border-border bg-background/50 px-4 py-8 text-center text-[13px] font-[500] text-text-tertiary">
               No matching tasks in this column.
             </div>
           ) : null}
         </div>
 
         <PermissionGate permission={permissions.operationalKanbanCreate}>
-          <div className="mt-4 rounded-[22px] border border-dashed border-border/70 bg-background/80 p-3 space-y-3">
+          <div className="mt-4 rounded-[12px] border border-border bg-background p-3 space-y-3">
             <Input
+              className="focus-visible:border-ops focus-visible:ring-ops/10"
               onChange={(event) => props.onQuickDraftChange(event.target.value)}
               placeholder="Add another card"
               value={props.quickDraft}
             />
             <div className="flex gap-3">
-              <Button onClick={props.onQuickAdd} size="sm">
+              <Button variant="ops" onClick={props.onQuickAdd} size="sm">
                 Quick add
               </Button>
-              <Button onClick={props.onTaskCreate} size="sm" variant="outline">
+              <Button onClick={props.onTaskCreate} size="sm" variant="ghost">
                 Open form
               </Button>
             </div>
@@ -873,49 +880,50 @@ function KanbanTaskCard({
         {...sortable.attributes}
         {...sortable.listeners}
         className={cn(
-          "cursor-grab rounded-[22px] border-border/60 bg-background/95 p-4 shadow-sm transition hover:border-primary/25 hover:shadow-panel active:cursor-grabbing",
-          sortable.isDragging && "opacity-60",
+          "cursor-grab p-4 shadow-sm transition-all hover:border-ops/30 hover:shadow-card active:cursor-grabbing group",
+          sortable.isDragging && "opacity-60 ring-2 ring-ops",
         )}
         onClick={onClick}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <PriorityBadge priority={task.priority} />
               <AssignmentBadge assignedVia={task.assigned_via} />
               {task.label ? (
-                <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+                <span className="rounded-full bg-surface-muted border border-border px-2 py-0.5 text-[11px] font-[600] uppercase tracking-wider text-text-secondary">
                   {task.label}
                 </span>
               ) : null}
             </div>
-            <h6 className="mt-3 text-base font-semibold">{task.title}</h6>
+            <h6 className="text-[14px] font-[600] text-text-primary leading-tight">{task.title}</h6>
           </div>
-          <span className="rounded-full border border-border/70 px-3 py-1 text-xs uppercase tracking-[0.24em] text-muted-foreground">
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity rounded-[6px] border border-border bg-surface-muted px-2 py-1 text-[10px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
             Move
           </span>
         </div>
 
-        {task.description ? <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{task.description}</p> : null}
+        {task.description ? <p className="mt-2 line-clamp-2 text-[12px] text-text-secondary leading-relaxed">{task.description}</p> : null}
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+          <div className="flex items-center gap-2">
             <AvatarBadge name={task.assignee_name} />
-            <span className="text-xs text-muted-foreground">{task.assignee_name ?? "Unassigned"}</span>
+            <span className="text-[12px] font-[500] text-text-secondary truncate max-w-[120px]">{task.assignee_name ?? "Unassigned"}</span>
           </div>
-          <span className="text-xs text-muted-foreground">{task.due_date ? formatDate(task.due_date) : "No due date"}</span>
+          <span className="text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">{task.due_date ? formatDate(task.due_date) : "No due date"}</span>
         </div>
 
         {!task.assignee_id ? (
           <PermissionGate permission={permissions.operationalAssignmentEdit}>
-            <div className="mt-4">
+            <div className="mt-3">
               <Button
                 onClick={(event) => {
                   event.stopPropagation();
                   onAutoAssign();
                 }}
                 size="sm"
-                variant="outline"
+                variant="ops"
+                className="w-full text-[12px] h-8"
               >
                 Auto assign
               </Button>
@@ -929,10 +937,10 @@ function KanbanTaskCard({
 
 function TaskOverlay({ task }: { task: KanbanTask }) {
   return (
-    <div className="w-[18rem]">
-      <Card className="border-primary/40 bg-card p-4 shadow-2xl">
+    <div className="w-[320px]">
+      <Card className="border-ops shadow-2xl p-4 rotate-2">
         <PriorityBadge priority={task.priority} />
-        <p className="mt-3 font-semibold">{task.title}</p>
+        <p className="mt-2 text-[14px] font-[600] text-text-primary leading-tight">{task.title}</p>
       </Card>
     </div>
   );
@@ -940,13 +948,13 @@ function TaskOverlay({ task }: { task: KanbanTask }) {
 
 function ColumnOverlay({ column, taskCount }: { column: KanbanColumn; taskCount: number }) {
   return (
-    <div className="w-[18rem]">
-      <Card className="border-primary/40 bg-card p-4 shadow-2xl">
+    <div className="w-[320px]">
+      <Card className="border-ops shadow-2xl p-4 rotate-2">
         <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: column.color ?? "#94A3B8" }} />
-          <p className="font-semibold">{column.name}</p>
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: column.color ?? "#94A3B8" }} />
+          <p className="text-[14px] font-[600] text-text-primary">{column.name}</p>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">{taskCount} tasks</p>
+        <p className="mt-1 text-[12px] font-[500] text-text-tertiary">{taskCount} tasks</p>
       </Card>
     </div>
   );
@@ -978,53 +986,53 @@ function TaskModal({
   } = form;
 
   return (
-    <div className="fixed inset-0 z-50 bg-foreground/25 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 bg-text-primary/10 backdrop-blur-sm">
       <button
         aria-label="Close task drawer"
         className="absolute inset-0 h-full w-full cursor-default"
         onClick={onClose}
         type="button"
       />
-      <Card className="absolute inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col rounded-none border-l border-border/80 p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border/70 pb-5">
+      <Card className="absolute inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col rounded-none border-l border-border bg-background p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
               {mode === "create" ? "Create task" : "Task detail"}
             </p>
-            <h5 className="mt-2 text-2xl font-bold">{mode === "create" ? "New task" : "Edit task"}</h5>
+            <h5 className="text-[20px] font-[700] text-text-primary leading-tight">{mode === "create" ? "New task" : "Edit task"}</h5>
           </div>
-          <Button onClick={onClose} size="sm" variant="outline">
+          <Button onClick={onClose} size="sm" variant="ghost">
             Close
           </Button>
         </div>
 
-        <form className="mt-6 flex-1 space-y-4 overflow-y-auto pr-1" onSubmit={handleSubmit(onSubmit)}>
+        <form className="mt-6 flex-1 space-y-6 overflow-y-auto pr-1" onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="task-title">
+            <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-title">
               Title
             </label>
-            <Input id="task-title" {...register("title")} />
-            {errors.title ? <p className="text-sm text-red-700">{errors.title.message}</p> : null}
+            <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-title" {...register("title")} />
+            {errors.title ? <p className="text-[13px] font-[500] text-priority-high">{errors.title.message}</p> : null}
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="task-description">
+            <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-description">
               Description
             </label>
             <textarea
-              className="min-h-32 rounded-[24px] border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-h-32 w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10 disabled:cursor-not-allowed disabled:opacity-50"
               id="task-description"
               {...register("description")}
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="task-assignee">
+              <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-assignee">
                 Assignee
               </label>
               <select
-                className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-[44px] w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
                 id="task-assignee"
                 {...register("assignee_id")}
               >
@@ -1038,20 +1046,20 @@ function TaskModal({
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="task-due-date">
+              <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-due-date">
                 Due date
               </label>
-              <Input id="task-due-date" type="date" {...register("due_date")} />
+              <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-due-date" type="date" {...register("due_date")} />
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="task-priority">
+              <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-priority">
                 Priority
               </label>
               <select
-                className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-[44px] w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
                 id="task-priority"
                 {...register("priority")}
               >
@@ -1063,15 +1071,15 @@ function TaskModal({
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="task-label">
+              <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-label">
                 Label
               </label>
-              <Input id="task-label" placeholder="Bug, design, backend" {...register("label")} />
+              <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-label" placeholder="Bug, design, backend" {...register("label")} />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button disabled={isSubmitting} type="submit">
+          <div className="flex flex-wrap gap-3 pt-4 border-t border-border">
+            <Button variant="ops" disabled={isSubmitting} type="submit">
               {isSubmitting ? "Saving..." : mode === "create" ? "Create task" : "Save changes"}
             </Button>
             {mode === "edit" ? (
@@ -1091,24 +1099,24 @@ function TaskModal({
 function PriorityBadge({ priority }: { priority: ProjectPriority }) {
   const tone =
     priority === "critical"
-      ? "bg-red-100 text-red-700"
+      ? "bg-priority-critical-bg text-priority-critical"
       : priority === "high"
-        ? "bg-amber-100 text-amber-700"
+        ? "bg-priority-high-bg text-priority-high"
         : priority === "medium"
-          ? "bg-sky-100 text-sky-700"
-          : "bg-emerald-100 text-emerald-700";
+          ? "bg-priority-medium-bg text-priority-medium"
+          : "bg-surface-muted text-text-secondary border border-border";
 
-  return <span className={cn("rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]", tone)}>{priority}</span>;
+  return <span className={cn("rounded-[6px] px-2 py-0.5 text-[11px] font-[700] uppercase tracking-[0.08em]", tone)}>{priority}</span>;
 }
 
 function AssignmentBadge({ assignedVia }: { assignedVia: "manual" | "auto" }) {
   const tone =
     assignedVia === "auto"
-      ? "bg-primary/15 text-primary"
-      : "bg-muted text-muted-foreground";
+      ? "bg-ops/10 text-ops"
+      : "bg-surface-muted text-text-secondary border border-border";
 
   return (
-    <span className={cn("rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]", tone)}>
+    <span className={cn("rounded-[6px] px-2 py-0.5 text-[11px] font-[700] uppercase tracking-[0.08em]", tone)}>
       {assignedVia}
     </span>
   );
@@ -1116,7 +1124,7 @@ function AssignmentBadge({ assignedVia }: { assignedVia: "manual" | "auto" }) {
 
 function AvatarBadge({ name }: { name?: string | null }) {
   return (
-    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold uppercase text-primary">
+    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ops text-[11px] font-[600] uppercase text-white shadow-sm ring-2 ring-background">
       {initials(name ?? "NA")}
     </div>
   );

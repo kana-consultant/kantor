@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import type { Employee, SubscriptionFormValues } from "@/types/hris";
+import { cn } from "@/lib/utils";
 
 const subscriptionSchema = z.object({
   name: z.string().min(2, "Nama subscription minimal 2 karakter"),
@@ -69,29 +70,31 @@ export function SubscriptionForm({
     handleSubmit,
     formState: { errors },
   } = useForm<SubscriptionFormValues>({
-    resolver: zodResolver(subscriptionSchema),
+    resolver: zodResolver(subscriptionSchema) as any,
     defaultValues: defaultValues ?? baseValues,
   });
+
+  const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-hr focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-hr/10 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <Card className="p-6">
       <div className="mb-6">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Subscription form</p>
-        <h3 className="mt-2 text-2xl font-bold">{title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-hr mb-1">Subscription Form</p>
+        <h3 className="text-[20px] font-[700] text-text-primary leading-tight">{title}</h3>
+        <p className="mt-1 text-[13px] text-text-secondary">{description}</p>
       </div>
 
-      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid gap-4 md:grid-cols-2">
+      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+        <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.name?.message} label="Name">
-            <Input {...register("name")} placeholder="Notion" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("name")} placeholder="Notion" />
           </Field>
           <Field error={errors.vendor?.message} label="Vendor">
-            <Input {...register("vendor")} placeholder="Notion Labs" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("vendor")} placeholder="Notion Labs" />
           </Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-3">
           <Field error={errors.cost_amount?.message} label="Cost amount">
             <Controller
               control={control}
@@ -107,17 +110,17 @@ export function SubscriptionForm({
             />
           </Field>
           <Field error={errors.cost_currency?.message} label="Currency">
-            <Input {...register("cost_currency")} />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("cost_currency")} />
           </Field>
           <Field error={errors.category?.message} label="Category">
-            <Input {...register("category")} placeholder="Project management" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("category")} placeholder="Project management" />
           </Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-3">
           <Field error={errors.billing_cycle?.message} label="Billing cycle">
             <select
-              className="flex h-12 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               {...register("billing_cycle")}
             >
               <option value="monthly">Monthly</option>
@@ -126,17 +129,17 @@ export function SubscriptionForm({
             </select>
           </Field>
           <Field error={errors.start_date?.message} label="Start date">
-            <Input {...register("start_date")} type="date" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("start_date")} type="date" />
           </Field>
           <Field error={errors.renewal_date?.message} label="Renewal date">
-            <Input {...register("renewal_date")} type="date" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("renewal_date")} type="date" />
           </Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.status?.message} label="Status">
             <select
-              className="flex h-12 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               {...register("status")}
             >
               <option value="active">Active</option>
@@ -146,7 +149,7 @@ export function SubscriptionForm({
           </Field>
           <Field error={errors.pic_employee_id?.message} label="PIC employee">
             <select
-              className="flex h-12 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               {...register("pic_employee_id")}
             >
               <option value="">Belum ditentukan</option>
@@ -161,29 +164,29 @@ export function SubscriptionForm({
 
         <Field error={errors.description?.message} label="Description">
           <textarea
-            className="min-h-24 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(formControlClass, "min-h-[96px] py-3")}
             {...register("description")}
           />
         </Field>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.login_credentials?.message} label="Encrypted login credentials">
             <textarea
-              className="min-h-24 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+               className={cn(formControlClass, "min-h-[96px] py-3 font-mono text-[13px]")}
               {...register("login_credentials")}
               placeholder="email: ops@company.com | password: ********"
             />
           </Field>
           <Field error={errors.notes?.message} label="Notes">
             <textarea
-              className="min-h-24 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={cn(formControlClass, "min-h-[96px] py-3")}
               {...register("notes")}
             />
           </Field>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Button disabled={isSubmitting} type="submit">
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button variant="hr" disabled={isSubmitting} type="submit">
             {isSubmitting ? "Saving..." : submitLabel}
           </Button>
           {onCancel ? (
@@ -207,10 +210,10 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+    <div className="space-y-1.5 flex flex-col">
+      <label className="text-[13px] font-[500] text-text-secondary">{label}</label>
       {children}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{error}</p> : null}
     </div>
   );
 }

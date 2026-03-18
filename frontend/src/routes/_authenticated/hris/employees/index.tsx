@@ -7,6 +7,7 @@ import { EmployeesTable } from "@/components/shared/employees-table";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
@@ -70,17 +71,17 @@ function EmployeesPage() {
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-border pb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">HRIS directory</p>
-            <h3 className="mt-2 text-3xl font-bold">Employees</h3>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-hris mb-1">HRIS directory</p>
+            <h3 className="text-[28px] font-[700] text-text-primary">Employees</h3>
+            <p className="mt-2 max-w-2xl text-[14px] text-text-secondary leading-relaxed">
               Kelola profil karyawan yang punya akses login maupun yang hanya dicatat sebagai data HR internal.
             </p>
           </div>
 
           <PermissionGate permission={permissions.hrisEmployeeCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)}>
+            <Button onClick={() => setIsCreateOpen((value) => !value)} variant="hr">
               {isCreateOpen ? "Close form" : "Add employee"}
             </Button>
           </PermissionGate>
@@ -170,15 +171,64 @@ function EmployeesPage() {
         <Card className="p-6 text-sm text-red-700">{employeesQuery.error.message}</Card>
       ) : null}
 
-      <EmployeesTable
-        canDelete={hasPermission(permissions.hrisEmployeeDelete)}
-        deletingId={deleteMutation.isPending ? deleteMutation.variables ?? null : null}
-        employees={employeesQuery.data?.items ?? []}
-        onDelete={(employeeId) => deleteMutation.mutate(employeeId)}
-      />
+      {employeesQuery.isLoading ? (
+        <Card className="p-0 overflow-hidden border-border bg-surface">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[14px]">
+              <thead className="bg-surface-muted border-b border-border">
+                <tr>
+                  <th className="px-6 py-4 font-[600] text-text-secondary h-[52px]">Employee</th>
+                  <th className="px-6 py-4 font-[600] text-text-secondary h-[52px]">Role & Dept</th>
+                  <th className="px-6 py-4 font-[600] text-text-secondary h-[52px]">Contact</th>
+                  <th className="px-6 py-4 font-[600] text-text-secondary h-[52px]">Status</th>
+                  <th className="px-6 py-4 font-[600] text-text-secondary h-[52px] w-[100px]"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i} className="hover:bg-surface-muted/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-10 w-10 shrink-0 rounded-full bg-muted/60" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-[120px] bg-muted/60" />
+                          <Skeleton className="h-3 w-[80px] bg-muted/60" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-[100px] bg-muted/60" />
+                        <Skeleton className="h-3 w-[70px] bg-muted/60" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 space-y-2">
+                      <Skeleton className="h-4 w-[140px] bg-muted/60" />
+                      <Skeleton className="h-3 w-[100px] bg-muted/60" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-6 w-[80px] rounded-full bg-muted/60" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-8 w-[60px] rounded-md bg-muted/60" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : (
+        <EmployeesTable
+          canDelete={hasPermission(permissions.hrisEmployeeDelete)}
+          deletingId={deleteMutation.isPending ? deleteMutation.variables ?? null : null}
+          employees={employeesQuery.data?.items ?? []}
+          onDelete={(employeeId) => deleteMutation.mutate(employeeId)}
+        />
+      )}
 
-      <Card className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-muted-foreground">
+      <Card className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between mt-6">
+        <p className="text-[14px] font-[500] text-text-secondary">
           Page {meta?.page ?? filters.page} of {meta ? Math.max(1, Math.ceil(meta.total / meta.per_page)) : 1}
           {" "}· Total {meta?.total ?? 0} employees
         </p>

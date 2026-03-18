@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatIDR } from "@/lib/currency";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
@@ -231,11 +232,11 @@ function FinancePage() {
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-border pb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">HRIS finance</p>
-            <h3 className="mt-2 text-3xl font-bold">Income and outcome control</h3>
-            <p className="mt-2 max-w-3xl text-muted-foreground">
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-hr mb-1">HRIS finance</p>
+            <h3 className="text-[28px] font-[700] text-text-primary">Income and outcome control</h3>
+            <p className="mt-2 max-w-3xl text-[14px] text-text-secondary leading-relaxed">
               Kelola record keuangan, approval flow, dashboard bulanan, dan export CSV tanpa pindah modul.
             </p>
           </div>
@@ -276,7 +277,7 @@ function FinancePage() {
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
               </select>
-              <Button onClick={() => void downloadExport()} variant="outline">
+              <Button onClick={() => void downloadExport()} variant="outline" className="h-12 w-full lg:w-auto px-6">
                 Export CSV
               </Button>
             </div>
@@ -288,6 +289,7 @@ function FinancePage() {
                     resetRecordForm(recordForm);
                     setShowRecordForm((value) => !value);
                   }}
+                  variant="hr"
                 >
                   {showRecordForm ? "Close form" : "New record"}
                 </Button>
@@ -298,8 +300,8 @@ function FinancePage() {
           {showRecordForm ? (
             <Card className="p-6">
               <div className="mb-4">
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Finance record</p>
-                <h4 className="mt-2 text-2xl font-bold">{editingRecord ? "Edit record" : "Create record"}</h4>
+                <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">Finance record</p>
+                <h4 className="text-[20px] font-[700] text-text-primary">{editingRecord ? "Edit record" : "Create record"}</h4>
               </div>
               <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleRecordSubmit}>
                 <select className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm" {...recordForm.register("type")}>
@@ -348,21 +350,40 @@ function FinancePage() {
           ) : null}
 
           <div className="grid gap-4">
-            {(recordsQuery.data?.items ?? []).map((record) => (
-              <Card className="p-6" key={record.id}>
+            {recordsQuery.isLoading ? (
+              [1, 2, 3].map((i) => (
+                <Card className="p-6 border border-border bg-surface shadow-sm" key={i}>
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="space-y-2">
+                       <Skeleton className="h-3 w-[100px] bg-muted/60" />
+                       <Skeleton className="h-6 w-[200px] bg-muted/60" />
+                       <Skeleton className="h-4 w-[150px] bg-muted/60" />
+                    </div>
+                    <div className="text-left xl:text-right space-y-2 flex flex-col xl:items-end">
+                       <Skeleton className="h-3 w-[60px] bg-muted/60" />
+                       <Skeleton className="h-8 w-[140px] bg-muted/60" />
+                       <Skeleton className="h-5 w-[80px] rounded-[6px] bg-muted/60" />
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : (recordsQuery.data?.items ?? []).map((record) => (
+              <Card className="p-6 border border-border bg-surface shadow-sm" key={record.id}>
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div>
-                    <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{record.category_name}</p>
-                    <h4 className="mt-2 text-xl font-bold">{record.description}</h4>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {new Date(record.record_date).toLocaleDateString("id-ID")} • {record.type}
+                    <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">{record.category_name}</p>
+                    <h4 className="text-[18px] font-[700] text-text-primary">{record.description}</h4>
+                    <p className="mt-2 text-[13px] text-text-secondary">
+                      {new Date(record.record_date).toLocaleDateString("id-ID")} • <span className="capitalize">{record.type}</span>
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Amount</p>
-                    <p className="mt-2 text-2xl font-bold">{formatIDR(record.amount)}</p>
-                    <span className="mt-3 inline-flex rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary-foreground">
-                      {record.approval_status}
+                  <div className="text-left xl:text-right">
+                    <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">Amount</p>
+                    <p className={`text-[24px] font-[700] ${record.type === "income" ? "text-hr" : "text-text-primary"}`}>
+                      {record.type === "income" ? "+" : "-"}{formatIDR(record.amount)}
+                    </p>
+                    <span className="mt-2 inline-flex rounded-[6px] border border-border bg-surface-muted px-2 py-0.5 text-[10px] font-[700] uppercase tracking-wider text-text-secondary">
+                      {record.approval_status.replace("_", " ")}
                     </span>
                   </div>
                 </div>
@@ -415,15 +436,15 @@ function FinancePage() {
           </div>
 
           {(recordsQuery.data?.items ?? []).length === 0 ? (
-            <Card className="p-8 text-center text-sm text-muted-foreground">Belum ada finance record yang tercatat.</Card>
+            <Card className="p-8 text-center text-[14px] text-text-secondary border-dashed">Belum ada finance record yang tercatat.</Card>
           ) : null}
 
           <PermissionGate fallback={null} permission={permissions.hrisFinanceApprove}>
             {canManageCategories ? (
               <Card className="p-6">
                 <div className="mb-4">
-                  <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Finance categories</p>
-                  <h4 className="mt-2 text-2xl font-bold">Manage categories</h4>
+                  <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">Finance categories</p>
+                  <h4 className="text-[20px] font-[700] text-text-primary">Manage categories</h4>
                 </div>
                 <form className="grid gap-4 lg:grid-cols-3" onSubmit={handleCategorySubmit}>
                   <Input {...categoryForm.register("name")} placeholder="Category name" />
@@ -435,14 +456,14 @@ function FinancePage() {
                 </form>
                 <div className="mt-5 grid gap-3 lg:grid-cols-2">
                   {categories.map((category) => (
-                    <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={category.id}>
-                      <div className="flex items-center justify-between gap-3">
+                    <div className="rounded-[12px] border border-border bg-surface-muted p-4" key={category.id}>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold">{category.name}</p>
-                          <p className="text-xs text-muted-foreground">{category.type}</p>
+                          <p className="text-[14px] font-[600] text-text-primary">{category.name}</p>
+                          <p className="text-[12px] text-text-secondary capitalize">{category.type}</p>
                         </div>
                         {category.is_default ? (
-                          <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary-foreground">
+                          <span className="rounded-[6px] border border-border bg-surface px-2 py-0.5 text-[10px] font-[700] uppercase tracking-wider text-text-secondary">
                             default
                           </span>
                         ) : (
@@ -474,17 +495,36 @@ function FinancePage() {
       ) : (
         <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-3">
-            <SummaryCard label="Total income" value={formatIDR(summaryQuery.data?.total_income ?? 0)} />
-            <SummaryCard label="Total outcome" value={formatIDR(summaryQuery.data?.total_outcome ?? 0)} />
-            <SummaryCard label="Net this month" value={formatIDR(summaryQuery.data?.net_profit_this_month ?? 0)} />
+            {summaryQuery.isLoading ? (
+              <>
+                <Card className="p-5 border border-border shadow-sm bg-surface">
+                  <Skeleton className="h-3 w-[100px] bg-muted/60 mb-2" />
+                  <Skeleton className="h-8 w-[140px] bg-muted/60" />
+                </Card>
+                <Card className="p-5 border border-border shadow-sm bg-surface">
+                  <Skeleton className="h-3 w-[100px] bg-muted/60 mb-2" />
+                  <Skeleton className="h-8 w-[140px] bg-muted/60" />
+                </Card>
+                <Card className="p-5 border border-border shadow-sm bg-surface">
+                  <Skeleton className="h-3 w-[100px] bg-muted/60 mb-2" />
+                  <Skeleton className="h-8 w-[140px] bg-muted/60" />
+                </Card>
+              </>
+            ) : (
+              <>
+                <SummaryCard label="Total income" value={formatIDR(summaryQuery.data?.total_income ?? 0)} />
+                <SummaryCard label="Total outcome" value={formatIDR(summaryQuery.data?.total_outcome ?? 0)} />
+                <SummaryCard label="Net this month" value={formatIDR(summaryQuery.data?.net_profit_this_month ?? 0)} />
+              </>
+            )}
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
             <Card className="p-6">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Monthly trend</p>
-                  <h4 className="mt-2 text-2xl font-bold">Income vs outcome</h4>
+                  <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">Monthly trend</p>
+                  <h4 className="text-[20px] font-[700] text-text-primary">Income vs outcome</h4>
                 </div>
                 <Input
                   className="w-32"
@@ -508,8 +548,10 @@ function FinancePage() {
             </Card>
 
             <Card className="p-6">
-              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Category mix</p>
-              <h4 className="mt-2 text-2xl font-bold">Breakdown</h4>
+              <div className="border-b border-border pb-4">
+                <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary mb-1">Category mix</p>
+                <h4 className="text-[20px] font-[700] text-text-primary">Breakdown</h4>
+              </div>
               <div className="mt-6 h-[260px]">
                 <ResponsiveContainer height="100%" width="100%">
                   <PieChart>
@@ -551,9 +593,9 @@ function FinancePage() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="p-6">
-      <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-      <h4 className="mt-3 text-2xl font-bold">{value}</h4>
+    <Card className="p-5 border border-border shadow-sm bg-surface">
+      <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">{label}</p>
+      <p className="mt-2 text-[24px] font-[700] text-text-primary leading-none">{value}</p>
     </Card>
   );
 }

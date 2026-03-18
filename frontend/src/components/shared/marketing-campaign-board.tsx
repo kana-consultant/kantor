@@ -151,20 +151,20 @@ function CampaignLane({
   });
 
   return (
-    <div className="w-[23rem] shrink-0">
+    <div className="w-[320px] shrink-0">
       <Card
         className={cn(
-          "flex min-h-[36rem] flex-col rounded-[28px] border-border/70 bg-muted/50 p-4 transition",
-          droppable.isOver && "border-primary/30 shadow-panel",
+          "flex min-h-[500px] flex-col border border-border bg-surface-muted p-4 shadow-sm transition-all",
+          droppable.isOver && "border-mkt/50 shadow-card bg-mkt/5",
         )}
         ref={droppable.setNodeRef}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-3">
+        <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
           <div className="flex items-center gap-3">
-            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: column.color ?? "#94A3B8" }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: column.color ?? "#94A3B8" }} />
             <div>
-              <h4 className="font-semibold">{column.name}</h4>
-              <p className="text-xs text-muted-foreground">{column.campaigns?.length ?? 0} campaigns</p>
+              <h4 className="font-[600] text-[14px] text-text-primary">{column.name}</h4>
+              <p className="text-[12px] font-[500] text-text-tertiary">{column.campaigns?.length ?? 0} campaigns</p>
             </div>
           </div>
         </div>
@@ -177,7 +177,7 @@ function CampaignLane({
           </SortableContext>
 
           {(column.campaigns ?? []).length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 px-4 py-10 text-center text-sm text-muted-foreground">
+            <div className="rounded-[12px] border border-dashed border-border bg-background/50 px-4 py-10 text-center text-[13px] font-[500] text-text-tertiary">
               Drop campaign here.
             </div>
           ) : null}
@@ -212,43 +212,43 @@ function CampaignCard({
         {...sortable.attributes}
         {...sortable.listeners}
         className={cn(
-          "cursor-grab rounded-[24px] border-border/60 bg-background/95 p-4 transition hover:border-primary/25 hover:shadow-panel active:cursor-grabbing",
-          sortable.isDragging && "opacity-60",
+          "cursor-grab border border-border bg-background p-4 shadow-sm transition-all hover:border-mkt/30 hover:shadow-card active:cursor-grabbing group",
+          sortable.isDragging && "opacity-60 ring-2 ring-mkt",
         )}
         onClick={onClick}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", channel.badgeClassName)}>
+            <div className={cn("inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[11px] font-[700] uppercase tracking-wider", channel.badgeClassName)}>
               <ChannelIcon className="h-3.5 w-3.5" />
               <span>{channel.label}</span>
             </div>
-            <h5 className="mt-3 text-base font-semibold">{campaign.name}</h5>
+            <h5 className="mt-2 text-[14px] font-[600] text-text-primary leading-tight">{campaign.name}</h5>
           </div>
-          <span className="rounded-full border border-border/70 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity rounded-[6px] border border-border bg-surface-muted px-2 py-1 text-[10px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
             Move
           </span>
         </div>
 
-        {campaign.description ? <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{campaign.description}</p> : null}
+        {campaign.description ? <p className="mt-2 line-clamp-2 text-[12px] text-text-secondary leading-relaxed">{campaign.description}</p> : null}
 
-        <div className="mt-4 grid gap-2 text-sm">
+        <div className="mt-4 grid gap-2 text-[13px] border-t border-border pt-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Budget</span>
-            <span className="font-semibold">{formatIDR(campaign.budget_amount)}</span>
+            <span className="text-text-secondary">Budget</span>
+            <span className="font-[600] text-text-primary">{formatIDR(campaign.budget_amount)}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">PIC</span>
+            <span className="text-text-secondary">PIC</span>
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold uppercase text-primary">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-mkt text-[10px] font-[600] uppercase text-white shadow-sm ring-2 ring-background">
                 {initials(campaign.pic_employee_name)}
               </div>
-              <span className="max-w-[9rem] truncate text-xs font-medium">{campaign.pic_employee_name ?? "Unassigned"}</span>
+              <span className="max-w-[9rem] truncate text-[12px] font-[500] text-text-primary">{campaign.pic_employee_name ?? "Unassigned"}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" />
             {new Date(campaign.start_date).toLocaleDateString()} - {new Date(campaign.end_date).toLocaleDateString()}
@@ -268,13 +268,13 @@ function CampaignOverlay({ campaign }: { campaign: Campaign }) {
   const ChannelIcon = channel.icon;
 
   return (
-    <div className="w-[20rem]">
-      <Card className="border-primary/30 bg-card p-4 shadow-2xl">
-        <div className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", channel.badgeClassName)}>
+    <div className="w-[320px]">
+      <Card className="border-mkt shadow-2xl p-4 rotate-2 rounded-[12px]">
+        <div className={cn("inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[11px] font-[700] uppercase tracking-wider", channel.badgeClassName)}>
           <ChannelIcon className="h-3.5 w-3.5" />
           <span>{channel.label}</span>
         </div>
-        <p className="mt-3 font-semibold">{campaign.name}</p>
+        <p className="mt-2 text-[14px] font-[600] text-text-primary leading-tight">{campaign.name}</p>
       </Card>
     </div>
   );

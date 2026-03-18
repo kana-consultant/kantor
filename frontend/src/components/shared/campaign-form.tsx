@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { campaignChannelOptions, campaignStatusOptions } from "@/lib/marketing";
 import type { Employee } from "@/types/hris";
 import type { CampaignFormValues } from "@/types/marketing";
+import { cn } from "@/lib/utils";
 
 const campaignFormSchema = z
   .object({
@@ -63,7 +64,7 @@ export function CampaignForm({
   onCancel,
 }: CampaignFormProps) {
   const form = useForm<CampaignFormValues>({
-    resolver: zodResolver(campaignFormSchema),
+    resolver: zodResolver(campaignFormSchema) as any,
     defaultValues: initialValues ?? defaultValues,
   });
 
@@ -74,30 +75,34 @@ export function CampaignForm({
     formState: { errors },
   } = form;
 
+  const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-marketing focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-marketing/10 disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
     <Card className="p-6">
-      <div className="border-b border-border/70 pb-5">
-        <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Campaign composer</p>
-        <h4 className="mt-2 text-2xl font-bold">{title}</h4>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{description}</p>
+      <div className="mb-6">
+        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-marketing mb-1">
+          Campaign composer
+        </p>
+        <h4 className="text-[20px] font-[700] text-text-primary leading-tight">{title}</h4>
+        <p className="mt-1 max-w-2xl text-[13px] text-text-secondary">{description}</p>
       </div>
 
-      <form className="mt-6 space-y-5" onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid gap-2">
-          <label className="text-sm font-medium" htmlFor="campaign-name">
+      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+        <div className="grid gap-1.5 flex flex-col">
+          <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-name">
             Campaign name
           </label>
-          <Input id="campaign-name" placeholder="Q2 retargeting push" {...register("name")} />
-          {errors.name ? <p className="text-sm text-red-700">{errors.name.message}</p> : null}
+          <Input className="focus-visible:border-marketing focus-visible:ring-marketing/10" id="campaign-name" placeholder="Q2 retargeting push" {...register("name")} />
+          {errors.name ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{errors.name.message}</p> : null}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="campaign-channel">
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-1.5 flex flex-col">
+            <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-channel">
               Channel
             </label>
             <select
-              className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               id="campaign-channel"
               {...register("channel")}
             >
@@ -109,12 +114,12 @@ export function CampaignForm({
             </select>
           </div>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="campaign-status">
+          <div className="grid gap-1.5 flex flex-col">
+            <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-status">
               Stage
             </label>
             <select
-              className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               id="campaign-status"
               {...register("status")}
             >
@@ -127,24 +132,26 @@ export function CampaignForm({
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Budget</label>
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-1.5 flex flex-col">
+            <label className="text-[13px] font-[500] text-text-secondary">Budget</label>
             <Controller
               control={control}
               name="budget_amount"
               render={({ field }) => (
-                <CurrencyInput onValueChange={field.onChange} value={field.value} />
+                <div className="focus-within:ring-4 focus-within:ring-marketing/10 focus-within:border-marketing focus-within:bg-surface rounded-[6px] transition-all">
+                  <CurrencyInput onValueChange={field.onChange} value={field.value} />
+                </div>
               )}
             />
           </div>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="campaign-pic">
+          <div className="grid gap-1.5 flex flex-col">
+            <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-pic">
               PIC
             </label>
             <select
-              className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               id="campaign-pic"
               {...register("pic_employee_id")}
             >
@@ -158,51 +165,51 @@ export function CampaignForm({
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="campaign-start-date">
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-1.5 flex flex-col">
+            <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-start-date">
               Start date
             </label>
-            <Input id="campaign-start-date" type="date" {...register("start_date")} />
+            <Input className="focus-visible:border-marketing focus-visible:ring-marketing/10" id="campaign-start-date" type="date" {...register("start_date")} />
           </div>
-          <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="campaign-end-date">
+          <div className="grid gap-1.5 flex flex-col">
+            <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-end-date">
               End date
             </label>
-            <Input id="campaign-end-date" type="date" {...register("end_date")} />
-            {errors.end_date ? <p className="text-sm text-red-700">{errors.end_date.message}</p> : null}
+            <Input className="focus-visible:border-marketing focus-visible:ring-marketing/10" id="campaign-end-date" type="date" {...register("end_date")} />
+            {errors.end_date ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{errors.end_date.message}</p> : null}
           </div>
         </div>
 
-        <div className="grid gap-2">
-          <label className="text-sm font-medium" htmlFor="campaign-description">
+        <div className="grid gap-1.5 flex flex-col">
+          <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-description">
             Description
           </label>
           <textarea
-            className="min-h-24 rounded-[24px] border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(formControlClass, "min-h-[96px] py-3")}
             id="campaign-description"
             placeholder="Main goal, positioning, target audience, and rollout context."
             {...register("description")}
           />
         </div>
 
-        <div className="grid gap-2">
-          <label className="text-sm font-medium" htmlFor="campaign-brief">
+        <div className="grid gap-1.5 flex flex-col">
+          <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-brief">
             Brief text
           </label>
           <textarea
-            className="min-h-32 rounded-[24px] border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(formControlClass, "min-h-[128px] py-3")}
             id="campaign-brief"
             placeholder="Copy notes, asset direction, CTA, landing page references, or launch checklist."
             {...register("brief_text")}
           />
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Button disabled={isSubmitting} type="submit">
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button variant="mkt" disabled={isSubmitting} type="submit">
             {isSubmitting ? "Saving..." : submitLabel}
           </Button>
-          <Button onClick={onCancel} type="button" variant="outline">
+          <Button onClick={onCancel} type="button" variant="ghost">
             Cancel
           </Button>
         </div>

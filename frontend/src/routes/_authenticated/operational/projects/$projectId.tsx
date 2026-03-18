@@ -10,6 +10,7 @@ import { ProjectForm } from "@/components/shared/project-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
 import {
@@ -96,7 +97,38 @@ function ProjectWorkspacePage() {
   });
 
   if (projectQuery.isLoading) {
-    return <Card className="p-8">Loading project workspace...</Card>;
+    return (
+      <div className="space-y-6">
+        <Card className="overflow-hidden border-ops/20 bg-gradient-to-br from-ops/10 via-background to-background p-8">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex-1 w-full">
+              <Skeleton className="h-4 w-[250px] bg-muted/60" />
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Skeleton className="h-7 w-[90px] rounded-full bg-muted/60" />
+                <Skeleton className="h-7 w-[80px] rounded-full bg-muted/60" />
+                <Skeleton className="h-7 w-[100px] rounded-full bg-muted/60" />
+              </div>
+              <Skeleton className="mt-5 h-10 w-[400px] max-w-full bg-muted/60" />
+              <Skeleton className="mt-3 h-5 w-[500px] max-w-full bg-muted/60" />
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Skeleton className="h-10 w-[80px] rounded-[6px] bg-muted/60" />
+                <Skeleton className="h-10 w-[90px] rounded-[6px] bg-muted/60" />
+                <Skeleton className="h-10 w-[120px] rounded-[6px] bg-muted/60" />
+              </div>
+            </div>
+            <Skeleton className="h-[180px] w-full min-w-[20rem] xl:w-[320px] rounded-[28px] bg-muted/60" />
+          </div>
+        </Card>
+        
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Skeleton className="h-[500px] w-full rounded-[24px] bg-muted/60" />
+          <div className="space-y-6">
+            <Skeleton className="h-[250px] w-full rounded-[24px] bg-muted/60" />
+            <Skeleton className="h-[300px] w-full rounded-[24px] bg-muted/60" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (projectQuery.error instanceof Error || !project) {
@@ -109,10 +141,10 @@ function ProjectWorkspacePage() {
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden p-8">
+      <Card className="overflow-hidden border-ops/20 bg-gradient-to-br from-ops/10 via-background to-background p-8">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground">
               <Link
                 className="underline-offset-4 hover:underline"
                 to="/operational"
@@ -139,7 +171,7 @@ function ProjectWorkspacePage() {
               />
             </div>
 
-            <h3 className="mt-5 max-w-4xl text-4xl font-bold leading-tight">{project.name}</h3>
+            <h3 className="mt-5 max-w-4xl text-4xl font-bold leading-tight tracking-tight text-foreground">{project.name}</h3>
             <p className="mt-3 max-w-3xl text-muted-foreground">
               {project.description || "This board is ready for daily task execution, collaboration, and automation."}
             </p>
@@ -155,7 +187,7 @@ function ProjectWorkspacePage() {
                       search: { view },
                     })
                   }
-                  variant={activeView === view ? "default" : "outline"}
+                  variant={activeView === view ? "ops" : "outline"}
                 >
                   {view}
                 </Button>
@@ -163,9 +195,9 @@ function ProjectWorkspacePage() {
             </div>
           </div>
 
-          <div className="grid min-w-[20rem] gap-4 rounded-[28px] border border-border/70 bg-background/80 p-5">
+          <div className="grid min-w-[20rem] gap-4 rounded-[28px] border border-ops/20 bg-background/80 p-5 shadow-sm backdrop-blur-md">
             <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
                 Team pulse
               </p>
               <div className="mt-4 flex flex-wrap -space-x-3">
@@ -186,7 +218,7 @@ function ProjectWorkspacePage() {
 
             <div className="grid gap-3">
               <Link
-                className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-ops px-5 text-sm font-medium text-white transition hover:opacity-95 shadow-sm"
                 params={{ projectId }}
                 search={{ view: "board" }}
                 to="/operational/projects/$projectId"
@@ -220,8 +252,8 @@ function ProjectWorkspacePage() {
           </PermissionGate>
 
           <div className="space-y-6">
-            <Card className="p-6">
-              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
                 Board summary
               </p>
               <div className="mt-4 grid gap-3">
@@ -235,10 +267,10 @@ function ProjectWorkspacePage() {
               </div>
             </Card>
 
-            <Card className="p-6">
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
                     People on this board
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -316,8 +348,8 @@ function ProjectWorkspacePage() {
 
           <div className="space-y-6">
             <PermissionGate permission={permissions.operationalProjectEdit}>
-              <Card className="p-6">
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">
+              <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
                   Invite or remove member
                 </p>
                 <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr_auto_auto]">
@@ -342,6 +374,7 @@ function ProjectWorkspacePage() {
                         role_in_project: memberRole,
                       })
                     }
+                    variant="ops"
                   >
                     Assign
                   </Button>
@@ -367,13 +400,13 @@ function ProjectWorkspacePage() {
               </Card>
             </PermissionGate>
 
-            <Card className="p-6">
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
                     Current members
                   </p>
-                  <h4 className="mt-2 text-xl font-bold">Project collaborators</h4>
+                  <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Project collaborators</h4>
                 </div>
                 <PermissionGate permission={permissions.operationalProjectDelete}>
                   <Button
@@ -446,7 +479,7 @@ function Badge({ value }: { value: string }) {
 
 function StatusBadge({ value }: { value: string }) {
   return (
-    <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+    <span className="rounded-full bg-ops-light px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-ops-dark">
       {value}
     </span>
   );

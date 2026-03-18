@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { Department, EmployeeFormValues } from "@/types/hris";
+import { cn } from "@/lib/utils";
 
 const employeeFormSchema = z.object({
   user_id: z.string(),
@@ -67,31 +68,33 @@ export function EmployeeForm({
     defaultValues: defaultValues ?? baseValues,
   });
 
+  const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-hr focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-hr/10 disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
     <Card className="p-6">
       <div className="mb-6">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Employee form</p>
-        <h3 className="mt-2 text-2xl font-bold">{title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-hr mb-1">Employee Form</p>
+        <h3 className="text-[20px] font-[700] text-text-primary leading-tight">{title}</h3>
+        <p className="mt-1 text-[13px] text-text-secondary">{description}</p>
       </div>
 
-      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid gap-4 md:grid-cols-2">
+      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+        <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.full_name?.message} label="Nama lengkap">
-            <Input {...register("full_name")} placeholder="Safri Ahmad" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("full_name")} placeholder="Safri Ahmad" />
           </Field>
           <Field error={errors.email?.message} label="Email">
-            <Input {...register("email")} placeholder="staff@kantor.local" type="email" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("email")} placeholder="staff@kantor.local" type="email" />
           </Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-3">
           <Field error={errors.position?.message} label="Posisi">
-            <Input {...register("position")} placeholder="Backend Engineer" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("position")} placeholder="Backend Engineer" />
           </Field>
           <Field error={errors.department?.message} label="Department">
             <select
-              className="flex h-12 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               {...register("department")}
             >
               <option value="">Pilih department</option>
@@ -104,7 +107,7 @@ export function EmployeeForm({
           </Field>
           <Field error={errors.employment_status?.message} label="Status">
             <select
-              className="flex h-12 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              className={formControlClass}
               {...register("employment_status")}
             >
               <option value="active">Active</option>
@@ -115,37 +118,37 @@ export function EmployeeForm({
           </Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-3">
           <Field error={errors.phone?.message} label="Phone">
-            <Input {...register("phone")} placeholder="+62..." />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("phone")} placeholder="+62..." />
           </Field>
           <Field error={errors.date_joined?.message} label="Tanggal join">
-            <Input {...register("date_joined")} type="date" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("date_joined")} type="date" />
           </Field>
           <Field error={errors.user_id?.message} label="User ID">
-            <Input {...register("user_id")} placeholder="Kosongkan jika belum punya akses login" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("user_id")} placeholder="Kosongkan jika belum punya akses login" />
           </Field>
         </div>
 
         <Field error={errors.address?.message} label="Alamat">
           <textarea
-            className="min-h-24 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(formControlClass, "min-h-[96px] py-3")}
             {...register("address")}
             placeholder="Alamat tempat tinggal"
           />
         </Field>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.emergency_contact?.message} label="Emergency contact">
-            <Input {...register("emergency_contact")} placeholder="Nama - nomor telepon" />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("emergency_contact")} placeholder="Nama - nomor telepon" />
           </Field>
           <Field error={errors.avatar_url?.message} label="Avatar URL">
-            <Input {...register("avatar_url")} placeholder="https://..." />
+            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("avatar_url")} placeholder="https://..." />
           </Field>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Button disabled={isSubmitting} type="submit">
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button variant="hr" disabled={isSubmitting} type="submit">
             {isSubmitting ? "Saving..." : submitLabel}
           </Button>
           {onCancel ? (
@@ -169,10 +172,10 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+    <div className="space-y-1.5 flex flex-col">
+      <label className="text-[13px] font-[500] text-text-secondary">{label}</label>
       {children}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{error}</p> : null}
     </div>
   );
 }
