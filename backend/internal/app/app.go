@@ -244,6 +244,7 @@ func (a *App) buildRouter(
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
 	router.Use(chimiddleware.Recoverer)
+	router.Use(platformmiddleware.MaxBodySize(1 << 20)) // 1 MB default for JSON endpoints
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   a.cfg.CORSOrigins,
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
