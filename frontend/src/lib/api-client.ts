@@ -124,14 +124,16 @@ async function handleAuthRetry<T>(
           refreshPromise = refreshSession();
         }
         await refreshPromise;
-        refreshPromise = null;
         return await fn(getAccessToken());
       } catch {
-        refreshPromise = null;
         const { useAuthStore } = await import("@/stores/auth-store");
         useAuthStore.getState().clearSession();
+        // Hard navigation: app state is potentially corrupted at this
+        // point, so a full reload ensures no stale data remains.
         window.location.href = "/login";
         throw err;
+      } finally {
+        refreshPromise = null;
       }
     }
     throw err;
