@@ -34,7 +34,7 @@ func main() {
 		Addr:              ":" + cfg.Port,
 		Handler:           application.Router(),
 		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      120 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 

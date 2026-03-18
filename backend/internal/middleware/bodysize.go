@@ -2,16 +2,22 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/kana-consultant/kantor/backend/internal/response"
 )
 
-// MaxBodySize limits the request body to maxBytes.
+// MaxBodySize limits the request body to maxBytes for non-multipart requests.
+// Multipart/form-data requests are exempt because upload handlers set their
+// own limits via ParseMultipartForm.
 // Returns 413 if the body exceeds the limit.
 func MaxBodySize(maxBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			ct := r.Header.Get("Content-Type")
+			if !strings.HasPrefix(ct, "multipart/form-data") {
+				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			}
 			next.ServeHTTP(w, r)
 		})
 	}
