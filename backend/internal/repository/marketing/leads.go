@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -62,6 +63,9 @@ func NewLeadsRepository(db *pgxpool.Pool) *LeadsRepository {
 }
 
 func (r *LeadsRepository) CreateLead(ctx context.Context, params UpsertLeadParams) (model.Lead, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	if err := r.ensureEmployeeExists(ctx, params.AssignedTo); err != nil {
 		return model.Lead{}, err
 	}
@@ -98,6 +102,9 @@ func (r *LeadsRepository) CreateLead(ctx context.Context, params UpsertLeadParam
 }
 
 func (r *LeadsRepository) ListLeads(ctx context.Context, params ListLeadsParams) ([]model.Lead, int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
@@ -195,6 +202,9 @@ func (r *LeadsRepository) ListLeads(ctx context.Context, params ListLeadsParams)
 }
 
 func (r *LeadsRepository) GetLeadByID(ctx context.Context, leadID string) (model.Lead, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	row := r.db.QueryRow(ctx, `
 		SELECT
 			leads.id::text,
@@ -234,6 +244,9 @@ func (r *LeadsRepository) GetLeadByID(ctx context.Context, leadID string) (model
 }
 
 func (r *LeadsRepository) UpdateLead(ctx context.Context, leadID string, params UpsertLeadParams) (model.Lead, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	if err := r.ensureEmployeeExists(ctx, params.AssignedTo); err != nil {
 		return model.Lead{}, err
 	}
@@ -280,6 +293,9 @@ func (r *LeadsRepository) UpdateLead(ctx context.Context, leadID string, params 
 }
 
 func (r *LeadsRepository) DeleteLead(ctx context.Context, leadID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(ctx, `DELETE FROM leads WHERE id = $1::uuid`, leadID)
 	if err != nil {
 		return err
@@ -291,6 +307,9 @@ func (r *LeadsRepository) DeleteLead(ctx context.Context, leadID string) error {
 }
 
 func (r *LeadsRepository) ListPipeline(ctx context.Context) ([]model.LeadPipelineColumn, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			leads.id::text,
@@ -350,6 +369,9 @@ func (r *LeadsRepository) ListPipeline(ctx context.Context) ([]model.LeadPipelin
 }
 
 func (r *LeadsRepository) MoveLeadStatus(ctx context.Context, leadID string, status string, actorID string) (model.Lead, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return model.Lead{}, err
@@ -393,6 +415,9 @@ func (r *LeadsRepository) MoveLeadStatus(ctx context.Context, leadID string, sta
 }
 
 func (r *LeadsRepository) ListActivities(ctx context.Context, leadID string) ([]model.LeadActivity, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	if _, err := r.GetLeadByID(ctx, leadID); err != nil {
 		return nil, err
 	}
@@ -441,6 +466,9 @@ func (r *LeadsRepository) ListActivities(ctx context.Context, leadID string) ([]
 }
 
 func (r *LeadsRepository) CreateActivity(ctx context.Context, params CreateLeadActivityParams) (model.LeadActivity, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	if _, err := r.GetLeadByID(ctx, params.LeadID); err != nil {
 		return model.LeadActivity{}, err
 	}
@@ -479,6 +507,9 @@ func (r *LeadsRepository) CreateActivity(ctx context.Context, params CreateLeadA
 }
 
 func (r *LeadsRepository) Summary(ctx context.Context) (model.LeadSummary, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT pipeline_status, COUNT(*)::bigint, COALESCE(SUM(estimated_value), 0)::bigint
 		FROM leads

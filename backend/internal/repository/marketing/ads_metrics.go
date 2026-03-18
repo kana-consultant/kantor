@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -62,6 +63,9 @@ func NewAdsMetricsRepository(db *pgxpool.Pool) *AdsMetricsRepository {
 }
 
 func (r *AdsMetricsRepository) CreateMetric(ctx context.Context, params UpsertAdsMetricParams) (model.AdsMetric, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	row := r.db.QueryRow(
 		ctx,
 		`
@@ -95,6 +99,9 @@ func (r *AdsMetricsRepository) CreateMetric(ctx context.Context, params UpsertAd
 }
 
 func (r *AdsMetricsRepository) BatchCreateMetrics(ctx context.Context, params []UpsertAdsMetricParams) ([]model.AdsMetric, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -154,6 +161,9 @@ func (r *AdsMetricsRepository) BatchCreateMetrics(ctx context.Context, params []
 }
 
 func (r *AdsMetricsRepository) ListMetrics(ctx context.Context, params ListAdsMetricsParams) ([]model.AdsMetric, int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
@@ -250,6 +260,9 @@ func (r *AdsMetricsRepository) ListMetrics(ctx context.Context, params ListAdsMe
 }
 
 func (r *AdsMetricsRepository) GetMetricByID(ctx context.Context, metricID string) (model.AdsMetric, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	row := r.db.QueryRow(
 		ctx,
 		`
@@ -307,6 +320,9 @@ func (r *AdsMetricsRepository) GetMetricByID(ctx context.Context, metricID strin
 }
 
 func (r *AdsMetricsRepository) UpdateMetric(ctx context.Context, metricID string, params UpsertAdsMetricParams) (model.AdsMetric, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	row := r.db.QueryRow(
 		ctx,
 		`
@@ -348,6 +364,9 @@ func (r *AdsMetricsRepository) UpdateMetric(ctx context.Context, metricID string
 }
 
 func (r *AdsMetricsRepository) DeleteMetric(ctx context.Context, metricID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(ctx, `DELETE FROM ads_metrics WHERE id = $1::uuid`, metricID)
 	if err != nil {
 		return err
@@ -359,6 +378,9 @@ func (r *AdsMetricsRepository) DeleteMetric(ctx context.Context, metricID string
 }
 
 func (r *AdsMetricsRepository) Summary(ctx context.Context, params AdsMetricsSummaryParams) (model.AdsMetricsSummary, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
@@ -445,6 +467,9 @@ func (r *AdsMetricsRepository) Summary(ctx context.Context, params AdsMetricsSum
 }
 
 func (r *AdsMetricsRepository) ListForExport(ctx context.Context, params AdsMetricsExportParams) ([]model.AdsMetric, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
