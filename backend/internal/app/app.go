@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -244,6 +245,7 @@ func (a *App) buildRouter(
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
 	router.Use(chimiddleware.Recoverer)
+	router.Use(platformmiddleware.LoggingMiddleware)
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   a.cfg.CORSOrigins,
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
@@ -320,13 +322,17 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now())
+		if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now()); err != nil {
+			slog.Error("subscription alert generation failed", "error", err)
+		}
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case tickAt := <-ticker.C:
-				_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt)
+				if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt); err != nil {
+					slog.Error("subscription alert generation failed", "error", err)
+				}
 			}
 		}
 	}()

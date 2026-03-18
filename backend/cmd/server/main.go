@@ -23,6 +23,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	configureLogger(cfg.AppEnv)
+
 	application, err := app.New(ctx, cfg)
 	if err != nil {
 		slog.Error("failed to initialize application", "error", err)
@@ -53,4 +55,14 @@ func main() {
 		slog.Error("server exited with error", "error", err)
 		os.Exit(1)
 	}
+}
+
+func configureLogger(appEnv string) {
+	var handler slog.Handler
+	if appEnv == "production" {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+	}
+	slog.SetDefault(slog.New(handler))
 }
