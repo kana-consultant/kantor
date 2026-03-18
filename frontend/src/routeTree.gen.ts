@@ -17,12 +17,15 @@ import { Route as AuthenticatedForbiddenRouteImport } from './routes/_authentica
 import { Route as AuthenticatedOperationalIndexRouteImport } from './routes/_authenticated/operational/index'
 import { Route as AuthenticatedMarketingIndexRouteImport } from './routes/_authenticated/marketing/index'
 import { Route as AuthenticatedHrisIndexRouteImport } from './routes/_authenticated/hris/index'
+import { Route as AuthenticatedOperationalOverviewRouteImport } from './routes/_authenticated/operational/overview'
 import { Route as AuthenticatedOperationalAutomationRouteImport } from './routes/_authenticated/operational/automation'
+import { Route as AuthenticatedMarketingOverviewRouteImport } from './routes/_authenticated/marketing/overview'
 import { Route as AuthenticatedMarketingLeadsRouteImport } from './routes/_authenticated/marketing/leads'
 import { Route as AuthenticatedMarketingDashboardRouteImport } from './routes/_authenticated/marketing/dashboard'
 import { Route as AuthenticatedMarketingCampaignsRouteImport } from './routes/_authenticated/marketing/campaigns'
 import { Route as AuthenticatedMarketingAdsMetricsRouteImport } from './routes/_authenticated/marketing/ads-metrics'
 import { Route as AuthenticatedHrisSubscriptionsRouteImport } from './routes/_authenticated/hris/subscriptions'
+import { Route as AuthenticatedHrisOverviewRouteImport } from './routes/_authenticated/hris/overview'
 import { Route as AuthenticatedHrisFinanceRouteImport } from './routes/_authenticated/hris/finance'
 import { Route as AuthenticatedHrisDepartmentsRouteImport } from './routes/_authenticated/hris/departments'
 import { Route as AuthenticatedOperationalProjectsIndexRouteImport } from './routes/_authenticated/operational/projects/index'
@@ -73,10 +76,22 @@ const AuthenticatedHrisIndexRoute = AuthenticatedHrisIndexRouteImport.update({
   path: '/hris/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedOperationalOverviewRoute =
+  AuthenticatedOperationalOverviewRouteImport.update({
+    id: '/operational/overview',
+    path: '/operational/overview',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedOperationalAutomationRoute =
   AuthenticatedOperationalAutomationRouteImport.update({
     id: '/operational/automation',
     path: '/operational/automation',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMarketingOverviewRoute =
+  AuthenticatedMarketingOverviewRouteImport.update({
+    id: '/marketing/overview',
+    path: '/marketing/overview',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedMarketingLeadsRoute =
@@ -107,6 +122,12 @@ const AuthenticatedHrisSubscriptionsRoute =
   AuthenticatedHrisSubscriptionsRouteImport.update({
     id: '/hris/subscriptions',
     path: '/hris/subscriptions',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedHrisOverviewRoute =
+  AuthenticatedHrisOverviewRouteImport.update({
+    id: '/hris/overview',
+    path: '/hris/overview',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedHrisFinanceRoute =
@@ -165,12 +186,15 @@ export interface FileRoutesByFullPath {
   '/forbidden': typeof AuthenticatedForbiddenRoute
   '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/hris/finance': typeof AuthenticatedHrisFinanceRoute
+  '/hris/overview': typeof AuthenticatedHrisOverviewRoute
   '/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
   '/marketing/ads-metrics': typeof AuthenticatedMarketingAdsMetricsRoute
   '/marketing/campaigns': typeof AuthenticatedMarketingCampaignsRoute
   '/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
   '/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
+  '/marketing/overview': typeof AuthenticatedMarketingOverviewRoute
   '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
+  '/operational/overview': typeof AuthenticatedOperationalOverviewRoute
   '/hris/': typeof AuthenticatedHrisIndexRoute
   '/marketing/': typeof AuthenticatedMarketingIndexRoute
   '/operational/': typeof AuthenticatedOperationalIndexRoute
@@ -188,12 +212,15 @@ export interface FileRoutesByTo {
   '/forbidden': typeof AuthenticatedForbiddenRoute
   '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/hris/finance': typeof AuthenticatedHrisFinanceRoute
+  '/hris/overview': typeof AuthenticatedHrisOverviewRoute
   '/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
   '/marketing/ads-metrics': typeof AuthenticatedMarketingAdsMetricsRoute
   '/marketing/campaigns': typeof AuthenticatedMarketingCampaignsRoute
   '/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
   '/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
+  '/marketing/overview': typeof AuthenticatedMarketingOverviewRoute
   '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
+  '/operational/overview': typeof AuthenticatedOperationalOverviewRoute
   '/hris': typeof AuthenticatedHrisIndexRoute
   '/marketing': typeof AuthenticatedMarketingIndexRoute
   '/operational': typeof AuthenticatedOperationalIndexRoute
@@ -213,12 +240,15 @@ export interface FileRoutesById {
   '/_authenticated/forbidden': typeof AuthenticatedForbiddenRoute
   '/_authenticated/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/_authenticated/hris/finance': typeof AuthenticatedHrisFinanceRoute
+  '/_authenticated/hris/overview': typeof AuthenticatedHrisOverviewRoute
   '/_authenticated/hris/subscriptions': typeof AuthenticatedHrisSubscriptionsRoute
   '/_authenticated/marketing/ads-metrics': typeof AuthenticatedMarketingAdsMetricsRoute
   '/_authenticated/marketing/campaigns': typeof AuthenticatedMarketingCampaignsRoute
   '/_authenticated/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
   '/_authenticated/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
+  '/_authenticated/marketing/overview': typeof AuthenticatedMarketingOverviewRoute
   '/_authenticated/operational/automation': typeof AuthenticatedOperationalAutomationRoute
+  '/_authenticated/operational/overview': typeof AuthenticatedOperationalOverviewRoute
   '/_authenticated/hris/': typeof AuthenticatedHrisIndexRoute
   '/_authenticated/marketing/': typeof AuthenticatedMarketingIndexRoute
   '/_authenticated/operational/': typeof AuthenticatedOperationalIndexRoute
@@ -238,12 +268,15 @@ export interface FileRouteTypes {
     | '/forbidden'
     | '/hris/departments'
     | '/hris/finance'
+    | '/hris/overview'
     | '/hris/subscriptions'
     | '/marketing/ads-metrics'
     | '/marketing/campaigns'
     | '/marketing/dashboard'
     | '/marketing/leads'
+    | '/marketing/overview'
     | '/operational/automation'
+    | '/operational/overview'
     | '/hris/'
     | '/marketing/'
     | '/operational/'
@@ -261,12 +294,15 @@ export interface FileRouteTypes {
     | '/forbidden'
     | '/hris/departments'
     | '/hris/finance'
+    | '/hris/overview'
     | '/hris/subscriptions'
     | '/marketing/ads-metrics'
     | '/marketing/campaigns'
     | '/marketing/dashboard'
     | '/marketing/leads'
+    | '/marketing/overview'
     | '/operational/automation'
+    | '/operational/overview'
     | '/hris'
     | '/marketing'
     | '/operational'
@@ -285,12 +321,15 @@ export interface FileRouteTypes {
     | '/_authenticated/forbidden'
     | '/_authenticated/hris/departments'
     | '/_authenticated/hris/finance'
+    | '/_authenticated/hris/overview'
     | '/_authenticated/hris/subscriptions'
     | '/_authenticated/marketing/ads-metrics'
     | '/_authenticated/marketing/campaigns'
     | '/_authenticated/marketing/dashboard'
     | '/_authenticated/marketing/leads'
+    | '/_authenticated/marketing/overview'
     | '/_authenticated/operational/automation'
+    | '/_authenticated/operational/overview'
     | '/_authenticated/hris/'
     | '/_authenticated/marketing/'
     | '/_authenticated/operational/'
@@ -367,11 +406,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHrisIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/operational/overview': {
+      id: '/_authenticated/operational/overview'
+      path: '/operational/overview'
+      fullPath: '/operational/overview'
+      preLoaderRoute: typeof AuthenticatedOperationalOverviewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/operational/automation': {
       id: '/_authenticated/operational/automation'
       path: '/operational/automation'
       fullPath: '/operational/automation'
       preLoaderRoute: typeof AuthenticatedOperationalAutomationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/marketing/overview': {
+      id: '/_authenticated/marketing/overview'
+      path: '/marketing/overview'
+      fullPath: '/marketing/overview'
+      preLoaderRoute: typeof AuthenticatedMarketingOverviewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/marketing/leads': {
@@ -407,6 +460,13 @@ declare module '@tanstack/react-router' {
       path: '/hris/subscriptions'
       fullPath: '/hris/subscriptions'
       preLoaderRoute: typeof AuthenticatedHrisSubscriptionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/hris/overview': {
+      id: '/_authenticated/hris/overview'
+      path: '/hris/overview'
+      fullPath: '/hris/overview'
+      preLoaderRoute: typeof AuthenticatedHrisOverviewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/hris/finance': {
@@ -472,12 +532,15 @@ interface AuthenticatedRouteChildren {
   AuthenticatedForbiddenRoute: typeof AuthenticatedForbiddenRoute
   AuthenticatedHrisDepartmentsRoute: typeof AuthenticatedHrisDepartmentsRoute
   AuthenticatedHrisFinanceRoute: typeof AuthenticatedHrisFinanceRoute
+  AuthenticatedHrisOverviewRoute: typeof AuthenticatedHrisOverviewRoute
   AuthenticatedHrisSubscriptionsRoute: typeof AuthenticatedHrisSubscriptionsRoute
   AuthenticatedMarketingAdsMetricsRoute: typeof AuthenticatedMarketingAdsMetricsRoute
   AuthenticatedMarketingCampaignsRoute: typeof AuthenticatedMarketingCampaignsRoute
   AuthenticatedMarketingDashboardRoute: typeof AuthenticatedMarketingDashboardRoute
   AuthenticatedMarketingLeadsRoute: typeof AuthenticatedMarketingLeadsRoute
+  AuthenticatedMarketingOverviewRoute: typeof AuthenticatedMarketingOverviewRoute
   AuthenticatedOperationalAutomationRoute: typeof AuthenticatedOperationalAutomationRoute
+  AuthenticatedOperationalOverviewRoute: typeof AuthenticatedOperationalOverviewRoute
   AuthenticatedHrisIndexRoute: typeof AuthenticatedHrisIndexRoute
   AuthenticatedMarketingIndexRoute: typeof AuthenticatedMarketingIndexRoute
   AuthenticatedOperationalIndexRoute: typeof AuthenticatedOperationalIndexRoute
@@ -493,13 +556,16 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedForbiddenRoute: AuthenticatedForbiddenRoute,
   AuthenticatedHrisDepartmentsRoute: AuthenticatedHrisDepartmentsRoute,
   AuthenticatedHrisFinanceRoute: AuthenticatedHrisFinanceRoute,
+  AuthenticatedHrisOverviewRoute: AuthenticatedHrisOverviewRoute,
   AuthenticatedHrisSubscriptionsRoute: AuthenticatedHrisSubscriptionsRoute,
   AuthenticatedMarketingAdsMetricsRoute: AuthenticatedMarketingAdsMetricsRoute,
   AuthenticatedMarketingCampaignsRoute: AuthenticatedMarketingCampaignsRoute,
   AuthenticatedMarketingDashboardRoute: AuthenticatedMarketingDashboardRoute,
   AuthenticatedMarketingLeadsRoute: AuthenticatedMarketingLeadsRoute,
+  AuthenticatedMarketingOverviewRoute: AuthenticatedMarketingOverviewRoute,
   AuthenticatedOperationalAutomationRoute:
     AuthenticatedOperationalAutomationRoute,
+  AuthenticatedOperationalOverviewRoute: AuthenticatedOperationalOverviewRoute,
   AuthenticatedHrisIndexRoute: AuthenticatedHrisIndexRoute,
   AuthenticatedMarketingIndexRoute: AuthenticatedMarketingIndexRoute,
   AuthenticatedOperationalIndexRoute: AuthenticatedOperationalIndexRoute,
