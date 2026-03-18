@@ -2,9 +2,12 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+import { Plus, UserMinus, Users } from "lucide-react";
 
 import { AssignmentRulesPanel } from "@/components/shared/assignment-rules-panel";
 import { KanbanBoard } from "@/components/shared/kanban-board";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProjectForm } from "@/components/shared/project-form";
 import { StatusBadge as SharedStatusBadge } from "@/components/shared/status-badge";
@@ -41,8 +44,12 @@ function ProjectWorkspacePage() {
   const activeView = search.view ?? "board";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [memberUserRef, setMemberUserRef] = useState("");
   const [memberRole, setMemberRole] = useState("");
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const projectQuery = useQuery({
     queryKey: projectsKeys.detail(projectId),
@@ -69,6 +76,7 @@ function ProjectWorkspacePage() {
   const updateMutation = useMutation({
     mutationFn: (values: ProjectFormValues) => updateProject(projectId, values),
     onSuccess: async () => {
+      setIsEditOpen(false);
       await queryClient.invalidateQueries({ queryKey: projectsKeys.detail(projectId) });
       await queryClient.invalidateQueries({ queryKey: projectsKeys.all });
     },
@@ -77,6 +85,7 @@ function ProjectWorkspacePage() {
   const deleteMutation = useMutation({
     mutationFn: () => deleteProject(projectId),
     onSuccess: async () => {
+      setIsDeleteDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: projectsKeys.all });
       void navigate({ to: "/operational/projects" });
     },
@@ -92,6 +101,8 @@ function ProjectWorkspacePage() {
     onSuccess: async () => {
       setMemberUserRef("");
       setMemberRole("");
+      setIsMemberModalOpen(false);
+      setMemberToRemove(null);
       await queryClient.invalidateQueries({ queryKey: projectsKeys.detail(projectId) });
       await queryClient.invalidateQueries({ queryKey: projectsKeys.all });
     },
@@ -329,75 +340,47 @@ function ProjectWorkspacePage() {
 
       {activeView === "settings" ? (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          {editDefaults ? (
-            <ProjectForm
-              defaultValues={editDefaults}
-              description="Edit core project information without interrupting the main board workflow."
-              isSubmitting={updateMutation.isPending}
-              onCancel={() =>
-                void navigate({
-                  to: "/operational/projects/$projectId",
-                  params: { projectId },
-                  search: { view: "board" },
-                })
-              }
-              onSubmit={(values) => updateMutation.mutate(values)}
-              submitLabel="Save project"
-              title="Project settings"
-            />
-          ) : null}
+          <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
+                  Project settings
+                </p>
+                <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Core project details</h4>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Update the project brief, deadline, and priority without pushing the page layout.
+                </p>
+              </div>
+              <PermissionGate permission={permissions.operationalProjectEdit}>
+                <Button onClick={() => setIsEditOpen(true)} variant="ops">
+                  Edit project
+                </Button>
+              </PermissionGate>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <SummaryRow label="Status" value={project.status.replace("_", " ")} />
+              <SummaryRow label="Priority" value={project.priority} />
+              <SummaryRow label="Deadline" value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"} />
+              <SummaryRow label="Description" value={project.description || "-"} />
+            </div>
+          </Card>
 
           <div className="space-y-6">
             <PermissionGate permission={permissions.operationalProjectEdit}>
               <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                  Invite or remove member
+                  Members
                 </p>
-                <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr_auto_auto]">
-                  <Input
-                    onChange={(event) => setMemberUserRef(event.target.value)}
-                    placeholder="Email or user ID"
-                    value={memberUserRef}
-                  />
-                  <Input
-                    onChange={(event) => setMemberRole(event.target.value)}
-                    placeholder="Role in project"
-                    value={memberRole}
-                  />
-                  <Button
-                    disabled={memberMutation.isPending}
-                    onClick={() =>
-                      memberMutation.mutate({
-                        operation: "assign",
-                        ...(memberUserRef.includes("@")
-                          ? { user_email: memberUserRef }
-                          : { user_id: memberUserRef }),
-                        role_in_project: memberRole,
-                      })
-                    }
-                    variant="ops"
-                  >
-                    Assign
-                  </Button>
-                  <Button
-                    disabled={memberMutation.isPending}
-                    onClick={() =>
-                      memberMutation.mutate({
-                        operation: "remove",
-                        ...(memberUserRef.includes("@")
-                          ? { user_email: memberUserRef }
-                          : { user_id: memberUserRef }),
-                      })
-                    }
-                    variant="ghost"
-                  >
-                    Remove
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Invite by email or user ID, then manage removals from the member list below.
+                  </p>
+                  <Button onClick={() => setIsMemberModalOpen(true)} variant="ops">
+                    <Plus className="h-4 w-4" />
+                    Add member
                   </Button>
                 </div>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Gunakan email seed seperti `staff.ops@kantor.local` atau `viewer.ops@kantor.local`
-                  agar tidak perlu lookup UUID.
-                </p>
               </Card>
             </PermissionGate>
 
@@ -412,11 +395,7 @@ function ProjectWorkspacePage() {
                 <PermissionGate permission={permissions.operationalProjectDelete}>
                   <Button
                     disabled={deleteMutation.isPending}
-                    onClick={() => {
-                      if (window.confirm(`Delete project "${project.name}"?`)) {
-                        deleteMutation.mutate();
-                      }
-                    }}
+                    onClick={() => setProjectToDelete(project)}
                     variant="ghost"
                   >
                     {deleteMutation.isPending ? "Deleting..." : "Delete project"}
@@ -436,11 +415,45 @@ function ProjectWorkspacePage() {
                         {member.user_email || member.user_id}
                       </p>
                     </div>
-                    <Badge value={member.role_in_project} />
+                    <div className="flex items-center gap-3">
+                      <Badge value={member.role_in_project} />
+                      <PermissionGate permission={permissions.operationalProjectEdit}>
+                        <Button
+                          onClick={() =>
+                            setMemberToRemove({
+                              id: member.user_id,
+                              name: member.full_name || member.user_email || member.user_id,
+                            })
+                          }
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                          Remove
+                        </Button>
+                      </PermissionGate>
+                    </div>
                   </div>
                 ))}
               </div>
             </Card>
+
+            <PermissionGate permission={permissions.operationalProjectDelete}>
+              <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">Danger zone</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Deleting this project removes the board and all related task data.
+                    </p>
+                  </div>
+                  <Button onClick={() => setIsDeleteDialogOpen(true)} variant="ghost">
+                    Delete project
+                  </Button>
+                </div>
+              </Card>
+            </PermissionGate>
           </div>
         </div>
       ) : null}
@@ -457,6 +470,80 @@ function ProjectWorkspacePage() {
           <AssignmentRulesPanel projectId={projectId} />
         </PermissionGate>
       ) : null}
+
+      {editDefaults ? (
+        <ProjectForm
+          defaultValues={editDefaults}
+          description="Edit core project information without interrupting the board context."
+          isOpen={isEditOpen}
+          isSubmitting={updateMutation.isPending}
+          onCancel={() => setIsEditOpen(false)}
+          onSubmit={(values) => updateMutation.mutate(values)}
+          submitLabel="Save project"
+          title="Project settings"
+        />
+      ) : null}
+
+      <FormModal
+        isLoading={memberMutation.isPending}
+        isOpen={isMemberModalOpen}
+        onClose={() => {
+          setIsMemberModalOpen(false);
+          setMemberUserRef("");
+          setMemberRole("");
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          memberMutation.mutate({
+            operation: "assign",
+            ...(memberUserRef.includes("@") ? { user_email: memberUserRef } : { user_id: memberUserRef }),
+            role_in_project: memberRole,
+          });
+        }}
+        size="md"
+        submitLabel="Add member"
+        title="Add project member"
+        subtitle="Use a seed email like staff.ops@kantor.local or a user ID to attach a collaborator to this project."
+      >
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <label className="text-[13px] font-[600] text-text-primary">Email or user ID</label>
+            <Input onChange={(event) => setMemberUserRef(event.target.value)} placeholder="staff.ops@kantor.local" value={memberUserRef} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[13px] font-[600] text-text-primary">Role in project</label>
+            <Input onChange={(event) => setMemberRole(event.target.value)} placeholder="developer, qa, lead" value={memberRole} />
+          </div>
+        </div>
+      </FormModal>
+
+      <ConfirmDialog
+        confirmLabel="Hapus project"
+        description={`Semua task dan data terkait untuk "${project.name}" akan ikut terhapus.`}
+        isLoading={deleteMutation.isPending}
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        title={`Hapus ${project.name}?`}
+      />
+
+      <ConfirmDialog
+        confirmLabel="Keluarkan member"
+        description={
+          memberToRemove
+            ? `${memberToRemove.name} akan dihapus dari project ini.`
+            : ""
+        }
+        isLoading={memberMutation.isPending}
+        isOpen={Boolean(memberToRemove)}
+        onClose={() => setMemberToRemove(null)}
+        onConfirm={() => {
+          if (memberToRemove) {
+            memberMutation.mutate({ operation: "remove", user_id: memberToRemove.id });
+          }
+        }}
+        title={memberToRemove ? `Keluarkan ${memberToRemove.name}?` : "Keluarkan member?"}
+      />
     </div>
   );
 }

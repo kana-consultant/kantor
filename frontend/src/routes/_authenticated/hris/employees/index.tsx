@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmployeeForm } from "@/components/shared/employee-form";
 import { PermissionGate } from "@/components/shared/permission-gate";
@@ -41,6 +43,7 @@ function EmployeesPage() {
   const { hasPermission } = useRBAC();
   const [filters, setFilters] = useState<EmployeeFilters>(defaultFilters);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
 
   const departmentsQuery = useQuery({
     queryKey: departmentsKeys.list(),
@@ -63,6 +66,7 @@ function EmployeesPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteEmployee,
     onSuccess: async () => {
+      setEmployeeToDelete(null);
       await queryClient.invalidateQueries({ queryKey: employeesKeys.all });
     },
   });
@@ -135,7 +139,7 @@ function EmployeesPage() {
           {hasPermission(permissions.hrisEmployeeDelete) ? (
             <Button
               disabled={deleteMutation.isPending && deleteMutation.variables === employee.id}
-              onClick={() => deleteMutation.mutate(employee.id)}
+              onClick={() => setEmployeeToDelete(employee)}
               size="sm"
               type="button"
               variant="ghost"
@@ -163,24 +167,24 @@ function EmployeesPage() {
           </div>
 
           <PermissionGate permission={permissions.hrisEmployeeCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)}>
-              {isCreateOpen ? "Close form" : "Add employee"}
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add employee
             </Button>
           </PermissionGate>
         </div>
       </Card>
 
-      {isCreateOpen ? (
-        <EmployeeForm
-          departments={departmentsQuery.data ?? []}
-          description="Form create employee menggunakan React Hook Form + Zod."
-          isSubmitting={createMutation.isPending}
-          onCancel={() => setIsCreateOpen(false)}
-          onSubmit={(values) => createMutation.mutate(values)}
-          submitLabel="Create employee"
-          title="New employee"
-        />
-      ) : null}
+      <EmployeeForm
+        departments={departmentsQuery.data ?? []}
+        description="Capture employee identity, role, department, and emergency contact in one large dialog."
+        isOpen={isCreateOpen}
+        isSubmitting={createMutation.isPending}
+        onCancel={() => setIsCreateOpen(false)}
+        onSubmit={(values) => createMutation.mutate(values)}
+        submitLabel="Create employee"
+        title="New employee"
+      />
 
       <Card className="p-6">
         <div className="grid gap-4 md:grid-cols-4">
@@ -272,6 +276,24 @@ function EmployeesPage() {
               }
             : undefined
         }
+      />
+
+      <ConfirmDialog
+        confirmLabel="Hapus employee"
+        description={
+          employeeToDelete
+            ? `Data employee "${employeeToDelete.full_name}" akan dihapus dari HRIS.`
+            : ""
+        }
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(employeeToDelete)}
+        onClose={() => setEmployeeToDelete(null)}
+        onConfirm={() => {
+          if (employeeToDelete) {
+            deleteMutation.mutate(employeeToDelete.id);
+          }
+        }}
+        title={employeeToDelete ? `Hapus ${employeeToDelete.full_name}?` : "Hapus employee?"}
       />
     </div>
   );

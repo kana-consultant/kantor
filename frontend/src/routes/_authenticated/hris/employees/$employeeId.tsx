@@ -5,11 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { CircleDollarSign, Gift } from "lucide-react";
+import { CircleDollarSign, Gift, Plus } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmployeeForm } from "@/components/shared/employee-form";
 import { EmptyState } from "@/components/shared/empty-state";
+import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -73,7 +75,11 @@ function EmployeeDetailPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"profile" | "salary" | "bonus" | "reimbursements">("profile");
   const [isEditing, setIsEditing] = useState(false);
+  const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
+  const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
   const [editingBonus, setEditingBonus] = useState<BonusRecord | null>(null);
+  const [bonusToDelete, setBonusToDelete] = useState<BonusRecord | null>(null);
+  const [bonusToReject, setBonusToReject] = useState<BonusRecord | null>(null);
 
   const salaryForm = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
@@ -159,6 +165,7 @@ function EmployeeDetailPage() {
         deductions: "",
         effective_date: "",
       });
+      setIsSalaryModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: compensationKeys.currentSalary(employeeId) });
       await queryClient.invalidateQueries({ queryKey: compensationKeys.salaries(employeeId) });
     },
@@ -168,6 +175,7 @@ function EmployeeDetailPage() {
     mutationFn: (values: BonusFormValues) => createBonus(employeeId, values),
     onSuccess: async () => {
       resetBonusForm(bonusForm);
+      setIsBonusModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: compensationKeys.bonuses(employeeId) });
     },
   });
@@ -177,6 +185,7 @@ function EmployeeDetailPage() {
     onSuccess: async () => {
       setEditingBonus(null);
       resetBonusForm(bonusForm);
+      setIsBonusModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: compensationKeys.bonuses(employeeId) });
     },
   });
@@ -188,6 +197,7 @@ function EmployeeDetailPage() {
         setEditingBonus(null);
         resetBonusForm(bonusForm);
       }
+      setBonusToDelete(null);
       await queryClient.invalidateQueries({ queryKey: compensationKeys.bonuses(employeeId) });
     },
   });
@@ -202,6 +212,7 @@ function EmployeeDetailPage() {
   const rejectBonusMutation = useMutation({
     mutationFn: rejectBonus,
     onSuccess: async () => {
+      setBonusToReject(null);
       await queryClient.invalidateQueries({ queryKey: compensationKeys.bonuses(employeeId) });
     },
   });
@@ -240,23 +251,22 @@ function EmployeeDetailPage() {
           </div>
 
           <PermissionGate permission={permissions.hrisEmployeeEdit}>
-            <Button onClick={() => setIsEditing((value) => !value)}>{isEditing ? "Close edit" : "Edit profile"}</Button>
+            <Button onClick={() => setIsEditing(true)}>Edit profile</Button>
           </PermissionGate>
         </div>
       </Card>
 
-      {isEditing ? (
-        <EmployeeForm
-          defaultValues={toEmployeeFormValues(employee)}
-          departments={departmentsQuery.data ?? []}
-          description="Perbarui data profil karyawan tanpa meninggalkan halaman detail."
-          isSubmitting={updateEmployeeMutation.isPending}
-          onCancel={() => setIsEditing(false)}
-          onSubmit={(values) => updateEmployeeMutation.mutate(values)}
-          submitLabel="Save changes"
-          title="Edit employee"
-        />
-      ) : null}
+      <EmployeeForm
+        defaultValues={toEmployeeFormValues(employee)}
+        departments={departmentsQuery.data ?? []}
+        description="Perbarui data profil karyawan tanpa meninggalkan halaman detail."
+        isOpen={isEditing}
+        isSubmitting={updateEmployeeMutation.isPending}
+        onCancel={() => setIsEditing(false)}
+        onSubmit={(values) => updateEmployeeMutation.mutate(values)}
+        submitLabel="Save changes"
+        title="Edit employee"
+      />
 
       <div className="flex flex-wrap gap-3">
         <Button onClick={() => setTab("profile")} variant={tab === "profile" ? "default" : "outline"}>Profile</Button>
@@ -278,6 +288,8 @@ function EmployeeDetailPage() {
             currentSalaryError={currentSalaryQuery.error}
             form={salaryForm}
             history={salaryHistoryQuery.data ?? []}
+            isModalOpen={isSalaryModalOpen}
+            onModalOpenChange={setIsSalaryModalOpen}
           />
         </PermissionGate>
       ) : null}
@@ -294,8 +306,14 @@ function EmployeeDetailPage() {
             createMutation={createBonusMutation}
             deleteMutation={deleteBonusMutation}
             editingBonus={editingBonus}
+            isModalOpen={isBonusModalOpen}
             rejectMutation={rejectBonusMutation}
+            bonusToDelete={bonusToDelete}
+            bonusToReject={bonusToReject}
             setEditingBonus={setEditingBonus}
+            setBonusToDelete={setBonusToDelete}
+            setBonusToReject={setBonusToReject}
+            setIsModalOpen={setIsBonusModalOpen}
             updateMutation={updateBonusMutation}
           />
         </PermissionGate>
@@ -356,12 +374,16 @@ function SalaryTab({
   history,
   form,
   createMutation,
+  isModalOpen,
+  onModalOpenChange,
 }: {
   currentSalary?: SalaryRecord;
   currentSalaryError: unknown;
   history: SalaryRecord[];
   form: ReturnType<typeof useForm<SalaryFormValues>>;
   createMutation: ReturnType<typeof useMutation<SalaryRecord, Error, SalaryFormValues>>;
+  isModalOpen: boolean;
+  onModalOpenChange: (value: boolean) => void;
 }) {
   const {
     control,
@@ -390,53 +412,18 @@ function SalaryTab({
 
       <PermissionGate permission={permissions.hrisSalaryCreate}>
         <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Add salary record</p>
-          <form className="mt-4 space-y-4" onSubmit={handleSubmit((values) => createMutation.mutate(values))}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field error={errors.base_salary?.message} label="Base salary">
-                <Controller
-                  control={control}
-                  name="base_salary"
-                  render={({ field }) => (
-                    <CurrencyInput
-                      onBlur={field.onBlur}
-                      onValueChange={field.onChange}
-                      ref={field.ref}
-                      value={field.value}
-                    />
-                  )}
-                />
-              </Field>
-              <Field error={errors.effective_date?.message} label="Effective date">
-                <Input {...register("effective_date")} type="date" />
-              </Field>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Add salary record</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Create a new compensation snapshot without shifting the salary history below it.
+              </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                error={errors.allowances?.message}
-                hint="Format per baris: Transport: Rp 500.000"
-                label="Allowances"
-              >
-                <textarea
-                  className="min-h-28 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-                  {...register("allowances")}
-                />
-              </Field>
-              <Field
-                error={errors.deductions?.message}
-                hint="Format per baris: BPJS: Rp 250.000"
-                label="Deductions"
-              >
-                <textarea
-                  className="min-h-28 w-full rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-                  {...register("deductions")}
-                />
-              </Field>
-            </div>
-            <Button disabled={createMutation.isPending} type="submit">
-              {createMutation.isPending ? "Saving..." : "Add salary"}
+            <Button onClick={() => onModalOpenChange(true)} type="button">
+              <Plus className="h-4 w-4" />
+              Add salary
             </Button>
-          </form>
+          </div>
         </Card>
       </PermissionGate>
 
@@ -467,6 +454,59 @@ function SalaryTab({
           )}
         </div>
       </Card>
+
+      <FormModal
+        isLoading={createMutation.isPending}
+        isOpen={isModalOpen}
+        onClose={() => onModalOpenChange(false)}
+        onSubmit={handleSubmit((values) => createMutation.mutate(values))}
+        size="md"
+        submitLabel="Add salary"
+        title="Add salary record"
+        subtitle="Store the latest salary composition and effective date for this employee."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field error={errors.base_salary?.message} label="Base salary">
+            <Controller
+              control={control}
+              name="base_salary"
+              render={({ field }) => (
+                <CurrencyInput
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  ref={field.ref}
+                  value={field.value}
+                />
+              )}
+            />
+          </Field>
+          <Field error={errors.effective_date?.message} label="Effective date">
+            <Input {...register("effective_date")} type="date" />
+          </Field>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field
+            error={errors.allowances?.message}
+            hint="Format per baris: Transport: Rp 500.000"
+            label="Allowances"
+          >
+            <textarea
+              className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
+              {...register("allowances")}
+            />
+          </Field>
+          <Field
+            error={errors.deductions?.message}
+            hint="Format per baris: BPJS: Rp 250.000"
+            label="Deductions"
+          >
+            <textarea
+              className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
+              {...register("deductions")}
+            />
+          </Field>
+        </div>
+      </FormModal>
     </div>
   );
 }
@@ -480,7 +520,13 @@ function BonusTab({
   approveMutation,
   rejectMutation,
   editingBonus,
+  isModalOpen,
+  bonusToDelete,
+  bonusToReject,
   setEditingBonus,
+  setBonusToDelete,
+  setBonusToReject,
+  setIsModalOpen,
 }: {
   bonuses: BonusRecord[];
   bonusForm: ReturnType<typeof useForm<BonusFormValues>>;
@@ -491,6 +537,12 @@ function BonusTab({
   rejectMutation: ReturnType<typeof useMutation<BonusRecord, Error, string>>;
   editingBonus: BonusRecord | null;
   setEditingBonus: (bonus: BonusRecord | null) => void;
+  isModalOpen: boolean;
+  bonusToDelete: BonusRecord | null;
+  bonusToReject: BonusRecord | null;
+  setBonusToDelete: (bonus: BonusRecord | null) => void;
+  setBonusToReject: (bonus: BonusRecord | null) => void;
+  setIsModalOpen: (value: boolean) => void;
 }) {
   const { hasPermission } = useRBAC();
   const {
@@ -504,62 +556,25 @@ function BonusTab({
     <div className="space-y-6">
       {hasPermission(permissions.hrisBonusCreate) || (Boolean(editingBonus) && hasPermission(permissions.hrisBonusEdit)) ? (
         <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{editingBonus ? "Edit bonus" : "Add bonus"}</p>
-          <form
-            className="mt-4 space-y-4"
-            onSubmit={handleSubmit((values) => {
-              if (editingBonus) {
-                updateMutation.mutate({ bonusId: editingBonus.id, values });
-                return;
-              }
-              createMutation.mutate(values);
-            })}
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field error={errors.amount?.message} label="Amount">
-                <Controller
-                  control={control}
-                  name="amount"
-                  render={({ field }) => (
-                    <CurrencyInput
-                      onBlur={field.onBlur}
-                      onValueChange={field.onChange}
-                      ref={field.ref}
-                      value={field.value}
-                    />
-                  )}
-                />
-              </Field>
-              <Field error={errors.reason?.message} label="Reason">
-                <Input {...register("reason")} placeholder="Project launch performance" />
-              </Field>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Bonus records</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Create or revise pending bonus requests in a focused dialog.
+              </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field error={errors.period_month?.message} label="Period month">
-                <Input {...register("period_month", { valueAsNumber: true })} max={12} min={1} type="number" />
-              </Field>
-              <Field error={errors.period_year?.message} label="Period year">
-                <Input {...register("period_year", { valueAsNumber: true })} max={2100} min={2000} type="number" />
-              </Field>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
-                {editingBonus ? (updateMutation.isPending ? "Saving..." : "Save bonus") : createMutation.isPending ? "Saving..." : "Add bonus"}
-              </Button>
-              {editingBonus ? (
-                <Button
-                  onClick={() => {
-                    setEditingBonus(null);
-                    resetBonusForm(bonusForm);
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Cancel edit
-                </Button>
-              ) : null}
-            </div>
-          </form>
+            <Button
+              onClick={() => {
+                setEditingBonus(null);
+                resetBonusForm(bonusForm);
+                setIsModalOpen(true);
+              }}
+              type="button"
+            >
+              <Plus className="h-4 w-4" />
+              Add bonus
+            </Button>
+          </div>
         </Card>
       ) : null}
 
@@ -601,6 +616,7 @@ function BonusTab({
                                 period_month: bonus.period_month,
                                 period_year: bonus.period_year,
                               });
+                              setIsModalOpen(true);
                             }}
                             size="sm"
                             type="button"
@@ -610,7 +626,7 @@ function BonusTab({
                           </Button>
                           <Button
                             disabled={deleteMutation.isPending}
-                            onClick={() => deleteMutation.mutate(bonus.id)}
+                            onClick={() => setBonusToDelete(bonus)}
                             size="sm"
                             type="button"
                             variant="ghost"
@@ -634,7 +650,7 @@ function BonusTab({
                         </Button>
                         <Button
                           disabled={rejectMutation.isPending}
-                          onClick={() => rejectMutation.mutate(bonus.id)}
+                          onClick={() => setBonusToReject(bonus)}
                           size="sm"
                           variant="ghost"
                         >
@@ -650,6 +666,83 @@ function BonusTab({
           )}
         </div>
       </Card>
+
+      <FormModal
+        isLoading={createMutation.isPending || updateMutation.isPending}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingBonus(null);
+          resetBonusForm(bonusForm);
+        }}
+        onSubmit={handleSubmit((values) => {
+          if (editingBonus) {
+            updateMutation.mutate({ bonusId: editingBonus.id, values });
+            return;
+          }
+          createMutation.mutate(values);
+        })}
+        size="md"
+        submitLabel={editingBonus ? "Save bonus" : "Add bonus"}
+        title={editingBonus ? "Edit bonus" : "Add bonus"}
+        subtitle="Capture the amount, reason, and payout period before approval."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field error={errors.amount?.message} label="Amount">
+            <Controller
+              control={control}
+              name="amount"
+              render={({ field }) => (
+                <CurrencyInput
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  ref={field.ref}
+                  value={field.value}
+                />
+              )}
+            />
+          </Field>
+          <Field error={errors.reason?.message} label="Reason">
+            <Input {...register("reason")} placeholder="Project launch performance" />
+          </Field>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field error={errors.period_month?.message} label="Period month">
+            <Input {...register("period_month", { valueAsNumber: true })} max={12} min={1} type="number" />
+          </Field>
+          <Field error={errors.period_year?.message} label="Period year">
+            <Input {...register("period_year", { valueAsNumber: true })} max={2100} min={2000} type="number" />
+          </Field>
+        </div>
+      </FormModal>
+
+      <ConfirmDialog
+        confirmLabel="Delete bonus"
+        description={bonusToDelete ? `Pending bonus "${bonusToDelete.reason}" will be removed.` : ""}
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(bonusToDelete)}
+        onClose={() => setBonusToDelete(null)}
+        onConfirm={() => {
+          if (bonusToDelete) {
+            deleteMutation.mutate(bonusToDelete.id);
+          }
+        }}
+        title={bonusToDelete ? `Delete bonus ${bonusToDelete.reason}?` : "Delete bonus?"}
+      />
+
+      <ConfirmDialog
+        confirmLabel="Reject bonus"
+        description={bonusToReject ? `Bonus "${bonusToReject.reason}" will be marked as rejected.` : ""}
+        isLoading={rejectMutation.isPending}
+        isOpen={Boolean(bonusToReject)}
+        onClose={() => setBonusToReject(null)}
+        onConfirm={() => {
+          if (bonusToReject) {
+            rejectMutation.mutate(bonusToReject.id);
+          }
+        }}
+        title={bonusToReject ? `Reject bonus ${bonusToReject.reason}?` : "Reject bonus?"}
+      />
     </div>
   );
 }

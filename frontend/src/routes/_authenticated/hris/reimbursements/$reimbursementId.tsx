@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,6 +32,7 @@ function ReimbursementDetailPage() {
   const queryClient = useQueryClient();
   const { hasPermission, hasRole } = useRBAC();
   const [notes, setNotes] = useState("");
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
 
   const reimbursementQuery = useQuery({
     queryKey: reimbursementsKeys.detail(reimbursementId),
@@ -38,9 +40,10 @@ function ReimbursementDetailPage() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: (decision: "approved" | "rejected") =>
-      reviewReimbursement(reimbursementId, decision, notes),
+    mutationFn: ({ decision, note }: { decision: "approved" | "rejected"; note?: string }) =>
+      reviewReimbursement(reimbursementId, decision, note ?? notes),
     onSuccess: async () => {
+      setIsRejectDialogOpen(false);
       setNotes("");
       await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
     },
@@ -130,10 +133,17 @@ function ReimbursementDetailPage() {
             <div className="mt-5 flex flex-col gap-3">
               {canReview && item.status === "submitted" ? (
                 <>
-                  <Button disabled={reviewMutation.isPending} onClick={() => reviewMutation.mutate("approved")}>
+                  <Button
+                    disabled={reviewMutation.isPending}
+                    onClick={() => reviewMutation.mutate({ decision: "approved" })}
+                  >
                     Approve reimbursement
                   </Button>
-                  <Button disabled={reviewMutation.isPending} onClick={() => reviewMutation.mutate("rejected")} variant="ghost">
+                  <Button
+                    disabled={reviewMutation.isPending}
+                    onClick={() => setIsRejectDialogOpen(true)}
+                    variant="ghost"
+                  >
                     Reject reimbursement
                   </Button>
                 </>
@@ -164,6 +174,21 @@ function ReimbursementDetailPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        confirmLabel="Reject reimbursement"
+        description={`Reimbursement "${item.title}" will be marked as rejected.`}
+        isLoading={reviewMutation.isPending}
+        isOpen={isRejectDialogOpen}
+        noteLabel="Rejection note"
+        notePlaceholder="Add the reason for rejection"
+        noteRequired
+        onClose={() => setIsRejectDialogOpen(false)}
+        onConfirm={(note) => {
+          reviewMutation.mutate({ decision: "rejected", note });
+        }}
+        title="Reject reimbursement?"
+      />
     </div>
   );
 }

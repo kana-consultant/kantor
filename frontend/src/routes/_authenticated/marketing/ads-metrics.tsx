@@ -20,9 +20,11 @@ import {
   YAxis,
 } from "recharts";
 import { z } from "zod";
-import { BarChart3, CircleDollarSign, Ratio, TrendingUp } from "lucide-react";
+import { BarChart3, CircleDollarSign, Plus, Ratio, TrendingUp } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
@@ -108,6 +110,7 @@ function AdsMetricsPage() {
   const [showForm, setShowForm] = useState(false);
   const [showBatchForm, setShowBatchForm] = useState(false);
   const [editingMetric, setEditingMetric] = useState<AdsMetric | null>(null);
+  const [metricToDelete, setMetricToDelete] = useState<AdsMetric | null>(null);
   const [batchRows, setBatchRows] = useState<AdsMetricFormValues[]>([{ ...defaultMetricForm }]);
 
   const campaignsQuery = useQuery({
@@ -182,6 +185,7 @@ function AdsMetricsPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteAdsMetric,
     onSuccess: async () => {
+      setMetricToDelete(null);
       await invalidateAdsMetrics(queryClient);
     },
   });
@@ -360,8 +364,8 @@ function AdsMetricsPage() {
           </PermissionGate>
           <PermissionGate permission={permissions.marketingAdsMetricsDelete}>
             <Button
-              disabled={deleteMutation.isPending && deleteMutation.variables === item.id}
-              onClick={() => deleteMutation.mutate(item.id)}
+              disabled={deleteMutation.isPending}
+              onClick={() => setMetricToDelete(item)}
               size="sm"
               type="button"
               variant="ghost"
@@ -442,16 +446,17 @@ function AdsMetricsPage() {
                   onClick={() => {
                     setEditingMetric(null);
                     resetMetricForm(form);
-                    setShowForm((value) => !value);
+                    setShowForm(true);
                     setShowBatchForm(false);
                   }}
                   type="button"
                 >
-                  {showForm ? "Close form" : "New entry"}
+                  <Plus className="h-4 w-4" />
+                  New entry
                 </Button>
                 <Button
                   onClick={() => {
-                    setShowBatchForm((value) => !value);
+                    setShowBatchForm(true);
                     setShowForm(false);
                     setEditingMetric(null);
                     resetMetricForm(form);
@@ -459,131 +464,11 @@ function AdsMetricsPage() {
                   type="button"
                   variant="outline"
                 >
-                  {showBatchForm ? "Close bulk input" : "Bulk input"}
+                  Bulk input
                 </Button>
               </PermissionGate>
             </div>
           </Card>
-
-          {showForm ? (
-            <Card className="p-6">
-              <div className="mb-5">
-                <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
-                  Single entry
-                </p>
-                <h4 className="text-[20px] font-[700] text-text-primary">
-                  {editingMetric ? "Edit ads metric" : "Add ads metric"}
-                </h4>
-              </div>
-              <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmitMetric}>
-                <select className="field-select" {...form.register("campaign_id")}>
-                  <option value="">Select campaign</option>
-                  {campaigns.map((campaign) => (
-                    <option key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </option>
-                  ))}
-                </select>
-                <select className="field-select" {...form.register("platform")}>
-                  {adsMetricPlatformOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <Input {...form.register("period_start")} type="date" />
-                <Input {...form.register("period_end")} type="date" />
-                <Controller control={form.control} name="amount_spent" render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />} />
-                <Controller control={form.control} name="revenue" render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />} />
-                <Input {...form.register("impressions", { valueAsNumber: true })} min={0} placeholder="Impressions" type="number" />
-                <Input {...form.register("clicks", { valueAsNumber: true })} min={0} placeholder="Clicks" type="number" />
-                <Input {...form.register("conversions", { valueAsNumber: true })} min={0} placeholder="Conversions" type="number" />
-                <Input className="lg:col-span-2" {...form.register("notes")} placeholder="Notes" />
-                {form.formState.errors.period_end ? (
-                  <p className="text-sm text-error lg:col-span-2">{form.formState.errors.period_end.message}</p>
-                ) : null}
-                <div className="flex flex-wrap gap-3 lg:col-span-2">
-                  <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
-                    {editingMetric ? "Save changes" : "Save entry"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setEditingMetric(null);
-                      resetMetricForm(form);
-                      setShowForm(false);
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Card>
-          ) : null}
-
-          {showBatchForm ? (
-            <Card className="p-6">
-              <div className="mb-5 flex items-start justify-between gap-4">
-                <div>
-                  <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
-                    Bulk input
-                  </p>
-                  <h4 className="text-[20px] font-[700] text-text-primary">Multiple ads metric rows</h4>
-                </div>
-                <Button onClick={() => setBatchRows((previous) => [...previous, { ...defaultMetricForm }])} type="button" variant="outline">
-                  Add row
-                </Button>
-              </div>
-              <div className="space-y-4">
-                {batchRows.map((row, index) => (
-                  <div className="grid gap-3 rounded-md border border-border bg-surface-muted p-4 lg:grid-cols-5" key={`${index}-${row.campaign_id}-${row.platform}`}>
-                    <select className="field-select" onChange={(event) => updateBatchRow(setBatchRows, index, "campaign_id", event.target.value)} value={row.campaign_id}>
-                      <option value="">Select campaign</option>
-                      {campaigns.map((campaign) => (
-                        <option key={campaign.id} value={campaign.id}>
-                          {campaign.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select className="field-select" onChange={(event) => updateBatchRow(setBatchRows, index, "platform", event.target.value)} value={row.platform}>
-                      {adsMetricPlatformOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <Input onChange={(event) => updateBatchRow(setBatchRows, index, "period_start", event.target.value)} type="date" value={row.period_start} />
-                    <Input onChange={(event) => updateBatchRow(setBatchRows, index, "period_end", event.target.value)} type="date" value={row.period_end} />
-                    <Button onClick={() => removeBatchRow(setBatchRows, index)} type="button" variant="ghost">
-                      Remove
-                    </Button>
-                    <CurrencyInput onValueChange={(value) => updateBatchRow(setBatchRows, index, "amount_spent", value)} value={row.amount_spent} />
-                    <CurrencyInput onValueChange={(value) => updateBatchRow(setBatchRows, index, "revenue", value)} value={row.revenue} />
-                    <Input onChange={(event) => updateBatchRow(setBatchRows, index, "impressions", Number(event.target.value))} placeholder="Impressions" type="number" value={row.impressions} />
-                    <Input onChange={(event) => updateBatchRow(setBatchRows, index, "clicks", Number(event.target.value))} placeholder="Clicks" type="number" value={row.clicks} />
-                    <Input onChange={(event) => updateBatchRow(setBatchRows, index, "conversions", Number(event.target.value))} placeholder="Conversions" type="number" value={row.conversions} />
-                    <Input className="lg:col-span-5" onChange={(event) => updateBatchRow(setBatchRows, index, "notes", event.target.value)} placeholder="Notes" value={row.notes} />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Button disabled={batchMutation.isPending} onClick={() => batchMutation.mutate(batchRows)} type="button">
-                  Submit batch
-                </Button>
-                <Button
-                  onClick={() => {
-                    setBatchRows([{ ...defaultMetricForm }]);
-                    setShowBatchForm(false);
-                  }}
-                  type="button"
-                  variant="ghost"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </Card>
-          ) : null}
 
           <DataTable
             columns={metricColumns}
@@ -603,6 +488,127 @@ function AdsMetricsPage() {
                   }
                 : undefined
             }
+          />
+
+          <FormModal
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            isOpen={showForm}
+            onClose={() => {
+              setEditingMetric(null);
+              resetMetricForm(form);
+              setShowForm(false);
+            }}
+            onSubmit={handleSubmitMetric}
+            size="lg"
+            submitLabel={editingMetric ? "Save metric" : "Save entry"}
+            title={editingMetric ? "Edit ads metric" : "Add ads metric"}
+            subtitle="Capture platform performance for a single campaign entry without shifting the metrics table below."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <select className="field-select" {...form.register("campaign_id")}>
+                <option value="">Select campaign</option>
+                {campaigns.map((campaign) => (
+                  <option key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </option>
+                ))}
+              </select>
+              <select className="field-select" {...form.register("platform")}>
+                {adsMetricPlatformOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <Input {...form.register("period_start")} type="date" />
+              <Input {...form.register("period_end")} type="date" />
+              <Controller
+                control={form.control}
+                name="amount_spent"
+                render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
+              />
+              <Controller
+                control={form.control}
+                name="revenue"
+                render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
+              />
+              <Input {...form.register("impressions", { valueAsNumber: true })} min={0} placeholder="Impressions" type="number" />
+              <Input {...form.register("clicks", { valueAsNumber: true })} min={0} placeholder="Clicks" type="number" />
+              <Input {...form.register("conversions", { valueAsNumber: true })} min={0} placeholder="Conversions" type="number" />
+              <Input className="lg:col-span-2" {...form.register("notes")} placeholder="Notes" />
+              {form.formState.errors.period_end ? (
+                <p className="text-sm text-error lg:col-span-2">{form.formState.errors.period_end.message}</p>
+              ) : null}
+            </div>
+          </FormModal>
+
+          <FormModal
+            isLoading={batchMutation.isPending}
+            isOpen={showBatchForm}
+            onClose={() => {
+              setBatchRows([{ ...defaultMetricForm }]);
+              setShowBatchForm(false);
+            }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              batchMutation.mutate(batchRows);
+            }}
+            size="xl"
+            submitLabel="Submit batch"
+            title="Bulk ads metrics input"
+            subtitle="Enter multiple metric rows in one pass without pushing the list view down."
+          >
+            <div className="flex justify-end">
+              <Button onClick={() => setBatchRows((previous) => [...previous, { ...defaultMetricForm }])} type="button" variant="outline">
+                Add row
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {batchRows.map((row, index) => (
+                <div className="grid gap-3 rounded-md border border-border bg-surface-muted p-4 lg:grid-cols-5" key={`${index}-${row.campaign_id}-${row.platform}`}>
+                  <select className="field-select" onChange={(event) => updateBatchRow(setBatchRows, index, "campaign_id", event.target.value)} value={row.campaign_id}>
+                    <option value="">Select campaign</option>
+                    {campaigns.map((campaign) => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select className="field-select" onChange={(event) => updateBatchRow(setBatchRows, index, "platform", event.target.value)} value={row.platform}>
+                    {adsMetricPlatformOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Input onChange={(event) => updateBatchRow(setBatchRows, index, "period_start", event.target.value)} type="date" value={row.period_start} />
+                  <Input onChange={(event) => updateBatchRow(setBatchRows, index, "period_end", event.target.value)} type="date" value={row.period_end} />
+                  <Button onClick={() => removeBatchRow(setBatchRows, index)} type="button" variant="ghost">
+                    Remove
+                  </Button>
+                  <CurrencyInput onValueChange={(value) => updateBatchRow(setBatchRows, index, "amount_spent", value)} value={row.amount_spent} />
+                  <CurrencyInput onValueChange={(value) => updateBatchRow(setBatchRows, index, "revenue", value)} value={row.revenue} />
+                  <Input onChange={(event) => updateBatchRow(setBatchRows, index, "impressions", Number(event.target.value))} placeholder="Impressions" type="number" value={row.impressions} />
+                  <Input onChange={(event) => updateBatchRow(setBatchRows, index, "clicks", Number(event.target.value))} placeholder="Clicks" type="number" value={row.clicks} />
+                  <Input onChange={(event) => updateBatchRow(setBatchRows, index, "conversions", Number(event.target.value))} placeholder="Conversions" type="number" value={row.conversions} />
+                  <Input className="lg:col-span-5" onChange={(event) => updateBatchRow(setBatchRows, index, "notes", event.target.value)} placeholder="Notes" value={row.notes} />
+                </div>
+              ))}
+            </div>
+          </FormModal>
+
+          <ConfirmDialog
+            confirmLabel="Delete metric"
+            description={metricToDelete ? `The metric entry for "${metricToDelete.campaign_name ?? "Unknown campaign"}" will be removed.` : ""}
+            isLoading={deleteMutation.isPending}
+            isOpen={Boolean(metricToDelete)}
+            onClose={() => setMetricToDelete(null)}
+            onConfirm={() => {
+              if (metricToDelete) {
+                deleteMutation.mutate(metricToDelete.id);
+              }
+            }}
+            title={metricToDelete ? "Delete ads metric?" : "Delete ads metric?"}
           />
         </div>
       ) : (

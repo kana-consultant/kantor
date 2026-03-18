@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProjectForm } from "@/components/shared/project-form";
@@ -41,6 +42,7 @@ function ProjectsListPage() {
   const { hasPermission } = useRBAC();
   const [filters, setFilters] = useState<ProjectFilters>(defaultFilters);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: projectsKeys.list(filters),
@@ -58,6 +60,7 @@ function ProjectsListPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteProject,
     onSuccess: async () => {
+      setProjectToDelete(null);
       await queryClient.invalidateQueries({ queryKey: projectsKeys.all });
     },
   });
@@ -142,8 +145,8 @@ function ProjectsListPage() {
           </Link>
           {hasPermission(permissions.operationalProjectDelete) ? (
             <Button
-              disabled={deleteMutation.isPending && deleteMutation.variables === project.id}
-              onClick={() => deleteMutation.mutate(project.id)}
+              disabled={deleteMutation.isPending && deleteMutation.variables === projectToDelete?.id}
+              onClick={() => setProjectToDelete(project)}
               size="sm"
               type="button"
               variant="ghost"
@@ -171,23 +174,23 @@ function ProjectsListPage() {
           </div>
 
           <PermissionGate permission={permissions.operationalProjectCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)}>
-              {isCreateOpen ? "Close form" : "Create project"}
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Create project
             </Button>
           </PermissionGate>
         </div>
       </Card>
 
-      {isCreateOpen ? (
-        <ProjectForm
-          description="Form create project menggunakan React Hook Form + Zod."
-          isSubmitting={createMutation.isPending}
-          onCancel={() => setIsCreateOpen(false)}
-          onSubmit={(values) => createMutation.mutate(values)}
-          submitLabel="Create project"
-          title="New Project"
-        />
-      ) : null}
+      <ProjectForm
+        description="Capture the project brief, timeline, and current delivery priority before the board goes live."
+        isOpen={isCreateOpen}
+        isSubmitting={createMutation.isPending}
+        onCancel={() => setIsCreateOpen(false)}
+        onSubmit={(values) => createMutation.mutate(values)}
+        submitLabel="Create project"
+        title="New Project"
+      />
 
       <Card className="p-6">
         <div className="grid gap-4 md:grid-cols-4">
@@ -279,6 +282,24 @@ function ProjectsListPage() {
               }
             : undefined
         }
+      />
+
+      <ConfirmDialog
+        confirmLabel="Hapus project"
+        description={
+          projectToDelete
+            ? `Semua task dan data board untuk "${projectToDelete.name}" akan ikut terhapus.`
+            : ""
+        }
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(projectToDelete)}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={() => {
+          if (projectToDelete) {
+            deleteMutation.mutate(projectToDelete.id);
+          }
+        }}
+        title={projectToDelete ? `Hapus ${projectToDelete.name}?` : "Hapus project?"}
       />
     </div>
   );

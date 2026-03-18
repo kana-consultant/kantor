@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2 } from "lucide-react";
+import { Building2, Plus } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DepartmentForm } from "@/components/shared/department-form";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PermissionGate } from "@/components/shared/permission-gate";
@@ -33,6 +34,7 @@ function DepartmentsPage() {
   const { hasPermission } = useRBAC();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
 
   const departmentsQuery = useQuery({
     queryKey: departmentsKeys.list(),
@@ -66,6 +68,7 @@ function DepartmentsPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteDepartment,
     onSuccess: async () => {
+      setDepartmentToDelete(null);
       await queryClient.invalidateQueries({ queryKey: departmentsKeys.all });
       await queryClient.invalidateQueries({ queryKey: employeesKeys.all });
     },
@@ -84,24 +87,24 @@ function DepartmentsPage() {
           </div>
 
           <PermissionGate permission={permissions.hrisDepartmentCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)} variant="hr">
-              {isCreateOpen ? "Close form" : "Add department"}
+            <Button onClick={() => setIsCreateOpen(true)} variant="hr">
+              <Plus className="h-4 w-4" />
+              Add department
             </Button>
           </PermissionGate>
         </div>
       </Card>
 
-      {isCreateOpen ? (
-        <DepartmentForm
-          description="Form create department untuk struktur organisasi dan penunjukan head."
-          employees={employeesQuery.data?.items ?? []}
-          isSubmitting={createMutation.isPending}
-          onCancel={() => setIsCreateOpen(false)}
-          onSubmit={(values) => createMutation.mutate(values)}
-          submitLabel="Create department"
-          title="New department"
-        />
-      ) : null}
+      <DepartmentForm
+        description="Define the team function, description, and department head in a single compact dialog."
+        employees={employeesQuery.data?.items ?? []}
+        isOpen={isCreateOpen}
+        isSubmitting={createMutation.isPending}
+        onCancel={() => setIsCreateOpen(false)}
+        onSubmit={(values) => createMutation.mutate(values)}
+        submitLabel="Create department"
+        title="New department"
+      />
 
       {editingDepartment ? (
         <DepartmentForm
@@ -110,8 +113,9 @@ function DepartmentsPage() {
             description: editingDepartment.description ?? "",
             head_id: editingDepartment.head_id ?? "",
           }}
-          description="Edit department dan sinkronkan perubahan struktur ke data employee."
+          description="Update the department profile and head assignment without leaving this directory."
           employees={employeesQuery.data?.items ?? []}
+          isOpen={Boolean(editingDepartment)}
           isSubmitting={updateMutation.isPending}
           onCancel={() => setEditingDepartment(null)}
           onSubmit={(values) => updateMutation.mutate({ departmentId: editingDepartment.id, values })}
@@ -158,7 +162,7 @@ function DepartmentsPage() {
               {hasPermission(permissions.hrisDepartmentDelete) ? (
                 <Button
                   disabled={deleteMutation.isPending && deleteMutation.variables === department.id}
-                  onClick={() => deleteMutation.mutate(department.id)}
+                  onClick={() => setDepartmentToDelete(department)}
                   variant="ghost"
                 >
                   {deleteMutation.isPending && deleteMutation.variables === department.id ? "Deleting..." : "Delete"}
@@ -178,6 +182,24 @@ function DepartmentsPage() {
           title="No departments yet"
         />
       ) : null}
+
+      <ConfirmDialog
+        confirmLabel="Hapus department"
+        description={
+          departmentToDelete
+            ? `Department "${departmentToDelete.name}" akan dihapus dari struktur organisasi.`
+            : ""
+        }
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(departmentToDelete)}
+        onClose={() => setDepartmentToDelete(null)}
+        onConfirm={() => {
+          if (departmentToDelete) {
+            deleteMutation.mutate(departmentToDelete.id);
+          }
+        }}
+        title={departmentToDelete ? `Hapus ${departmentToDelete.name}?` : "Hapus department?"}
+      />
     </div>
   );
 }

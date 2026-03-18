@@ -3,7 +3,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { Plus } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { EmptyState } from "@/components/shared/empty-state";
+import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +42,8 @@ const emptyRuleForm: AssignmentRuleFormValues = {
 export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const [editingRule, setEditingRule] = useState<AssignmentRule | null>(null);
+  const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<AssignmentRule | null>(null);
   const form = useForm<AssignmentRuleFormValues>({
     resolver: zodResolver(ruleSchema) as any,
     defaultValues: emptyRuleForm,
@@ -94,14 +100,30 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
           Assignment settings
-        </p>
-        <h4 className="text-[20px] font-[700] text-text-primary leading-tight">Auto assign rules</h4>
-        <p className="mt-2 max-w-3xl text-[13px] text-text-secondary">
-          Rule akan dievaluasi berdasarkan priority kecil ke besar. Untuk `by_workload`,
-          backend memilih member project dengan workload paling rendah.
-        </p>
+            </p>
+            <h4 className="text-[20px] font-[700] text-text-primary leading-tight">Auto assign rules</h4>
+            <p className="mt-2 max-w-3xl text-[13px] text-text-secondary">
+              Rules are evaluated from the lowest priority number upward. Workload rules choose the member with the lightest task load.
+            </p>
+          </div>
+          <PermissionGate permission={permissions.operationalAssignmentCreate}>
+            <Button
+              onClick={() => {
+                setEditingRule(null);
+                form.reset(emptyRuleForm);
+                setIsRuleModalOpen(true);
+              }}
+              variant="ops"
+            >
+              <Plus className="h-4 w-4" />
+              Add rule
+            </Button>
+          </PermissionGate>
+        </div>
       </Card>
 
       <PermissionGate
@@ -112,18 +134,27 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
         }
         permission={editingRule ? permissions.operationalAssignmentEdit : permissions.operationalAssignmentCreate}
       >
-        <Card className="p-6">
-          <form
-            className="space-y-5"
-            onSubmit={form.handleSubmit((values) => {
-              if (editingRule) {
-                updateMutation.mutate(values);
-                return;
-              }
+        <FormModal
+          isLoading={createMutation.isPending || updateMutation.isPending}
+          isOpen={isRuleModalOpen}
+          onClose={() => {
+            setIsRuleModalOpen(false);
+            setEditingRule(null);
+            form.reset(emptyRuleForm);
+          }}
+          onSubmit={form.handleSubmit((values) => {
+            if (editingRule) {
+              updateMutation.mutate(values);
+              return;
+            }
 
-              createMutation.mutate(values);
-            })}
-          >
+            createMutation.mutate(values);
+          })}
+          size="md"
+          submitLabel={editingRule ? "Save rule" : "Create rule"}
+          title={editingRule ? "Edit assignment rule" : "Create assignment rule"}
+          subtitle="Choose the matching strategy, optional project role, and the order this rule should be evaluated."
+        >
             <div className="grid gap-5 md:grid-cols-2">
               <div className="grid gap-1.5">
                 <label className="text-[13px] font-[500] text-text-secondary" htmlFor="rule-type">
@@ -180,27 +211,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
                 Active Rule
               </label>
             </div>
-
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Button variant="ops" disabled={createMutation.isPending || updateMutation.isPending} type="submit">
-                {createMutation.isPending || updateMutation.isPending
-                  ? "Saving..."
-                  : editingRule
-                    ? "Save rule"
-                    : "Create rule"}
-              </Button>
-              {editingRule ? (
-                <Button
-                  onClick={() => setEditingRule(null)}
-                  type="button"
-                  variant="ghost"
-                >
-                  Cancel
-                </Button>
-              ) : null}
-            </div>
-          </form>
-        </Card>
+        </FormModal>
       </PermissionGate>
 
       {rulesQuery.error instanceof Error ? (
@@ -224,18 +235,21 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
               <div className="flex items-center gap-3">
                 <StatusBadge status={rule.is_active ? "active" : "inactive"} />
                 <PermissionGate permission={permissions.operationalAssignmentEdit}>
-                  <Button onClick={() => setEditingRule(rule)} size="sm" variant="secondary">
+                  <Button
+                    onClick={() => {
+                      setEditingRule(rule);
+                      setIsRuleModalOpen(true);
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
                     Edit
                   </Button>
                 </PermissionGate>
                 <PermissionGate permission={permissions.operationalAssignmentDelete}>
                   <Button
                     disabled={deleteMutation.isPending}
-                    onClick={() => {
-                      if (window.confirm("Delete this assignment rule?")) {
-                        deleteMutation.mutate(rule.id);
-                      }
-                    }}
+                    onClick={() => setRuleToDelete(rule)}
                     size="sm"
                     variant="ghost"
                   >
@@ -252,11 +266,32 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
         ) : null}
 
         {rulesQuery.data?.length === 0 ? (
-          <Card className="p-8 text-center text-[13px] text-text-secondary font-[500] border-dashed">
-            No assignment rules yet. Create one to enable auto assign from the Kanban board.
-          </Card>
+          <EmptyState
+            actionLabel="Add rule"
+            description="Create the first assignment rule to enable auto-assign actions from the Kanban board."
+            onAction={() => {
+              setEditingRule(null);
+              form.reset(emptyRuleForm);
+              setIsRuleModalOpen(true);
+            }}
+            title="No assignment rules yet"
+          />
         ) : null}
       </div>
+
+      <ConfirmDialog
+        confirmLabel="Delete rule"
+        description={ruleToDelete ? `Rule priority #${ruleToDelete.priority} will be removed from this project.` : ""}
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(ruleToDelete)}
+        onClose={() => setRuleToDelete(null)}
+        onConfirm={() => {
+          if (ruleToDelete) {
+            deleteMutation.mutate(ruleToDelete.id);
+          }
+        }}
+        title={ruleToDelete ? `Delete ${ruleToDelete.rule_type.replaceAll("_", " ")} rule?` : "Delete rule?"}
+      />
     </div>
   );
 }

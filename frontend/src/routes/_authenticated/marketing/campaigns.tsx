@@ -6,7 +6,17 @@ import { z } from "zod";
 import { Download, FolderKanban, LayoutList, Paperclip, Plus } from "lucide-react";
 
 import { CampaignForm } from "@/components/shared/campaign-form";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import {
+  Drawer,
+  DrawerBody,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/shared/drawer";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MarketingCampaignBoard } from "@/components/shared/marketing-campaign-board";
 import { PermissionGate } from "@/components/shared/permission-gate";
@@ -89,6 +99,8 @@ function MarketingCampaignsPage() {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "attachments" | "metrics" | "leads" | "activity">("overview");
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<CampaignAttachment | null>(null);
 
   const employeesQuery = useQuery({
     queryKey: employeesKeys.list(employeeFilters),
@@ -190,6 +202,7 @@ function MarketingCampaignsPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteCampaign,
     onSuccess: async (_, campaignId) => {
+      setCampaignToDelete(null);
       if (selectedCampaignId === campaignId) {
         setSelectedCampaignId(null);
       }
@@ -217,6 +230,7 @@ function MarketingCampaignsPage() {
     mutationFn: ({ campaignId, attachmentId }: { campaignId: string; attachmentId: string }) =>
       deleteCampaignAttachment(campaignId, attachmentId),
     onSuccess: async (_, variables) => {
+      setAttachmentToDelete(null);
       await invalidateCampaignQueries(queryClient, variables.campaignId);
     },
   });
@@ -326,7 +340,7 @@ function MarketingCampaignsPage() {
           {hasPermission(permissions.marketingCampaignDelete) ? (
             <Button
               disabled={deleteMutation.isPending && deleteMutation.variables === campaign.id}
-              onClick={() => deleteMutation.mutate(campaign.id)}
+              onClick={() => setCampaignToDelete(campaign)}
               size="sm"
               type="button"
               variant="ghost"
@@ -362,32 +376,32 @@ function MarketingCampaignsPage() {
               Table view
             </Button>
             <PermissionGate permission={permissions.marketingCampaignCreate}>
-              <Button onClick={() => setIsComposerOpen((value) => !value)} variant="mkt">
+              <Button onClick={() => setIsComposerOpen(true)} variant="mkt">
                 <Plus className="mr-2 h-4 w-4" />
-                {isComposerOpen ? "Close composer" : "New campaign"}
+                New campaign
               </Button>
             </PermissionGate>
           </div>
         </div>
       </Card>
 
-      {isComposerOpen ? (
-        <CampaignForm
-          description="Susun campaign baru dengan channel, budget, PIC, timeline, dan brief inti agar board langsung siap dipakai."
-          employees={employees}
-          isSubmitting={createMutation.isPending}
-          onCancel={() => setIsComposerOpen(false)}
-          onSubmit={(values) => createMutation.mutate(values)}
-          submitLabel="Create campaign"
-          title="New campaign"
-        />
-      ) : null}
+      <CampaignForm
+        description="Susun campaign baru dengan channel, budget, PIC, timeline, dan brief inti agar board langsung siap dipakai."
+        employees={employees}
+        isOpen={isComposerOpen}
+        isSubmitting={createMutation.isPending}
+        onCancel={() => setIsComposerOpen(false)}
+        onSubmit={(values) => createMutation.mutate(values)}
+        submitLabel="Create campaign"
+        title="New campaign"
+      />
 
       {editingCampaign ? (
         <CampaignForm
           defaultValues={defaultEditValues}
           description="Perbarui detail utama campaign tanpa meninggalkan workspace marketing."
           employees={employees}
+          isOpen={Boolean(editingCampaign)}
           isSubmitting={updateMutation.isPending}
           onCancel={() => setEditingCampaign(null)}
           onSubmit={(values) => updateMutation.mutate({ campaignId: editingCampaign.id, values })}
@@ -517,13 +531,16 @@ function MarketingCampaignsPage() {
           isUploading={uploadMutation.isPending}
           onClose={() => setSelectedCampaignId(null)}
           onDelete={() => {
-            if (selectedCampaign && window.confirm(`Delete "${selectedCampaign.name}"?`)) {
-              deleteMutation.mutate(selectedCampaign.id);
+            if (selectedCampaign) {
+              setCampaignToDelete(selectedCampaign);
             }
           }}
           onDeleteAttachment={(attachmentId) => {
             if (selectedCampaign) {
-              deleteAttachmentMutation.mutate({ attachmentId, campaignId: selectedCampaign.id });
+              const targetAttachment = selectedAttachments.find((attachment) => attachment.id === attachmentId);
+              if (targetAttachment) {
+                setAttachmentToDelete(targetAttachment);
+              }
             }
           }}
           onEdit={() => {
@@ -540,6 +557,34 @@ function MarketingCampaignsPage() {
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        confirmLabel="Delete campaign"
+        description={campaignToDelete ? `Campaign "${campaignToDelete.name}" and its workflow history will be removed.` : ""}
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(campaignToDelete)}
+        onClose={() => setCampaignToDelete(null)}
+        onConfirm={() => {
+          if (campaignToDelete) {
+            deleteMutation.mutate(campaignToDelete.id);
+          }
+        }}
+        title={campaignToDelete ? `Delete ${campaignToDelete.name}?` : "Delete campaign?"}
+      />
+
+      <ConfirmDialog
+        confirmLabel="Delete attachment"
+        description={attachmentToDelete ? `Attachment "${attachmentToDelete.file_name}" will be removed from this campaign.` : ""}
+        isLoading={deleteAttachmentMutation.isPending}
+        isOpen={Boolean(attachmentToDelete)}
+        onClose={() => setAttachmentToDelete(null)}
+        onConfirm={() => {
+          if (selectedCampaign && attachmentToDelete) {
+            deleteAttachmentMutation.mutate({ attachmentId: attachmentToDelete.id, campaignId: selectedCampaign.id });
+          }
+        }}
+        title={attachmentToDelete ? "Delete attachment?" : "Delete attachment?"}
+      />
     </div>
   );
 }
@@ -595,41 +640,40 @@ function CampaignDetailDrawer({
   onDeleteAttachment: (attachmentId: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-foreground/25 backdrop-blur-sm">
-      <button aria-label="Close campaign drawer" className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} type="button" />
-      <Card className="absolute inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col rounded-none border-l border-border/80 p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border/70 pb-5">
+    <Drawer onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)} open={Boolean(campaign) || isLoading}>
+      <DrawerContent size="lg">
+        <DrawerHeader className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Campaign detail</p>
-            <h4 className="mt-2 text-2xl font-bold">{campaign ? campaign.name : isLoading ? "Loading..." : "Campaign"}</h4>
+            <DrawerTitle>{campaign ? campaign.name : isLoading ? "Loading campaign..." : "Campaign detail"}</DrawerTitle>
+            <DrawerDescription>
+              Review campaign scope, attached assets, related metrics, leads, and movement history without leaving the board.
+            </DrawerDescription>
           </div>
-          <Button onClick={onClose} size="sm" variant="outline">
-            Close
-          </Button>
-        </div>
+          <DrawerClose />
+        </DrawerHeader>
 
-        {campaign ? (
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button onClick={onEdit} size="sm" variant="outline">
-              Edit campaign
-            </Button>
-            {canDelete ? (
-              <Button onClick={onDelete} size="sm" variant="ghost">
-                Delete campaign
+        <DrawerBody className="space-y-6">
+          {campaign ? (
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={onEdit} size="sm" type="button" variant="outline">
+                Edit campaign
               </Button>
-            ) : null}
+              {canDelete ? (
+                <Button onClick={onDelete} size="sm" type="button" variant="ghost">
+                  Delete campaign
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-3">
+            {(["overview", "attachments", "metrics", "leads", "activity"] as const).map((tab) => (
+              <Button key={tab} onClick={() => onTabChange(tab)} size="sm" type="button" variant={detailTab === tab ? "default" : "outline"}>
+                {tab}
+              </Button>
+            ))}
           </div>
-        ) : null}
 
-        <div className="mt-5 flex flex-wrap gap-3">
-          {(["overview", "attachments", "metrics", "leads", "activity"] as const).map((tab) => (
-            <Button key={tab} onClick={() => onTabChange(tab)} size="sm" variant={detailTab === tab ? "default" : "outline"}>
-              {tab}
-            </Button>
-          ))}
-        </div>
-
-        <div className="mt-6 flex-1 overflow-y-auto pr-1">
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-20 rounded-lg" />
@@ -689,7 +733,9 @@ function CampaignDetailDrawer({
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold">{attachment.file_name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{attachment.file_type} | {new Date(attachment.created_at).toLocaleString()}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {attachment.file_type} | {new Date(attachment.created_at).toLocaleString()}
+                        </p>
                       </div>
                       <div className="flex gap-3">
                         <button
@@ -700,7 +746,7 @@ function CampaignDetailDrawer({
                           <Download className="h-4 w-4" />
                           Open
                         </button>
-                        <Button disabled={isDeletingAttachment} onClick={() => onDeleteAttachment(attachment.id)} size="sm" variant="ghost">
+                        <Button disabled={isDeletingAttachment} onClick={() => onDeleteAttachment(attachment.id)} size="sm" type="button" variant="ghost">
                           Delete
                         </Button>
                       </div>
@@ -823,9 +869,9 @@ function CampaignDetailDrawer({
               ))}
             </div>
           ) : null}
-        </div>
-      </Card>
-    </div>
+        </DrawerBody>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

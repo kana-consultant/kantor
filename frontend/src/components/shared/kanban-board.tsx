@@ -22,7 +22,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
+import { Plus } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/shared/drawer";
+import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -76,6 +80,10 @@ interface DragSnapshot {
   tasks: KanbanTask[];
 }
 
+type ColumnModalState =
+  | { mode: "create" }
+  | { mode: "edit"; columnId: string };
+
 type TaskModalState =
   | { mode: "create"; columnId: string }
   | { mode: "edit"; columnId: string; taskId: string };
@@ -93,15 +101,15 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
     dueDate: "",
   });
   const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
-  const [columnDraft, setColumnDraft] = useState({ name: "", color: "#38BDF8" });
-  const [isColumnComposerOpen, setIsColumnComposerOpen] = useState(false);
-  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
-  const [editingColumnForm, setEditingColumnForm] = useState({ name: "", color: "#38BDF8" });
+  const [columnModal, setColumnModal] = useState<ColumnModalState | null>(null);
+  const [columnForm, setColumnForm] = useState({ name: "", color: "#38BDF8" });
   const [taskModal, setTaskModal] = useState<TaskModalState | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [activeColumn, setActiveColumn] = useState<KanbanColumn | null>(null);
   const [dragSnapshot, setDragSnapshot] = useState<DragSnapshot | null>(null);
+  const [columnToDelete, setColumnToDelete] = useState<KanbanColumn | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<KanbanTask | null>(null);
 
   const columnsQuery = useQuery({
     queryKey: kanbanKeys.columns(projectId),
@@ -121,8 +129,8 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
   const createColumnMutation = useMutation({
     mutationFn: (payload: { name: string; color?: string }) => createKanbanColumn(projectId, payload),
     onSuccess: async () => {
-      setColumnDraft({ name: "", color: "#38BDF8" });
-      setIsColumnComposerOpen(false);
+      setColumnForm({ name: "", color: "#38BDF8" });
+      setColumnModal(null);
       await invalidateBoard(queryClient, projectId);
     },
     onError: (error) => setBoardError(extractErrorMessage(error)),
@@ -132,7 +140,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
     mutationFn: (payload: { columnId: string; name: string; color?: string }) =>
       updateKanbanColumn(projectId, payload.columnId, { name: payload.name, color: payload.color }),
     onSuccess: async () => {
-      setEditingColumnId(null);
+      setColumnModal(null);
       await invalidateBoard(queryClient, projectId);
     },
     onError: (error) => setBoardError(extractErrorMessage(error)),
@@ -141,6 +149,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
   const deleteColumnMutation = useMutation({
     mutationFn: (columnId: string) => deleteKanbanColumn(projectId, columnId),
     onSuccess: async () => {
+      setColumnToDelete(null);
       await invalidateBoard(queryClient, projectId);
     },
     onError: (error) => setBoardError(extractErrorMessage(error)),
@@ -172,6 +181,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
     onSuccess: async () => {
       form.reset(emptyTaskForm);
       setTaskModal(null);
+      setTaskToDelete(null);
       await invalidateBoard(queryClient, projectId);
     },
     onError: (error) => setBoardError(extractErrorMessage(error)),
@@ -243,23 +253,37 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
     await updateTaskMutation.mutateAsync({ taskId: taskModal.taskId, values });
   }
 
-  function handleCreateColumn() {
-    const name = columnDraft.name.trim();
+  function handleColumnSubmit() {
+    const name = columnForm.name.trim();
     if (name.length < 2) {
       setBoardError("List name must be at least 2 characters.");
       return;
     }
 
     setBoardError(null);
+    if (columnModal?.mode === "edit") {
+      updateColumnMutation.mutate({
+        columnId: columnModal.columnId,
+        name,
+        color: columnForm.color,
+      });
+      return;
+    }
+
     createColumnMutation.mutate({
       name,
-      color: columnDraft.color,
+      color: columnForm.color,
     });
   }
 
   function startColumnEdit(column: KanbanColumn) {
-    setEditingColumnId(column.id);
-    setEditingColumnForm({ name: column.name, color: column.color ?? "#38BDF8" });
+    setColumnModal({ mode: "edit", columnId: column.id });
+    setColumnForm({ name: column.name, color: column.color ?? "#38BDF8" });
+  }
+
+  function startColumnCreate() {
+    setColumnModal({ mode: "create" });
+    setColumnForm({ name: "", color: "#38BDF8" });
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -357,62 +381,16 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 
             <PermissionGate permission={permissions.operationalKanbanCreate}>
               <div className="flex w-full flex-col items-stretch gap-3 xl:w-auto xl:items-end">
-                {isColumnComposerOpen ? (
-                  <div className="w-full rounded-[12px] border border-border bg-surface p-4 shadow-panel xl:w-[25rem]">
-                    <div className="grid gap-3">
-                      <Input
-                        className="focus-visible:border-ops focus-visible:ring-ops/10 h-[44px]"
-                        onChange={(event) => setColumnDraft((current) => ({ ...current, name: event.target.value }))}
-                        placeholder="List name"
-                        value={columnDraft.name}
-                      />
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-secondary">Accent color</p>
-                        <div className="flex flex-wrap gap-2">
-                          {columnColorOptions.map((color) => (
-                            <button
-                              aria-label={`Choose list color ${color}`}
-                              className={cn(
-                                "h-9 w-9 rounded-full border-2 transition hover:scale-105",
-                                columnDraft.color === color ? "border-foreground shadow-sm" : "border-transparent",
-                              )}
-                              key={color}
-                              onClick={() => setColumnDraft((current) => ({ ...current, color }))}
-                              style={{ backgroundColor: color }}
-                              type="button"
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-3 pt-2">
-                        <Button
-                          onClick={() => {
-                            setIsColumnComposerOpen(false);
-                            setColumnDraft({ name: "", color: "#38BDF8" });
-                            setBoardError(null);
-                          }}
-                          type="button"
-                          variant="ghost"
-                        >
-                          Cancel
-                        </Button>
-                        <Button variant="ops" disabled={createColumnMutation.isPending} onClick={handleCreateColumn} type="button">
-                          {createColumnMutation.isPending ? "Adding..." : "Add list"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
                 <Button
                   variant="ops"
                   className="xl:self-end"
                   onClick={() => {
                     setBoardError(null);
-                    setIsColumnComposerOpen(true);
+                    startColumnCreate();
                   }}
                   type="button"
                 >
+                  <Plus className="h-4 w-4" />
                   New list
                 </Button>
               </div>
@@ -488,26 +466,10 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             {columns.map((column) => (
               <KanbanColumnCard
                 column={column}
-                editingForm={editingColumnForm}
-                editingId={editingColumnId}
-                onCancelEdit={() => setEditingColumnId(null)}
-                onColumnColorChange={(value) => setEditingColumnForm((current) => ({ ...current, color: value }))}
-                onColumnNameChange={(value) => setEditingColumnForm((current) => ({ ...current, name: value }))}
-                onDeleteColumn={() => {
-                  if (window.confirm(`Delete column "${column.name}" and its tasks?`)) {
-                    deleteColumnMutation.mutate(column.id);
-                  }
-                }}
+                onDeleteColumn={() => setColumnToDelete(column)}
                 onEditColumn={() => startColumnEdit(column)}
                 onQuickAdd={() => void handleQuickAdd(column.id)}
                 onQuickDraftChange={(value) => setQuickDrafts((current) => ({ ...current, [column.id]: value }))}
-                onSaveColumnEdit={() =>
-                  updateColumnMutation.mutate({
-                    columnId: column.id,
-                    name: editingColumnForm.name.trim(),
-                    color: editingColumnForm.color,
-                  })
-                }
                 onAutoAssignTask={(taskId) => autoAssignMutation.mutate(taskId)}
                 onTaskClick={(task) => setTaskModal({ mode: "edit", columnId: task.column_id, taskId: task.id })}
                 onTaskCreate={() => setTaskModal({ mode: "create", columnId: column.id })}
@@ -534,13 +496,93 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
           mode={taskModal.mode}
           onClose={() => setTaskModal(null)}
           onDelete={() => {
-            if (taskModal.mode === "edit" && window.confirm("Delete this task?")) {
-              deleteTaskMutation.mutate(taskModal.taskId);
+            if (taskModal.mode === "edit") {
+              const task = tasks.find((item) => item.id === taskModal.taskId);
+              if (task) {
+                setTaskToDelete(task);
+              }
             }
           }}
           onSubmit={(values) => void handleTaskSubmit(values)}
         />
       ) : null}
+
+      <FormModal
+        isLoading={createColumnMutation.isPending || updateColumnMutation.isPending}
+        isOpen={Boolean(columnModal)}
+        onClose={() => {
+          setColumnModal(null);
+          setColumnForm({ name: "", color: "#38BDF8" });
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleColumnSubmit();
+        }}
+        size="sm"
+        submitLabel={columnModal?.mode === "edit" ? "Save list" : "Create list"}
+        title={columnModal?.mode === "edit" ? "Edit list" : "Create list"}
+        subtitle="Use a short label and a single accent color so this column stays easy to scan on the board."
+      >
+        <div className="space-y-2">
+          <label className="text-[13px] font-[600] text-text-primary">List name</label>
+          <Input
+            className="focus-visible:border-ops focus-visible:ring-ops/10"
+            onChange={(event) => setColumnForm((current) => ({ ...current, name: event.target.value }))}
+            placeholder="Review"
+            value={columnForm.name}
+          />
+        </div>
+        <div className="space-y-2">
+          <p className="text-[13px] font-[600] text-text-primary">Accent color</p>
+          <div className="flex flex-wrap gap-2">
+            {columnColorOptions.map((color) => (
+              <button
+                aria-label={`Choose list color ${color}`}
+                className={cn(
+                  "h-9 w-9 rounded-full border-2 transition hover:scale-105",
+                  columnForm.color === color ? "border-foreground shadow-sm" : "border-transparent",
+                )}
+                key={color}
+                onClick={() => setColumnForm((current) => ({ ...current, color }))}
+                style={{ backgroundColor: color }}
+                type="button"
+              />
+            ))}
+          </div>
+        </div>
+      </FormModal>
+
+      <ConfirmDialog
+        confirmLabel="Delete list"
+        description={
+          columnToDelete
+            ? `All tasks inside "${columnToDelete.name}" will be deleted with this column.`
+            : ""
+        }
+        isLoading={deleteColumnMutation.isPending}
+        isOpen={Boolean(columnToDelete)}
+        onClose={() => setColumnToDelete(null)}
+        onConfirm={() => {
+          if (columnToDelete) {
+            deleteColumnMutation.mutate(columnToDelete.id);
+          }
+        }}
+        title={columnToDelete ? `Delete ${columnToDelete.name}?` : "Delete list?"}
+      />
+
+      <ConfirmDialog
+        confirmLabel="Delete task"
+        description={taskToDelete ? `Task "${taskToDelete.title}" will be removed from this board.` : ""}
+        isLoading={deleteTaskMutation.isPending}
+        isOpen={Boolean(taskToDelete)}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={() => {
+          if (taskToDelete) {
+            deleteTaskMutation.mutate(taskToDelete.id);
+          }
+        }}
+        title={taskToDelete ? `Delete ${taskToDelete.title}?` : "Delete task?"}
+      />
     </div>
   );
 }
@@ -733,8 +775,6 @@ interface KanbanColumnCardProps {
   column: KanbanColumn;
   tasks: KanbanTask[];
   quickDraft: string;
-  editingId: string | null;
-  editingForm: { name: string; color: string };
   onQuickDraftChange: (value: string) => void;
   onQuickAdd: () => void;
   onAutoAssignTask: (taskId: string) => void;
@@ -742,10 +782,6 @@ interface KanbanColumnCardProps {
   onTaskCreate: () => void;
   onEditColumn: () => void;
   onDeleteColumn: () => void;
-  onCancelEdit: () => void;
-  onSaveColumnEdit: () => void;
-  onColumnNameChange: (value: string) => void;
-  onColumnColorChange: (value: string) => void;
 }
 
 function KanbanColumnCard(props: KanbanColumnCardProps) {
@@ -793,26 +829,6 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
             </div>
           </PermissionGate>
         </div>
-
-        {props.editingId === props.column.id ? (
-          <div className="mt-4 grid gap-3">
-            <Input className="focus-visible:border-ops focus-visible:ring-ops/10" onChange={(event) => props.onColumnNameChange(event.target.value)} value={props.editingForm.name} />
-            <Input
-              className="h-[44px] w-full p-1 cursor-pointer focus-visible:border-ops focus-visible:ring-ops/10"
-              onChange={(event) => props.onColumnColorChange(event.target.value)}
-              type="color"
-              value={props.editingForm.color}
-            />
-            <div className="flex gap-3">
-              <Button onClick={props.onSaveColumnEdit} size="sm" variant="ops">
-                Save
-              </Button>
-              <Button onClick={props.onCancelEdit} size="sm" variant="ghost">
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : null}
 
         <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
           <SortableContext items={props.tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
@@ -986,27 +1002,25 @@ function TaskModal({
   } = form;
 
   return (
-    <div className="fixed inset-0 z-50 bg-text-primary/10 backdrop-blur-sm">
-      <button
-        aria-label="Close task drawer"
-        className="absolute inset-0 h-full w-full cursor-default"
-        onClick={onClose}
-        type="button"
-      />
-      <Card className="absolute inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col rounded-none border-l border-border bg-background p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
+    <Drawer onOpenChange={(open) => (!open ? onClose() : undefined)} open>
+      <DrawerContent size="lg">
+        <DrawerHeader className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
               {mode === "create" ? "Create task" : "Task detail"}
             </p>
-            <h5 className="text-[20px] font-[700] text-text-primary leading-tight">{mode === "create" ? "New task" : "Edit task"}</h5>
+            <DrawerTitle>{mode === "create" ? "New task" : "Edit task"}</DrawerTitle>
+            <DrawerDescription>
+              {mode === "create"
+                ? "Capture the task brief, assignee, and due date without losing the board context."
+                : "Review task details, edit delivery info, or remove the task from the board."}
+            </DrawerDescription>
           </div>
-          <Button onClick={onClose} size="sm" variant="ghost">
-            Close
-          </Button>
-        </div>
+          <DrawerClose />
+        </DrawerHeader>
 
-        <form className="mt-6 flex-1 space-y-6 overflow-y-auto pr-1" onSubmit={handleSubmit(onSubmit)}>
+        <DrawerBody>
+        <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-2">
             <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-title">
               Title
@@ -1091,8 +1105,9 @@ function TaskModal({
             ) : null}
           </div>
         </form>
-      </Card>
-    </div>
+        </DrawerBody>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

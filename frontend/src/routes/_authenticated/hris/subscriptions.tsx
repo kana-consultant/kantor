@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Banknote, CalendarClock, CreditCard } from "lucide-react";
+import { Banknote, CalendarClock, CreditCard, Plus } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
@@ -39,6 +40,7 @@ function SubscriptionsPage() {
   const { hasPermission } = useRBAC();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
+  const [subscriptionToDelete, setSubscriptionToDelete] = useState<Subscription | null>(null);
 
   const employeesQuery = useQuery({
     queryKey: employeesKeys.list({ page: 1, perPage: 100, search: "", department: "", status: "" }),
@@ -80,6 +82,7 @@ function SubscriptionsPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteSubscription,
     onSuccess: async () => {
+      setSubscriptionToDelete(null);
       await invalidateSubscriptionQueries(queryClient);
     },
   });
@@ -166,8 +169,8 @@ function SubscriptionsPage() {
           </PermissionGate>
           {hasPermission(permissions.hrisSubscriptionDelete) ? (
             <Button
-              disabled={deleteMutation.isPending && deleteMutation.variables === subscription.id}
-              onClick={() => deleteMutation.mutate(subscription.id)}
+              disabled={deleteMutation.isPending && deleteMutation.variables === subscriptionToDelete?.id}
+              onClick={() => setSubscriptionToDelete(subscription)}
               size="sm"
               type="button"
               variant="ghost"
@@ -195,8 +198,9 @@ function SubscriptionsPage() {
           </div>
 
           <PermissionGate permission={permissions.hrisSubscriptionCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)}>
-              {isCreateOpen ? "Close form" : "Add subscription"}
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add subscription
             </Button>
           </PermissionGate>
         </div>
@@ -273,23 +277,23 @@ function SubscriptionsPage() {
         </div>
       </Card>
 
-      {isCreateOpen ? (
-        <SubscriptionForm
-          description="Create a software subscription record with renewal cadence and encrypted credentials."
-          employees={employeesQuery.data?.items ?? []}
-          isSubmitting={createMutation.isPending}
-          onCancel={() => setIsCreateOpen(false)}
-          onSubmit={(values) => createMutation.mutate(values)}
-          submitLabel="Create subscription"
-          title="New subscription"
-        />
-      ) : null}
+      <SubscriptionForm
+        description="Capture renewal cadence, software owner, and encrypted credentials without pushing the table down."
+        employees={employeesQuery.data?.items ?? []}
+        isOpen={isCreateOpen}
+        isSubmitting={createMutation.isPending}
+        onCancel={() => setIsCreateOpen(false)}
+        onSubmit={(values) => createMutation.mutate(values)}
+        submitLabel="Create subscription"
+        title="New subscription"
+      />
 
       {editingSubscription ? (
         <SubscriptionForm
           defaultValues={toSubscriptionFormValues(editingSubscription)}
-          description="Update subscription ownership, renewal schedule, and encrypted credentials."
+          description="Update ownership, renewal schedule, and secure notes inside the same workflow."
           employees={employeesQuery.data?.items ?? []}
+          isOpen={Boolean(editingSubscription)}
           isSubmitting={updateMutation.isPending}
           onCancel={() => setEditingSubscription(null)}
           onSubmit={(values) => updateMutation.mutate({ subscriptionId: editingSubscription.id, values })}
@@ -312,6 +316,24 @@ function SubscriptionsPage() {
         loading={subscriptionsQuery.isLoading}
         loadingRows={6}
         onEmptyAction={hasPermission(permissions.hrisSubscriptionCreate) ? () => setIsCreateOpen(true) : undefined}
+      />
+
+      <ConfirmDialog
+        confirmLabel="Hapus subscription"
+        description={
+          subscriptionToDelete
+            ? `Subscription "${subscriptionToDelete.name}" akan dihapus dari tracker dan alert renewal terkait akan hilang.`
+            : ""
+        }
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(subscriptionToDelete)}
+        onClose={() => setSubscriptionToDelete(null)}
+        onConfirm={() => {
+          if (subscriptionToDelete) {
+            deleteMutation.mutate(subscriptionToDelete.id);
+          }
+        }}
+        title={subscriptionToDelete ? `Hapus ${subscriptionToDelete.name}?` : "Hapus subscription?"}
       />
     </div>
   );

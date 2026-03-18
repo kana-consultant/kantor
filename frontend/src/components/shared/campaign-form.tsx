@@ -3,8 +3,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { FormModal } from "@/components/shared/form-modal";
 import { Input } from "@/components/ui/input";
 import { campaignChannelOptions, campaignStatusOptions } from "@/lib/marketing";
 import type { Employee } from "@/types/hris";
@@ -43,6 +42,7 @@ const defaultValues: CampaignFormValues = {
 };
 
 interface CampaignFormProps {
+  isOpen: boolean;
   title: string;
   description: string;
   submitLabel: string;
@@ -54,6 +54,7 @@ interface CampaignFormProps {
 }
 
 export function CampaignForm({
+  isOpen,
   title,
   description,
   submitLabel,
@@ -78,16 +79,16 @@ export function CampaignForm({
   const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-marketing focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-marketing/10 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <Card className="p-6">
-      <div className="mb-6">
-        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-marketing mb-1">
-          Campaign composer
-        </p>
-        <h4 className="text-[20px] font-[700] text-text-primary leading-tight">{title}</h4>
-        <p className="mt-1 max-w-2xl text-[13px] text-text-secondary">{description}</p>
-      </div>
-
-      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+    <FormModal
+      isLoading={isSubmitting}
+      isOpen={isOpen}
+      onClose={onCancel}
+      onSubmit={handleSubmit(onSubmit)}
+      size="lg"
+      submitLabel={submitLabel}
+      title={title}
+      subtitle={description}
+    >
         <div className="grid gap-1.5 flex flex-col">
           <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-name">
             Campaign name
@@ -204,16 +205,6 @@ export function CampaignForm({
             {...register("brief_text")}
           />
         </div>
-
-        <div className="flex flex-wrap gap-3 pt-2">
-          <Button variant="mkt" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Saving..." : submitLabel}
-          </Button>
-          <Button onClick={onCancel} type="button" variant="ghost">
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </Card>
+    </FormModal>
   );
 }

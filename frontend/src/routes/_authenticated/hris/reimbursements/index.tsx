@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Controller, useForm } from "react-hook-form";
-import { CircleDollarSign, FileText, Receipt, TimerReset } from "lucide-react";
+import { CircleDollarSign, FileText, Plus, Receipt, TimerReset } from "lucide-react";
 import { z } from "zod";
 
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -211,8 +212,9 @@ function ReimbursementsPage() {
             </p>
           </div>
           <PermissionGate permission={permissions.hrisReimbursementCreate}>
-            <Button onClick={() => setShowForm((value) => !value)} type="button">
-              {showForm ? "Close form" : "Submit reimbursement"}
+            <Button onClick={() => setShowForm(true)} type="button">
+              <Plus className="h-4 w-4" />
+              Submit reimbursement
             </Button>
           </PermissionGate>
         </div>
@@ -282,85 +284,78 @@ function ReimbursementsPage() {
         </div>
       </Card>
 
-      {showForm ? (
-        <Card className="p-6">
-          <div className="mb-4">
-            <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
-              New reimbursement
-            </p>
-            <h4 className="text-[20px] font-[700] text-text-primary">Submit claim</h4>
-          </div>
-          <form className="grid gap-4 lg:grid-cols-2" onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}>
-            <select className="field-select" {...form.register("employee_id")}>
-              <option value="">Select employee</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.full_name}
-                </option>
-              ))}
-            </select>
-            <Input {...form.register("category")} placeholder="Category" />
-            <Input {...form.register("title")} placeholder="Title" />
-            <Controller
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <CurrencyInput
-                  onBlur={field.onBlur}
-                  onValueChange={field.onChange}
-                  ref={field.ref}
-                  value={field.value}
-                />
-              )}
-            />
-            <Input {...form.register("transaction_date")} type="date" />
-            <Input className="lg:col-span-2" {...form.register("description")} placeholder="Description" />
-            <div
-              className="lg:col-span-2 rounded-md border border-dashed border-border bg-surface-muted p-6"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                handleFiles(event.dataTransfer.files);
-              }}
-            >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="font-semibold text-text-primary">Attachment drop zone</p>
-                  <p className="text-xs text-text-secondary">
-                    Drag image or PDF files here. Maximum 10MB per file.
-                  </p>
-                </div>
-                <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted">
-                  Choose files
-                  <input
-                    className="hidden"
-                    multiple
-                    onChange={(event) => handleFiles(event.target.files ?? [])}
-                    type="file"
-                  />
-                </label>
+      <FormModal
+        isLoading={createMutation.isPending}
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}
+        size="lg"
+        submitLabel="Submit claim"
+        title="Submit reimbursement"
+        subtitle="Capture the expense detail, transaction date, and supporting evidence in one focused dialog."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <select className="field-select" {...form.register("employee_id")}>
+            <option value="">Select employee</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.full_name}
+              </option>
+            ))}
+          </select>
+          <Input {...form.register("category")} placeholder="Category" />
+          <Input {...form.register("title")} placeholder="Title" />
+          <Controller
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <CurrencyInput
+                onBlur={field.onBlur}
+                onValueChange={field.onChange}
+                ref={field.ref}
+                value={field.value}
+              />
+            )}
+          />
+          <Input {...form.register("transaction_date")} type="date" />
+          <Input className="lg:col-span-2" {...form.register("description")} placeholder="Description" />
+          <div
+            className="lg:col-span-2 rounded-md border border-dashed border-border bg-surface-muted p-6"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              handleFiles(event.dataTransfer.files);
+            }}
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="font-semibold text-text-primary">Attachment drop zone</p>
+                <p className="text-xs text-text-secondary">
+                  Drag image or PDF files here. Maximum 10MB per file.
+                </p>
               </div>
-              {fileSummary.length > 0 ? (
-                <div className="mt-4 space-y-2">
-                  {fileSummary.map((item) => (
-                    <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-text-secondary" key={item}>
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted">
+                Choose files
+                <input
+                  className="hidden"
+                  multiple
+                  onChange={(event) => handleFiles(event.target.files ?? [])}
+                  type="file"
+                />
+              </label>
             </div>
-            <div className="lg:col-span-2 flex flex-wrap gap-3">
-              <Button disabled={createMutation.isPending} type="submit">
-                Submit claim
-              </Button>
-              <Button onClick={() => setShowForm(false)} type="button" variant="ghost">
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </Card>
-      ) : null}
+            {fileSummary.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                {fileSummary.map((item) => (
+                  <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-text-secondary" key={item}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </FormModal>
 
       {reimbursementsQuery.error instanceof Error ? (
         <Card className="p-6 text-sm text-error">{reimbursementsQuery.error.message}</Card>

@@ -17,9 +17,11 @@ import {
   YAxis,
 } from "recharts";
 import { z } from "zod";
-import { ArrowDownCircle, ArrowUpCircle, ChartColumn, Scale } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, ChartColumn, Plus, Scale } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -93,8 +95,12 @@ function FinancePage() {
   const [activeTab, setActiveTab] = useState<"records" | "dashboard">("records");
   const [filters, setFilters] = useState<FinanceRecordFilters>(defaultFilters);
   const [showRecordForm, setShowRecordForm] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(null);
   const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<FinanceRecord | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<FinanceCategory | null>(null);
+  const [recordToReject, setRecordToReject] = useState<FinanceRecord | null>(null);
 
   const categoriesQuery = useQuery({
     queryKey: financeKeys.categories(),
@@ -155,6 +161,7 @@ function FinancePage() {
   const deleteRecordMutation = useMutation({
     mutationFn: deleteFinanceRecord,
     onSuccess: async () => {
+      setRecordToDelete(null);
       await invalidateFinance(queryClient, summaryYear);
     },
   });
@@ -170,6 +177,7 @@ function FinancePage() {
     mutationFn: (payload: { recordId: string; decision: "approved" | "rejected" }) =>
       reviewFinanceRecord(payload.recordId, payload.decision),
     onSuccess: async () => {
+      setRecordToReject(null);
       await invalidateFinance(queryClient, summaryYear);
     },
   });
@@ -178,6 +186,7 @@ function FinancePage() {
     mutationFn: createFinanceCategory,
     onSuccess: async () => {
       categoryForm.reset({ name: "", type: "income" });
+      setShowCategoryForm(false);
       await queryClient.invalidateQueries({ queryKey: financeKeys.categories() });
     },
   });
@@ -187,6 +196,7 @@ function FinancePage() {
       updateFinanceCategory(payload.categoryId, payload.values),
     onSuccess: async () => {
       setEditingCategory(null);
+      setShowCategoryForm(false);
       categoryForm.reset({ name: "", type: "income" });
       await queryClient.invalidateQueries({ queryKey: financeKeys.categories() });
     },
@@ -195,6 +205,7 @@ function FinancePage() {
   const deleteCategoryMutation = useMutation({
     mutationFn: deleteFinanceCategory,
     onSuccess: async () => {
+      setCategoryToDelete(null);
       await queryClient.invalidateQueries({ queryKey: financeKeys.categories() });
     },
   });
@@ -295,7 +306,7 @@ function FinancePage() {
               </Button>
               <Button
                 disabled={deleteRecordMutation.isPending && deleteRecordMutation.variables === record.id}
-                onClick={() => deleteRecordMutation.mutate(record.id)}
+                onClick={() => setRecordToDelete(record)}
                 size="sm"
                 type="button"
                 variant="ghost"
@@ -319,7 +330,7 @@ function FinancePage() {
                 Approve
               </Button>
               <Button
-                onClick={() => reviewRecordMutation.mutate({ recordId: record.id, decision: "rejected" })}
+                onClick={() => setRecordToReject(record)}
                 size="sm"
                 type="button"
                 variant="ghost"
@@ -431,71 +442,16 @@ function FinancePage() {
                   onClick={() => {
                     setEditingRecord(null);
                     resetRecordForm(recordForm);
-                    setShowRecordForm((value) => !value);
+                    setShowRecordForm(true);
                   }}
                   type="button"
                 >
-                  {showRecordForm ? "Close form" : "New record"}
+                  <Plus className="h-4 w-4" />
+                  New record
                 </Button>
               </PermissionGate>
             </div>
           </Card>
-
-          {showRecordForm ? (
-            <Card className="p-6">
-              <div className="mb-4">
-                <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
-                  Finance record
-                </p>
-                <h4 className="text-[20px] font-[700] text-text-primary">
-                  {editingRecord ? "Edit record" : "Create record"}
-                </h4>
-              </div>
-              <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleRecordSubmit}>
-                <select className="field-select" {...recordForm.register("type")}>
-                  <option value="income">Income</option>
-                  <option value="outcome">Outcome</option>
-                </select>
-                <select className="field-select" {...recordForm.register("category_id")}>
-                  <option value="">Select category</option>
-                  {visibleCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                <Controller
-                  control={recordForm.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <CurrencyInput
-                      onBlur={field.onBlur}
-                      onValueChange={field.onChange}
-                      ref={field.ref}
-                      value={field.value}
-                    />
-                  )}
-                />
-                <Input {...recordForm.register("record_date")} type="date" />
-                <Input className="lg:col-span-2" {...recordForm.register("description")} placeholder="Description" />
-                <div className="lg:col-span-2 flex flex-wrap gap-3">
-                  <Button disabled={createRecordMutation.isPending || updateRecordMutation.isPending} type="submit">
-                    {editingRecord ? "Save record" : "Create record"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setEditingRecord(null);
-                      setShowRecordForm(false);
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Card>
-          ) : null}
 
           {recordsQuery.error instanceof Error ? (
             <Card className="p-6 text-sm text-error">{recordsQuery.error.message}</Card>
@@ -530,14 +486,19 @@ function FinancePage() {
                   </p>
                   <h4 className="text-[20px] font-[700] text-text-primary">Manage categories</h4>
                 </div>
-                <form className="grid gap-4 lg:grid-cols-3" onSubmit={handleCategorySubmit}>
-                  <Input {...categoryForm.register("name")} placeholder="Category name" />
-                  <select className="field-select" {...categoryForm.register("type")}>
-                    <option value="income">Income</option>
-                    <option value="outcome">Outcome</option>
-                  </select>
-                  <Button type="submit">{editingCategory ? "Save category" : "Add category"}</Button>
-                </form>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => {
+                      setEditingCategory(null);
+                      categoryForm.reset({ name: "", type: "income" });
+                      setShowCategoryForm(true);
+                    }}
+                    type="button"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add category
+                  </Button>
+                </div>
                 <div className="mt-5 grid gap-3 lg:grid-cols-2">
                   {categories.map((category) => (
                     <div className="rounded-md border border-border bg-surface-muted p-4" key={category.id}>
@@ -554,6 +515,7 @@ function FinancePage() {
                               onClick={() => {
                                 setEditingCategory(category);
                                 categoryForm.reset({ name: category.name, type: category.type });
+                                setShowCategoryForm(true);
                               }}
                               size="sm"
                               type="button"
@@ -561,7 +523,7 @@ function FinancePage() {
                             >
                               Edit
                             </Button>
-                            <Button onClick={() => deleteCategoryMutation.mutate(category.id)} size="sm" type="button" variant="ghost">
+                            <Button onClick={() => setCategoryToDelete(category)} size="sm" type="button" variant="ghost">
                               Delete
                             </Button>
                           </div>
@@ -675,6 +637,115 @@ function FinancePage() {
           </div>
         </div>
       )}
+
+      <FormModal
+        isLoading={createRecordMutation.isPending || updateRecordMutation.isPending}
+        isOpen={showRecordForm}
+        onClose={() => {
+          setShowRecordForm(false);
+          setEditingRecord(null);
+          resetRecordForm(recordForm);
+        }}
+        onSubmit={handleRecordSubmit}
+        size="lg"
+        submitLabel={editingRecord ? "Save record" : "Create record"}
+        title={editingRecord ? "Edit record" : "Create record"}
+        subtitle="Capture the category, amount, and posting date without pushing the records table down."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <select className="field-select" {...recordForm.register("type")}>
+            <option value="income">Income</option>
+            <option value="outcome">Outcome</option>
+          </select>
+          <select className="field-select" {...recordForm.register("category_id")}>
+            <option value="">Select category</option>
+            {visibleCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          <Controller
+            control={recordForm.control}
+            name="amount"
+            render={({ field }) => (
+              <CurrencyInput
+                onBlur={field.onBlur}
+                onValueChange={field.onChange}
+                ref={field.ref}
+                value={field.value}
+              />
+            )}
+          />
+          <Input {...recordForm.register("record_date")} type="date" />
+          <Input className="lg:col-span-2" {...recordForm.register("description")} placeholder="Description" />
+        </div>
+      </FormModal>
+
+      <FormModal
+        isLoading={createCategoryMutation.isPending || updateCategoryMutation.isPending}
+        isOpen={showCategoryForm}
+        onClose={() => {
+          setShowCategoryForm(false);
+          setEditingCategory(null);
+          categoryForm.reset({ name: "", type: "income" });
+        }}
+        onSubmit={handleCategorySubmit}
+        size="sm"
+        submitLabel={editingCategory ? "Save category" : "Add category"}
+        title={editingCategory ? "Edit finance category" : "Add finance category"}
+        subtitle="Keep income and outcome categories tidy so records stay easy to classify."
+      >
+        <div className="grid gap-4">
+          <Input {...categoryForm.register("name")} placeholder="Category name" />
+          <select className="field-select" {...categoryForm.register("type")}>
+            <option value="income">Income</option>
+            <option value="outcome">Outcome</option>
+          </select>
+        </div>
+      </FormModal>
+
+      <ConfirmDialog
+        confirmLabel="Delete record"
+        description={recordToDelete ? `Record "${recordToDelete.description}" will be removed permanently.` : ""}
+        isLoading={deleteRecordMutation.isPending}
+        isOpen={Boolean(recordToDelete)}
+        onClose={() => setRecordToDelete(null)}
+        onConfirm={() => {
+          if (recordToDelete) {
+            deleteRecordMutation.mutate(recordToDelete.id);
+          }
+        }}
+        title={recordToDelete ? "Delete finance record?" : "Delete finance record?"}
+      />
+
+      <ConfirmDialog
+        confirmLabel="Reject record"
+        description={recordToReject ? `Record "${recordToReject.description}" will be marked as rejected.` : ""}
+        isLoading={reviewRecordMutation.isPending}
+        isOpen={Boolean(recordToReject)}
+        onClose={() => setRecordToReject(null)}
+        onConfirm={() => {
+          if (recordToReject) {
+            reviewRecordMutation.mutate({ recordId: recordToReject.id, decision: "rejected" });
+          }
+        }}
+        title={recordToReject ? "Reject finance record?" : "Reject finance record?"}
+      />
+
+      <ConfirmDialog
+        confirmLabel="Delete category"
+        description={categoryToDelete ? `Category "${categoryToDelete.name}" will be removed from finance settings.` : ""}
+        isLoading={deleteCategoryMutation.isPending}
+        isOpen={Boolean(categoryToDelete)}
+        onClose={() => setCategoryToDelete(null)}
+        onConfirm={() => {
+          if (categoryToDelete) {
+            deleteCategoryMutation.mutate(categoryToDelete.id);
+          }
+        }}
+        title={categoryToDelete ? `Delete ${categoryToDelete.name}?` : "Delete category?"}
+      />
     </div>
   );
 }

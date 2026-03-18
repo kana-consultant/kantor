@@ -4,8 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { FormModal } from "@/components/shared/form-modal";
 import { Input } from "@/components/ui/input";
 import type { ProjectFormValues } from "@/types/project";
 import { cn } from "@/lib/utils";
@@ -19,6 +18,7 @@ const projectFormSchema = z.object({
 });
 
 interface ProjectFormProps {
+  isOpen: boolean;
   defaultValues?: ProjectFormValues;
   title: string;
   description: string;
@@ -37,6 +37,7 @@ const baseValues: ProjectFormValues = {
 };
 
 export function ProjectForm({
+  isOpen,
   defaultValues,
   title,
   description,
@@ -57,16 +58,16 @@ export function ProjectForm({
   const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <Card className="p-6">
-      <div className="mb-6">
-        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
-          Project Form
-        </p>
-        <h3 className="text-[20px] font-[700] text-text-primary leading-tight">{title}</h3>
-        <p className="mt-1 text-[13px] text-text-secondary">{description}</p>
-      </div>
-
-      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+    <FormModal
+      isLoading={isSubmitting}
+      isOpen={isOpen}
+      onClose={onCancel ?? (() => undefined)}
+      onSubmit={handleSubmit(onSubmit)}
+      size="lg"
+      submitLabel={submitLabel}
+      title={title}
+      subtitle={description}
+    >
         <Field error={errors.name?.message} label="Project name">
           <Input className="focus-visible:border-ops focus-visible:ring-ops/10" {...register("name")} placeholder="Q2 Operational Revamp" />
         </Field>
@@ -109,19 +110,7 @@ export function ProjectForm({
             <Input className="focus-visible:border-ops focus-visible:ring-ops/10" {...register("deadline")} type="date" />
           </Field>
         </div>
-
-        <div className="flex flex-wrap gap-3 pt-2">
-          <Button variant="ops" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Saving..." : submitLabel}
-          </Button>
-          {onCancel ? (
-            <Button onClick={onCancel} type="button" variant="ghost">
-              Cancel
-            </Button>
-          ) : null}
-        </div>
-      </form>
-    </Card>
+    </FormModal>
   );
 }
 

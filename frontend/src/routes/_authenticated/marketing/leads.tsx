@@ -6,11 +6,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import Papa from "papaparse";
 import { Controller, useForm } from "react-hook-form";
-import { Download, FolderKanban, LayoutList, Plus } from "lucide-react";
+import { Download, FolderKanban, LayoutList, MessageSquarePlus, Plus } from "lucide-react";
 import { z } from "zod";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import {
+  Drawer,
+  DrawerBody,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/shared/drawer";
 import { EmptyState } from "@/components/shared/empty-state";
+import { FormModal } from "@/components/shared/form-modal";
 import { MarketingLeadsPipeline } from "@/components/shared/marketing-leads-pipeline";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -20,9 +31,10 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
-import { formatLeadStatus, leadSourceMeta, leadSourceOptions, leadStatusOptions } from "@/lib/marketing";
+import { leadSourceMeta, leadSourceOptions, leadStatusOptions } from "@/lib/marketing";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
+import { campaignsKeys, listCampaigns } from "@/services/marketing-campaigns";
 import {
   createLead,
   createLeadActivity,
@@ -37,26 +49,27 @@ import {
   moveLeadStatus,
   updateLead,
 } from "@/services/marketing-leads";
-import { campaignsKeys, listCampaigns } from "@/services/marketing-campaigns";
 import { employeesKeys, listEmployees } from "@/services/hris-employees";
 import type { EmployeeFilters } from "@/types/hris";
 import type { Lead, LeadFilters, LeadFormValues, LeadImportSummary } from "@/types/marketing";
 
-const leadSchema = z.object({
-  name: z.string().trim().min(2).max(180),
-  phone: z.string().trim().regex(/^(\+62|08)\d{8,13}$/).or(z.literal("")),
-  email: z.string().trim().email().or(z.literal("")),
-  source_channel: z.enum(["whatsapp", "email", "instagram", "facebook", "website", "referral", "other"]),
-  pipeline_status: z.enum(["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"]),
-  campaign_id: z.string(),
-  assigned_to: z.string(),
-  notes: z.string(),
-  company_name: z.string(),
-  estimated_value: z.number().min(0),
-}).refine((value) => value.phone !== "" || value.email !== "", {
-  message: "Phone or email is required",
-  path: ["phone"],
-});
+const leadSchema = z
+  .object({
+    name: z.string().trim().min(2).max(180),
+    phone: z.string().trim().regex(/^(\+62|08)\d{8,13}$/).or(z.literal("")),
+    email: z.string().trim().email().or(z.literal("")),
+    source_channel: z.enum(["whatsapp", "email", "instagram", "facebook", "website", "referral", "other"]),
+    pipeline_status: z.enum(["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"]),
+    campaign_id: z.string(),
+    assigned_to: z.string(),
+    notes: z.string(),
+    company_name: z.string(),
+    estimated_value: z.number().min(0),
+  })
+  .refine((value) => value.phone !== "" || value.email !== "", {
+    message: "Phone or email is required",
+    path: ["phone"],
+  });
 
 const defaultLeadForm: LeadFormValues = {
   name: "",
@@ -132,14 +145,16 @@ function MarketingLeadsPage() {
   const [filters, setFilters] = useState<LeadFilters>(defaultFilters);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showActivityForm, setShowActivityForm] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
+  const [activityNote, setActivityNote] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreviewRows, setImportPreviewRows] = useState<LeadImportPreviewRow[]>([]);
   const [importPreviewError, setImportPreviewError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<LeadImportSummary | null>(null);
   const [isParsingImport, setIsParsingImport] = useState(false);
-  const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [activityNote, setActivityNote] = useState("");
 
   const employeesQuery = useQuery({
     queryKey: employeesKeys.list(employeeFilters),
@@ -205,27 +220,26 @@ function MarketingLeadsPage() {
   const createMutation = useMutation({
     mutationFn: createLead,
     onSuccess: async () => {
-      resetLeadForm(form);
-      setShowForm(false);
+      closeLeadForm(form, setEditingLead, setShowForm);
       await invalidateLeads(queryClient);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { leadId: string; values: LeadFormValues }) =>
-      updateLead(payload.leadId, payload.values),
+    mutationFn: (payload: { leadId: string; values: LeadFormValues }) => updateLead(payload.leadId, payload.values),
     onSuccess: async () => {
-      resetLeadForm(form);
-      setEditingLead(null);
-      setShowForm(false);
+      closeLeadForm(form, setEditingLead, setShowForm);
       await invalidateLeads(queryClient);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteLead,
-    onSuccess: async () => {
-      setSelectedLeadId(null);
+    onSuccess: async (_, leadId) => {
+      if (selectedLeadId === leadId) {
+        setSelectedLeadId(null);
+      }
+      setLeadToDelete(null);
       await invalidateLeads(queryClient);
     },
   });
@@ -242,6 +256,7 @@ function MarketingLeadsPage() {
       createLeadActivity(leadId, { activity_type: "follow_up", description }),
     onSuccess: async () => {
       setActivityNote("");
+      setShowActivityForm(false);
       await invalidateLeads(queryClient);
     },
   });
@@ -341,14 +356,18 @@ function MarketingLeadsPage() {
           <Button onClick={() => setSelectedLeadId(lead.id)} size="sm" type="button" variant="outline">
             Open
           </Button>
-          <PermissionGate permission={permissions.marketingLeadsDelete}>
+          <PermissionGate permission={permissions.marketingLeadsEdit}>
             <Button
-              disabled={deleteMutation.isPending && deleteMutation.variables === lead.id}
-              onClick={() => deleteMutation.mutate(lead.id)}
+              onClick={() => openLeadEditForm(lead, form, setEditingLead, setShowForm)}
               size="sm"
               type="button"
               variant="ghost"
             >
+              Edit
+            </Button>
+          </PermissionGate>
+          <PermissionGate permission={permissions.marketingLeadsDelete}>
+            <Button onClick={() => setLeadToDelete(lead)} size="sm" type="button" variant="ghost">
               Delete
             </Button>
           </PermissionGate>
@@ -392,6 +411,7 @@ function MarketingLeadsPage() {
       updateMutation.mutate({ leadId: editingLead.id, values });
       return;
     }
+
     createMutation.mutate(values);
   });
 
@@ -436,6 +456,15 @@ function MarketingLeadsPage() {
     importMutation.mutate(importFile);
   };
 
+  const closeImportModal = () => {
+    setShowImport(false);
+    setImportFile(null);
+    setImportPreviewRows([]);
+    setImportPreviewError(null);
+    setImportResult(null);
+    setIsParsingImport(false);
+  };
+
   return (
     <div className="space-y-6">
       <Card className="border-mkt/20 bg-gradient-to-br from-mkt/10 via-background to-background p-8">
@@ -457,11 +486,18 @@ function MarketingLeadsPage() {
               Table view
             </Button>
             <PermissionGate permission={permissions.marketingLeadsCreate}>
-              <Button onClick={() => setShowForm((value) => !value)} variant="mkt">
+              <Button
+                onClick={() => {
+                  resetLeadForm(form);
+                  setEditingLead(null);
+                  setShowForm(true);
+                }}
+                variant="mkt"
+              >
                 <Plus className="mr-2 h-4 w-4" />
-                {showForm ? "Close form" : "New lead"}
+                New lead
               </Button>
-              <Button onClick={() => setShowImport((value) => !value)} variant="outline">
+              <Button onClick={() => setShowImport(true)} variant="outline">
                 <Download className="mr-2 h-4 w-4" />
                 Import CSV
               </Button>
@@ -482,189 +518,81 @@ function MarketingLeadsPage() {
 
       <Card className="p-6">
         <div className="grid gap-3 lg:grid-cols-6">
-          <Input onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value, page: 1 }))} placeholder="Search name, phone, or email" value={filters.search} />
-          <select className="field-select" onChange={(event) => setFilters((current) => ({ ...current, pipelineStatus: event.target.value, page: 1 }))} value={filters.pipelineStatus}>
+          <Input
+            onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value, page: 1 }))}
+            placeholder="Search name, phone, or email"
+            value={filters.search}
+          />
+          <select
+            className="field-select"
+            onChange={(event) => setFilters((current) => ({ ...current, pipelineStatus: event.target.value, page: 1 }))}
+            value={filters.pipelineStatus}
+          >
             <option value="">All statuses</option>
             {leadStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
-          <select className="field-select" onChange={(event) => setFilters((current) => ({ ...current, sourceChannel: event.target.value, page: 1 }))} value={filters.sourceChannel}>
+          <select
+            className="field-select"
+            onChange={(event) => setFilters((current) => ({ ...current, sourceChannel: event.target.value, page: 1 }))}
+            value={filters.sourceChannel}
+          >
             <option value="">All sources</option>
             {leadSourceOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
-          <select className="field-select" onChange={(event) => setFilters((current) => ({ ...current, campaignId: event.target.value, page: 1 }))} value={filters.campaignId}>
+          <select
+            className="field-select"
+            onChange={(event) => setFilters((current) => ({ ...current, campaignId: event.target.value, page: 1 }))}
+            value={filters.campaignId}
+          >
             <option value="">All campaigns</option>
             {campaigns.map((campaign) => (
-              <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
+              <option key={campaign.id} value={campaign.id}>
+                {campaign.name}
+              </option>
             ))}
           </select>
-          <select className="field-select" onChange={(event) => setFilters((current) => ({ ...current, assignedTo: event.target.value, page: 1 }))} value={filters.assignedTo}>
+          <select
+            className="field-select"
+            onChange={(event) => setFilters((current) => ({ ...current, assignedTo: event.target.value, page: 1 }))}
+            value={filters.assignedTo}
+          >
             <option value="">All assigned sales</option>
             {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>{employee.full_name}</option>
+              <option key={employee.id} value={employee.id}>
+                {employee.full_name}
+              </option>
             ))}
           </select>
-          <div className="grid gap-3 lg:grid-cols-2 lg:col-span-2">
-            <Input onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value, page: 1 }))} type="date" value={filters.dateFrom} />
-            <Input onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value, page: 1 }))} type="date" value={filters.dateTo} />
+          <div className="grid gap-3 lg:col-span-2 lg:grid-cols-2">
+            <Input
+              onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value, page: 1 }))}
+              type="date"
+              value={filters.dateFrom}
+            />
+            <Input
+              onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value, page: 1 }))}
+              type="date"
+              value={filters.dateTo}
+            />
           </div>
         </div>
       </Card>
-
-      {showForm ? (
-        <Card className="p-6">
-          <div className="mb-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Lead form</p>
-            <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{editingLead ? "Edit lead" : "Create lead"}</h4>
-          </div>
-          <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit}>
-            <Input {...form.register("name")} placeholder="Lead name" />
-            <Controller control={form.control} name="estimated_value" render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />} />
-              <Input {...form.register("phone")} placeholder="+628123456789" />
-              <Input {...form.register("email")} placeholder="lead@example.com" />
-              <select className="field-select" {...form.register("source_channel")}>
-                {leadSourceOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <select className="field-select" {...form.register("pipeline_status")}>
-                {leadStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <select className="field-select" {...form.register("campaign_id")}>
-                <option value="">No linked campaign</option>
-                {campaigns.map((campaign) => (
-                  <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
-                ))}
-              </select>
-              <select className="field-select" {...form.register("assigned_to")}>
-                <option value="">Unassigned</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>{employee.full_name}</option>
-                ))}
-            </select>
-            <Input {...form.register("company_name")} placeholder="Company name" />
-            <Input className="lg:col-span-2" {...form.register("notes")} placeholder="Lead notes or qualification summary" />
-            <div className="flex flex-wrap gap-3 lg:col-span-2">
-              <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit" variant="mkt">
-                {editingLead ? "Save changes" : "Create lead"}
-              </Button>
-              <Button
-                onClick={() => {
-                  resetLeadForm(form);
-                  setEditingLead(null);
-                  setShowForm(false);
-                }}
-                type="button"
-                variant="outline"
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </Card>
-      ) : null}
-
-      {showImport ? (
-        <Card className="p-6">
-          <div className="mb-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Bulk import</p>
-            <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Import leads from CSV</h4>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Format kolom: `name, phone, email, source_channel, pipeline_status, assigned_to, notes, company_name, estimated_value`
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <input
-              accept=".csv,text/csv"
-              onChange={(event) => {
-                handleImportFileChange(event.target.files?.[0] ?? null);
-                event.target.value = "";
-              }}
-              type="file"
-            />
-
-            {isParsingImport ? <p className="text-sm text-text-secondary">Parsing CSV preview...</p> : null}
-            {importPreviewError ? <Card className="p-4 text-sm text-error">{importPreviewError}</Card> : null}
-
-            {importFile && importPreviewRows.length > 0 ? (
-              <div className="space-y-4">
-                <Card className="p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary">{importFile.name}</p>
-                      <p className="mt-1 text-sm text-text-secondary">
-                        Showing the first {Math.min(importPreviewRows.length, 10)} rows. Rows with validation issues are highlighted before import.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="text-sm text-text-secondary">
-                        {importPreviewRows.filter((row) => row.errors.length === 0).length} ready
-                      </span>
-                      <span className="text-sm text-error">
-                        {importPreviewRows.filter((row) => row.errors.length > 0).length} flagged
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-
-                <DataTable
-                  columns={importPreviewColumns}
-                  data={importPreviewRows.slice(0, 10)}
-                  emptyDescription="Upload a CSV file to preview import rows."
-                  emptyTitle="No preview rows"
-                  getRowClassName={(row) => (row.errors.length > 0 ? "bg-error-light hover:bg-error-light" : undefined)}
-                  getRowId={(row) => row.id}
-                  loading={false}
-                />
-
-                <div className="flex flex-wrap gap-3">
-                  <Button disabled={Boolean(importPreviewError) || importMutation.isPending} onClick={handleConfirmImport} type="button" variant="mkt">
-                    {importMutation.isPending ? "Importing..." : "Confirm import"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setImportFile(null);
-                      setImportPreviewRows([]);
-                      setImportPreviewError(null);
-                      setImportResult(null);
-                    }}
-                    type="button"
-                    variant="outline"
-                  >
-                    Reset file
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {importResult ? (
-              <div className="rounded-[22px] border border-border/70 bg-background/70 p-4 text-sm">
-                <p>Success: {importResult.success_count}</p>
-                <p>Failed: {importResult.failed_count}</p>
-                {importResult.errors.length > 0 ? (
-                  <div className="mt-3 space-y-1 text-error">
-                    {importResult.errors.map((error) => (
-                      <p key={`${error.row}-${error.message}`}>Row {error.row}: {error.message}</p>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
 
       {activeView === "pipeline" ? (
         <MarketingLeadsPipeline
           columns={pipelineColumns}
           onLeadOpen={(lead) => setSelectedLeadId(lead.id)}
-          onMoveLead={(leadId, pipelineStatus) => moveMutation.mutateAsync({ leadId, status: pipelineStatus }).then(() => undefined)}
+          onMoveLead={(leadId, pipelineStatus) =>
+            moveMutation.mutateAsync({ leadId, status: pipelineStatus }).then(() => undefined)
+          }
         />
       ) : (
         <DataTable
@@ -676,7 +604,15 @@ function MarketingLeadsPage() {
           getRowId={(lead) => lead.id}
           loading={leadsQuery.isLoading}
           loadingRows={6}
-          onEmptyAction={hasPermission(permissions.marketingLeadsCreate) ? () => setShowForm(true) : undefined}
+          onEmptyAction={
+            hasPermission(permissions.marketingLeadsCreate)
+              ? () => {
+                  resetLeadForm(form);
+                  setEditingLead(null);
+                  setShowForm(true);
+                }
+              : undefined
+          }
           pagination={
             meta
               ? {
@@ -691,76 +627,292 @@ function MarketingLeadsPage() {
         />
       )}
 
-      {selectedLeadId ? (
-        <LeadDetailDrawer
-          activities={leadActivities}
-          activityNote={activityNote}
-          lead={selectedLead}
-          onActivityNoteChange={setActivityNote}
-          onAddActivity={() => {
-            if (selectedLeadId && activityNote.trim()) {
-              activityMutation.mutate({ leadId: selectedLeadId, description: activityNote.trim() });
-            }
-          }}
-          onClose={() => setSelectedLeadId(null)}
-          onDelete={() => {
-            if (selectedLead) {
-              deleteMutation.mutate(selectedLead.id);
-            }
-          }}
-          onEdit={() => {
-            if (selectedLead) {
-              setEditingLead(selectedLead);
-              form.reset(toLeadForm(selectedLead));
-              setShowForm(true);
-              setSelectedLeadId(null);
-            }
-          }}
+      <FormModal
+        isLoading={createMutation.isPending || updateMutation.isPending}
+        isOpen={showForm}
+        onClose={() => closeLeadForm(form, setEditingLead, setShowForm)}
+        onSubmit={handleSubmit}
+        size="lg"
+        submitLabel={editingLead ? "Save lead" : "Create lead"}
+        title={editingLead ? "Edit lead" : "Create lead"}
+        subtitle="Capture the lead profile, contact details, assignment, and estimated value without pushing the pipeline down."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Input {...form.register("name")} placeholder="Lead name" />
+          <Controller
+            control={form.control}
+            name="estimated_value"
+            render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
+          />
+          <Input {...form.register("phone")} placeholder="+628123456789" />
+          <Input {...form.register("email")} placeholder="lead@example.com" />
+          <select className="field-select" {...form.register("source_channel")}>
+            {leadSourceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select className="field-select" {...form.register("pipeline_status")}>
+            {leadStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select className="field-select" {...form.register("campaign_id")}>
+            <option value="">No linked campaign</option>
+            {campaigns.map((campaign) => (
+              <option key={campaign.id} value={campaign.id}>
+                {campaign.name}
+              </option>
+            ))}
+          </select>
+          <select className="field-select" {...form.register("assigned_to")}>
+            <option value="">Unassigned</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.full_name}
+              </option>
+            ))}
+          </select>
+          <Input {...form.register("company_name")} placeholder="Company name" />
+          <textarea
+            className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus lg:col-span-2"
+            {...form.register("notes")}
+            placeholder="Lead notes or qualification summary"
+          />
+        </div>
+      </FormModal>
+
+      <FormModal
+        cancelLabel={importResult ? "Close" : "Cancel"}
+        error={importPreviewError}
+        isLoading={importMutation.isPending}
+        isOpen={showImport}
+        onClose={closeImportModal}
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleConfirmImport();
+        }}
+        size="xl"
+        submitDisabled={!importFile || Boolean(importPreviewError) || importPreviewRows.length === 0}
+        submitLabel="Confirm import"
+        title="Import leads from CSV"
+        subtitle="Preview the first rows, validate contact fields, and confirm the batch before it is sent to the backend."
+      >
+        <div className="space-y-4">
+          <div className="rounded-md border border-dashed border-border bg-surface-muted p-4">
+            <label className="flex cursor-pointer flex-col gap-2 text-sm text-text-secondary">
+              <span className="font-medium text-text-primary">Upload CSV file</span>
+              <span>Required headers: {leadImportHeaders.join(", ")}</span>
+              <input
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(event) => {
+                  handleImportFileChange(event.target.files?.[0] ?? null);
+                  event.target.value = "";
+                }}
+                type="file"
+              />
+              <span className="inline-flex w-fit items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-text-primary">
+                Choose CSV
+              </span>
+            </label>
+          </div>
+
+          {isParsingImport ? <p className="text-sm text-text-secondary">Parsing CSV preview...</p> : null}
+
+          {importFile && importPreviewRows.length > 0 ? (
+            <>
+              <Card className="p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">{importFile.name}</p>
+                    <p className="mt-1 text-sm text-text-secondary">
+                      Showing the first {Math.min(importPreviewRows.length, 10)} rows before import.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="text-success">
+                      {importPreviewRows.filter((row) => row.errors.length === 0).length} ready
+                    </span>
+                    <span className="text-error">
+                      {importPreviewRows.filter((row) => row.errors.length > 0).length} flagged
+                    </span>
+                  </div>
+                </div>
+              </Card>
+
+              <DataTable
+                columns={importPreviewColumns}
+                data={importPreviewRows.slice(0, 10)}
+                emptyDescription="Upload a CSV file to preview import rows."
+                emptyTitle="No preview rows"
+                getRowClassName={(row) => (row.errors.length > 0 ? "bg-error-light hover:bg-error-light" : undefined)}
+                getRowId={(row) => row.id}
+                loading={false}
+              />
+            </>
+          ) : null}
+
+          {importResult ? (
+            <Card className="p-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Import result</p>
+                  <p className="mt-2 text-sm text-text-secondary">Success: {importResult.success_count}</p>
+                  <p className="text-sm text-text-secondary">Failed: {importResult.failed_count}</p>
+                </div>
+                {importResult.errors.length > 0 ? (
+                  <div className="space-y-1 text-sm text-error">
+                    {importResult.errors.map((error) => (
+                      <p key={`${error.row}-${error.message}`}>
+                        Row {error.row}: {error.message}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-success">All rows were imported successfully.</p>
+                )}
+              </div>
+            </Card>
+          ) : null}
+        </div>
+      </FormModal>
+
+      <LeadDetailDrawer
+        activities={leadActivities}
+        canAddActivity={hasPermission(permissions.marketingLeadsEdit)}
+        canDelete={hasPermission(permissions.marketingLeadsDelete)}
+        canEdit={hasPermission(permissions.marketingLeadsEdit)}
+        isLoading={leadDetailQuery.isLoading}
+        lead={selectedLead}
+        onAddActivity={() => setShowActivityForm(true)}
+        onClose={() => {
+          setSelectedLeadId(null);
+          setShowActivityForm(false);
+          setActivityNote("");
+        }}
+        onDelete={() => {
+          if (selectedLead) {
+            setLeadToDelete(selectedLead);
+          }
+        }}
+        onEdit={() => {
+          if (selectedLead) {
+            openLeadEditForm(selectedLead, form, setEditingLead, setShowForm);
+            setSelectedLeadId(null);
+          }
+        }}
+        open={Boolean(selectedLeadId)}
+      />
+
+      <FormModal
+        isLoading={activityMutation.isPending}
+        isOpen={showActivityForm}
+        onClose={() => {
+          setShowActivityForm(false);
+          setActivityNote("");
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (selectedLeadId && activityNote.trim()) {
+            activityMutation.mutate({ leadId: selectedLeadId, description: activityNote.trim() });
+          }
+        }}
+        size="sm"
+        submitDisabled={!activityNote.trim()}
+        submitLabel="Add note"
+        title="Add follow-up note"
+        subtitle="Capture the next step or latest conversation for this lead."
+      >
+        <textarea
+          className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
+          onChange={(event) => setActivityNote(event.target.value)}
+          placeholder="Write the follow-up note"
+          value={activityNote}
         />
-      ) : null}
+      </FormModal>
+
+      <ConfirmDialog
+        confirmLabel="Delete lead"
+        description={leadToDelete ? `Lead "${leadToDelete.name}" and its activity history will be removed.` : ""}
+        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(leadToDelete)}
+        onClose={() => setLeadToDelete(null)}
+        onConfirm={() => {
+          if (leadToDelete) {
+            deleteMutation.mutate(leadToDelete.id);
+          }
+        }}
+        title={leadToDelete ? `Delete ${leadToDelete.name}?` : "Delete lead?"}
+      />
     </div>
   );
 }
 
 function LeadDetailDrawer({
+  open,
   lead,
   activities,
-  activityNote,
-  onActivityNoteChange,
+  isLoading,
+  canEdit,
+  canDelete,
+  canAddActivity,
   onAddActivity,
   onEdit,
   onDelete,
   onClose,
 }: {
+  open: boolean;
   lead: Lead | null;
   activities: { id: string; description: string; created_by_name?: string | null; created_at: string; activity_type: string }[];
-  activityNote: string;
-  onActivityNoteChange: (value: string) => void;
+  isLoading: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canAddActivity: boolean;
   onAddActivity: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-foreground/25 backdrop-blur-sm">
-      <button className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} type="button" />
-      <Card className="absolute inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col rounded-none border-l border-border/80 bg-surface p-6 shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border/70 pb-5">
+    <Drawer onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)} open={open}>
+      <DrawerContent size="lg">
+        <DrawerHeader className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Lead detail</p>
-            <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{lead?.name ?? "Loading..."}</h4>
+            <DrawerTitle>{lead?.name ?? (isLoading ? "Loading lead..." : "Lead detail")}</DrawerTitle>
+            <DrawerDescription>
+              Review assignment, status, campaign link, and follow-up history without leaving the pipeline.
+            </DrawerDescription>
           </div>
-          <Button onClick={onClose} size="sm" variant="outline">Close</Button>
-        </div>
+          <DrawerClose />
+        </DrawerHeader>
+        <DrawerBody className="space-y-6">
+          {lead ? (
+            <div className="flex flex-wrap gap-3">
+              {canEdit ? (
+                <Button onClick={onEdit} size="sm" type="button" variant="outline">
+                  Edit lead
+                </Button>
+              ) : null}
+              {canAddActivity ? (
+                <Button onClick={onAddActivity} size="sm" type="button" variant="outline">
+                  <MessageSquarePlus className="h-4 w-4" />
+                  Add follow-up
+                </Button>
+              ) : null}
+              {canDelete ? (
+                <Button onClick={onDelete} size="sm" type="button" variant="ghost">
+                  Delete lead
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
-        {lead ? (
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button onClick={onEdit} size="sm" variant="outline">Edit lead</Button>
-            <Button onClick={onDelete} size="sm" variant="ghost">Delete lead</Button>
-          </div>
-        ) : null}
+          {isLoading ? <Card className="p-6 text-sm text-text-secondary">Loading lead details...</Card> : null}
 
-        <div className="mt-6 flex-1 space-y-4 overflow-y-auto pr-1">
           {lead ? (
             <>
               <DetailRow label="Source" value={leadSourceMeta(lead.source_channel).label} />
@@ -769,45 +921,39 @@ function LeadDetailDrawer({
               <DetailRow label="Assigned" value={lead.assigned_to_name ?? "Unassigned"} />
               <DetailRow label="Estimated value" value={formatIDR(lead.estimated_value)} />
               <DetailRow label="Contact" value={lead.phone || lead.email || "No contact"} />
+
               <Card className="p-6">
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mkt">Notes</p>
-                <p className="mt-3 text-sm text-muted-foreground">{lead.notes || "No notes yet."}</p>
+                <p className="mt-3 text-sm text-text-secondary">{lead.notes || "No notes yet."}</p>
+              </Card>
+
+              <Card className="p-6">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mkt">Activity timeline</p>
+                <div className="mt-5 space-y-3">
+                  {activities.map((activity) => (
+                    <div className="rounded-[18px] border border-border/70 bg-background/70 p-3" key={activity.id}>
+                      <p className="text-sm font-semibold">{activity.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {activity.created_by_name ?? "System"} | {new Date(activity.created_at).toLocaleString("id-ID")} |{" "}
+                        {formatLeadActivity(activity.activity_type)}
+                      </p>
+                    </div>
+                  ))}
+                  {activities.length === 0 ? (
+                    <EmptyState
+                      className="border-border/70 bg-transparent px-4 py-8"
+                      description="Timeline events and follow-up notes will appear here once the lead starts moving through the pipeline."
+                      icon={LayoutList}
+                      title="No activities yet"
+                    />
+                  ) : null}
+                </div>
               </Card>
             </>
           ) : null}
-
-          <Card className="p-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mkt">Add follow-up</p>
-            <div className="mt-4 flex gap-3">
-              <Input onChange={(event) => onActivityNoteChange(event.target.value)} placeholder="Follow-up note" value={activityNote} />
-              <Button onClick={onAddActivity} variant="mkt">Add note</Button>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mkt">Activity timeline</p>
-            <div className="mt-5 space-y-3">
-              {activities.map((activity) => (
-                <div className="rounded-[18px] border border-border/70 bg-background/70 p-3" key={activity.id}>
-                  <p className="text-sm font-semibold">{activity.description}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {activity.created_by_name ?? "System"} | {new Date(activity.created_at).toLocaleString("id-ID")} | {activity.activity_type}
-                  </p>
-                </div>
-              ))}
-              {activities.length === 0 ? (
-                <EmptyState
-                  className="border-border/70 bg-transparent px-4 py-8"
-                  description="Timeline events and follow-up notes will appear here once the lead starts moving through the pipeline."
-                  icon={LayoutList}
-                  title="No activities yet"
-                />
-              ) : null}
-            </div>
-          </Card>
-        </div>
-      </Card>
-    </div>
+        </DrawerBody>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
@@ -831,6 +977,27 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
 
 function resetLeadForm(form: ReturnType<typeof useForm<LeadFormValues>>) {
   form.reset({ ...defaultLeadForm });
+}
+
+function closeLeadForm(
+  form: ReturnType<typeof useForm<LeadFormValues>>,
+  setEditingLead: (lead: Lead | null) => void,
+  setShowForm: (value: boolean) => void,
+) {
+  resetLeadForm(form);
+  setEditingLead(null);
+  setShowForm(false);
+}
+
+function openLeadEditForm(
+  lead: Lead,
+  form: ReturnType<typeof useForm<LeadFormValues>>,
+  setEditingLead: (lead: Lead | null) => void,
+  setShowForm: (value: boolean) => void,
+) {
+  setEditingLead(lead);
+  form.reset(toLeadForm(lead));
+  setShowForm(true);
 }
 
 function buildLeadImportPreviewRow(row: Record<string, string>, index: number): LeadImportPreviewRow {
@@ -882,6 +1049,10 @@ function toLeadForm(lead: Lead): LeadFormValues {
     company_name: lead.company_name ?? "",
     estimated_value: lead.estimated_value,
   };
+}
+
+function formatLeadActivity(value: string) {
+  return value.replaceAll("_", " ");
 }
 
 async function invalidateLeads(queryClient: ReturnType<typeof useQueryClient>) {

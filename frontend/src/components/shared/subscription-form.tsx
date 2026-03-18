@@ -4,8 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { FormModal } from "@/components/shared/form-modal";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import type { Employee, SubscriptionFormValues } from "@/types/hris";
@@ -44,6 +43,7 @@ const baseValues: SubscriptionFormValues = {
 };
 
 interface SubscriptionFormProps {
+  isOpen: boolean;
   employees: Employee[];
   defaultValues?: SubscriptionFormValues;
   title: string;
@@ -55,6 +55,7 @@ interface SubscriptionFormProps {
 }
 
 export function SubscriptionForm({
+  isOpen,
   employees,
   defaultValues,
   title,
@@ -77,14 +78,16 @@ export function SubscriptionForm({
   const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-hr focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-hr/10 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <Card className="p-6">
-      <div className="mb-6">
-        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-hr mb-1">Subscription Form</p>
-        <h3 className="text-[20px] font-[700] text-text-primary leading-tight">{title}</h3>
-        <p className="mt-1 text-[13px] text-text-secondary">{description}</p>
-      </div>
-
-      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+    <FormModal
+      isLoading={isSubmitting}
+      isOpen={isOpen}
+      onClose={onCancel ?? (() => undefined)}
+      onSubmit={handleSubmit(onSubmit)}
+      size="lg"
+      submitLabel={submitLabel}
+      title={title}
+      subtitle={description}
+    >
         <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.name?.message} label="Name">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("name")} placeholder="Notion" />
@@ -184,19 +187,7 @@ export function SubscriptionForm({
             />
           </Field>
         </div>
-
-        <div className="flex flex-wrap gap-3 pt-2">
-          <Button variant="hr" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Saving..." : submitLabel}
-          </Button>
-          {onCancel ? (
-            <Button onClick={onCancel} type="button" variant="ghost">
-              Cancel
-            </Button>
-          ) : null}
-        </div>
-      </form>
-    </Card>
+    </FormModal>
   );
 }
 
