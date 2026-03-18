@@ -258,6 +258,17 @@ func (a *App) buildRouter(
 			"status": "ok",
 		}, nil)
 	})
+	router.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := a.db.Ping(ctx); err != nil {
+			response.WriteError(w, http.StatusServiceUnavailable, "DB_UNHEALTHY", "Database is not reachable", nil)
+			return
+		}
+		response.WriteJSON(w, http.StatusOK, map[string]string{
+			"status": "ok",
+		}, nil)
+	})
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", authHandler.RegisterRoutes)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
