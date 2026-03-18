@@ -31,6 +31,7 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 	router.Post("/register", h.register)
 	router.Post("/login", h.login)
 	router.Post("/refresh", h.refresh)
+	router.Post("/logout", h.logout)
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +112,20 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 		Permissions: result.Permissions,
 		Tokens:      result.Tokens,
 	}, nil)
+}
+
+func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	var input dto.LogoutRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	if err := h.service.Logout(r.Context(), input.RefreshToken); err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]bool{"revoked": true}, nil)
 }
 
 func (h *Handler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {

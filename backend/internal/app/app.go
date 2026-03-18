@@ -23,6 +23,7 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
+	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
 	hrishandler "github.com/kana-consultant/kantor/backend/internal/handler/hris"
 	marketinghandler "github.com/kana-consultant/kantor/backend/internal/handler/marketing"
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
@@ -37,6 +38,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	"github.com/kana-consultant/kantor/backend/internal/security"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
+	filesservice "github.com/kana-consultant/kantor/backend/internal/service/files"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
 	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
@@ -136,21 +138,29 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
 	assignmentRulesRepository := operationalrepo.NewAssignmentRulesRepository(pool)
+	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
 	employeesRepository := hrisrepo.NewEmployeesRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
 	compensationRepository := hrisrepo.NewCompensationRepository(pool)
 	financeRepository := hrisrepo.NewFinanceRepository(pool)
 	reimbursementsRepository := hrisrepo.NewReimbursementsRepository(pool)
 	subscriptionsRepository := hrisrepo.NewSubscriptionsRepository(pool)
+	hrisOverviewRepository := hrisrepo.NewOverviewRepository(pool)
 	campaignsRepository := marketingrepo.NewCampaignsRepository(pool)
 	adsMetricsRepository := marketingrepo.NewAdsMetricsRepository(pool)
 	leadsRepository := marketingrepo.NewLeadsRepository(pool)
+	marketingOverviewRepository := marketingrepo.NewOverviewRepository(pool)
 	notificationsRepository := notificationsrepo.New(pool)
-	encrypter := security.NewEncrypter(cfg.DataEncryptionKey)
+	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey)
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("configure data encryption: %w", err)
+	}
 
 	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
 	kanbanService := operationalservice.NewKanbanService(kanbanRepository)
 	assignmentRulesService := operationalservice.NewAssignmentRulesService(assignmentRulesRepository)
+	operationalOverviewService := operationalservice.NewOverviewService(operationalOverviewRepository)
 	employeesService := hrisservice.NewEmployeesService(employeesRepository)
 	departmentsService := hrisservice.NewDepartmentsService(departmentsRepository, employeesRepository)
 	compensationService := hrisservice.NewCompensationService(compensationRepository, employeesRepository, encrypter)
@@ -158,26 +168,33 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	notificationsService := notificationsservice.New(notificationsRepository)
 	reimbursementsService := hrisservice.NewReimbursementsService(reimbursementsRepository, employeesRepository, authRepository, notificationsService)
 	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter)
+	hrisOverviewService := hrisservice.NewOverviewService(hrisOverviewRepository)
 	campaignsService := marketingservice.NewCampaignsService(campaignsRepository, authRepository, notificationsService)
 	adsMetricsService := marketingservice.NewAdsMetricsService(adsMetricsRepository)
 	leadsService := marketingservice.NewLeadsService(leadsRepository, authRepository, notificationsService)
+	marketingOverviewService := marketingservice.NewOverviewService(marketingOverviewRepository)
+	filesService := filesservice.New(cfg.UploadsDir, reimbursementsRepository, campaignsRepository)
 
 	application := &App{cfg: cfg, db: pool}
 	application.router = application.buildRouter(
 		authService,
+		operationalhandler.NewOverviewHandler(operationalOverviewService),
 		operationalhandler.NewProjectsHandler(projectsService),
 		operationalhandler.NewKanbanHandler(kanbanService),
 		operationalhandler.NewAssignmentRulesHandler(assignmentRulesService),
+		hrishandler.NewOverviewHandler(hrisOverviewService),
 		hrishandler.NewEmployeesHandler(employeesService),
 		hrishandler.NewDepartmentsHandler(departmentsService),
 		hrishandler.NewCompensationHandler(compensationService),
 		hrishandler.NewFinanceHandler(financeService),
 		hrishandler.NewReimbursementsHandler(reimbursementsService, cfg.UploadsDir),
 		hrishandler.NewSubscriptionsHandler(subscriptionsService),
+		marketinghandler.NewOverviewHandler(marketingOverviewService),
 		marketinghandler.NewCampaignsHandler(campaignsService, cfg.UploadsDir),
 		marketinghandler.NewAdsMetricsHandler(adsMetricsService),
 		marketinghandler.NewLeadsHandler(leadsService),
 		notificationshandler.New(notificationsService),
+		fileshandler.New(filesService),
 	)
 	application.startBackgroundJobs(subscriptionsService)
 
@@ -203,19 +220,23 @@ func (a *App) Close() {
 
 func (a *App) buildRouter(
 	authService *authservice.Service,
+	operationalOverviewHandler *operationalhandler.OverviewHandler,
 	projectsHandler *operationalhandler.ProjectsHandler,
 	kanbanHandler *operationalhandler.KanbanHandler,
 	assignmentRulesHandler *operationalhandler.AssignmentRulesHandler,
+	hrisOverviewHandler *hrishandler.OverviewHandler,
 	employeesHandler *hrishandler.EmployeesHandler,
 	departmentsHandler *hrishandler.DepartmentsHandler,
 	compensationHandler *hrishandler.CompensationHandler,
 	financeHandler *hrishandler.FinanceHandler,
 	reimbursementsHandler *hrishandler.ReimbursementsHandler,
 	subscriptionsHandler *hrishandler.SubscriptionsHandler,
+	marketingOverviewHandler *marketinghandler.OverviewHandler,
 	campaignsHandler *marketinghandler.CampaignsHandler,
 	adsMetricsHandler *marketinghandler.AdsMetricsHandler,
 	leadsHandler *marketinghandler.LeadsHandler,
 	notificationsHandler *notificationshandler.Handler,
+	filesHandler *fileshandler.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
 	authHandler := authhandler.New(authService)
@@ -237,8 +258,6 @@ func (a *App) buildRouter(
 			"status": "ok",
 		}, nil)
 	})
-	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.cfg.UploadsDir))))
-
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", authHandler.RegisterRoutes)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -250,15 +269,11 @@ func (a *App) buildRouter(
 		r.Group(func(protected chi.Router) {
 			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken))
 			protected.Get("/auth/me", authHandler.Me)
+			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
 
 			protected.Route("/operational", func(module chi.Router) {
-				module.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/overview", func(w http.ResponseWriter, r *http.Request) {
-					response.WriteJSON(w, http.StatusOK, map[string]string{
-						"module":  "operational",
-						"message": "Operational overview is protected by RBAC middleware",
-					}, nil)
-				})
+				module.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/overview", operationalOverviewHandler.Get)
 
 				module.Route("/projects", projectsHandler.RegisterRoutes)
 				module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
@@ -268,17 +283,14 @@ func (a *App) buildRouter(
 			})
 
 			protected.Route("/hris", func(module chi.Router) {
-				module.With(platformmiddleware.RBACMiddleware("hris:employee:view")).Get("/overview", func(w http.ResponseWriter, r *http.Request) {
-					response.WriteJSON(w, http.StatusOK, map[string]string{
-						"module":  "hris",
-						"message": "HRIS overview is protected by RBAC middleware",
-					}, nil)
-				})
+				module.With(platformmiddleware.RBACMiddleware("hris:employee:view")).Get("/overview", hrisOverviewHandler.Get)
 
 				module.Route("/employees", employeesHandler.RegisterRoutes)
 				module.Route("/departments", departmentsHandler.RegisterRoutes)
 				module.Route("/employees/{employeeID}/salaries", compensationHandler.RegisterSalaryRoutes)
 				module.Route("/employees/{employeeID}/bonuses", compensationHandler.RegisterBonusRoutes)
+				module.With(platformmiddleware.RBACMiddleware("hris:bonus:edit")).Put("/bonuses/{bonusID}", compensationHandler.UpdateBonus)
+				module.With(platformmiddleware.RBACMiddleware("hris:bonus:edit")).Delete("/bonuses/{bonusID}", compensationHandler.DeleteBonus)
 				module.With(platformmiddleware.RBACMiddleware("hris:bonus:approve")).Patch("/bonuses/{bonusID}/approve", compensationHandler.ApproveBonus)
 				module.With(platformmiddleware.RBACMiddleware("hris:bonus:approve")).Patch("/bonuses/{bonusID}/reject", compensationHandler.RejectBonus)
 				module.Route("/finance", financeHandler.RegisterRoutes)
@@ -287,12 +299,7 @@ func (a *App) buildRouter(
 			})
 
 			protected.Route("/marketing", func(module chi.Router) {
-				module.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/overview", func(w http.ResponseWriter, r *http.Request) {
-					response.WriteJSON(w, http.StatusOK, map[string]string{
-						"module":  "marketing",
-						"message": "Marketing overview is protected by RBAC middleware",
-					}, nil)
-				})
+				module.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/overview", marketingOverviewHandler.Get)
 
 				module.Route("/campaigns", campaignsHandler.RegisterRoutes)
 				module.Route("/ads-metrics", adsMetricsHandler.RegisterRoutes)

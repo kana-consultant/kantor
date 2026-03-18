@@ -6,11 +6,6 @@ export interface HealthStatus {
   status: string;
 }
 
-export interface ModuleOverview {
-  module: string;
-  message: string;
-}
-
 export interface SessionProfile {
   user: AuthUser;
   roles: string[];
@@ -24,13 +19,6 @@ export function fetchApiHealth() {
 export async function fetchSessionProfile() {
   const token = await requireAccessToken();
   return getJSON<SessionProfile>("/auth/me", token);
-}
-
-export async function fetchModuleOverview(
-  module: "operational" | "hris" | "marketing",
-) {
-  const token = await requireAccessToken();
-  return getJSON<ModuleOverview>(`/${module}/overview`, token);
 }
 
 async function requireAccessToken() {

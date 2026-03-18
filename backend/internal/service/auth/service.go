@@ -152,6 +152,22 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, userAgent st
 	return s.issueAuthResult(ctx, user, tokenHash, userAgent, ipAddress)
 }
 
+func (s *Service) Logout(ctx context.Context, refreshToken string) error {
+	tokenHash := backendauth.HashRefreshToken(strings.TrimSpace(refreshToken))
+	if tokenHash == "" {
+		return ErrInvalidRefreshToken
+	}
+
+	if err := s.repo.RevokeRefreshToken(ctx, tokenHash); err != nil {
+		if errors.Is(err, authrepo.ErrNotFound) {
+			return ErrInvalidRefreshToken
+		}
+		return err
+	}
+
+	return nil
+}
+
 func (s *Service) ParseAccessToken(token string) (*backendauth.AccessClaims, error) {
 	return s.tokenManager.ParseAccessToken(token)
 }

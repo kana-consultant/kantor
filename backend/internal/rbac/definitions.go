@@ -69,6 +69,7 @@ var defaultPermissions = []PermissionDefinition{
 	{Name: "marketing:campaign:create", Module: "marketing", Resource: "campaign", Action: "create", Description: "Create campaigns"},
 	{Name: "marketing:campaign:edit", Module: "marketing", Resource: "campaign", Action: "edit", Description: "Edit campaigns"},
 	{Name: "marketing:campaign:delete", Module: "marketing", Resource: "campaign", Action: "delete", Description: "Delete campaigns"},
+	{Name: "marketing:column:manage", Module: "marketing", Resource: "column", Action: "manage", Description: "Manage marketing campaign columns"},
 	{Name: "marketing:ads_metrics:view", Module: "marketing", Resource: "ads_metrics", Action: "view", Description: "View ads metrics"},
 	{Name: "marketing:ads_metrics:create", Module: "marketing", Resource: "ads_metrics", Action: "create", Description: "Create ads metrics"},
 	{Name: "marketing:ads_metrics:edit", Module: "marketing", Resource: "ads_metrics", Action: "edit", Description: "Edit ads metrics"},

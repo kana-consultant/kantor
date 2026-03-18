@@ -72,43 +72,43 @@ export function channelMeta(channel: CampaignChannel) {
       return {
         label: "Instagram",
         icon: Instagram,
-        badgeClassName: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+        badgeClassName: "border-transparent bg-platform-instagram text-white",
       };
     case "facebook":
       return {
         label: "Facebook",
         icon: Facebook,
-        badgeClassName: "bg-blue-100 text-blue-700 border-blue-200",
+        badgeClassName: "border-transparent bg-platform-facebook text-white",
       };
     case "google_ads":
       return {
         label: "Google Ads",
         icon: Search,
-        badgeClassName: "bg-amber-100 text-amber-800 border-amber-200",
+        badgeClassName: "border-transparent bg-platform-google text-white",
       };
     case "tiktok":
       return {
         label: "TikTok",
         icon: Globe,
-        badgeClassName: "bg-slate-900 text-white border-slate-800",
+        badgeClassName: "border-transparent bg-platform-tiktok text-white",
       };
     case "youtube":
       return {
         label: "YouTube",
         icon: Youtube,
-        badgeClassName: "bg-rose-100 text-rose-700 border-rose-200",
+        badgeClassName: "border-transparent bg-platform-youtube text-white",
       };
     case "email":
       return {
         label: "Email",
         icon: Mail,
-        badgeClassName: "bg-emerald-100 text-emerald-700 border-emerald-200",
+        badgeClassName: "border-transparent bg-platform-email text-white",
       };
     default:
       return {
         label: "Other",
         icon: Globe,
-        badgeClassName: "bg-muted text-muted-foreground border-border",
+        badgeClassName: "border-transparent bg-platform-other text-white",
       };
   }
 }
@@ -119,37 +119,37 @@ export function adsPlatformMeta(platform: AdsMetricPlatform) {
       return {
         label: "Instagram",
         icon: Instagram,
-        badgeClassName: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+        badgeClassName: "border-transparent bg-platform-instagram text-white",
       };
     case "facebook":
       return {
         label: "Facebook",
         icon: Facebook,
-        badgeClassName: "bg-blue-100 text-blue-700 border-blue-200",
+        badgeClassName: "border-transparent bg-platform-facebook text-white",
       };
     case "google_ads":
       return {
         label: "Google Ads",
         icon: Search,
-        badgeClassName: "bg-amber-100 text-amber-800 border-amber-200",
+        badgeClassName: "border-transparent bg-platform-google text-white",
       };
     case "tiktok":
       return {
         label: "TikTok",
         icon: Globe,
-        badgeClassName: "bg-slate-900 text-white border-slate-800",
+        badgeClassName: "border-transparent bg-platform-tiktok text-white",
       };
     case "youtube":
       return {
         label: "YouTube",
         icon: Youtube,
-        badgeClassName: "bg-rose-100 text-rose-700 border-rose-200",
+        badgeClassName: "border-transparent bg-platform-youtube text-white",
       };
     default:
       return {
         label: "Other",
         icon: Globe,
-        badgeClassName: "bg-muted text-muted-foreground border-border",
+        badgeClassName: "border-transparent bg-platform-other text-white",
       };
   }
 }
@@ -160,43 +160,43 @@ export function leadSourceMeta(source: LeadSourceChannel) {
       return {
         label: "WhatsApp",
         icon: MessageCircle,
-        badgeClassName: "bg-emerald-100 text-emerald-700 border-emerald-200",
+        badgeClassName: "border-transparent bg-platform-whatsapp text-white",
       };
     case "email":
       return {
         label: "Email",
         icon: Mail,
-        badgeClassName: "bg-blue-100 text-blue-700 border-blue-200",
+        badgeClassName: "border-transparent bg-platform-email text-white",
       };
     case "instagram":
       return {
         label: "Instagram",
         icon: Instagram,
-        badgeClassName: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+        badgeClassName: "border-transparent bg-platform-instagram text-white",
       };
     case "facebook":
       return {
         label: "Facebook",
         icon: Facebook,
-        badgeClassName: "bg-sky-100 text-sky-700 border-sky-200",
+        badgeClassName: "border-transparent bg-platform-facebook text-white",
       };
     case "website":
       return {
         label: "Website",
         icon: Globe,
-        badgeClassName: "bg-amber-100 text-amber-800 border-amber-200",
+        badgeClassName: "border-transparent bg-platform-website text-white",
       };
     case "referral":
       return {
         label: "Referral",
         icon: Users,
-        badgeClassName: "bg-violet-100 text-violet-700 border-violet-200",
+        badgeClassName: "border-transparent bg-platform-referral text-white",
       };
     default:
       return {
         label: "Other",
         icon: Globe,
-        badgeClassName: "bg-muted text-muted-foreground border-border",
+        badgeClassName: "border-transparent bg-platform-other text-white",
       };
   }
 }

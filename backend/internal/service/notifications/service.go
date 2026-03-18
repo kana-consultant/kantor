@@ -51,6 +51,10 @@ func (s *Service) List(ctx context.Context, params ListParams) ([]model.Notifica
 	})
 }
 
+func (s *Service) CountUnread(ctx context.Context, userID string) (int64, error) {
+	return s.repo.CountUnread(ctx, strings.TrimSpace(userID))
+}
+
 func (s *Service) MarkRead(ctx context.Context, notificationID string, userID string) error {
 	err := s.repo.MarkRead(ctx, notificationID, userID)
 	if errors.Is(err, notificationsrepo.ErrNotificationNotFound) {

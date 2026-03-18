@@ -25,6 +25,7 @@ export const permissions = {
   hrisSalaryCreate: "hris:salary:create",
   hrisBonusView: "hris:bonus:view",
   hrisBonusCreate: "hris:bonus:create",
+  hrisBonusEdit: "hris:bonus:edit",
   hrisBonusApprove: "hris:bonus:approve",
   hrisSubscriptionView: "hris:subscription:view",
   hrisSubscriptionCreate: "hris:subscription:create",

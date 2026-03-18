@@ -15,6 +15,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { Clock3 } from "lucide-react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
 import { formatLeadStatus, initials, leadSourceMeta } from "@/lib/marketing";
@@ -242,7 +243,7 @@ function LeadOverlay({ lead }: { lead: Lead }) {
   return (
     <div className="w-[320px]">
       <Card className="border-mkt shadow-2xl p-4 rotate-2 rounded-[12px]">
-        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">{formatLeadStatus(lead.pipeline_status)}</p>
+        <StatusBadge status={lead.pipeline_status} variant="lead-status" />
         <p className="mt-2 text-[14px] font-[600] text-text-primary leading-tight">{lead.name}</p>
       </Card>
     </div>

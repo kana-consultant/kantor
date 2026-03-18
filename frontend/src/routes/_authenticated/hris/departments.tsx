@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { Building2 } from "lucide-react";
 
 import { DepartmentForm } from "@/components/shared/department-form";
+import { EmptyState } from "@/components/shared/empty-state";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -119,7 +121,7 @@ function DepartmentsPage() {
       ) : null}
 
       {departmentsQuery.error instanceof Error ? (
-        <Card className="p-6 text-sm text-red-700">{departmentsQuery.error.message}</Card>
+        <Card className="p-6 text-sm text-error">{departmentsQuery.error.message}</Card>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -168,7 +170,13 @@ function DepartmentsPage() {
       </div>
 
       {(departmentsQuery.data ?? []).length === 0 ? (
-        <Card className="p-8 text-center text-[14px] text-text-secondary border-dashed">Belum ada department yang tercatat.</Card>
+        <EmptyState
+          actionLabel={hasPermission(permissions.hrisDepartmentCreate) ? "Add department" : undefined}
+          description="Create the first department to map teams and assign department heads in HRIS."
+          icon={Building2}
+          onAction={hasPermission(permissions.hrisDepartmentCreate) ? () => setIsCreateOpen(true) : undefined}
+          title="No departments yet"
+        />
       ) : null}
     </div>
   );

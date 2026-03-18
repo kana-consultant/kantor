@@ -7,6 +7,7 @@ import { AssignmentRulesPanel } from "@/components/shared/assignment-rules-panel
 import { KanbanBoard } from "@/components/shared/kanban-board";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProjectForm } from "@/components/shared/project-form";
+import { StatusBadge as SharedStatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -133,7 +134,7 @@ function ProjectWorkspacePage() {
 
   if (projectQuery.error instanceof Error || !project) {
     return (
-      <Card className="p-8 text-red-700">
+      <Card className="p-8 text-error">
         {projectQuery.error instanceof Error ? projectQuery.error.message : "Project not found"}
       </Card>
     );
@@ -163,8 +164,8 @@ function ProjectWorkspacePage() {
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <StatusBadge value={project.status.replace("_", " ")} />
-              <PriorityBadge value={project.priority} />
+              <SharedStatusBadge status={project.status} variant="project-status" />
+              <SharedStatusBadge status={project.priority} variant="priority" />
               <Badge value={`${project.member_count} members`} />
               <Badge
                 value={project.deadline ? `Due ${new Date(project.deadline).toLocaleDateString()}` : "No deadline"}
@@ -472,31 +473,6 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 function Badge({ value }: { value: string }) {
   return (
     <span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-      {value}
-    </span>
-  );
-}
-
-function StatusBadge({ value }: { value: string }) {
-  return (
-    <span className="rounded-full bg-ops-light px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-ops-dark">
-      {value}
-    </span>
-  );
-}
-
-function PriorityBadge({ value }: { value: ProjectFormValues["priority"] }) {
-  const tone =
-    value === "critical"
-      ? "bg-red-100 text-red-700"
-      : value === "high"
-        ? "bg-orange-100 text-orange-700"
-        : value === "medium"
-          ? "bg-amber-100 text-amber-700"
-          : "bg-sky-100 text-sky-700";
-
-  return (
-    <span className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] ${tone}`}>
       {value}
     </span>
   );

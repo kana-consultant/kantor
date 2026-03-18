@@ -66,6 +66,29 @@ export async function createBonus(employeeId: string, input: BonusFormValues) {
   );
 }
 
+export async function updateBonus(bonusId: string, input: BonusFormValues) {
+  const token = await requireAccessToken();
+  return requestJSON<BonusRecord>(
+    `/hris/bonuses/${bonusId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: input.amount,
+        reason: input.reason.trim(),
+        period_month: input.period_month,
+        period_year: input.period_year,
+      }),
+    },
+    token,
+  );
+}
+
+export async function deleteBonus(bonusId: string) {
+  const token = await requireAccessToken();
+  return requestJSON<{ message: string }>(`/hris/bonuses/${bonusId}`, { method: "DELETE" }, token);
+}
+
 export async function approveBonus(bonusId: string) {
   const token = await requireAccessToken();
   return requestJSON<BonusRecord>(`/hris/bonuses/${bonusId}/approve`, { method: "PATCH" }, token);

@@ -63,6 +63,13 @@ type CreateBonusParams struct {
 	CreatedBy   string
 }
 
+type UpdateBonusParams struct {
+	Amount      string
+	Reason      string
+	PeriodMonth int
+	PeriodYear  int
+}
+
 func NewCompensationRepository(db *pgxpool.Pool) *CompensationRepository {
 	return &CompensationRepository{db: db}
 }
@@ -206,6 +213,57 @@ func (r *CompensationRepository) ListBonuses(ctx context.Context, employeeID str
 	return result, rows.Err()
 }
 
+func (r *CompensationRepository) GetBonusByID(ctx context.Context, bonusID string) (BonusRow, error) {
+	var row BonusRow
+	err := r.db.QueryRow(ctx, `
+		SELECT id::text, employee_id::text, amount, reason, period_month, period_year, approval_status, approved_by::text, approved_at, created_by::text, created_at
+		FROM bonuses
+		WHERE id = $1::uuid
+	`, bonusID).Scan(
+		&row.ID,
+		&row.EmployeeID,
+		&row.Amount,
+		&row.Reason,
+		&row.PeriodMonth,
+		&row.PeriodYear,
+		&row.ApprovalStatus,
+		&row.ApprovedBy,
+		&row.ApprovedAt,
+		&row.CreatedBy,
+		&row.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return BonusRow{}, ErrBonusNotFound
+	}
+	return row, err
+}
+
+func (r *CompensationRepository) UpdateBonus(ctx context.Context, bonusID string, params UpdateBonusParams) (BonusRow, error) {
+	var row BonusRow
+	err := r.db.QueryRow(ctx, `
+		UPDATE bonuses
+		SET amount = $2, reason = $3, period_month = $4, period_year = $5
+		WHERE id = $1::uuid
+		RETURNING id::text, employee_id::text, amount, reason, period_month, period_year, approval_status, approved_by::text, approved_at, created_by::text, created_at
+	`, bonusID, params.Amount, params.Reason, params.PeriodMonth, params.PeriodYear).Scan(
+		&row.ID,
+		&row.EmployeeID,
+		&row.Amount,
+		&row.Reason,
+		&row.PeriodMonth,
+		&row.PeriodYear,
+		&row.ApprovalStatus,
+		&row.ApprovedBy,
+		&row.ApprovedAt,
+		&row.CreatedBy,
+		&row.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return BonusRow{}, ErrBonusNotFound
+	}
+	return row, err
+}
+
 func (r *CompensationRepository) UpdateBonusApprovalStatus(ctx context.Context, bonusID string, status string, approverID string) (BonusRow, error) {
 	query := `
 		UPDATE bonuses
@@ -232,6 +290,17 @@ func (r *CompensationRepository) UpdateBonusApprovalStatus(ctx context.Context, 
 		return BonusRow{}, ErrBonusNotFound
 	}
 	return row, err
+}
+
+func (r *CompensationRepository) DeleteBonus(ctx context.Context, bonusID string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM bonuses WHERE id = $1::uuid`, bonusID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrBonusNotFound
+	}
+	return nil
 }
 
 func (r *CompensationRepository) LogSalaryAccess(ctx context.Context, userID string, employeeID string, action string) error {

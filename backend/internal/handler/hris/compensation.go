@@ -129,6 +129,20 @@ func (h *CompensationHandler) ApproveBonus(w http.ResponseWriter, r *http.Reques
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
+func (h *CompensationHandler) UpdateBonus(w http.ResponseWriter, r *http.Request) {
+	var input hrisdto.UpdateBonusRequest
+	if !decodeAndValidate(h.validator, w, r, &input) {
+		return
+	}
+
+	result, err := h.service.UpdateBonus(r.Context(), chi.URLParam(r, "bonusID"), input)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, result, nil)
+}
+
 func (h *CompensationHandler) RejectBonus(w http.ResponseWriter, r *http.Request) {
 	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
@@ -143,6 +157,14 @@ func (h *CompensationHandler) RejectBonus(w http.ResponseWriter, r *http.Request
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
+func (h *CompensationHandler) DeleteBonus(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.DeleteBonus(r.Context(), chi.URLParam(r, "bonusID")); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Bonus deleted successfully"}, nil)
+}
+
 func (h *CompensationHandler) writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
@@ -151,6 +173,8 @@ func (h *CompensationHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusNotFound, "SALARY_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrBonusNotFound):
 		response.WriteError(w, http.StatusNotFound, "BONUS_NOT_FOUND", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrBonusNotPending):
+		response.WriteError(w, http.StatusConflict, "BONUS_NOT_PENDING", err.Error(), nil)
 	default:
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}

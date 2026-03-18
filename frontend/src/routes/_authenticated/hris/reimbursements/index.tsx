@@ -4,9 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Controller, useForm } from "react-hook-form";
+import { CircleDollarSign, FileText, Receipt, TimerReset } from "lucide-react";
 import { z } from "zod";
 
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { StatCard } from "@/components/shared/stat-card";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -23,7 +27,7 @@ import {
   reimbursementsKeys,
   uploadReimbursementAttachments,
 } from "@/services/hris-reimbursements";
-import type { ReimbursementFilters, ReimbursementFormValues } from "@/types/hris";
+import type { Reimbursement, ReimbursementFilters, ReimbursementFormValues } from "@/types/hris";
 
 const reimbursementSchema = z.object({
   employee_id: z.string().min(1),
@@ -108,8 +112,10 @@ function ReimbursementsPage() {
   });
 
   const employees = employeesQuery.data?.items ?? [];
+  const meta = reimbursementsQuery.data?.meta;
   const canReview = hasPermission(permissions.hrisReimbursementApprove);
   const canMarkPaid = hasRole("manager", "hris") || hasRole("admin", "hris") || hasRole("super_admin");
+  const reimbursements = reimbursementsQuery.data?.items ?? [];
 
   const handleFiles = (incomingFiles: FileList | File[]) => {
     const nextFiles = Array.from(incomingFiles).filter((file) => {
@@ -125,19 +131,87 @@ function ReimbursementsPage() {
     [files],
   );
 
+  const columns: Array<DataTableColumn<Reimbursement>> = [
+    {
+      id: "title",
+      header: "Request",
+      accessor: "title",
+      sortable: true,
+      cell: (item) => (
+        <div className="space-y-1">
+          <p className="font-semibold text-text-primary">{item.title}</p>
+          <p className="text-[13px] text-text-secondary">{item.employee_name}</p>
+        </div>
+      ),
+    },
+    {
+      id: "category",
+      header: "Category",
+      accessor: "category",
+      sortable: true,
+      cell: (item) => (
+        <div className="space-y-1">
+          <p className="text-sm text-text-primary">{item.category}</p>
+          <p className="text-[13px] text-text-secondary">
+            {new Date(item.transaction_date).toLocaleDateString("id-ID")}
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "amount",
+      header: "Amount",
+      accessor: "amount",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (item) => <span className="font-mono tabular-nums">{formatIDR(item.amount)}</span>,
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessor: "status",
+      sortable: true,
+      cell: (item) => <StatusBadge status={item.status} variant="reimbursement-status" />,
+    },
+    {
+      id: "attachments",
+      header: "Attachments",
+      accessor: "attachments",
+      align: "right",
+      cell: (item) => <span className="font-mono tabular-nums text-text-secondary">{item.attachments.length}</span>,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (item) => (
+        <Link
+          className="inline-flex h-9 items-center justify-center rounded-md bg-module px-4 text-sm font-semibold text-white transition hover:brightness-95"
+          params={{ reimbursementId: item.id }}
+          to="/hris/reimbursements/$reimbursementId"
+        >
+          Open detail
+        </Link>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">HRIS reimbursements</p>
-            <h3 className="mt-2 text-3xl font-bold">Reimbursement workflow</h3>
-            <p className="mt-2 max-w-3xl text-muted-foreground">
-              Submit claim, upload bukti gambar atau PDF, dan pantau status sampai dibayar.
+            <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-hr">
+              HRIS reimbursements
+            </p>
+            <h3 className="text-[28px] font-[700] text-text-primary">Reimbursement workflow</h3>
+            <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-text-secondary">
+              Submit claims, attach supporting files, and track approval through payout.
             </p>
           </div>
           <PermissionGate permission={permissions.hrisReimbursementCreate}>
-            <Button onClick={() => setShowForm((value) => !value)}>
+            <Button onClick={() => setShowForm((value) => !value)} type="button">
               {showForm ? "Close form" : "Submit reimbursement"}
             </Button>
           </PermissionGate>
@@ -145,21 +219,48 @@ function ReimbursementsPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <SummaryCard label="Awaiting review" value={String(summaryQuery.data?.counts_by_status?.submitted ?? 0)} />
-        <SummaryCard label="Approved requests" value={String(summaryQuery.data?.counts_by_status?.approved ?? 0)} />
-        <SummaryCard label="Approved this month" value={formatIDR(summaryQuery.data?.approved_amount_month ?? 0)} />
+        <StatCard
+          helper="Requests waiting for approval"
+          icon={TimerReset}
+          label="Awaiting review"
+          tone="warning"
+          value={String(summaryQuery.data?.counts_by_status?.submitted ?? 0)}
+        />
+        <StatCard
+          helper="Requests already approved"
+          icon={Receipt}
+          label="Approved requests"
+          tone="success"
+          value={String(summaryQuery.data?.counts_by_status?.approved ?? 0)}
+        />
+        <StatCard
+          helper={canMarkPaid ? "Approval and payout access active" : canReview ? "Approval access active" : "Self-service mode"}
+          icon={CircleDollarSign}
+          label="Approved this month"
+          mono
+          tone="hr"
+          value={formatIDR(summaryQuery.data?.approved_amount_month ?? 0)}
+        />
       </div>
 
       <Card className="p-6">
         <div className="grid gap-3 lg:grid-cols-5">
-          <select className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm" onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value, page: 1 }))} value={filters.status}>
+          <select
+            className="field-select"
+            onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value, page: 1 }))}
+            value={filters.status}
+          >
             <option value="">All statuses</option>
             <option value="submitted">Submitted</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
             <option value="paid">Paid</option>
           </select>
-          <select className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm" onChange={(event) => setFilters((prev) => ({ ...prev, employee: event.target.value, page: 1 }))} value={filters.employee}>
+          <select
+            className="field-select"
+            onChange={(event) => setFilters((prev) => ({ ...prev, employee: event.target.value, page: 1 }))}
+            value={filters.employee}
+          >
             <option value="">All employees</option>
             {employees.map((employee) => (
               <option key={employee.id} value={employee.id}>
@@ -169,20 +270,28 @@ function ReimbursementsPage() {
           </select>
           <Input onChange={(event) => setFilters((prev) => ({ ...prev, month: event.target.value, page: 1 }))} placeholder="Month" type="number" value={filters.month} />
           <Input onChange={(event) => setFilters((prev) => ({ ...prev, year: event.target.value, page: 1 }))} placeholder="Year" type="number" value={filters.year} />
-          <div className="rounded-2xl border border-dashed border-border/70 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
-            {canMarkPaid ? "Approval and payout access active" : canReview ? "Approval access active" : "Self-service mode"}
-          </div>
+          <select
+            className="field-select"
+            onChange={(event) => setFilters((prev) => ({ ...prev, perPage: Number(event.target.value), page: 1 }))}
+            value={filters.perPage}
+          >
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+            <option value={50}>50 per page</option>
+          </select>
         </div>
       </Card>
 
       {showForm ? (
         <Card className="p-6">
           <div className="mb-4">
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">New reimbursement</p>
-            <h4 className="mt-2 text-2xl font-bold">Submit claim</h4>
+            <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
+              New reimbursement
+            </p>
+            <h4 className="text-[20px] font-[700] text-text-primary">Submit claim</h4>
           </div>
           <form className="grid gap-4 lg:grid-cols-2" onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}>
-            <select className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm" {...form.register("employee_id")}>
+            <select className="field-select" {...form.register("employee_id")}>
               <option value="">Select employee</option>
               {employees.map((employee) => (
                 <option key={employee.id} value={employee.id}>
@@ -207,7 +316,7 @@ function ReimbursementsPage() {
             <Input {...form.register("transaction_date")} type="date" />
             <Input className="lg:col-span-2" {...form.register("description")} placeholder="Description" />
             <div
-              className="lg:col-span-2 rounded-[24px] border border-dashed border-border/70 bg-background/70 p-6"
+              className="lg:col-span-2 rounded-md border border-dashed border-border bg-surface-muted p-6"
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
@@ -216,12 +325,12 @@ function ReimbursementsPage() {
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-sm font-semibold">Attachment drop zone</p>
-                  <p className="text-xs text-muted-foreground">
-                    Drag-and-drop file gambar atau PDF. Maksimum 10MB per file.
+                  <p className="font-semibold text-text-primary">Attachment drop zone</p>
+                  <p className="text-xs text-text-secondary">
+                    Drag image or PDF files here. Maximum 10MB per file.
                   </p>
                 </div>
-                <label className="inline-flex h-11 cursor-pointer items-center justify-center rounded-full border border-border bg-card px-5 text-sm font-medium">
+                <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted">
                   Choose files
                   <input
                     className="hidden"
@@ -234,7 +343,7 @@ function ReimbursementsPage() {
               {fileSummary.length > 0 ? (
                 <div className="mt-4 space-y-2">
                   {fileSummary.map((item) => (
-                    <div className="rounded-[18px] border border-border/60 bg-card/70 px-4 py-3 text-sm" key={item}>
+                    <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-text-secondary" key={item}>
                       {item}
                     </div>
                   ))}
@@ -253,59 +362,31 @@ function ReimbursementsPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4">
-        {(reimbursementsQuery.data?.items ?? []).map((item) => (
-          <Card className="p-6" key={item.id}>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{item.employee_name}</p>
-                <h4 className="mt-2 text-xl font-bold">{item.title}</h4>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {item.category} - {new Date(item.transaction_date).toLocaleDateString("id-ID")}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Amount</p>
-                <p className="mt-2 text-2xl font-bold">{formatIDR(item.amount)}</p>
-                <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${statusTone(item.status)}`}>
-                  {item.status}
-                </span>
-              </div>
-            </div>
-            <p className="mt-4 text-sm text-muted-foreground">{item.description}</p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-background/80 px-5 text-sm font-medium transition hover:bg-muted" params={{ reimbursementId: item.id }} to="/hris/reimbursements/$reimbursementId">
-                Open detail
-              </Link>
-              <div className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-background/80 px-5 text-sm text-muted-foreground">
-                {item.attachments.length} attachment(s)
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      {reimbursementsQuery.error instanceof Error ? (
+        <Card className="p-6 text-sm text-error">{reimbursementsQuery.error.message}</Card>
+      ) : null}
+
+      <DataTable
+        columns={columns}
+        data={reimbursements}
+        emptyActionLabel={hasPermission(permissions.hrisReimbursementCreate) ? "Submit reimbursement" : undefined}
+        emptyDescription="No reimbursement requests match the current filter."
+        emptyTitle="No reimbursements found"
+        getRowId={(item) => item.id}
+        loading={reimbursementsQuery.isLoading}
+        loadingRows={6}
+        onEmptyAction={hasPermission(permissions.hrisReimbursementCreate) ? () => setShowForm(true) : undefined}
+        pagination={
+          meta
+            ? {
+                page: meta.page,
+                perPage: meta.per_page,
+                total: meta.total,
+                onPageChange: (page) => setFilters((current) => ({ ...current, page })),
+              }
+            : undefined
+        }
+      />
     </div>
   );
-}
-
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="p-6">
-      <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
-      <h4 className="mt-3 text-2xl font-bold">{value}</h4>
-    </Card>
-  );
-}
-
-function statusTone(status: string) {
-  switch (status) {
-    case "paid":
-      return "bg-sky-100 text-sky-700";
-    case "approved":
-      return "bg-emerald-100 text-emerald-700";
-    case "rejected":
-      return "bg-red-100 text-red-700";
-    default:
-      return "bg-amber-100 text-amber-700";
-  }
 }

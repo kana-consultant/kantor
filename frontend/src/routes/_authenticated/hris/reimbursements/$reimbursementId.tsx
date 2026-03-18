@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { formatIDR } from "@/lib/currency";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
+import { fetchProtectedFileBlob, getProtectedFileName, openProtectedFile } from "@/services/files";
 import {
   getReimbursement,
   markReimbursementPaid,
@@ -78,9 +80,9 @@ function ReimbursementDetailPage() {
           <div className="text-right">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Amount</p>
             <p className="mt-2 text-3xl font-bold">{formatIDR(item.amount)}</p>
-            <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${statusTone(item.status)}`}>
-              {item.status}
-            </span>
+            <div className="mt-3">
+              <StatusBadge status={item.status} variant="reimbursement-status" />
+            </div>
           </div>
         </div>
         <p className="mt-5 text-sm text-muted-foreground">{item.description}</p>
@@ -103,7 +105,7 @@ function ReimbursementDetailPage() {
                 </div>
               ) : (
                 item.attachments.map((attachment) => (
-                  <AttachmentPreview attachment={attachment} key={attachment} />
+                  <AttachmentPreview attachment={attachment} key={attachment} reimbursementId={item.id} />
                 ))
               )}
             </div>
@@ -166,18 +168,60 @@ function ReimbursementDetailPage() {
   );
 }
 
-function AttachmentPreview({ attachment }: { attachment: string }) {
-  const url = `${(import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1").replace(/\/api\/v1$/, "")}/uploads/${attachment}`;
+function AttachmentPreview({
+  attachment,
+  reimbursementId,
+}: {
+  attachment: string;
+  reimbursementId: string;
+}) {
   const isPDF = attachment.toLowerCase().endsWith(".pdf");
-  const fileName = attachment.split("/").at(-1) ?? attachment;
+  const fileName = getProtectedFileName(attachment);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isPDF) {
+      return undefined;
+    }
+
+    let active = true;
+    let objectURL: string | null = null;
+
+    void fetchProtectedFileBlob("reimbursements", reimbursementId, fileName)
+      .then((blob) => {
+        if (!active) {
+          return;
+        }
+        objectURL = URL.createObjectURL(blob);
+        setPreviewUrl(objectURL);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+        setPreviewError("Preview attachment tidak tersedia.");
+      });
+
+    return () => {
+      active = false;
+      if (objectURL) {
+        URL.revokeObjectURL(objectURL);
+      }
+    };
+  }, [fileName, isPDF, reimbursementId]);
 
   return (
     <div className="rounded-[22px] border border-border/70 bg-background/70 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-sm font-semibold">{fileName}</p>
-        <a className="text-sm font-medium text-primary" href={url} rel="noreferrer" target="_blank">
+        <button
+          className="text-sm font-medium text-primary"
+          onClick={() => void openProtectedFile("reimbursements", reimbursementId, fileName)}
+          type="button"
+        >
           Open
-        </a>
+        </button>
       </div>
       {isPDF ? (
         <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-card/70 px-6 text-center">
@@ -189,8 +233,14 @@ function AttachmentPreview({ attachment }: { attachment: string }) {
             Browser sering tidak merender PDF inline dengan konsisten. Gunakan tombol open untuk melihat dokumen penuh.
           </p>
         </div>
+      ) : previewError ? (
+        <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-card/70 px-6 text-center text-sm text-muted-foreground">
+          {previewError}
+        </div>
+      ) : previewUrl ? (
+        <img alt={attachment} className="max-h-[420px] w-full rounded-2xl object-cover" src={previewUrl} />
       ) : (
-        <img alt={attachment} className="max-h-[420px] w-full rounded-2xl object-cover" src={url} />
+        <div className="h-[220px] animate-pulse rounded-2xl bg-muted" />
       )}
     </div>
   );
@@ -215,15 +265,3 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function statusTone(status: string) {
-  switch (status) {
-    case "paid":
-      return "bg-sky-100 text-sky-700";
-    case "approved":
-      return "bg-emerald-100 text-emerald-700";
-    case "rejected":
-      return "bg-red-100 text-red-700";
-    default:
-      return "bg-amber-100 text-amber-700";
-  }
-}

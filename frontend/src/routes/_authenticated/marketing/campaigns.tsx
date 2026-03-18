@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -5,8 +6,11 @@ import { z } from "zod";
 import { Download, FolderKanban, LayoutList, Paperclip, Plus } from "lucide-react";
 
 import { CampaignForm } from "@/components/shared/campaign-form";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { EmptyState } from "@/components/shared/empty-state";
 import { MarketingCampaignBoard } from "@/components/shared/marketing-campaign-board";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,12 +19,11 @@ import { useRBAC } from "@/hooks/use-rbac";
 import {
   campaignMatchesFilters,
   channelMeta,
-  formatCampaignStatus,
-  uploadsURL,
 } from "@/lib/marketing";
 import { formatIDR } from "@/lib/currency";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
+import { getProtectedFileName, openProtectedFile } from "@/services/files";
 import {
   adsMetricsKeys,
   listAdsMetrics,
@@ -31,6 +34,7 @@ import {
   deleteCampaign,
   deleteCampaignAttachment,
   getCampaign,
+  listCampaignActivities,
   listCampaignKanban,
   listCampaigns,
   moveCampaign,
@@ -39,7 +43,7 @@ import {
 } from "@/services/marketing-campaigns";
 import { leadsKeys, listLeads } from "@/services/marketing-leads";
 import { employeesKeys, listEmployees } from "@/services/hris-employees";
-import type { AdsMetric, Campaign, CampaignAttachment, CampaignFilters, CampaignFormValues, Lead } from "@/types/marketing";
+import type { AdsMetric, Campaign, CampaignActivity, CampaignAttachment, CampaignFilters, CampaignFormValues, Lead } from "@/types/marketing";
 import type { EmployeeFilters } from "@/types/hris";
 
 const searchSchema = z.object({
@@ -159,6 +163,12 @@ function MarketingCampaignsPage() {
       }),
   });
 
+  const activitiesQuery = useQuery({
+    enabled: Boolean(selectedCampaignId),
+    queryKey: selectedCampaignId ? campaignsKeys.activities(selectedCampaignId) : [...campaignsKeys.all, "activities", "empty"],
+    queryFn: () => listCampaignActivities(selectedCampaignId!),
+  });
+
   const createMutation = useMutation({
     mutationFn: createCampaign,
     onSuccess: async () => {
@@ -229,7 +239,105 @@ function MarketingCampaignsPage() {
   const selectedAttachments = detailQuery.data?.attachments ?? [];
   const relatedMetrics = metricsQuery.data?.items ?? [];
   const relatedLeads = relatedLeadsQuery.data?.items ?? [];
+  const activities = activitiesQuery.data ?? [];
   const defaultEditValues = editingCampaign ? toCampaignFormValues(editingCampaign) : undefined;
+
+  const tableColumns: Array<DataTableColumn<Campaign>> = [
+    {
+      id: "campaign",
+      header: "Campaign",
+      accessor: "name",
+      sortable: true,
+      cell: (campaign) => (
+        <button className="space-y-1 text-left" onClick={() => setSelectedCampaignId(campaign.id)} type="button">
+          <p className="font-semibold text-text-primary">{campaign.name}</p>
+          <p className="line-clamp-1 text-sm text-text-secondary">{campaign.description || "Open detail drawer for brief and attachments."}</p>
+        </button>
+      ),
+    },
+    {
+      id: "channel",
+      header: "Channel",
+      accessor: "channel",
+      sortable: true,
+      cell: (campaign) => {
+        const channel = channelMeta(campaign.channel);
+        const ChannelIcon = channel.icon;
+        return (
+          <span className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[11px] font-[700] uppercase tracking-wider ${channel.badgeClassName}`}>
+            <ChannelIcon className="h-3.5 w-3.5" />
+            {channel.label}
+          </span>
+        );
+      },
+    },
+    {
+      id: "budget",
+      header: "Budget",
+      accessor: "budget_amount",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (campaign) => <span className="font-mono tabular-nums">{formatIDR(campaign.budget_amount)}</span>,
+    },
+    {
+      id: "pic",
+      header: "PIC",
+      accessor: "pic_employee_name",
+      sortable: true,
+      cell: (campaign) => <span className="text-sm text-text-primary">{campaign.pic_employee_name ?? "Unassigned"}</span>,
+    },
+    {
+      id: "timeline",
+      header: "Timeline",
+      accessor: "start_date",
+      sortable: true,
+      cell: (campaign) => (
+        <span className="text-sm text-text-secondary">
+          {new Date(campaign.start_date).toLocaleDateString("id-ID")} - {new Date(campaign.end_date).toLocaleDateString("id-ID")}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessor: "status",
+      sortable: true,
+      cell: (campaign) => <StatusBadge status={campaign.status} variant="campaign-status" />,
+    },
+    {
+      id: "assets",
+      header: "Assets",
+      accessor: "attachment_count",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (campaign) => <span className="font-mono tabular-nums text-text-secondary">{campaign.attachment_count}</span>,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (campaign) => (
+        <div className="flex justify-end gap-2">
+          <Button onClick={() => setSelectedCampaignId(campaign.id)} size="sm" type="button" variant="outline">
+            Open
+          </Button>
+          {hasPermission(permissions.marketingCampaignDelete) ? (
+            <Button
+              disabled={deleteMutation.isPending && deleteMutation.variables === campaign.id}
+              onClick={() => deleteMutation.mutate(campaign.id)}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Delete
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -296,7 +404,7 @@ function MarketingCampaignsPage() {
             value={filters.search}
           />
           <select
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className="field-select"
             onChange={(event) => setFilters((current) => ({ ...current, channel: event.target.value }))}
             value={filters.channel}
           >
@@ -310,7 +418,7 @@ function MarketingCampaignsPage() {
             <option value="other">Other</option>
           </select>
           <select
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className="field-select"
             onChange={(event) => setFilters((current) => ({ ...current, pic: event.target.value }))}
             value={filters.pic}
           >
@@ -332,8 +440,8 @@ function MarketingCampaignsPage() {
         <SummaryCard label="Tracked budget" value={formatIDR(tableItems.reduce((total, campaign) => total + campaign.budget_amount, 0))} />
       </div>
 
-      {campaignsQuery.error instanceof Error ? <Card className="p-6 text-sm text-red-700">{campaignsQuery.error.message}</Card> : null}
-      {kanbanQuery.error instanceof Error ? <Card className="p-6 text-sm text-red-700">{kanbanQuery.error.message}</Card> : null}
+      {campaignsQuery.error instanceof Error ? <Card className="p-6 text-sm text-error">{campaignsQuery.error.message}</Card> : null}
+      {kanbanQuery.error instanceof Error ? <Card className="p-6 text-sm text-error">{kanbanQuery.error.message}</Card> : null}
 
       {activeView === "kanban" ? (
         <PermissionGate permission={permissions.marketingCampaignView}>
@@ -348,89 +456,49 @@ function MarketingCampaignsPage() {
             }
           />
         </PermissionGate>
-      ) : campaignsQuery.isLoading ? (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[14px]">
-              <thead className="border-b border-border bg-surface-muted text-[12px] font-[600] text-text-tertiary uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-4 font-medium h-[45px]">Campaign</th>
-                  <th className="px-5 py-4 font-medium h-[45px]">Channel</th>
-                  <th className="px-5 py-4 font-medium h-[45px]">Budget</th>
-                  <th className="px-5 py-4 font-medium h-[45px]">PIC</th>
-                  <th className="px-5 py-4 font-medium h-[45px]">Timeline</th>
-                  <th className="px-5 py-4 font-medium h-[45px]">Status</th>
-                  <th className="px-5 py-4 font-medium h-[45px]">Assets</th>
-                  <th className="px-5 py-4 font-medium h-[45px]">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-surface">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr className="transition-colors hover:bg-surface-muted/50 group" key={i}>
-                    <td className="px-5 py-4 space-y-2">
-                       <Skeleton className="h-4 w-[160px] bg-muted/60" />
-                       <Skeleton className="h-3 w-[200px] bg-muted/60" />
-                    </td>
-                    <td className="px-5 py-4">
-                       <Skeleton className="h-6 w-[80px] rounded-full bg-muted/60" />
-                    </td>
-                    <td className="px-5 py-4">
-                       <Skeleton className="h-4 w-[100px] bg-muted/60" />
-                    </td>
-                    <td className="px-5 py-4">
-                       <Skeleton className="h-4 w-[90px] bg-muted/60" />
-                    </td>
-                    <td className="px-5 py-4">
-                       <Skeleton className="h-4 w-[150px] bg-muted/60" />
-                    </td>
-                    <td className="px-5 py-4">
-                       <Skeleton className="h-5 w-[70px] rounded-[6px] bg-muted/60" />
-                    </td>
-                    <td className="px-5 py-4">
-                       <Skeleton className="h-4 w-[20px] bg-muted/60" />
-                    </td>
-                    <td className="px-5 py-4 flex gap-2">
-                       <Skeleton className="h-8 w-[60px] rounded-[6px] bg-muted/60" />
-                       <Skeleton className="h-8 w-[60px] rounded-[6px] bg-muted/60" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
       ) : (
-        <CampaignsTable
-          campaigns={tableItems}
-          canDelete={hasPermission(permissions.marketingCampaignDelete)}
-          deletingId={deleteMutation.isPending ? deleteMutation.variables ?? null : null}
-          onDelete={(campaignId) => deleteMutation.mutate(campaignId)}
-          onOpen={(campaign) => {
-            setDetailTab("overview");
-            setSelectedCampaignId(campaign.id);
-          }}
+        <DataTable
+          columns={tableColumns}
+          data={tableItems}
+          emptyDescription="No campaigns match the current filters."
+          emptyTitle="No campaigns found"
+          getRowId={(campaign) => campaign.id}
+          loading={campaignsQuery.isLoading}
+          pagination={
+            campaignsQuery.data?.meta
+              ? {
+                  page: campaignsQuery.data.meta.page,
+                  perPage: campaignsQuery.data.meta.per_page,
+                  total: campaignsQuery.data.meta.total,
+                  onPageChange: (page) => setFilters((current) => ({ ...current, page })),
+                }
+              : undefined
+          }
+          selectedRowId={selectedCampaignId}
         />
       )}
 
-      <Card className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-muted-foreground">
-          Page {campaignsQuery.data?.meta.page ?? filters.page} of{" "}
-          {campaignsQuery.data?.meta ? Math.max(1, Math.ceil(campaignsQuery.data.meta.total / campaignsQuery.data.meta.per_page)) : 1} · Total{" "}
-          {campaignsQuery.data?.meta.total ?? 0} campaigns
-        </p>
-        <div className="flex gap-3">
-          <Button disabled={(campaignsQuery.data?.meta.page ?? filters.page) <= 1} onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))} variant="outline">
-            Previous
-          </Button>
-          <Button
-            disabled={campaignsQuery.data?.meta ? campaignsQuery.data.meta.page * campaignsQuery.data.meta.per_page >= campaignsQuery.data.meta.total : true}
-            onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}
-            variant="outline"
-          >
-            Next
-          </Button>
-        </div>
-      </Card>
+      {activeView === "kanban" ? (
+        <Card className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {campaignsQuery.data?.meta.page ?? filters.page} of{" "}
+            {campaignsQuery.data?.meta ? Math.max(1, Math.ceil(campaignsQuery.data.meta.total / campaignsQuery.data.meta.per_page)) : 1} | Total{" "}
+            {campaignsQuery.data?.meta.total ?? 0} campaigns
+          </p>
+          <div className="flex gap-3">
+            <Button disabled={(campaignsQuery.data?.meta.page ?? filters.page) <= 1} onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))} variant="outline">
+              Previous
+            </Button>
+            <Button
+              disabled={campaignsQuery.data?.meta ? campaignsQuery.data.meta.page * campaignsQuery.data.meta.per_page >= campaignsQuery.data.meta.total : true}
+              onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}
+              variant="outline"
+            >
+              Next
+            </Button>
+          </div>
+        </Card>
+      ) : null}
 
       {selectedCampaignId ? (
         <CampaignDetailDrawer
@@ -438,8 +506,10 @@ function MarketingCampaignsPage() {
           campaign={selectedCampaign}
           canDelete={hasPermission(permissions.marketingCampaignDelete)}
           detailTab={detailTab}
+          activities={activities}
           leads={relatedLeads}
           metrics={relatedMetrics}
+          isLoadingActivities={activitiesQuery.isLoading}
           isDeletingAttachment={deleteAttachmentMutation.isPending}
           isLoading={detailQuery.isLoading}
           isLoadingLeads={relatedLeadsQuery.isLoading}
@@ -483,101 +553,18 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CampaignsTable({
-  campaigns,
-  canDelete,
-  deletingId,
-  onOpen,
-  onDelete,
-}: {
-  campaigns: Campaign[];
-  canDelete: boolean;
-  deletingId: string | null;
-  onOpen: (campaign: Campaign) => void;
-  onDelete: (campaignId: string) => void;
-}) {
-  return (
-    <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-[14px]">
-          <thead className="border-b border-border bg-surface-muted text-[12px] font-[600] text-text-tertiary uppercase tracking-wider">
-            <tr>
-              <th className="px-5 py-4 font-medium">Campaign</th>
-              <th className="px-5 py-4 font-medium">Channel</th>
-              <th className="px-5 py-4 font-medium">Budget</th>
-              <th className="px-5 py-4 font-medium">PIC</th>
-              <th className="px-5 py-4 font-medium">Timeline</th>
-              <th className="px-5 py-4 font-medium">Status</th>
-              <th className="px-5 py-4 font-medium">Assets</th>
-              <th className="px-5 py-4 font-medium">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-surface">
-            {campaigns.map((campaign) => {
-              const channel = channelMeta(campaign.channel);
-              const ChannelIcon = channel.icon;
-              return (
-                <tr className="transition-colors hover:bg-surface-muted/50 group" key={campaign.id}>
-                  <td className="px-5 py-4 align-top">
-                    <button className="text-left" onClick={() => onOpen(campaign)} type="button">
-                      <p className="font-[600] text-[15px] text-text-primary group-hover:text-mkt transition-colors">{campaign.name}</p>
-                      <p className="mt-1 line-clamp-1 text-[13px] text-text-secondary w-[16rem]">{campaign.description || "Open detail drawer for attachments and brief."}</p>
-                    </button>
-                  </td>
-                  <td className="px-5 py-4 align-top">
-                    <span className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[11px] font-[700] uppercase tracking-wider ${channel.badgeClassName}`}>
-                      <ChannelIcon className="h-3.5 w-3.5" />
-                      {channel.label}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 align-top font-[600] text-[14px] text-text-primary">{formatIDR(campaign.budget_amount)}</td>
-                  <td className="px-5 py-4 align-top text-[13px] font-[500] text-text-primary">{campaign.pic_employee_name ?? "Unassigned"}</td>
-                  <td className="px-5 py-4 align-top text-[13px] text-text-secondary">{new Date(campaign.start_date).toLocaleDateString()} - {new Date(campaign.end_date).toLocaleDateString()}</td>
-                  <td className="px-5 py-4 align-top">
-                    <span className="rounded-[6px] border border-border bg-surface-muted px-2 py-0.5 text-[10px] font-[700] uppercase tracking-wider text-text-secondary">
-                      {formatCampaignStatus(campaign.status)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 align-top text-[13px] font-[500] text-text-primary">{campaign.attachment_count}</td>
-                  <td className="px-5 py-4 align-top">
-                    <div className="flex gap-2">
-                      <Button onClick={() => onOpen(campaign)} size="sm" variant="outline">
-                        Open
-                      </Button>
-                      {canDelete ? (
-                        <Button disabled={deletingId === campaign.id} onClick={() => onDelete(campaign.id)} size="sm" variant="ghost">
-                           {deletingId === campaign.id ? "Deleting..." : "Delete"}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {campaigns.length === 0 ? (
-              <tr>
-                <td className="px-5 py-10 text-center text-muted-foreground" colSpan={8}>
-                  No campaigns found for the current filter.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
-}
-
 function CampaignDetailDrawer({
   campaign,
   attachments,
   metrics,
   leads,
+  activities,
   detailTab,
   canDelete,
   isLoading,
   isLoadingMetrics,
   isLoadingLeads,
+  isLoadingActivities,
   isUploading,
   isDeletingAttachment,
   onClose,
@@ -591,11 +578,13 @@ function CampaignDetailDrawer({
   attachments: CampaignAttachment[];
   metrics: AdsMetric[];
   leads: Lead[];
+  activities: CampaignActivity[];
   detailTab: "overview" | "attachments" | "metrics" | "leads" | "activity";
   canDelete: boolean;
   isLoading: boolean;
   isLoadingMetrics: boolean;
   isLoadingLeads: boolean;
+  isLoadingActivities: boolean;
   isUploading: boolean;
   isDeletingAttachment: boolean;
   onClose: () => void;
@@ -641,14 +630,20 @@ function CampaignDetailDrawer({
         </div>
 
         <div className="mt-6 flex-1 overflow-y-auto pr-1">
-          {isLoading ? <p className="text-sm text-muted-foreground">Loading campaign detail...</p> : null}
+          {isLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+            </div>
+          ) : null}
 
           {campaign && detailTab === "overview" ? (
             <div className="space-y-4">
               <InfoRow label="Channel" value={channelMeta(campaign.channel).label} />
               <InfoRow label="Budget" value={formatIDR(campaign.budget_amount)} />
               <InfoRow label="PIC" value={campaign.pic_employee_name ?? "Unassigned"} />
-              <InfoRow label="Status" value={formatCampaignStatus(campaign.status)} />
+              <InfoRow label="Status" value={<StatusBadge status={campaign.status} variant="campaign-status" />} />
               <InfoRow label="Timeline" value={`${new Date(campaign.start_date).toLocaleDateString()} - ${new Date(campaign.end_date).toLocaleDateString()}`} />
               <Card className="p-4">
                 <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">Description</p>
@@ -694,13 +689,17 @@ function CampaignDetailDrawer({
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold">{attachment.file_name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{attachment.file_type} · {new Date(attachment.created_at).toLocaleString()}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{attachment.file_type} | {new Date(attachment.created_at).toLocaleString()}</p>
                       </div>
                       <div className="flex gap-3">
-                        <a className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted" href={uploadsURL(attachment.file_path)} rel="noreferrer" target="_blank">
+                        <button
+                          className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
+                          onClick={() => void openProtectedFile("campaigns", campaign.id, getProtectedFileName(attachment.file_path))}
+                          type="button"
+                        >
                           <Download className="h-4 w-4" />
                           Open
-                        </a>
+                        </button>
                         <Button disabled={isDeletingAttachment} onClick={() => onDeleteAttachment(attachment.id)} size="sm" variant="ghost">
                           Delete
                         </Button>
@@ -709,7 +708,12 @@ function CampaignDetailDrawer({
                   </Card>
                 ))
               ) : (
-                <Card className="p-6 text-sm text-muted-foreground">No attachments yet.</Card>
+                <EmptyState
+                  className="border-border/70"
+                  description="Upload a brief, asset pack, or supporting file to keep campaign materials in one place."
+                  icon={Paperclip}
+                  title="No attachments yet"
+                />
               )}
             </div>
           ) : null}
@@ -744,7 +748,12 @@ function CampaignDetailDrawer({
                   </Card>
                 ))
               ) : (
-                <Card className="p-6 text-sm text-muted-foreground">Belum ada ads metrics yang dikaitkan ke campaign ini.</Card>
+                <EmptyState
+                  className="border-border/70"
+                  description="Ads metrics linked to this campaign will appear here after the first performance entry is recorded."
+                  icon={LayoutList}
+                  title="No metrics linked yet"
+                />
               )}
             </div>
           ) : null}
@@ -765,7 +774,7 @@ function CampaignDetailDrawer({
                         <p className="mt-1 text-xs text-muted-foreground">{lead.phone ?? lead.email ?? "No contact"}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">{formatCampaignStatusLabel(lead.pipeline_status)}</p>
+                        <StatusBadge status={lead.pipeline_status} variant="lead-status" />
                         <p className="text-xs text-muted-foreground">{formatIDR(lead.estimated_value)}</p>
                       </div>
                     </div>
@@ -776,15 +785,43 @@ function CampaignDetailDrawer({
                   </Card>
                 ))
               ) : (
-                <Card className="p-6 text-sm text-muted-foreground">Belum ada lead yang terhubung ke campaign ini.</Card>
+                <EmptyState
+                  className="border-border/70"
+                  description="Linked leads will appear here once campaign-attributed opportunities start coming in."
+                  icon={LayoutList}
+                  title="No linked leads"
+                />
               )}
             </div>
           ) : null}
 
           {campaign && detailTab === "activity" ? (
-            <Card className="p-6 text-sm text-muted-foreground">
-              Activity log akan dipakai untuk history perpindahan stage dan update campaign. Untuk step ini, audit visual masih placeholder.
-            </Card>
+            <div className="space-y-4">
+              <Card className="p-4">
+                <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">Campaign activity</p>
+                <p className="mt-2 text-sm text-muted-foreground">Recent movement and asset upload activity for this campaign.</p>
+              </Card>
+              {isLoadingActivities ? <Card className="p-6 text-sm text-muted-foreground">Loading activity...</Card> : null}
+              {!isLoadingActivities && activities.length === 0 ? (
+                <EmptyState
+                  className="border-border/70"
+                  description="Activity will appear here after the campaign is moved or attachments are uploaded."
+                  icon={LayoutList}
+                  title="No activity yet"
+                />
+              ) : null}
+              {activities.map((activity) => (
+                <Card className="p-4" key={activity.id}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-text-primary">{activity.description}</p>
+                      <p className="mt-1 text-sm text-text-secondary">{activity.actor_name ?? "System"}</p>
+                    </div>
+                    <p className="text-xs text-text-secondary">{new Date(activity.created_at).toLocaleString("id-ID")}</p>
+                  </div>
+                </Card>
+              ))}
+            </div>
           ) : null}
         </div>
       </Card>
@@ -792,11 +829,11 @@ function CampaignDetailDrawer({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold capitalize">{value}</span>
+      <div className="text-sm font-semibold capitalize">{value}</div>
     </div>
   );
 }
@@ -846,6 +883,4 @@ function formatMetricPercent(value?: number | null) {
   return `${value.toFixed(2)}%`;
 }
 
-function formatCampaignStatusLabel(value: string) {
-  return value.replaceAll("_", " ");
-}
+

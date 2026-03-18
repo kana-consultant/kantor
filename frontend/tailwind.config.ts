@@ -19,6 +19,11 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        module: {
+          DEFAULT: "var(--module-primary)",
+          light: "var(--module-light)",
+          dark: "var(--module-dark)",
+        },
         
         // Base Colors
         surface: {
@@ -113,6 +118,27 @@ const config: Config = {
           won: "#36B37E",
           lost: "#97A0AF",
         },
+        pipelineLight: {
+          new: "#E6FCFF",
+          contacted: "#E8F2FF",
+          qualified: "#EAE6FF",
+          proposal: "#FFF1E6",
+          negotiation: "#FFFAE6",
+          won: "#E3FCEF",
+          lost: "#F4F5F7",
+        },
+        platform: {
+          instagram: "#E4405F",
+          facebook: "#1877F2",
+          google: "#4285F4",
+          tiktok: "#000000",
+          youtube: "#FF0000",
+          email: "#5E6C84",
+          whatsapp: "#25D366",
+          website: "#FFAB00",
+          referral: "#6554C0",
+          other: "#97A0AF",
+        },
       },
       spacing: {
         '2': '8px',
@@ -137,6 +163,9 @@ const config: Config = {
         md: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
         lg: "0 8px 16px -4px rgba(23,43,77,0.08), 0 4px 8px -4px rgba(23,43,77,0.06)",
         xl: "0 20px 32px -8px rgba(23,43,77,0.12)",
+        card: "0 1px 2px rgba(23,43,77,0.04)",
+        "card-hover": "0 1px 3px rgba(23,43,77,0.06), 0 1px 2px rgba(23,43,77,0.04)",
+        focus: "0 0 0 2px #FFFFFF, 0 0 0 4px #4C9AFF",
       },
       fontFamily: {
         sans: ["Inter", ...defaultTheme.fontFamily.sans],

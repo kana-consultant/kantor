@@ -5,6 +5,7 @@ import type { NotificationFilters, NotificationItem } from "@/types/notification
 export const notificationsKeys = {
   all: ["notifications"] as const,
   list: (filters: NotificationFilters = {}) => [...notificationsKeys.all, "list", filters] as const,
+  unreadCount: () => [...notificationsKeys.all, "unread-count"] as const,
 };
 
 export async function listNotifications(filters: NotificationFilters = {}) {
@@ -43,6 +44,15 @@ export async function markAllNotificationsRead() {
   return requestJSON<{ marked_all: boolean }>(
     "/notifications/read-all",
     { method: "PATCH" },
+    session?.tokens.access_token,
+  );
+}
+
+export async function getUnreadNotificationsCount() {
+  const session = getStoredSession();
+  return requestJSON<{ unread_count: number }>(
+    "/notifications/unread-count",
+    { method: "GET" },
     session?.tokens.access_token,
   );
 }

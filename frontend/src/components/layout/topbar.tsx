@@ -1,89 +1,28 @@
 import { useMemo, useState } from "react";
-
-import { Bell, ChevronDown, LogOut, PanelLeft, PanelLeftClose } from "lucide-react";
-import { useRouterState } from "@tanstack/react-router";
+import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Sun } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useModuleTheme } from "@/hooks/use-module-theme";
 import { cn } from "@/lib/utils";
-import { useSidebarStore } from "@/stores/sidebar-store";
+import {
+  getUnreadNotificationsCount,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  notificationsKeys,
+} from "@/services/notifications";
 import { logout } from "@/services/auth";
-import { listNotifications, markAllNotificationsRead, markNotificationRead, notificationsKeys } from "@/services/notifications";
-
-const pageMetadata = [
-  {
-    match: (pathname: string) => pathname.startsWith("/operational/projects"),
-    title: "Projects",
-    module: "OPERASIONAL"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/operational/automation"),
-    title: "Automation",
-    module: "OPERASIONAL"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/operational"),
-    title: "Overview",
-    module: "OPERASIONAL"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/hris/employees"),
-    title: "Employees",
-    module: "HRIS"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/hris/departments"),
-    title: "Departments",
-    module: "HRIS"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/hris/reimbursements"),
-    title: "Reimbursements",
-    module: "HRIS"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/hris/finance"),
-    title: "Finance",
-    module: "HRIS"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/hris/subscriptions"),
-    title: "Subscriptions",
-    module: "HRIS"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/hris"),
-    title: "Overview",
-    module: "HRIS"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/marketing/campaigns"),
-    title: "Campaigns",
-    module: "MARKETING"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/marketing/leads"),
-    title: "Leads",
-    module: "MARKETING"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/marketing/ads-metrics"),
-    title: "Ads Metrics",
-    module: "MARKETING"
-  },
-  {
-    match: (pathname: string) => pathname.startsWith("/marketing"),
-    title: "Overview",
-    module: "MARKETING"
-  },
-];
+import { useSidebarStore } from "@/stores/sidebar-store";
+import { useThemeStore } from "@/stores/theme-store";
 
 export function Topbar() {
   const queryClient = useQueryClient();
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
+  const { breadcrumb } = useModuleTheme();
   const { user, roles } = useAuth();
+  const mode = useThemeStore((state) => state.mode);
+  const toggleTheme = useThemeStore((state) => state.toggleMode);
   const { isDesktopCollapsed, toggleDesktopCollapsed, toggleMobileOpen } = useSidebarStore();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -91,6 +30,12 @@ export function Topbar() {
   const notificationsQuery = useQuery({
     queryKey: notificationsKeys.list({ page: 1, perPage: 8 }),
     queryFn: () => listNotifications({ page: 1, perPage: 8 }),
+    refetchInterval: 30_000,
+  });
+
+  const unreadCountQuery = useQuery({
+    queryKey: notificationsKeys.unreadCount(),
+    queryFn: getUnreadNotificationsCount,
     refetchInterval: 30_000,
   });
 
@@ -108,105 +53,125 @@ export function Topbar() {
     },
   });
 
-  const page = pageMetadata.find((item) => item.match(pathname)) ?? {
-    title: "Internal Platform",
-    module: "KANTOR Workspace"
-  };
+  const unreadCount = unreadCountQuery.data?.unread_count ?? 0;
+  const unreadLabel = useMemo(() => (unreadCount > 99 ? "99+" : String(unreadCount)), [unreadCount]);
+  const notificationItems = notificationsQuery.data?.items ?? [];
+  const BreadcrumbIcon = breadcrumb.icon;
 
   const handleLogout = () => {
-    logout();
-    window.location.href = "/login";
+    void logout().finally(() => {
+      window.location.href = "/login";
+    });
   };
 
-  const notificationItems = notificationsQuery.data?.items ?? [];
-  const unreadCount = useMemo(
-    () => notificationItems.filter((item) => !item.is_read).length,
-    [notificationItems],
-  );
-
   return (
-    <header className="flex h-[64px] items-center justify-between px-6 bg-surface border-b border-border z-10 sticky top-0">
-      <div className="flex items-center gap-4">
-        {/* Mobile Toggle */}
-        <button
-          className="lg:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-surface-muted text-text-secondary transition-colors"
-          onClick={toggleMobileOpen}
+    <header className="sticky top-0 z-20 flex h-[56px] items-center justify-between gap-4 bg-transparent px-1">
+      <div className="flex items-center gap-3">
+        <Button
           aria-label="Open sidebar"
+          className="lg:hidden"
+          onClick={toggleMobileOpen}
+          size="icon"
+          variant="ghost"
         >
-          <PanelLeft className="w-5 h-5" />
-        </button>
-
-        {/* Desktop Toggle */}
-        <button
-          className="hidden lg:flex items-center justify-center w-8 h-8 rounded-md hover:bg-surface-muted text-text-secondary transition-colors"
-          onClick={toggleDesktopCollapsed}
+          <PanelLeft className="h-5 w-5" />
+        </Button>
+        <Button
           aria-label="Toggle sidebar"
+          className="hidden lg:inline-flex"
+          onClick={toggleDesktopCollapsed}
+          size="icon"
+          variant="ghost"
         >
-          {isDesktopCollapsed ? <PanelLeft className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-        </button>
+          {isDesktopCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+        </Button>
 
-        {/* Breadcrumb / Title */}
-        <div className="flex items-center gap-2 text-[14px]">
-          <span className="text-text-secondary font-[500] uppercase tracking-wider text-[12px]">{page.module}</span>
-          <span className="text-border mx-1">/</span>
-          <span className="text-text-primary font-[600] text-[16px]">{page.title}</span>
+        <div className="flex items-center gap-3">
+          <div className={cn("flex h-9 w-9 items-center justify-center rounded-md", breadcrumb.module.lightClassName)}>
+            <BreadcrumbIcon className={cn("h-5 w-5", breadcrumb.module.accentClassName)} />
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <span className={cn("font-semibold uppercase tracking-[0.08em]", breadcrumb.module.accentClassName)}>
+              {breadcrumb.module.label}
+            </span>
+            <span className="text-text-tertiary">/</span>
+            <span className="font-semibold text-text-primary">{breadcrumb.title}</span>
+          </div>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Notifications */}
+        <Button
+          aria-label="Toggle theme"
+          onClick={toggleTheme}
+          size="icon"
+          variant="ghost"
+        >
+          {mode === "dark" ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+        </Button>
+
         <div className="relative">
-          <button
-            className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-surface-muted text-text-secondary transition-colors"
+          <Button
+            aria-label="Open notifications"
             onClick={() => {
               setIsNotificationsOpen((value) => !value);
               setIsProfileOpen(false);
             }}
-            aria-label="Toggle notifications"
+            size="icon"
+            variant="ghost"
           >
-            <Bell className="w-5 h-5" strokeWidth={1.5} />
+            <Bell className="h-4.5 w-4.5" />
             {unreadCount > 0 ? (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-priority-high rounded-full border-2 border-surface"></span>
+              <span className="absolute right-0 top-0 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold leading-none text-white">
+                {unreadLabel}
+              </span>
             ) : null}
-          </button>
+          </Button>
 
           {isNotificationsOpen ? (
-            <div className="absolute right-0 top-12 w-80 rounded-[12px] border border-border bg-surface shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-muted">
-                <h3 className="font-[600] text-[14px] text-text-primary">Notifications</h3>
+            <div className="absolute right-0 top-12 w-[320px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <h3 className="text-sm font-semibold text-text-primary">Notifications</h3>
                 <button
+                  className="text-xs font-semibold text-module transition hover:opacity-80 disabled:opacity-50"
                   disabled={markAllMutation.isPending || unreadCount === 0}
                   onClick={() => markAllMutation.mutate()}
-                  className="text-[12px] font-[500] text-ops hover:text-ops-hover disabled:opacity-50 disabled:hover:text-ops transition-colors"
+                  type="button"
                 >
                   Mark all as read
                 </button>
               </div>
-              <div className="max-h-[300px] overflow-y-auto">
+              <div className="max-h-[320px] overflow-y-auto">
                 {notificationItems.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-text-secondary">
-                    No new notifications.
+                    No notifications yet.
                   </div>
                 ) : (
                   <div className="divide-y divide-border">
                     {notificationItems.map((item) => (
                       <button
-                        key={item.id}
                         className={cn(
-                          "w-full text-left px-4 py-3 hover:bg-surface-muted transition-colors flex items-start gap-3",
-                          !item.is_read ? "bg-ops-light/30" : ""
+                          "flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-surface-muted",
+                          !item.is_read && "bg-module-light",
                         )}
+                        key={item.id}
                         onClick={() => {
                           if (!item.is_read) {
                             markReadMutation.mutate(item.id);
                           }
                         }}
+                        type="button"
                       >
-                        {!item.is_read && <span className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-ops" />}
-                        <div>
-                          <p className={cn("text-[13px] text-text-primary", !item.is_read ? "font-[600]" : "font-[500]")}>{item.title}</p>
-                          <p className="mt-1 text-[12px] text-text-secondary line-clamp-2">{item.message}</p>
-                          <p className="mt-2 text-[11px] text-text-tertiary">
+                        <span
+                          className={cn(
+                            "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                            !item.is_read ? "bg-module" : "bg-text-tertiary",
+                          )}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-text-primary">{item.title}</p>
+                          <p className="mt-1 text-[13px] leading-5 text-text-secondary">{item.message}</p>
+                          <p className="mt-2 text-xs text-text-tertiary">
                             {new Date(item.created_at).toLocaleString("id-ID")}
                           </p>
                         </div>
@@ -219,44 +184,43 @@ export function Topbar() {
           ) : null}
         </div>
 
-        {/* Profile Dropdown */}
-        <div className="relative ml-2">
-          <button 
-            className="flex items-center gap-2 hover:bg-surface-muted py-1.5 pl-1.5 pr-2.5 rounded-full transition-colors"
+        <div className="relative">
+          <button
+            className="flex items-center gap-3 rounded-full bg-surface px-2 py-1.5 shadow-xs transition hover:shadow-sm"
             onClick={() => {
-              setIsProfileOpen(!isProfileOpen);
+              setIsProfileOpen((value) => !value);
               setIsNotificationsOpen(false);
             }}
+            type="button"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ops text-[13px] font-[600] text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-module text-[13px] font-semibold text-white">
               {initials(user?.full_name ?? "Guest")}
             </div>
-            <div className="hidden md:block text-left">
-              <p className="text-[13px] font-[600] text-text-primary leading-none">{user?.full_name ?? "Guest"}</p>
+            <div className="hidden text-left md:block">
+              <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
+              <p className="text-xs text-text-secondary">{roles[0] ?? "viewer"}</p>
             </div>
-            <ChevronDown className="w-4 h-4 text-text-secondary ml-1 hidden md:block" strokeWidth={2} />
+            <ChevronDown className="hidden h-4 w-4 text-text-secondary md:block" />
           </button>
 
-          {isProfileOpen && (
-             <div className="absolute right-0 top-12 w-56 rounded-[12px] border border-border bg-surface shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2">
-                <div className="px-4 py-3 border-b border-border bg-surface-muted">
-                   <p className="text-[14px] font-[600] text-text-primary truncate">{user?.full_name ?? "Guest"}</p>
-                   <p className="text-[12px] text-text-secondary mt-0.5 truncate">{user?.email ?? "guest@kantor.local"}</p>
-                   <div className="mt-2 inline-flex items-center rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-[600] uppercase tracking-wider text-text-secondary">
-                     {roles[0] ?? "Viewer"}
-                   </div>
-                </div>
-                <div className="p-1">
-                   <button 
-                     onClick={handleLogout}
-                     className="w-full flex items-center gap-2 px-3 py-2 text-[13px] font-[500] text-priority-high hover:bg-priority-high/10 rounded-[6px] transition-colors"
-                   >
-                     <LogOut className="w-4 h-4" />
-                     Logout
-                   </button>
-                </div>
-             </div>
-          )}
+          {isProfileOpen ? (
+            <div className="absolute right-0 top-12 w-[240px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
+              <div className="border-b border-border px-4 py-4">
+                <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
+                <p className="mt-1 text-xs text-text-secondary">{user?.email ?? "guest@kantor.local"}</p>
+              </div>
+              <div className="p-2">
+                <Button
+                  className="w-full justify-start text-error hover:bg-error-light hover:text-error"
+                  onClick={handleLogout}
+                  variant="ghost"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </header>

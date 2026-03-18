@@ -38,6 +38,9 @@
     /* Semantic Colors */
     --error: 11 100% 59%; /* #FF5630 */
     --error-foreground: 0 0% 100%;
+    --module-primary: #0065ff;
+    --module-light: #deebff;
+    --module-dark: #0747a6;
     
     /* Module Colors defined explicitly in Tailwind config, but we keep core UI vars here */
     --radius: 0.5rem; /* 8px MD border radius */
@@ -64,6 +67,9 @@
     --popover-foreground: 214 32% 91%;
     --card: 218 41% 25%;
     --card-foreground: 214 32% 91%;
+    --module-primary: #4c9aff;
+    --module-light: #1f3765;
+    --module-dark: #deebff;
   }
 
   * {
@@ -78,5 +84,58 @@
     font-family: theme('fontFamily.display');
     @apply tracking-tight;
   }
+
+  [data-module="ops"] {
+    --module-primary: #0065ff;
+    --module-light: #deebff;
+    --module-dark: #0747a6;
+  }
+
+  [data-module="hr"] {
+    --module-primary: #6554c0;
+    --module-light: #eae6ff;
+    --module-dark: #403294;
+  }
+
+  [data-module="mkt"] {
+    --module-primary: #ff5630;
+    --module-light: #ffebe6;
+    --module-dark: #bf2600;
+  }
+
+  .dark [data-module="ops"] {
+    --module-primary: #4c9aff;
+    --module-light: #1f3765;
+    --module-dark: #deebff;
+  }
+
+  .dark [data-module="hr"] {
+    --module-primary: #998dd9;
+    --module-light: #352d66;
+    --module-dark: #eae6ff;
+  }
+
+  .dark [data-module="mkt"] {
+    --module-primary: #ff8b73;
+    --module-light: #5a2f27;
+    --module-dark: #ffebe6;
+  }
 }
 
+@layer components {
+  .field-select {
+    @apply h-10 rounded-sm border-[1.5px] border-transparent bg-surface-muted px-3 text-[14px] text-text-primary outline-none transition-all duration-150 focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus;
+  }
+
+  .surface-panel {
+    @apply rounded-md border border-border bg-surface shadow-card transition-shadow hover:shadow-card-hover;
+  }
+
+  .table-shell {
+    @apply overflow-hidden rounded-md border border-border bg-surface shadow-xs;
+  }
+
+  .page-transition {
+    @apply motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-200;
+  }
+}

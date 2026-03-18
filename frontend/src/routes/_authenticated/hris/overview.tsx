@@ -1,69 +1,264 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { CopyPlus, Users, Banknote, Building2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  AlertTriangle,
+  CreditCard,
+  Landmark,
+  Receipt,
+  Users,
+} from "lucide-react";
+
+import { EmptyState } from "@/components/shared/empty-state";
+import { OverviewSkeleton } from "@/components/shared/skeletons";
+import { StatCard } from "@/components/shared/stat-card";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { formatIDR } from "@/lib/currency";
+import { permissions } from "@/lib/permissions";
+import { ensurePermission } from "@/lib/rbac";
+import { getHrisOverview, overviewKeys } from "@/services/overview";
 
 export const Route = createFileRoute("/_authenticated/hris/overview")({
-  component: RouteComponent,
+  beforeLoad: async () => {
+    await ensurePermission(permissions.hrisOverview);
+  },
+  component: HrisOverviewPage,
 });
 
-function RouteComponent() {
+function HrisOverviewPage() {
+  const navigate = useNavigate();
+  const overviewQuery = useQuery({
+    queryKey: overviewKeys.hris(),
+    queryFn: getHrisOverview,
+  });
+
+  if (overviewQuery.isLoading) {
+    return <OverviewSkeleton />;
+  }
+
+  if (overviewQuery.isError || !overviewQuery.data) {
+    return (
+      <EmptyState
+        actionLabel="Open employees"
+        description="Data overview HRIS belum bisa dimuat. Anda masih bisa lanjut dari halaman employees atau reimbursements."
+        icon={AlertTriangle}
+        onAction={() => void navigate({ to: "/hris/employees" })}
+        title="Overview tidak tersedia"
+      />
+    );
+  }
+
+  const overview = overviewQuery.data;
+  const monthlyNetTone = overview.monthly_net >= 0 ? "success" : "error";
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-display tracking-tight text-foreground">HRIS Overview</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Manage employees, departments, and financial data.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
+            HRIS
+          </p>
+          <h1 className="mt-2 text-[28px] font-bold tracking-tight text-text-primary">
+            People and finance overview
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
+            Ringkasan karyawan aktif, subscription berjalan, kesehatan arus kas, dan reimbursement terbaru dalam satu layar.
+          </p>
         </div>
-        <Button variant="hr">
-          <CopyPlus className="mr-2 h-4 w-4" />
-          Add Employee
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void navigate({ to: "/hris/employees" })}>Open Employees</Button>
+          <Button
+            onClick={() => void navigate({ to: "/hris/reimbursements" })}
+            variant="secondary"
+          >
+            Open Reimbursements
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-4">
+        <StatCard
+          helper="Karyawan dengan status employment active."
+          icon={Users}
+          label="Total Employees"
+          tone="hr"
+          value={overview.total_employees.toLocaleString("id-ID")}
+        />
+        <StatCard
+          helper={`${formatIDR(overview.active_subscription_monthly_cost)} per bulan`}
+          icon={CreditCard}
+          label="Active Subscriptions"
+          tone="hr"
+          value={overview.active_subscriptions.toLocaleString("id-ID")}
+        />
+        <StatCard
+          helper="Income dikurangi outcome bulan berjalan."
+          icon={Landmark}
+          label="Monthly Net"
+          mono
+          tone={monthlyNetTone}
+          value={formatIDR(overview.monthly_net)}
+        />
+        <StatCard
+          helper="Reimbursement yang masih menunggu review."
+          icon={Receipt}
+          label="Pending Reimbursements"
+          tone="warning"
+          value={overview.pending_reimbursements.toLocaleString("id-ID")}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
         <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-hr/10 text-hr">
-              <Users className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Employees</p>
-              <h3 className="text-2xl font-bold font-display tracking-tight mt-0.5">48</h3>
-            </div>
+          <div className="border-b border-border pb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
+              Income vs Outcome
+            </p>
+            <h2 className="mt-2 text-[22px] font-bold text-text-primary">
+              Last 6 months
+            </h2>
           </div>
-        </Card>
-        
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-hr-light text-hr">
-              <Building2 className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Departments</p>
-              <h3 className="text-2xl font-bold font-display tracking-tight mt-0.5">6</h3>
-            </div>
+          <div className="mt-6 h-[320px]">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={overview.income_vs_outcome}>
+                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
+                <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
+                <YAxis
+                  stroke="hsl(var(--text-tertiary))"
+                  tickFormatter={(value) => compactCurrency(value)}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--surface))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
+                  }}
+                  formatter={(value: number) => formatIDR(value)}
+                />
+                <Bar dataKey="income" fill="#36B37E" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="outcome" fill="#FF5630" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </Card>
 
         <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-success/10 text-success">
-              <Banknote className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">This Month Payroll</p>
-              <h3 className="text-2xl font-bold font-display tracking-tight mt-0.5 text-success">Rp 148M</h3>
-            </div>
+          <div className="border-b border-border pb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
+              Upcoming Renewals
+            </p>
+            <h2 className="mt-2 text-[22px] font-bold text-text-primary">
+              Next 30 days
+            </h2>
+          </div>
+          <div className="mt-6 space-y-3">
+            {overview.upcoming_renewals.length > 0 ? (
+              overview.upcoming_renewals.map((item) => (
+                <div className="rounded-md border border-border bg-surface p-4" key={item.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">{item.name}</p>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        {item.vendor} {item.pic_employee_name ? `| PIC ${item.pic_employee_name}` : ""}
+                      </p>
+                    </div>
+                    <StatusBadge
+                      status={alertStatus(item.days_remaining)}
+                      variant="renewal-alert"
+                    />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
+                    <span>{new Date(item.renewal_date).toLocaleDateString("id-ID")}</span>
+                    <span className="font-mono tabular-nums">{formatIDR(item.cost_amount)}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState
+                description="Belum ada subscription aktif yang jatuh tempo dalam 30 hari ke depan."
+                icon={CreditCard}
+                title="Tidak ada renewal dekat"
+              />
+            )}
           </div>
         </Card>
       </div>
-      
-      <Card className="border-dashed border-2 bg-transparent shadow-none p-12 text-center rounded-2xl">
-        <Users className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
-        <h3 className="text-lg font-semibold font-display text-foreground">HR Dashboard Analytics Coming Soon</h3>
-        <p className="mt-2 text-sm text-muted-foreground">We are working on bringing full organization charts and attendance tracking.</p>
+
+      <Card className="p-6">
+        <div className="border-b border-border pb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
+            Recent Reimbursements
+          </p>
+          <h2 className="mt-2 text-[22px] font-bold text-text-primary">
+            Latest submissions
+          </h2>
+        </div>
+        <div className="mt-6 space-y-3">
+          {overview.recent_reimbursements.length > 0 ? (
+            overview.recent_reimbursements.map((item) => (
+              <div
+                className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 md:flex-row md:items-center md:justify-between"
+                key={item.id}
+              >
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">{item.title}</p>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    {item.employee_name} | {item.category}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                  <StatusBadge status={item.status} variant="reimbursement-status" />
+                  <span className="text-sm font-mono tabular-nums text-text-primary">
+                    {formatIDR(item.amount)}
+                  </span>
+                  <span className="text-xs text-text-tertiary">
+                    {new Date(item.created_at).toLocaleDateString("id-ID")}
+                  </span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              description="Rangkuman reimbursement akan muncul di sini saat pengajuan mulai masuk."
+              icon={Receipt}
+              title="Belum ada reimbursement"
+            />
+          )}
+        </div>
       </Card>
     </div>
   );
+}
+
+function compactCurrency(value: number) {
+  if (Math.abs(value) >= 1_000_000) {
+    return `Rp${(value / 1_000_000).toFixed(0)}jt`;
+  }
+  if (Math.abs(value) >= 1_000) {
+    return `Rp${(value / 1_000).toFixed(0)}rb`;
+  }
+  return `Rp${value}`;
+}
+
+function alertStatus(daysRemaining: number) {
+  if (daysRemaining <= 1) {
+    return "1_day";
+  }
+  if (daysRemaining <= 7) {
+    return "7_days";
+  }
+  return "30_days";
 }

@@ -339,6 +339,25 @@ func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string
 	return tx.Commit(ctx)
 }
 
+func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
+	tag, err := r.db.Exec(
+		ctx,
+		`
+			UPDATE refresh_tokens
+			SET revoked_at = NOW(), last_used_at = NOW()
+			WHERE token_hash = $1 AND revoked_at IS NULL
+		`,
+		tokenHash,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) IsUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"

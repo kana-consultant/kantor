@@ -150,6 +150,15 @@ func (s *CampaignsService) MoveCampaign(ctx context.Context, campaignID string, 
 		return CampaignDetail{}, mapCampaignError(err)
 	}
 
+	if err := s.repo.LogActivity(ctx, item.ID, actorID, "campaign_moved", map[string]any{
+		"from_status": existing.Status,
+		"to_status":   item.Status,
+		"column_id":   item.ColumnID,
+		"column_name": valueOrFallback(item.ColumnName, "another stage"),
+	}); err != nil {
+		return CampaignDetail{}, err
+	}
+
 	if existing.Status != item.Status && item.Status == "live" {
 		if notifyErr := s.notifyCampaignLive(ctx, item); notifyErr != nil {
 			return CampaignDetail{}, notifyErr
@@ -160,8 +169,16 @@ func (s *CampaignsService) MoveCampaign(ctx context.Context, campaignID string, 
 }
 
 func (s *CampaignsService) AddAttachment(ctx context.Context, params marketingrepo.CreateCampaignAttachmentParams) (CampaignDetail, error) {
-	if _, err := s.repo.CreateAttachment(ctx, params); err != nil {
+	attachment, err := s.repo.CreateAttachment(ctx, params)
+	if err != nil {
 		return CampaignDetail{}, mapCampaignError(err)
+	}
+
+	if err := s.repo.LogActivity(ctx, params.CampaignID, params.UploadedBy, "attachment_uploaded", map[string]any{
+		"file_name": attachment.FileName,
+		"file_type": attachment.FileType,
+	}); err != nil {
+		return CampaignDetail{}, err
 	}
 	return s.GetCampaign(ctx, params.CampaignID)
 }
@@ -174,6 +191,11 @@ func (s *CampaignsService) ListAttachments(ctx context.Context, campaignID strin
 func (s *CampaignsService) DeleteAttachment(ctx context.Context, campaignID string, attachmentID string) (model.CampaignAttachment, error) {
 	item, err := s.repo.DeleteAttachment(ctx, campaignID, attachmentID)
 	return item, mapCampaignError(err)
+}
+
+func (s *CampaignsService) ListActivities(ctx context.Context, campaignID string) ([]model.CampaignActivity, error) {
+	items, err := s.repo.ListActivities(ctx, campaignID)
+	return items, mapCampaignError(err)
 }
 
 func (s *CampaignsService) ListColumns(ctx context.Context) ([]model.CampaignColumn, error) {
@@ -237,6 +259,13 @@ func normalizeCurrency(value string) string {
 		return "IDR"
 	}
 	return strings.ToUpper(trimmed)
+}
+
+func valueOrFallback(value *string, fallback string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(*value)
 }
 
 func (s *CampaignsService) notifyCampaignLive(ctx context.Context, campaign model.Campaign) error {

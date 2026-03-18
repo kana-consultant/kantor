@@ -15,3 +15,10 @@ type CreateBonusRequest struct {
 	PeriodMonth int    `json:"period_month" validate:"required,min=1,max=12"`
 	PeriodYear  int    `json:"period_year" validate:"required,min=2000,max=2100"`
 }
+
+type UpdateBonusRequest struct {
+	Amount      int64  `json:"amount" validate:"required,min=0"`
+	Reason      string `json:"reason" validate:"required,min=3,max=255"`
+	PeriodMonth int    `json:"period_month" validate:"required,min=1,max=12"`
+	PeriodYear  int    `json:"period_year" validate:"required,min=2000,max=2100"`
+}

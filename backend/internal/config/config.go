@@ -63,7 +63,7 @@ func Load() (Config, error) {
 	}
 
 	jwtSecret := getEnv("JWT_SECRET", "change-me")
-	dataEncryptionKey := getEnv("DATA_ENCRYPTION_KEY", jwtSecret)
+	dataEncryptionKey := strings.TrimSpace(os.Getenv("DATA_ENCRYPTION_KEY"))
 
 	seedEnabled, err := parseBool("SEED_SUPERADMIN_ENABLED", appEnv != "production")
 	if err != nil {
@@ -126,6 +126,10 @@ func Load() (Config, error) {
 
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
+	}
+
+	if cfg.DataEncryptionKey == "" {
+		return Config{}, errors.New("DATA_ENCRYPTION_KEY is required")
 	}
 
 	if cfg.SeedSuperAdmin.Enabled {

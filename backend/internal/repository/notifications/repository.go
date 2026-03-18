@@ -162,6 +162,16 @@ func (r *Repository) List(ctx context.Context, params ListParams) ([]model.Notif
 	return items, total, nil
 }
 
+func (r *Repository) CountUnread(ctx context.Context, userID string) (int64, error) {
+	var count int64
+	err := r.db.QueryRow(
+		ctx,
+		`SELECT COUNT(*) FROM notifications WHERE user_id = $1::uuid AND is_read = FALSE`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
+
 func (r *Repository) MarkRead(ctx context.Context, notificationID string, userID string) error {
 	tag, err := r.db.Exec(
 		ctx,

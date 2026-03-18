@@ -334,7 +334,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 
   if (columnsQuery.error instanceof Error || tasksQuery.error instanceof Error) {
     return (
-      <Card className="p-8 text-red-700">
+      <Card className="p-8 text-error">
         {(columnsQuery.error as Error | undefined)?.message ??
           (tasksQuery.error as Error | undefined)?.message ??
           "Failed to load Kanban board"}

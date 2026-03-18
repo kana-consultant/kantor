@@ -23,6 +23,7 @@ func New(service *notificationsservice.Service) *Handler {
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/", h.List)
+	r.Get("/unread-count", h.UnreadCount)
 	r.Patch("/{notificationID}/read", h.MarkRead)
 	r.Patch("/read-all", h.MarkAllRead)
 }
@@ -100,4 +101,20 @@ func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"marked_all": true}, nil)
+}
+
+func (h *Handler) UnreadCount(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+
+	count, err := h.service.CountUnread(r.Context(), principal.UserID)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "NOTIFICATION_COUNT_FAILED", "Unable to load unread notification count", nil)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]int64{"unread_count": count}, nil)
 }

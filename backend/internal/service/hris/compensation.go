@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	ErrSalaryNotFound = errors.New("salary record not found")
-	ErrBonusNotFound  = errors.New("bonus record not found")
+	ErrSalaryNotFound  = errors.New("salary record not found")
+	ErrBonusNotFound   = errors.New("bonus record not found")
+	ErrBonusNotPending = errors.New("only pending bonus records can be changed")
 )
 
 type CompensationService struct {
@@ -145,6 +146,39 @@ func (s *CompensationService) ListBonuses(ctx context.Context, employeeID string
 	return result, nil
 }
 
+func (s *CompensationService) UpdateBonus(ctx context.Context, bonusID string, request hrisdto.UpdateBonusRequest) (model.BonusRecord, error) {
+	row, err := s.repo.GetBonusByID(ctx, bonusID)
+	if err != nil {
+		if errors.Is(err, hrisrepo.ErrBonusNotFound) {
+			return model.BonusRecord{}, ErrBonusNotFound
+		}
+		return model.BonusRecord{}, err
+	}
+	if row.ApprovalStatus != "pending" {
+		return model.BonusRecord{}, ErrBonusNotPending
+	}
+
+	amountCipher, err := s.encrypter.EncryptString(strconv.FormatInt(request.Amount, 10))
+	if err != nil {
+		return model.BonusRecord{}, err
+	}
+
+	row, err = s.repo.UpdateBonus(ctx, bonusID, hrisrepo.UpdateBonusParams{
+		Amount:      amountCipher,
+		Reason:      strings.TrimSpace(request.Reason),
+		PeriodMonth: request.PeriodMonth,
+		PeriodYear:  request.PeriodYear,
+	})
+	if err != nil {
+		if errors.Is(err, hrisrepo.ErrBonusNotFound) {
+			return model.BonusRecord{}, ErrBonusNotFound
+		}
+		return model.BonusRecord{}, err
+	}
+
+	return s.mapBonusRow(row)
+}
+
 func (s *CompensationService) ApproveBonus(ctx context.Context, bonusID string, actorID string) (model.BonusRecord, error) {
 	row, err := s.repo.UpdateBonusApprovalStatus(ctx, bonusID, "approved", actorID)
 	if err != nil {
@@ -165,6 +199,27 @@ func (s *CompensationService) RejectBonus(ctx context.Context, bonusID string, a
 		return model.BonusRecord{}, err
 	}
 	return s.mapBonusRow(row)
+}
+
+func (s *CompensationService) DeleteBonus(ctx context.Context, bonusID string) error {
+	row, err := s.repo.GetBonusByID(ctx, bonusID)
+	if err != nil {
+		if errors.Is(err, hrisrepo.ErrBonusNotFound) {
+			return ErrBonusNotFound
+		}
+		return err
+	}
+	if row.ApprovalStatus != "pending" {
+		return ErrBonusNotPending
+	}
+
+	if err := s.repo.DeleteBonus(ctx, bonusID); err != nil {
+		if errors.Is(err, hrisrepo.ErrBonusNotFound) {
+			return ErrBonusNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *CompensationService) mapSalaryRow(row hrisrepo.SalaryRow) (model.SalaryRecord, error) {

@@ -29,6 +29,7 @@ services:
       PORT: ${PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev}@db:5432/${POSTGRES_DB:-internal_platform}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-change-me}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
       UPLOADS_DIR: /app/data/uploads
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-168h}

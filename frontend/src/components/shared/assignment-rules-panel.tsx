@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,6 @@ import {
   updateAssignmentRule,
 } from "@/services/operational-assignment-rules";
 import type { AssignmentRule, AssignmentRuleFormValues } from "@/types/assignment";
-import { cn } from "@/lib/utils";
 
 const ruleSchema = z.object({
   rule_type: z.enum(["by_department", "by_skill", "by_workload"]),
@@ -222,11 +222,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
               </div>
 
               <div className="flex items-center gap-3">
-                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-[600] uppercase tracking-wider border", 
-                  rule.is_active ? "bg-ops-light/50 text-ops border-ops/20" : "bg-surface-muted text-text-secondary border-border" 
-                )}>
-                  {rule.is_active ? "active" : "inactive"}
-                </span>
+                <StatusBadge status={rule.is_active ? "active" : "inactive"} />
                 <PermissionGate permission={permissions.operationalAssignmentEdit}>
                   <Button onClick={() => setEditingRule(rule)} size="sm" variant="secondary">
                     Edit

@@ -17,6 +17,10 @@ interface RefreshRequest {
   refresh_token: string;
 }
 
+interface LogoutRequest {
+  refresh_token: string;
+}
+
 export function login(payload: LoginRequest) {
   return postJSON<AuthPayload, LoginRequest>("/auth/login", payload);
 }
@@ -27,6 +31,12 @@ export function register(payload: RegisterRequest) {
 
 export function refresh(refreshToken: string) {
   return postJSON<AuthPayload, RefreshRequest>("/auth/refresh", {
+    refresh_token: refreshToken,
+  });
+}
+
+export function revokeRefreshToken(refreshToken: string) {
+  return postJSON<{ revoked: boolean }, LogoutRequest>("/auth/logout", {
     refresh_token: refreshToken,
   });
 }
@@ -44,8 +54,17 @@ export async function refreshSession() {
   return refreshedSession;
 }
 
-export function logout() {
-  useAuthStore.getState().clearSession();
+export async function logout() {
+  const store = useAuthStore.getState();
+  const refreshToken = store.session?.tokens.refresh_token;
+
+  try {
+    if (refreshToken) {
+      await revokeRefreshToken(refreshToken);
+    }
+  } finally {
+    store.clearSession();
+  }
 }
 
 export async function ensureAuthenticated(): Promise<AuthSession | null> {

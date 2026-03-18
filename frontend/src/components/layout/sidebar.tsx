@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 
+import { KantorLogo } from "@/components/layout/kantor-logo";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -153,26 +155,16 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
   return (
     <aside
       className={cn(
-        "relative flex h-full flex-col bg-surface border-r border-border transition-all duration-200 ease-in-out shrink-0",
+        "relative flex h-full flex-col rounded-lg bg-surface transition-all duration-200 ease-in-out shrink-0",
         collapsed ? "w-[68px]" : "w-[256px]"
       )}
     >
-      {/* Logo Area */}
-      <div className="flex h-[64px] items-center p-[20px] shrink-0">
+      <div className="flex h-[64px] items-center px-5 shrink-0">
         <div className={cn("flex w-full items-center", collapsed ? "justify-center" : "justify-between")}>
-          {!collapsed ? (
-             <div className="text-[20px] font-[800] leading-none tracking-tight font-display text-text-primary flex items-start">
-               K<span className="relative">A<span className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-ops"></span></span>NTOR
-             </div>
-          ) : (
-             <div className="text-[20px] font-[800] leading-none tracking-tight font-display text-text-primary flex items-start">
-               K<span className="relative">A<span className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-ops"></span></span>
-             </div>
-          )}
+          <KantorLogo compact={collapsed} />
         </div>
       </div>
 
-      {/* Navigation Area */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2 space-y-6">
         {visibleSections.map((section) => (
           <div key={section.id}>
@@ -181,14 +173,16 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
                   "mt-6 mb-2 px-3 text-[11px] font-[700] uppercase tracking-[0.08em]",
                   section.id === 'ops' ? 'text-ops' : section.id === 'hr' ? 'text-hr' : 'text-mkt'
                 )}>
-                  {section.label}
+                 {section.label}
                 </div>
              ) : (
                 <div className="mt-6 mb-2 flex justify-center">
-                  <div className={cn(
-                    "w-2 h-2 rounded-full",
-                    section.id === 'ops' ? 'bg-ops' : section.id === 'hr' ? 'bg-hr' : 'bg-mkt'
-                  )} title={section.label} />
+                  <Tooltip content={section.label}>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      section.id === 'ops' ? 'bg-ops' : section.id === 'hr' ? 'bg-hr' : 'bg-mkt'
+                    )} />
+                  </Tooltip>
                 </div>
              )}
 
@@ -206,21 +200,22 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
                   }
 
                   return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      onClick={onNavigate}
-                      title={collapsed ? item.label : undefined}
-                      className={cn(
-                        "flex items-center h-[36px] px-3 rounded-[6px] text-[14px] transition-colors",
-                        collapsed ? "justify-center px-0 w-11 mx-auto" : "",
-                        !active && "text-text-secondary font-[500] hover:bg-surface-muted hover:text-text-primary",
-                        activeColors
-                      )}
-                    >
-                      <Icon className={cn("shrink-0", collapsed ? "w-5 h-5 mx-auto" : "w-5 h-5 mr-3")} strokeWidth={1.5} />
-                      {!collapsed && <span>{item.label}</span>}
-                    </Link>
+                    <Tooltip content={item.label} key={item.to}>
+                      <Link
+                        to={item.to}
+                        onClick={onNavigate}
+                        className={cn(
+                          "flex items-center h-[36px] px-3 rounded-sm text-[14px] transition-colors",
+                          collapsed ? "justify-center px-0 w-11 mx-auto" : "",
+                          !active && "text-text-secondary font-[500] hover:bg-surface-muted hover:text-text-primary",
+                          active && "shadow-[inset_3px_0_0_0_currentColor]",
+                          activeColors
+                        )}
+                      >
+                        <Icon className={cn("shrink-0", collapsed ? "w-5 h-5 mx-auto" : "w-5 h-5 mr-3")} strokeWidth={1.5} />
+                        {!collapsed && <span>{item.label}</span>}
+                      </Link>
+                    </Tooltip>
                   )
                })}
              </div>
@@ -228,7 +223,6 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
         ))}
       </div>
 
-      {/* Collapse Toggle */}
       {!mobile && onToggleCollapse && (
         <div className="p-3 mt-auto shrink-0 border-t border-border/50">
            <button

@@ -41,6 +41,7 @@ func (h *CampaignsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/", h.listCampaigns)
 	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/kanban", h.kanban)
 	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/{campaignID}", h.getCampaign)
+	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/{campaignID}/activities", h.listActivities)
 	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:edit")).Put("/{campaignID}", h.updateCampaign)
 	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:delete")).Delete("/{campaignID}", h.deleteCampaign)
 	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:edit")).Patch("/{campaignID}/move", h.moveCampaign)
@@ -51,10 +52,10 @@ func (h *CampaignsHandler) RegisterRoutes(router chi.Router) {
 
 func (h *CampaignsHandler) RegisterColumnRoutes(router chi.Router) {
 	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/", h.listColumns)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:create")).Post("/", h.createColumn)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:edit")).Put("/{columnID}", h.updateColumn)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:delete")).Delete("/{columnID}", h.deleteColumn)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:edit")).Patch("/reorder", h.reorderColumns)
+	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Post("/", h.createColumn)
+	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Put("/{columnID}", h.updateColumn)
+	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Delete("/{columnID}", h.deleteColumn)
+	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Patch("/reorder", h.reorderColumns)
 }
 
 func (h *CampaignsHandler) createCampaign(w http.ResponseWriter, r *http.Request) {
@@ -113,6 +114,15 @@ func (h *CampaignsHandler) getCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
+}
+
+func (h *CampaignsHandler) listActivities(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.ListActivities(r.Context(), chi.URLParam(r, "campaignID"))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, items, nil)
 }
 
 func (h *CampaignsHandler) updateCampaign(w http.ResponseWriter, r *http.Request) {

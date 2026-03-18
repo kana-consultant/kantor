@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Users } from "lucide-react";
 
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProjectForm } from "@/components/shared/project-form";
-import { ProjectsTable } from "@/components/shared/projects-table";
-import { useRBAC } from "@/hooks/use-rbac";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
 import {
@@ -17,7 +19,7 @@ import {
   listProjects,
   projectsKeys,
 } from "@/services/operational-projects";
-import type { ProjectFilters } from "@/types/project";
+import type { Project, ProjectFilters } from "@/types/project";
 
 const defaultFilters: ProjectFilters = {
   page: 1,
@@ -60,25 +62,116 @@ function ProjectsListPage() {
     },
   });
 
+  const projects = projectsQuery.data?.items ?? [];
   const meta = projectsQuery.data?.meta;
+  const columns: Array<DataTableColumn<Project>> = [
+    {
+      id: "name",
+      header: "Project",
+      accessor: "name",
+      sortable: true,
+      cell: (project) => (
+        <div className="space-y-1">
+          <p className="font-semibold text-text-primary">{project.name}</p>
+          <p className="line-clamp-1 text-[13px] text-text-secondary">
+            {project.description || "Project board ready for execution."}
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessor: "status",
+      sortable: true,
+      cell: (project) => <StatusBadge status={project.status} variant="project-status" />,
+    },
+    {
+      id: "priority",
+      header: "Priority",
+      accessor: "priority",
+      sortable: true,
+      cell: (project) => <StatusBadge status={project.priority} variant="priority" />,
+    },
+    {
+      id: "deadline",
+      header: "Deadline",
+      accessor: "deadline",
+      sortable: true,
+      cell: (project) => (
+        <span className="text-sm text-text-secondary">
+          {project.deadline ? new Date(project.deadline).toLocaleDateString("id-ID") : "-"}
+        </span>
+      ),
+    },
+    {
+      id: "members",
+      header: "Members",
+      accessor: "member_count",
+      align: "right",
+      numeric: true,
+      sortable: true,
+      cell: (project) => (
+        <div className="inline-flex items-center justify-end gap-2 font-mono tabular-nums">
+          <Users className="h-4 w-4 text-text-tertiary" />
+          <span>{project.member_count}</span>
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (project) => (
+        <div className="flex justify-end gap-2">
+          <Link
+            className="inline-flex h-9 items-center justify-center rounded-md bg-module px-4 text-sm font-semibold text-white transition hover:brightness-95"
+            params={{ projectId: project.id }}
+            search={{ view: "board" }}
+            to="/operational/projects/$projectId"
+          >
+            Open
+          </Link>
+          <Link
+            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted"
+            params={{ projectId: project.id }}
+            search={{ view: "automation" }}
+            to="/operational/projects/$projectId"
+          >
+            Automation
+          </Link>
+          {hasPermission(permissions.operationalProjectDelete) ? (
+            <Button
+              disabled={deleteMutation.isPending && deleteMutation.variables === project.id}
+              onClick={() => deleteMutation.mutate(project.id)}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Delete
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <Card className="p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-border pb-4">
+        <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
+            <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-ops">
               Operational boards
             </p>
             <h3 className="text-[28px] font-[700] text-text-primary">Projects</h3>
-            <p className="mt-2 max-w-2xl text-[14px] text-text-secondary leading-relaxed">
-              Halaman ini sekarang berfungsi sebagai board directory. User bisa scan project,
-              buka board utama, atau langsung masuk ke automation rules dari kartu project.
+            <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-text-secondary">
+              Scan active projects, open the board directly, or jump into project automation settings.
             </p>
           </div>
 
           <PermissionGate permission={permissions.operationalProjectCreate}>
-            <Button onClick={() => setIsCreateOpen((value) => !value)} variant="ops">
+            <Button onClick={() => setIsCreateOpen((value) => !value)}>
               {isCreateOpen ? "Close form" : "Create project"}
             </Button>
           </PermissionGate>
@@ -98,8 +191,7 @@ function ProjectsListPage() {
 
       <Card className="p-6">
         <div className="grid gap-4 md:grid-cols-4">
-          <input
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+          <Input
             onChange={(event) =>
               setFilters((current) => ({
                 ...current,
@@ -111,7 +203,7 @@ function ProjectsListPage() {
             value={filters.search}
           />
           <select
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className="field-select"
             onChange={(event) =>
               setFilters((current) => ({
                 ...current,
@@ -129,7 +221,7 @@ function ProjectsListPage() {
             <option value="archived">Archived</option>
           </select>
           <select
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className="field-select"
             onChange={(event) =>
               setFilters((current) => ({
                 ...current,
@@ -146,7 +238,7 @@ function ProjectsListPage() {
             <option value="critical">Critical</option>
           </select>
           <select
-            className="h-12 rounded-2xl border border-input bg-card/80 px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            className="field-select"
             onChange={(event) =>
               setFilters((current) => ({
                 ...current,
@@ -163,74 +255,31 @@ function ProjectsListPage() {
         </div>
       </Card>
 
-      <Card className="p-5 text-sm text-muted-foreground">
-        Pilih `Open board` untuk masuk ke workspace utama ala Trello. Gunakan `Automation`
-        jika ingin langsung mengatur auto assign rules per project.
-      </Card>
-
       {projectsQuery.error instanceof Error ? (
-        <Card className="p-6 text-sm text-red-700">{projectsQuery.error.message}</Card>
+        <Card className="p-6 text-sm text-error">{projectsQuery.error.message}</Card>
       ) : null}
 
-      {projectsQuery.isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card className="p-5 flex flex-col gap-4" key={i}>
-              <div className="flex items-start gap-3">
-                <Skeleton className="h-10 w-10 shrink-0 bg-muted/60" />
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-1/2 bg-muted/60" />
-                  <Skeleton className="h-3 w-1/4 bg-muted/60" />
-                </div>
-              </div>
-              <Skeleton className="h-10 w-full bg-muted/60" />
-              <div className="grid grid-cols-2 gap-2">
-                <Skeleton className="h-12 w-full bg-muted/60" />
-                <Skeleton className="h-12 w-full bg-muted/60" />
-              </div>
-              <div className="flex gap-2 mt-2">
-                <Skeleton className="h-9 w-1/2 bg-muted/60" />
-                <Skeleton className="h-9 w-1/2 bg-muted/60" />
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <ProjectsTable
-          canDelete={hasPermission(permissions.operationalProjectDelete)}
-          deletingId={deleteMutation.isPending ? deleteMutation.variables ?? null : null}
-          onDelete={(projectId) => deleteMutation.mutate(projectId)}
-          projects={projectsQuery.data?.items ?? []}
-        />
-      )}
-
-      <Card className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between mt-6">
-        <p className="text-[14px] font-[500] text-text-secondary">
-          Page {meta?.page ?? filters.page} of{" "}
-          {meta ? Math.max(1, Math.ceil(meta.total / meta.per_page)) : 1} · Total{" "}
-          {meta?.total ?? 0} projects
-        </p>
-        <div className="flex gap-3">
-          <Button
-            disabled={(meta?.page ?? filters.page) <= 1}
-            onClick={() =>
-              setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))
-            }
-            variant="outline"
-          >
-            Previous
-          </Button>
-          <Button
-            disabled={meta ? meta.page * meta.per_page >= meta.total : true}
-            onClick={() =>
-              setFilters((current) => ({ ...current, page: current.page + 1 }))
-            }
-            variant="outline"
-          >
-            Next
-          </Button>
-        </div>
-      </Card>
+      <DataTable
+        columns={columns}
+        data={projects}
+        emptyActionLabel={hasPermission(permissions.operationalProjectCreate) ? "Create project" : undefined}
+        emptyDescription="No projects match the current filter. Create a new board or widen the filter."
+        emptyTitle="No projects found"
+        getRowId={(project) => project.id}
+        loading={projectsQuery.isLoading}
+        loadingRows={6}
+        onEmptyAction={hasPermission(permissions.operationalProjectCreate) ? () => setIsCreateOpen(true) : undefined}
+        pagination={
+          meta
+            ? {
+                page: meta.page,
+                perPage: meta.per_page,
+                total: meta.total,
+                onPageChange: (page) => setFilters((current) => ({ ...current, page })),
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

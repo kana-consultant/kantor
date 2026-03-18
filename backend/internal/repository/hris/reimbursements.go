@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 )
 
 var ErrReimbursementNotFound = errors.New("reimbursement not found")
+var ErrReimbursementAttachmentNotFound = errors.New("reimbursement attachment not found")
 
 type ReimbursementsRepository struct {
 	db *pgxpool.Pool
@@ -195,6 +197,22 @@ func (r *ReimbursementsRepository) GetByID(ctx context.Context, reimbursementID 
 		return model.Reimbursement{}, err
 	}
 	return item, nil
+}
+
+func (r *ReimbursementsRepository) FindAttachmentPath(ctx context.Context, reimbursementID string, filename string) (string, error) {
+	item, err := r.GetByID(ctx, reimbursementID)
+	if err != nil {
+		return "", err
+	}
+
+	target := filepath.Base(strings.TrimSpace(filename))
+	for _, attachment := range item.Attachments {
+		if filepath.Base(filepath.FromSlash(attachment)) == target {
+			return attachment, nil
+		}
+	}
+
+	return "", ErrReimbursementAttachmentNotFound
 }
 
 func (r *ReimbursementsRepository) AddAttachments(ctx context.Context, reimbursementID string, attachments []string) (model.Reimbursement, error) {

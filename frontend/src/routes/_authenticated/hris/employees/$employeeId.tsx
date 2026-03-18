@@ -2,16 +2,22 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { CircleDollarSign, Gift } from "lucide-react";
 
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmployeeForm } from "@/components/shared/employee-form";
+import { EmptyState } from "@/components/shared/empty-state";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useRBAC } from "@/hooks/use-rbac";
 import { ApiError } from "@/lib/api-client";
 import { formatIDR } from "@/lib/currency";
 import { permissions } from "@/lib/permissions";
@@ -21,18 +27,22 @@ import {
   compensationKeys,
   createBonus,
   createSalary,
+  deleteBonus,
   getCurrentSalary,
   listBonuses,
+  updateBonus,
   listSalaries,
   rejectBonus,
 } from "@/services/hris-compensation";
 import { departmentsKeys, listDepartments } from "@/services/hris-departments";
 import { employeesKeys, getEmployee, updateEmployee } from "@/services/hris-employees";
+import { listReimbursements, reimbursementsKeys } from "@/services/hris-reimbursements";
 import type {
   BonusFormValues,
   BonusRecord,
   Employee,
   EmployeeFormValues,
+  Reimbursement,
   SalaryFormValues,
   SalaryRecord,
 } from "@/types/hris";
@@ -63,6 +73,7 @@ function EmployeeDetailPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"profile" | "salary" | "bonus" | "reimbursements">("profile");
   const [isEditing, setIsEditing] = useState(false);
+  const [editingBonus, setEditingBonus] = useState<BonusRecord | null>(null);
 
   const salaryForm = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
@@ -109,6 +120,27 @@ function EmployeeDetailPage() {
     queryFn: () => listBonuses(employeeId),
   });
 
+  const reimbursementsQuery = useQuery({
+    enabled: tab === "reimbursements",
+    queryKey: reimbursementsKeys.list({
+      page: 1,
+      perPage: 20,
+      status: "",
+      employee: employeeId,
+      month: "",
+      year: "",
+    }),
+    queryFn: () =>
+      listReimbursements({
+        page: 1,
+        perPage: 20,
+        status: "",
+        employee: employeeId,
+        month: "",
+        year: "",
+      }),
+  });
+
   const updateEmployeeMutation = useMutation({
     mutationFn: (values: EmployeeFormValues) => updateEmployee(employeeId, values),
     onSuccess: async () => {
@@ -135,12 +167,27 @@ function EmployeeDetailPage() {
   const createBonusMutation = useMutation({
     mutationFn: (values: BonusFormValues) => createBonus(employeeId, values),
     onSuccess: async () => {
-      bonusForm.reset({
-        amount: 0,
-        reason: "",
-        period_month: new Date().getMonth() + 1,
-        period_year: new Date().getFullYear(),
-      });
+      resetBonusForm(bonusForm);
+      await queryClient.invalidateQueries({ queryKey: compensationKeys.bonuses(employeeId) });
+    },
+  });
+
+  const updateBonusMutation = useMutation({
+    mutationFn: ({ bonusId, values }: { bonusId: string; values: BonusFormValues }) => updateBonus(bonusId, values),
+    onSuccess: async () => {
+      setEditingBonus(null);
+      resetBonusForm(bonusForm);
+      await queryClient.invalidateQueries({ queryKey: compensationKeys.bonuses(employeeId) });
+    },
+  });
+
+  const deleteBonusMutation = useMutation({
+    mutationFn: deleteBonus,
+    onSuccess: async (_, bonusId) => {
+      if (editingBonus?.id === bonusId) {
+        setEditingBonus(null);
+        resetBonusForm(bonusForm);
+      }
       await queryClient.invalidateQueries({ queryKey: compensationKeys.bonuses(employeeId) });
     },
   });
@@ -162,11 +209,17 @@ function EmployeeDetailPage() {
   const employee = employeeQuery.data;
 
   if (employeeQuery.isLoading) {
-    return <Card className="p-8">Loading employee profile...</Card>;
+    return (
+      <Card className="space-y-4 p-8">
+        <Skeleton className="h-8 w-56 rounded-lg" />
+        <Skeleton className="h-5 w-80 rounded-lg" />
+        <Skeleton className="h-32 rounded-lg" />
+      </Card>
+    );
   }
 
   if (employeeQuery.error instanceof Error || !employee) {
-    return <Card className="p-8 text-red-700">{employeeQuery.error instanceof Error ? employeeQuery.error.message : "Employee not found"}</Card>;
+    return <Card className="p-8 text-error">{employeeQuery.error instanceof Error ? employeeQuery.error.message : "Employee not found"}</Card>;
   }
 
   return (
@@ -181,7 +234,7 @@ function EmployeeDetailPage() {
               <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Employee profile</p>
               <h3 className="mt-2 text-3xl font-bold">{employee.full_name}</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                {employee.position} · {employee.department || "No department"} · {employee.email}
+                {employee.position} | {employee.department || "No department"} | {employee.email}
               </p>
             </div>
           </div>
@@ -239,19 +292,21 @@ function EmployeeDetailPage() {
             bonuses={bonusesQuery.data ?? []}
             bonusForm={bonusForm}
             createMutation={createBonusMutation}
+            deleteMutation={deleteBonusMutation}
+            editingBonus={editingBonus}
             rejectMutation={rejectBonusMutation}
+            setEditingBonus={setEditingBonus}
+            updateMutation={updateBonusMutation}
           />
         </PermissionGate>
       ) : null}
 
       {tab === "reimbursements" ? (
-        <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Reimbursements</p>
-          <h4 className="mt-2 text-2xl font-bold">Reimbursement history</h4>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Placeholder untuk history reimbursement karyawan. Workflow reimbursement akan dibangun pada step HRIS berikutnya.
-          </p>
-        </Card>
+        <ReimbursementsTab
+          employeeName={employee.full_name}
+          items={reimbursementsQuery.data?.items ?? []}
+          loading={reimbursementsQuery.isLoading}
+        />
       ) : null}
     </div>
   );
@@ -275,7 +330,13 @@ function ProfileTab({ employee }: { employee: Employee }) {
           {items.map((item) => (
             <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={item.label}>
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
-              <p className="mt-2 text-sm font-semibold">{item.value}</p>
+              <div className="mt-2">
+                {item.label === "Status" ? (
+                  <StatusBadge status={item.value} variant="employee-status" />
+                ) : (
+                  <p className="text-sm font-semibold">{item.value}</p>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -383,9 +444,12 @@ function SalaryTab({
         <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Salary history</p>
         <div className="mt-4 space-y-3">
           {history.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-              Belum ada riwayat salary.
-            </div>
+            <EmptyState
+              className="border-border/70"
+              description="Salary records for this employee will appear here after the first compensation entry is saved."
+              icon={CircleDollarSign}
+              title="No salary history yet"
+            />
           ) : (
             history.map((item) => (
               <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={item.id}>
@@ -395,7 +459,7 @@ function SalaryTab({
                     <p className="text-xs text-muted-foreground">Effective {new Date(item.effective_date).toLocaleDateString()}</p>
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Base {formatIDR(item.base_salary)} · Allowances {formatIDR(sumAmountMap(item.allowances))} · Deductions {formatIDR(sumAmountMap(item.deductions))}
+                    Base {formatIDR(item.base_salary)} | Allowances {formatIDR(sumAmountMap(item.allowances))} | Deductions {formatIDR(sumAmountMap(item.deductions))}
                   </div>
                 </div>
               </div>
@@ -411,15 +475,24 @@ function BonusTab({
   bonuses,
   bonusForm,
   createMutation,
+  updateMutation,
+  deleteMutation,
   approveMutation,
   rejectMutation,
+  editingBonus,
+  setEditingBonus,
 }: {
   bonuses: BonusRecord[];
   bonusForm: ReturnType<typeof useForm<BonusFormValues>>;
   createMutation: ReturnType<typeof useMutation<BonusRecord, Error, BonusFormValues>>;
+  updateMutation: ReturnType<typeof useMutation<BonusRecord, Error, { bonusId: string; values: BonusFormValues }>>;
+  deleteMutation: ReturnType<typeof useMutation<{ message: string }, Error, string>>;
   approveMutation: ReturnType<typeof useMutation<BonusRecord, Error, string>>;
   rejectMutation: ReturnType<typeof useMutation<BonusRecord, Error, string>>;
+  editingBonus: BonusRecord | null;
+  setEditingBonus: (bonus: BonusRecord | null) => void;
 }) {
+  const { hasPermission } = useRBAC();
   const {
     control,
     register,
@@ -429,10 +502,19 @@ function BonusTab({
 
   return (
     <div className="space-y-6">
-      <PermissionGate permission={permissions.hrisBonusCreate}>
+      {hasPermission(permissions.hrisBonusCreate) || (Boolean(editingBonus) && hasPermission(permissions.hrisBonusEdit)) ? (
         <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Add bonus</p>
-          <form className="mt-4 space-y-4" onSubmit={handleSubmit((values) => createMutation.mutate(values))}>
+          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{editingBonus ? "Edit bonus" : "Add bonus"}</p>
+          <form
+            className="mt-4 space-y-4"
+            onSubmit={handleSubmit((values) => {
+              if (editingBonus) {
+                updateMutation.mutate({ bonusId: editingBonus.id, values });
+                return;
+              }
+              createMutation.mutate(values);
+            })}
+          >
             <div className="grid gap-4 md:grid-cols-2">
               <Field error={errors.amount?.message} label="Amount">
                 <Controller
@@ -460,20 +542,37 @@ function BonusTab({
                 <Input {...register("period_year", { valueAsNumber: true })} max={2100} min={2000} type="number" />
               </Field>
             </div>
-            <Button disabled={createMutation.isPending} type="submit">
-              {createMutation.isPending ? "Saving..." : "Add bonus"}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
+                {editingBonus ? (updateMutation.isPending ? "Saving..." : "Save bonus") : createMutation.isPending ? "Saving..." : "Add bonus"}
+              </Button>
+              {editingBonus ? (
+                <Button
+                  onClick={() => {
+                    setEditingBonus(null);
+                    resetBonusForm(bonusForm);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Cancel edit
+                </Button>
+              ) : null}
+            </div>
           </form>
         </Card>
-      </PermissionGate>
+      ) : null}
 
       <Card className="p-6">
         <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Bonus history</p>
         <div className="mt-4 space-y-3">
           {bonuses.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-              Belum ada riwayat bonus.
-            </div>
+            <EmptyState
+              className="border-border/70"
+              description="Bonus history will appear here after the first bonus record is added for this employee."
+              icon={Gift}
+              title="No bonus history yet"
+            />
           ) : (
             bonuses.map((bonus) => (
               <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={bonus.id}>
@@ -481,9 +580,7 @@ function BonusTab({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold">{formatIDR(bonus.amount)}</p>
-                      <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary-foreground">
-                        {bonus.approval_status}
-                      </span>
+                      <StatusBadge status={bonus.approval_status} />
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">{bonus.reason}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -491,8 +588,41 @@ function BonusTab({
                     </p>
                   </div>
 
-                  <PermissionGate permission={permissions.hrisBonusApprove}>
-                    {bonus.approval_status === "pending" ? (
+                  <div className="flex flex-wrap gap-3">
+                    <PermissionGate permission={permissions.hrisBonusEdit}>
+                      {bonus.approval_status === "pending" ? (
+                        <>
+                          <Button
+                            onClick={() => {
+                              setEditingBonus(bonus);
+                              bonusForm.reset({
+                                amount: bonus.amount,
+                                reason: bonus.reason,
+                                period_month: bonus.period_month,
+                                period_year: bonus.period_year,
+                              });
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            disabled={deleteMutation.isPending}
+                            onClick={() => deleteMutation.mutate(bonus.id)}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      ) : null}
+                    </PermissionGate>
+
+                    <PermissionGate permission={permissions.hrisBonusApprove}>
+                      {bonus.approval_status === "pending" ? (
                       <div className="flex gap-3">
                         <Button
                           disabled={approveMutation.isPending}
@@ -511,8 +641,9 @@ function BonusTab({
                           Reject
                         </Button>
                       </div>
-                    ) : null}
-                  </PermissionGate>
+                      ) : null}
+                    </PermissionGate>
+                  </div>
                 </div>
               </div>
             ))
@@ -520,6 +651,87 @@ function BonusTab({
         </div>
       </Card>
     </div>
+  );
+}
+
+function ReimbursementsTab({
+  employeeName,
+  items,
+  loading,
+}: {
+  employeeName: string;
+  items: Reimbursement[];
+  loading: boolean;
+}) {
+  const columns: Array<DataTableColumn<Reimbursement>> = [
+    {
+      id: "title",
+      header: "Title",
+      accessor: "title",
+      sortable: true,
+      cell: (item) => (
+        <div className="space-y-1">
+          <p className="font-semibold text-text-primary">{item.title}</p>
+          <p className="text-sm text-text-secondary">{item.category}</p>
+        </div>
+      ),
+    },
+    {
+      id: "amount",
+      header: "Amount",
+      accessor: "amount",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (item) => <span className="font-mono tabular-nums">{formatIDR(item.amount)}</span>,
+    },
+    {
+      id: "date",
+      header: "Transaction date",
+      accessor: "transaction_date",
+      sortable: true,
+      cell: (item) => new Date(item.transaction_date).toLocaleDateString("id-ID"),
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessor: "status",
+      sortable: true,
+      cell: (item) => <StatusBadge status={item.status} variant="reimbursement-status" />,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (item) => (
+        <Link
+          className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-sm font-semibold text-text-primary transition hover:bg-surface-muted"
+          params={{ reimbursementId: item.id }}
+          to="/hris/reimbursements/$reimbursementId"
+        >
+          Open
+        </Link>
+      ),
+    },
+  ];
+
+  return (
+    <Card className="p-6">
+      <div className="mb-5">
+        <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Reimbursements</p>
+        <h4 className="mt-2 text-2xl font-bold">Reimbursement history</h4>
+        <p className="mt-2 text-sm text-muted-foreground">All reimbursement requests submitted for {employeeName}.</p>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={items}
+        emptyDescription="No reimbursement history has been recorded for this employee yet."
+        emptyTitle="No reimbursements found"
+        getRowId={(item) => item.id}
+        loading={loading}
+      />
+    </Card>
   );
 }
 
@@ -548,7 +760,7 @@ function Field({
       <label className="text-sm font-medium">{label}</label>
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-error">{error}</p> : null}
     </div>
   );
 }
@@ -571,6 +783,15 @@ function toEmployeeFormValues(employee: Employee): EmployeeFormValues {
 
 function sumAmountMap(values: Record<string, number>) {
   return Object.values(values).reduce((total, amount) => total + amount, 0);
+}
+
+function resetBonusForm(form: ReturnType<typeof useForm<BonusFormValues>>) {
+  form.reset({
+    amount: 0,
+    reason: "",
+    period_month: new Date().getMonth() + 1,
+    period_year: new Date().getFullYear(),
+  });
 }
 
 function initials(value: string) {

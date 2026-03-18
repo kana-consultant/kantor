@@ -210,10 +210,10 @@ function metricTone(value?: number | null) {
     return "text-muted-foreground";
   }
   if (value > 3) {
-    return "text-emerald-700";
+    return "text-success";
   }
   if (value >= 1) {
-    return "text-amber-700";
+    return "text-warning";
   }
-  return "text-red-700";
+  return "text-error";
 }

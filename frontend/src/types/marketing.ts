@@ -55,6 +55,16 @@ export interface CampaignDetail {
   attachments: CampaignAttachment[];
 }
 
+export interface CampaignActivity {
+  id: string;
+  campaign_id: string;
+  action: string;
+  description: string;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  created_at: string;
+}
+
 export interface CampaignColumn {
   id: string;
   name: string;

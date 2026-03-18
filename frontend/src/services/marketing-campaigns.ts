@@ -1,6 +1,7 @@
 import { ApiError, requestEnvelope, requestJSON } from "@/lib/api-client";
 import { ensureAuthenticated } from "@/services/auth";
 import type {
+  CampaignActivity,
   CampaignColumn,
   CampaignDetail,
   CampaignFilters,
@@ -13,6 +14,7 @@ export const campaignsKeys = {
   all: ["marketing", "campaigns"] as const,
   list: (filters: CampaignFilters) => [...campaignsKeys.all, "list", { ...filters }] as const,
   detail: (campaignId: string) => [...campaignsKeys.all, "detail", campaignId] as const,
+  activities: (campaignId: string) => [...campaignsKeys.all, "activities", campaignId] as const,
   kanban: () => [...campaignsKeys.all, "kanban"] as const,
   columns: () => [...campaignsKeys.all, "columns"] as const,
 };
@@ -66,6 +68,11 @@ export async function listCampaignKanban() {
 export async function getCampaign(campaignId: string) {
   const token = await requireAccessToken();
   return requestJSON<CampaignDetail>(`/marketing/campaigns/${campaignId}`, { method: "GET" }, token);
+}
+
+export async function listCampaignActivities(campaignId: string) {
+  const token = await requireAccessToken();
+  return requestJSON<CampaignActivity[]>(`/marketing/campaigns/${campaignId}/activities`, { method: "GET" }, token);
 }
 
 export async function createCampaign(input: CampaignFormValues) {

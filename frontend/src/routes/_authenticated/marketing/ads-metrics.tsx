@@ -20,13 +20,15 @@ import {
   YAxis,
 } from "recharts";
 import { z } from "zod";
+import { BarChart3, CircleDollarSign, Ratio, TrendingUp } from "lucide-react";
 
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
 import { adsMetricPlatformOptions, adsPlatformMeta } from "@/lib/marketing";
@@ -85,7 +87,7 @@ const defaultFilters: AdsMetricFilters = {
   dateTo: "",
 };
 
-const summaryColors = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#ca8a04", "#0f766e"];
+const summaryColors = ["#FF5630", "#36B37E", "#0065FF", "#6554C0", "#FF8B00", "#00B8D9"];
 
 export const Route = createFileRoute("/_authenticated/marketing/ads-metrics")({
   beforeLoad: async () => {
@@ -200,6 +202,7 @@ function AdsMetricsPage() {
   );
   const platformRows = platformSummaryQuery.data?.items ?? [];
   const metrics = metricsQuery.data?.items ?? [];
+  const meta = metricsQuery.data?.meta;
 
   const totals = monthlyRows.reduce(
     (accumulator, row) => ({
@@ -232,22 +235,163 @@ function AdsMetricsPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const metricColumns: Array<DataTableColumn<AdsMetric>> = [
+    {
+      id: "campaign",
+      header: "Campaign",
+      accessor: "campaign_name",
+      sortable: true,
+      cell: (item) => (
+        <div className="space-y-1">
+          <p className="font-semibold text-text-primary">{item.campaign_name ?? "Unknown campaign"}</p>
+          <p className="text-[13px] text-text-secondary">
+            {item.impressions.toLocaleString("id-ID")} impressions | {item.clicks.toLocaleString("id-ID")} clicks
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "platform",
+      header: "Platform",
+      accessor: "platform",
+      sortable: true,
+      cell: (item) => {
+        const platform = adsPlatformMeta(item.platform);
+        const PlatformIcon = platform.icon;
+        return (
+          <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${platform.badgeClassName}`}>
+            <PlatformIcon className="h-3.5 w-3.5" />
+            {platform.label}
+          </span>
+        );
+      },
+    },
+    {
+      id: "period",
+      header: "Period",
+      accessor: "period_start",
+      sortable: true,
+      cell: (item) => (
+        <span className="text-sm text-text-secondary">
+          {formatShortDate(item.period_start)} - {formatShortDate(item.period_end)}
+        </span>
+      ),
+    },
+    {
+      id: "spent",
+      header: "Spent",
+      accessor: "amount_spent",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (item) => <span className="font-mono tabular-nums">{formatIDR(item.amount_spent)}</span>,
+    },
+    {
+      id: "revenue",
+      header: "Revenue",
+      accessor: "revenue",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (item) => <span className="font-mono tabular-nums">{formatIDR(item.revenue)}</span>,
+    },
+    {
+      id: "cpr",
+      header: "CPR",
+      accessor: "cpr",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (item) => <span className="font-mono tabular-nums">{formatMetricCurrency(item.cpr)}</span>,
+    },
+    {
+      id: "roas",
+      header: "ROAS",
+      accessor: "roas",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (item) => (
+        <span className={`font-mono tabular-nums ${metricTone(item.roas, "roas")}`}>{formatMetricRatio(item.roas)}</span>
+      ),
+    },
+    {
+      id: "ctr",
+      header: "CTR",
+      accessor: "ctr",
+      numeric: true,
+      align: "right",
+      sortable: true,
+      cell: (item) => (
+        <span className={`font-mono tabular-nums ${metricTone(item.ctr, "ctr")}`}>{formatMetricPercent(item.ctr)}</span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "right",
+      cell: (item) => (
+        <div className="flex justify-end gap-2">
+          <PermissionGate permission={permissions.marketingAdsMetricsEdit}>
+            <Button
+              onClick={() => {
+                setEditingMetric(item);
+                setShowForm(true);
+                setShowBatchForm(false);
+                form.reset({
+                  campaign_id: item.campaign_id,
+                  platform: item.platform,
+                  period_start: item.period_start.slice(0, 10),
+                  period_end: item.period_end.slice(0, 10),
+                  amount_spent: item.amount_spent,
+                  impressions: item.impressions,
+                  clicks: item.clicks,
+                  conversions: item.conversions,
+                  revenue: item.revenue,
+                  notes: item.notes ?? "",
+                });
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Edit
+            </Button>
+          </PermissionGate>
+          <PermissionGate permission={permissions.marketingAdsMetricsDelete}>
+            <Button
+              disabled={deleteMutation.isPending && deleteMutation.variables === item.id}
+              onClick={() => deleteMutation.mutate(item.id)}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Delete
+            </Button>
+          </PermissionGate>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <Card className="border-mkt/20 bg-gradient-to-br from-mkt/10 via-background to-background p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <Card className="p-8">
+        <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-mkt">Marketing analytics</p>
-            <h3 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Ads spent and performance metrics</h3>
-            <p className="mt-2 max-w-3xl text-muted-foreground">
-              Input performa campaign manual, pantau ROAS dan CTR per periode, lalu export data tanpa pindah tool.
+            <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-mkt">
+              Marketing analytics
+            </p>
+            <h3 className="text-[28px] font-[700] text-text-primary">Ads spent and performance metrics</h3>
+            <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-text-secondary">
+              Capture paid media performance, compare ROAS across campaigns, and export clean reporting data.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setActiveTab("input")} variant={activeTab === "input" ? "mkt" : "outline"}>
-              Input Data
+            <Button onClick={() => setActiveTab("input")} variant={activeTab === "input" ? undefined : "outline"}>
+              Input data
             </Button>
-            <Button onClick={() => setActiveTab("dashboard")} variant={activeTab === "dashboard" ? "mkt" : "outline"}>
+            <Button onClick={() => setActiveTab("dashboard")} variant={activeTab === "dashboard" ? undefined : "outline"}>
               Dashboard
             </Button>
           </div>
@@ -259,7 +403,7 @@ function AdsMetricsPage() {
           <Card className="p-6">
             <div className="grid gap-3 lg:grid-cols-5">
               <select
-                className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm"
+                className="field-select"
                 onChange={(event) => setFilters((previous) => ({ ...previous, campaignId: event.target.value, page: 1 }))}
                 value={filters.campaignId}
               >
@@ -271,7 +415,7 @@ function AdsMetricsPage() {
                 ))}
               </select>
               <select
-                className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm"
+                className="field-select"
                 onChange={(event) => setFilters((previous) => ({ ...previous, platform: event.target.value, page: 1 }))}
                 value={filters.platform}
               >
@@ -286,6 +430,7 @@ function AdsMetricsPage() {
               <Input onChange={(event) => setFilters((previous) => ({ ...previous, dateTo: event.target.value, page: 1 }))} type="date" value={filters.dateTo} />
               <Button
                 onClick={() => setFilters((previous) => ({ ...previous, campaignId: "", platform: "", dateFrom: "", dateTo: "", page: 1 }))}
+                type="button"
                 variant="outline"
               >
                 Clear
@@ -300,7 +445,7 @@ function AdsMetricsPage() {
                     setShowForm((value) => !value);
                     setShowBatchForm(false);
                   }}
-                  variant="mkt"
+                  type="button"
                 >
                   {showForm ? "Close form" : "New entry"}
                 </Button>
@@ -311,6 +456,7 @@ function AdsMetricsPage() {
                     setEditingMetric(null);
                     resetMetricForm(form);
                   }}
+                  type="button"
                   variant="outline"
                 >
                   {showBatchForm ? "Close bulk input" : "Bulk input"}
@@ -320,13 +466,17 @@ function AdsMetricsPage() {
           </Card>
 
           {showForm ? (
-            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+            <Card className="p-6">
               <div className="mb-5">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Single entry</p>
-                <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{editingMetric ? "Edit ads metric" : "Add ads metric"}</h4>
+                <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
+                  Single entry
+                </p>
+                <h4 className="text-[20px] font-[700] text-text-primary">
+                  {editingMetric ? "Edit ads metric" : "Add ads metric"}
+                </h4>
               </div>
               <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmitMetric}>
-                <select className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm" {...form.register("campaign_id")}>
+                <select className="field-select" {...form.register("campaign_id")}>
                   <option value="">Select campaign</option>
                   {campaigns.map((campaign) => (
                     <option key={campaign.id} value={campaign.id}>
@@ -334,7 +484,7 @@ function AdsMetricsPage() {
                     </option>
                   ))}
                 </select>
-                <select className="h-12 rounded-2xl border border-input bg-card/80 px-4 text-sm" {...form.register("platform")}>
+                <select className="field-select" {...form.register("platform")}>
                   {adsMetricPlatformOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -350,10 +500,10 @@ function AdsMetricsPage() {
                 <Input {...form.register("conversions", { valueAsNumber: true })} min={0} placeholder="Conversions" type="number" />
                 <Input className="lg:col-span-2" {...form.register("notes")} placeholder="Notes" />
                 {form.formState.errors.period_end ? (
-                  <p className="text-sm text-red-700 lg:col-span-2">{form.formState.errors.period_end.message}</p>
+                  <p className="text-sm text-error lg:col-span-2">{form.formState.errors.period_end.message}</p>
                 ) : null}
                 <div className="flex flex-wrap gap-3 lg:col-span-2">
-                  <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit" variant="mkt">
+                  <Button disabled={createMutation.isPending || updateMutation.isPending} type="submit">
                     {editingMetric ? "Save changes" : "Save entry"}
                   </Button>
                   <Button
@@ -363,7 +513,7 @@ function AdsMetricsPage() {
                       setShowForm(false);
                     }}
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                   >
                     Cancel
                   </Button>
@@ -373,20 +523,22 @@ function AdsMetricsPage() {
           ) : null}
 
           {showBatchForm ? (
-            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+            <Card className="p-6">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Bulk input</p>
-                  <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Multiple ads metric rows</h4>
+                  <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
+                    Bulk input
+                  </p>
+                  <h4 className="text-[20px] font-[700] text-text-primary">Multiple ads metric rows</h4>
                 </div>
-                <Button onClick={() => setBatchRows((previous) => [...previous, { ...defaultMetricForm }])} variant="outline">
+                <Button onClick={() => setBatchRows((previous) => [...previous, { ...defaultMetricForm }])} type="button" variant="outline">
                   Add row
                 </Button>
               </div>
               <div className="space-y-4">
                 {batchRows.map((row, index) => (
-                  <div className="grid gap-3 rounded-[24px] border border-border/70 bg-background/70 p-4 lg:grid-cols-5" key={`${index}-${row.campaign_id}-${row.platform}`}>
-                    <select className="h-11 rounded-2xl border border-input bg-card/80 px-4 text-sm" onChange={(event) => updateBatchRow(setBatchRows, index, "campaign_id", event.target.value)} value={row.campaign_id}>
+                  <div className="grid gap-3 rounded-md border border-border bg-surface-muted p-4 lg:grid-cols-5" key={`${index}-${row.campaign_id}-${row.platform}`}>
+                    <select className="field-select" onChange={(event) => updateBatchRow(setBatchRows, index, "campaign_id", event.target.value)} value={row.campaign_id}>
                       <option value="">Select campaign</option>
                       {campaigns.map((campaign) => (
                         <option key={campaign.id} value={campaign.id}>
@@ -394,7 +546,7 @@ function AdsMetricsPage() {
                         </option>
                       ))}
                     </select>
-                    <select className="h-11 rounded-2xl border border-input bg-card/80 px-4 text-sm" onChange={(event) => updateBatchRow(setBatchRows, index, "platform", event.target.value)} value={row.platform}>
+                    <select className="field-select" onChange={(event) => updateBatchRow(setBatchRows, index, "platform", event.target.value)} value={row.platform}>
                       {adsMetricPlatformOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
@@ -416,7 +568,7 @@ function AdsMetricsPage() {
                 ))}
               </div>
               <div className="mt-5 flex flex-wrap gap-3">
-                <Button disabled={batchMutation.isPending} onClick={() => batchMutation.mutate(batchRows)} type="button" variant="mkt">
+                <Button disabled={batchMutation.isPending} onClick={() => batchMutation.mutate(batchRows)} type="button">
                   Submit batch
                 </Button>
                 <Button
@@ -425,7 +577,7 @@ function AdsMetricsPage() {
                     setShowBatchForm(false);
                   }}
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                 >
                   Cancel
                 </Button>
@@ -433,166 +585,25 @@ function AdsMetricsPage() {
             </Card>
           ) : null}
 
-          {metricsQuery.isLoading ? (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/60 text-left">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold h-[45px]">Campaign</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">Platform</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">Period</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">Spent</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">Revenue</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">CPR</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">ROAS</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">CTR</th>
-                      <th className="px-4 py-3 font-semibold h-[45px]">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <tr className="border-t border-border/70" key={i}>
-                        <td className="px-4 py-3 space-y-2">
-                          <Skeleton className="h-4 w-[140px] bg-muted/60" />
-                          <Skeleton className="h-3 w-[180px] bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Skeleton className="h-6 w-[80px] rounded-full bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Skeleton className="h-4 w-[110px] bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Skeleton className="h-4 w-[90px] bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Skeleton className="h-4 w-[90px] bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Skeleton className="h-4 w-[70px] bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Skeleton className="h-4 w-[50px] bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Skeleton className="h-4 w-[50px] bg-muted/60" />
-                        </td>
-                        <td className="px-4 py-3 flex gap-2">
-                          <Skeleton className="h-8 w-[50px] rounded-[6px] bg-muted/60" />
-                          <Skeleton className="h-8 w-[60px] rounded-[6px] bg-muted/60" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/60 text-left">
-                    <tr>
-                    <th className="px-4 py-3 font-semibold">Campaign</th>
-                    <th className="px-4 py-3 font-semibold">Platform</th>
-                    <th className="px-4 py-3 font-semibold">Period</th>
-                    <th className="px-4 py-3 font-semibold">Spent</th>
-                    <th className="px-4 py-3 font-semibold">Revenue</th>
-                    <th className="px-4 py-3 font-semibold">CPR</th>
-                    <th className="px-4 py-3 font-semibold">ROAS</th>
-                    <th className="px-4 py-3 font-semibold">CTR</th>
-                    <th className="px-4 py-3 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metrics.map((item) => {
-                    const platform = adsPlatformMeta(item.platform);
-                    const PlatformIcon = platform.icon;
-                    return (
-                      <tr className="border-t border-border/70" key={item.id}>
-                        <td className="px-4 py-3">
-                          <div>
-                            <p className="font-semibold">{item.campaign_name ?? "Unknown campaign"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {item.impressions.toLocaleString("id-ID")} impressions | {item.clicks.toLocaleString("id-ID")} clicks
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${platform.badgeClassName}`}>
-                            <PlatformIcon className="h-3.5 w-3.5" />
-                            {platform.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatShortDate(item.period_start)} - {formatShortDate(item.period_end)}
-                        </td>
-                        <td className="px-4 py-3 font-semibold">{formatIDR(item.amount_spent)}</td>
-                        <td className="px-4 py-3 font-semibold">{formatIDR(item.revenue)}</td>
-                        <td className="px-4 py-3">{formatMetricCurrency(item.cpr)}</td>
-                        <td className={`px-4 py-3 font-semibold ${metricTone(item.roas, "roas")}`}>{formatMetricRatio(item.roas)}</td>
-                        <td className={`px-4 py-3 font-semibold ${metricTone(item.ctr, "ctr")}`}>{formatMetricPercent(item.ctr)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-2">
-                            <PermissionGate permission={permissions.marketingAdsMetricsEdit}>
-                              <Button
-                                onClick={() => {
-                                  setEditingMetric(item);
-                                  setShowForm(true);
-                                  setShowBatchForm(false);
-                                  form.reset({
-                                    campaign_id: item.campaign_id,
-                                    platform: item.platform,
-                                    period_start: item.period_start.slice(0, 10),
-                                    period_end: item.period_end.slice(0, 10),
-                                    amount_spent: item.amount_spent,
-                                    impressions: item.impressions,
-                                    clicks: item.clicks,
-                                    conversions: item.conversions,
-                                    revenue: item.revenue,
-                                    notes: item.notes ?? "",
-                                  });
-                                }}
-                                size="sm"
-                                variant="outline"
-                              >
-                                Edit
-                              </Button>
-                            </PermissionGate>
-                            <PermissionGate permission={permissions.marketingAdsMetricsDelete}>
-                              <Button disabled={deleteMutation.isPending && deleteMutation.variables === item.id} onClick={() => deleteMutation.mutate(item.id)} size="sm" variant="ghost">
-                                Delete
-                              </Button>
-                            </PermissionGate>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-          )}
-
-          {metrics.length === 0 ? (
-            <Card className="p-8 text-center text-sm text-muted-foreground">Belum ada ads metrics yang dicatat untuk filter ini.</Card>
-          ) : null}
-
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Showing page {metricsQuery.data?.meta.page ?? filters.page} of {Math.max(1, Math.ceil((metricsQuery.data?.meta.total ?? 0) / (metricsQuery.data?.meta.per_page ?? filters.perPage)))}
-            </p>
-            <div className="flex gap-2">
-              <Button disabled={filters.page <= 1} onClick={() => setFilters((previous) => ({ ...previous, page: previous.page - 1 }))} variant="outline">
-                Previous
-              </Button>
-              <Button disabled={(metricsQuery.data?.meta.total ?? 0) <= filters.page * filters.perPage} onClick={() => setFilters((previous) => ({ ...previous, page: previous.page + 1 }))} variant="outline">
-                Next
-              </Button>
-            </div>
-          </div>
+          <DataTable
+            columns={metricColumns}
+            data={metrics}
+            emptyDescription="No ads metrics have been recorded for the current filter."
+            emptyTitle="No ads metrics found"
+            getRowId={(item) => item.id}
+            loading={metricsQuery.isLoading}
+            loadingRows={6}
+            pagination={
+              meta
+                ? {
+                    page: meta.page,
+                    perPage: meta.per_page,
+                    total: meta.total,
+                    onPageChange: (page) => setFilters((previous) => ({ ...previous, page })),
+                  }
+                : undefined
+            }
+          />
         </div>
       ) : (
         <div className="space-y-6">
@@ -601,7 +612,7 @@ function AdsMetricsPage() {
               <Input onChange={(event) => setDashboardRange((previous) => ({ ...previous, dateFrom: event.target.value }))} type="date" value={dashboardRange.dateFrom} />
               <Input onChange={(event) => setDashboardRange((previous) => ({ ...previous, dateTo: event.target.value }))} type="date" value={dashboardRange.dateTo} />
               <div className="flex flex-wrap gap-3 lg:col-span-2">
-                <Button onClick={() => void handleExport()} variant="outline">
+                <Button onClick={() => void handleExport()} type="button" variant="outline">
                   Export CSV
                 </Button>
               </div>
@@ -609,21 +620,44 @@ function AdsMetricsPage() {
           </Card>
 
           <div className="grid gap-4 lg:grid-cols-4">
-            <SummaryMetricCard label="Total spent" value={formatIDR(totals.spent)} />
-            <SummaryMetricCard label="Total revenue" value={formatIDR(totals.revenue)} />
-            <SummaryMetricCard label="Overall ROAS" toneClass={metricTone(overallROAS, "roas")} value={formatMetricRatio(overallROAS)} />
-            <SummaryMetricCard label="Overall CTR" toneClass={metricTone(overallCTR, "ctr")} value={formatMetricPercent(overallCTR)} />
+            <StatCard
+              helper="Spend across the selected period"
+              icon={CircleDollarSign}
+              label="Total spent"
+              mono
+              tone="mkt"
+              value={formatIDR(totals.spent)}
+            />
+            <StatCard
+              helper="Revenue attributed to paid traffic"
+              icon={TrendingUp}
+              label="Total revenue"
+              mono
+              tone="success"
+              value={formatIDR(totals.revenue)}
+            />
+            <StatCard
+              helper="Return on ad spend"
+              icon={Ratio}
+              label="Overall ROAS"
+              tone={metricTone(overallROAS, "roas").includes("success") ? "success" : metricTone(overallROAS, "roas").includes("warning") ? "warning" : "error"}
+              value={formatMetricRatio(overallROAS)}
+            />
+            <StatCard
+              helper="Click-through rate"
+              icon={BarChart3}
+              label="Overall CTR"
+              tone={metricTone(overallCTR, "ctr").includes("success") ? "success" : metricTone(overallCTR, "ctr").includes("warning") ? "warning" : "error"}
+              value={formatMetricPercent(overallCTR)}
+            />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
-            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Campaign comparison</p>
-              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Spent vs revenue per campaign</h4>
-              {campaignSummaryQuery.isLoading ? (
-                <div className="mt-6 h-[320px]">
-                  <Skeleton className="h-full w-full bg-muted/60 rounded-[12px]" />
-                </div>
-              ) : (
+            <Card className="p-6">
+              <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
+                Campaign comparison
+              </p>
+              <h4 className="text-[20px] font-[700] text-text-primary">Spent vs revenue per campaign</h4>
               <div className="mt-6 h-[320px]">
                 <ResponsiveContainer height="100%" width="100%">
                   <BarChart data={campaignRows.slice(0, 8)}>
@@ -631,28 +665,19 @@ function AdsMetricsPage() {
                     <XAxis dataKey="group_label" tick={{ fontSize: 12 }} />
                     <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000000)} jt`} />
                     <Tooltip formatter={(value: number) => formatIDR(value)} />
-                    <Bar dataKey="total_spent" fill="#2563eb" radius={[8, 8, 0, 0]} />
-                    <Bar dataKey="total_revenue" fill="#16a34a" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="total_spent" fill="#FF5630" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total_revenue" fill="#36B37E" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              )}
             </Card>
 
-            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Platform mix</p>
-              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Spent breakdown</h4>
-              {platformSummaryQuery.isLoading ? (
-                <div className="mt-6 space-y-4">
-                  <Skeleton className="h-[260px] w-full bg-muted/60 rounded-full mx-auto max-w-[260px]" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-[46px] w-full bg-muted/60 rounded-[18px]" />
-                    <Skeleton className="h-[46px] w-full bg-muted/60 rounded-[18px]" />
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="mt-6 h-[260px]">
+            <Card className="p-6">
+              <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
+                Platform mix
+              </p>
+              <h4 className="text-[20px] font-[700] text-text-primary">Spent breakdown</h4>
+              <div className="mt-6 h-[260px]">
                 <ResponsiveContainer height="100%" width="100%">
                   <PieChart>
                     <Pie cx="50%" cy="50%" data={platformRows} dataKey="total_spent" innerRadius={55} outerRadius={90} paddingAngle={3}>
@@ -666,29 +691,24 @@ function AdsMetricsPage() {
               </div>
               <div className="space-y-2">
                 {platformRows.map((row, index) => (
-                  <div className="flex items-center justify-between gap-3 rounded-[18px] border border-border/70 bg-background/70 px-4 py-3" key={row.group_key}>
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-muted px-4 py-3" key={row.group_key}>
                     <div className="flex items-center gap-3">
                       <span className="h-3 w-3 rounded-full" style={{ backgroundColor: summaryColors[index % summaryColors.length] }} />
-                      <span className="text-sm font-medium">{row.group_label}</span>
+                      <span className="text-sm font-medium text-text-primary">{row.group_label}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">{formatIDR(row.total_spent)}</span>
+                    <span className="font-mono text-sm tabular-nums text-text-secondary">{formatIDR(row.total_spent)}</span>
                   </div>
                 ))}
               </div>
-              </>
-              )}
             </Card>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
-            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Trendline</p>
-              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Monthly CTR and ROAS</h4>
-              {monthlySummaryQuery.isLoading ? (
-                <div className="mt-6 h-[320px]">
-                  <Skeleton className="h-full w-full bg-muted/60 rounded-[12px]" />
-                </div>
-              ) : (
+            <Card className="p-6">
+              <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
+                Trendline
+              </p>
+              <h4 className="text-[20px] font-[700] text-text-primary">Monthly CTR and ROAS</h4>
               <div className="mt-6 h-[320px]">
                 <ResponsiveContainer height="100%" width="100%">
                   <LineChart data={monthlyRows}>
@@ -697,58 +717,46 @@ function AdsMetricsPage() {
                     <YAxis tickFormatter={(value) => `${Number(value).toFixed(1)}`} yAxisId="left" />
                     <YAxis orientation="right" tickFormatter={(value) => `${Number(value).toFixed(1)}%`} yAxisId="right" />
                     <Tooltip formatter={(value: number, name: string) => (name === "ctr" ? `${Number(value).toFixed(2)}%` : Number(value).toFixed(2))} />
-                    <Line dataKey="roas" name="roas" stroke="#16a34a" strokeWidth={3} type="monotone" yAxisId="left" />
-                    <Line dataKey="ctr" name="ctr" stroke="#ea580c" strokeWidth={3} type="monotone" yAxisId="right" />
+                    <Line dataKey="roas" name="roas" stroke="#36B37E" strokeWidth={2} type="monotone" yAxisId="left" />
+                    <Line dataKey="ctr" name="ctr" stroke="#FF5630" strokeWidth={2} type="monotone" yAxisId="right" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              )}
             </Card>
 
-            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Ranking</p>
-              <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Best ROAS campaigns</h4>
-              {campaignSummaryQuery.isLoading ? (
-                <div className="mt-5 space-y-3">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                     <Skeleton className="h-[74px] w-full bg-muted/60 rounded-[22px]" key={i} />
-                  ))}
-                </div>
-              ) : (
+            <Card className="p-6">
+              <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
+                Ranking
+              </p>
+              <h4 className="text-[20px] font-[700] text-text-primary">Best ROAS campaigns</h4>
               <div className="mt-5 space-y-3">
                 {campaignRows.slice(0, 8).map((row) => (
-                  <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={row.group_key}>
+                  <div className="rounded-md border border-border bg-surface-muted p-4" key={row.group_key}>
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <p className="font-semibold">{row.group_label}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatIDR(row.total_spent)} spent | {formatIDR(row.total_revenue)} revenue</p>
+                        <p className="font-semibold text-text-primary">{row.group_label}</p>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          {formatIDR(row.total_spent)} spent | {formatIDR(row.total_revenue)} revenue
+                        </p>
                       </div>
-                      <div className={`text-right text-sm font-semibold ${metricTone(row.roas, "roas")}`}>{formatMetricRatio(row.roas)}</div>
+                      <div className={`text-right font-mono text-sm tabular-nums ${metricTone(row.roas, "roas")}`}>
+                        {formatMetricRatio(row.roas)}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-              )}
             </Card>
           </div>
         </div>
       )}
 
       {!hasPermission(permissions.marketingAdsMetricsCreate) ? (
-        <Card className="p-5 text-sm text-muted-foreground">
-          Akun ini hanya punya akses view untuk ads metrics. Form input dan aksi edit otomatis disembunyikan oleh permission gate.
+        <Card className="p-5 text-sm text-text-secondary">
+          This account has view-only access to ads metrics.
         </Card>
       ) : null}
     </div>
-  );
-}
-
-function SummaryMetricCard({ label, value, toneClass }: { label: string; value: string; toneClass?: string }) {
-  return (
-    <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm transition-all hover:border-mkt/30 hover:shadow-sm">
-      <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-      <h4 className={`mt-4 text-3xl font-bold tracking-tight ${toneClass ?? "text-foreground"}`}>{value}</h4>
-    </Card>
   );
 }
 
@@ -787,26 +795,26 @@ function formatMetricPercent(value?: number | null) {
 
 function metricTone(value: number | null | undefined, metric: "roas" | "ctr") {
   if (value === undefined || value === null) {
-    return "text-muted-foreground";
+    return "text-text-tertiary";
   }
 
   if (metric === "roas") {
     if (value > 3) {
-      return "text-emerald-700";
+      return "text-success";
     }
     if (value >= 1) {
-      return "text-amber-700";
+      return "text-warning";
     }
-    return "text-red-700";
+    return "text-error";
   }
 
   if (value > 2) {
-    return "text-emerald-700";
+    return "text-success";
   }
   if (value >= 0.5) {
-    return "text-amber-700";
+    return "text-warning";
   }
-  return "text-red-700";
+  return "text-error";
 }
 
 function updateBatchRow(

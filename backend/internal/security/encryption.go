@@ -6,21 +6,27 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Encrypter uses AES-256-GCM for application-layer encryption.
-// The key is derived from DATA_ENCRYPTION_KEY, with JWT_SECRET as fallback in development.
+// The key is derived from DATA_ENCRYPTION_KEY and must always be configured explicitly.
 type Encrypter struct {
 	key []byte
 }
 
-func NewEncrypter(secret string) *Encrypter {
+func NewEncrypter(secret string) (*Encrypter, error) {
+	if strings.TrimSpace(secret) == "" {
+		return nil, errors.New("DATA_ENCRYPTION_KEY is required")
+	}
+
 	sum := sha256.Sum256([]byte(secret))
 	key := make([]byte, len(sum))
 	copy(key, sum[:])
-	return &Encrypter{key: key}
+	return &Encrypter{key: key}, nil
 }
 
 func (e *Encrypter) EncryptString(plaintext string) (string, error) {

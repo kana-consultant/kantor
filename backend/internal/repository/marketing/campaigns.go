@@ -2,8 +2,10 @@ package marketing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -701,6 +703,100 @@ func (r *CampaignsRepository) DeleteAttachment(ctx context.Context, campaignID s
 		return model.CampaignAttachment{}, err
 	}
 	return item, nil
+}
+
+func (r *CampaignsRepository) ListActivities(ctx context.Context, campaignID string) ([]model.CampaignActivity, error) {
+	if _, err := r.GetCampaignByID(ctx, campaignID); err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			audit_logs.id::text,
+			audit_logs.resource_id,
+			audit_logs.action,
+			CASE
+				WHEN audit_logs.action = 'campaign_moved' THEN CONCAT('Moved to ', COALESCE(audit_logs.new_value->>'column_name', 'another stage'))
+				WHEN audit_logs.action = 'attachment_uploaded' THEN CONCAT('Uploaded ', COALESCE(audit_logs.new_value->>'file_name', 'an attachment'))
+				ELSE REPLACE(INITCAP(REPLACE(audit_logs.action, '_', ' ')), '  ', ' ')
+			END AS description,
+			audit_logs.user_id::text,
+			users.full_name,
+			audit_logs.created_at
+		FROM audit_logs
+		LEFT JOIN users ON users.id = audit_logs.user_id
+		WHERE audit_logs.module = 'marketing' AND audit_logs.resource = 'campaign' AND audit_logs.resource_id = $1
+		ORDER BY audit_logs.created_at DESC
+	`, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.CampaignActivity, 0)
+	for rows.Next() {
+		var item model.CampaignActivity
+		if err := rows.Scan(
+			&item.ID,
+			&item.CampaignID,
+			&item.Action,
+			&item.Description,
+			&item.ActorID,
+			&item.ActorName,
+			&item.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
+func (r *CampaignsRepository) LogActivity(ctx context.Context, campaignID string, actorID string, action string, payload map[string]any) error {
+	newValue, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO audit_logs (user_id, action, module, resource, resource_id, new_value, created_at)
+		VALUES ($1::uuid, $2, 'marketing', 'campaign', $3, $4::jsonb, NOW())
+	`, actorID, action, campaignID, newValue)
+	return err
+}
+
+func (r *CampaignsRepository) FindAttachmentPath(ctx context.Context, campaignID string, filename string) (string, error) {
+	if _, err := r.GetCampaignByID(ctx, campaignID); err != nil {
+		return "", err
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT file_path
+		FROM campaign_attachments
+		WHERE campaign_id = $1::uuid
+	`, campaignID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	target := filepath.Base(strings.TrimSpace(filename))
+	for rows.Next() {
+		var filePath string
+		if err := rows.Scan(&filePath); err != nil {
+			return "", err
+		}
+		if filepath.Base(filepath.FromSlash(filePath)) == target {
+			return filePath, nil
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+
+	return "", ErrCampaignAttachmentNotFound
 }
 
 func (r *CampaignsRepository) moveCampaignWithinTx(ctx context.Context, tx pgx.Tx, campaignID string, destinationColumnID string, requestedPosition *int, movedBy string, status string) error {

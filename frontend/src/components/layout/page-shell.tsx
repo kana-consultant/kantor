@@ -1,20 +1,29 @@
 import type { PropsWithChildren } from "react";
+import { useRouterState } from "@tanstack/react-router";
 
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { resolveModuleTheme } from "@/lib/module-theme";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/stores/sidebar-store";
 
 export function PageShell({ children }: PropsWithChildren) {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   const {
     isDesktopCollapsed,
     isMobileOpen,
     setMobileOpen,
     toggleDesktopCollapsed,
   } = useSidebarStore();
+  const module = resolveModuleTheme(pathname);
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-2 p-3 lg:gap-3 lg:p-4">
+    <div
+      className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-2 bg-background p-3 lg:gap-3 lg:p-4"
+      data-module={module.key}
+    >
       <div
         className={cn(
           "hidden shrink-0 lg:block",
@@ -42,7 +51,9 @@ export function PageShell({ children }: PropsWithChildren) {
 
       <main className="flex min-h-[calc(100vh-1.5rem)] flex-1 flex-col gap-3 lg:min-h-[calc(100vh-2rem)]">
         <Topbar />
-        <section className="flex-1">{children}</section>
+        <section className="page-transition flex-1" key={pathname}>
+          {children}
+        </section>
       </main>
     </div>
   );

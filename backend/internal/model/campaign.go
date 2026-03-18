@@ -46,3 +46,13 @@ type CampaignColumn struct {
 	Campaigns   []Campaign `json:"campaigns,omitempty"`
 	CampaignsNo int        `json:"campaign_count,omitempty"`
 }
+
+type CampaignActivity struct {
+	ID          string    `json:"id"`
+	CampaignID  string    `json:"campaign_id"`
+	Action      string    `json:"action"`
+	Description string    `json:"description"`
+	ActorID     *string   `json:"actor_id,omitempty"`
+	ActorName   *string   `json:"actor_name,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
