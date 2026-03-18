@@ -100,3 +100,65 @@ export async function getJSON<TData>(path: string, token?: string) {
     token,
   );
 }
+
+// --- Authenticated wrappers (auto-attach token + 401 refresh retry) ---
+
+import { getStoredSession } from "@/stores/auth-store";
+
+function getAccessToken(): string | undefined {
+  return getStoredSession()?.tokens.access_token;
+}
+
+let refreshPromise: Promise<unknown> | null = null;
+
+async function handleAuthRetry<T>(
+  fn: (token?: string) => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn(getAccessToken());
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      try {
+        if (!refreshPromise) {
+          const { refreshSession } = await import("@/services/auth");
+          refreshPromise = refreshSession();
+        }
+        await refreshPromise;
+        refreshPromise = null;
+        return await fn(getAccessToken());
+      } catch {
+        refreshPromise = null;
+        const { useAuthStore } = await import("@/stores/auth-store");
+        useAuthStore.getState().clearSession();
+        window.location.href = "/login";
+        throw err;
+      }
+    }
+    throw err;
+  }
+}
+
+export function authGetJSON<TData>(path: string): Promise<TData> {
+  return handleAuthRetry((token) => getJSON<TData>(path, token));
+}
+
+export function authPostJSON<TData, TBody>(
+  path: string,
+  body: TBody,
+): Promise<TData> {
+  return handleAuthRetry((token) => postJSON<TData, TBody>(path, body, token));
+}
+
+export function authRequestJSON<TData>(
+  path: string,
+  init: RequestInit = {},
+): Promise<TData> {
+  return handleAuthRetry((token) => requestJSON<TData>(path, init, token));
+}
+
+export function authRequestEnvelope<TData>(
+  path: string,
+  init: RequestInit = {},
+): Promise<ApiSuccess<TData>> {
+  return handleAuthRetry((token) => requestEnvelope<TData>(path, init, token));
+}

@@ -1,5 +1,4 @@
-import { ApiError, requestEnvelope, requestJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type {
   ListProjectsResponse,
   PaginationMeta,
@@ -23,7 +22,6 @@ export const projectsKeys = {
 };
 
 export async function listProjects(filters: ProjectFilters): Promise<ListProjectsResponse> {
-  const token = await requireAccessToken();
   const params = new URLSearchParams();
 
   params.set("page", String(filters.page));
@@ -38,10 +36,9 @@ export async function listProjects(filters: ProjectFilters): Promise<ListProject
     params.set("priority", filters.priority);
   }
 
-  const payload = await requestEnvelope<ListProjectsResponse["items"]>(
+  const payload = await authRequestEnvelope<ListProjectsResponse["items"]>(
     `/operational/projects?${params.toString()}`,
     { method: "GET" },
-    token,
   );
 
   return {
@@ -55,13 +52,11 @@ export async function listProjects(filters: ProjectFilters): Promise<ListProject
 }
 
 export async function getProject(projectId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<ProjectDetail>(`/operational/projects/${projectId}`, { method: "GET" }, token);
+  return authRequestJSON<ProjectDetail>(`/operational/projects/${projectId}`, { method: "GET" });
 }
 
 export async function createProject(input: ProjectFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<ProjectDetail>(
+  return authRequestJSON<ProjectDetail>(
     "/operational/projects",
     {
       method: "POST",
@@ -70,13 +65,11 @@ export async function createProject(input: ProjectFormValues) {
       },
       body: JSON.stringify(serializeProjectForm(input)),
     },
-    token,
   );
 }
 
 export async function updateProject(projectId: string, input: ProjectFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<ProjectDetail>(
+  return authRequestJSON<ProjectDetail>(
     `/operational/projects/${projectId}`,
     {
       method: "PUT",
@@ -85,18 +78,15 @@ export async function updateProject(projectId: string, input: ProjectFormValues)
       },
       body: JSON.stringify(serializeProjectForm(input)),
     },
-    token,
   );
 }
 
 export async function deleteProject(projectId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     `/operational/projects/${projectId}`,
     {
       method: "DELETE",
     },
-    token,
   );
 }
 
@@ -104,8 +94,7 @@ export async function mutateProjectMember(
   projectId: string,
   input: ProjectMemberMutationInput,
 ) {
-  const token = await requireAccessToken();
-  return requestJSON<ProjectDetail>(
+  return authRequestJSON<ProjectDetail>(
     `/operational/projects/${projectId}/members`,
     {
       method: "POST",
@@ -114,7 +103,6 @@ export async function mutateProjectMember(
       },
       body: JSON.stringify(input),
     },
-    token,
   );
 }
 
@@ -126,13 +114,4 @@ function serializeProjectForm(input: ProjectFormValues) {
     status: input.status,
     priority: input.priority,
   };
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
 }

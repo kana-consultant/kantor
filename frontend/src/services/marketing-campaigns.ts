@@ -1,5 +1,4 @@
-import { ApiError, requestEnvelope, requestJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type {
   CampaignActivity,
   CampaignColumn,
@@ -20,7 +19,6 @@ export const campaignsKeys = {
 };
 
 export async function listCampaigns(filters: CampaignFilters): Promise<CampaignsListResponse> {
-  const token = await requireAccessToken();
   const params = new URLSearchParams();
 
   params.set("page", String(filters.page));
@@ -44,10 +42,9 @@ export async function listCampaigns(filters: CampaignFilters): Promise<Campaigns
     params.set("date_to", filters.dateTo);
   }
 
-  const payload = await requestEnvelope<CampaignsListResponse["items"]>(
+  const payload = await authRequestEnvelope<CampaignsListResponse["items"]>(
     `/marketing/campaigns?${params.toString()}`,
     { method: "GET" },
-    token,
   );
 
   return {
@@ -61,23 +58,19 @@ export async function listCampaigns(filters: CampaignFilters): Promise<Campaigns
 }
 
 export async function listCampaignKanban() {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignColumn[]>("/marketing/campaigns/kanban", { method: "GET" }, token);
+  return authRequestJSON<CampaignColumn[]>("/marketing/campaigns/kanban", { method: "GET" });
 }
 
 export async function getCampaign(campaignId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignDetail>(`/marketing/campaigns/${campaignId}`, { method: "GET" }, token);
+  return authRequestJSON<CampaignDetail>(`/marketing/campaigns/${campaignId}`, { method: "GET" });
 }
 
 export async function listCampaignActivities(campaignId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignActivity[]>(`/marketing/campaigns/${campaignId}/activities`, { method: "GET" }, token);
+  return authRequestJSON<CampaignActivity[]>(`/marketing/campaigns/${campaignId}/activities`, { method: "GET" });
 }
 
 export async function createCampaign(input: CampaignFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignDetail>(
+  return authRequestJSON<CampaignDetail>(
     "/marketing/campaigns",
     {
       method: "POST",
@@ -86,13 +79,11 @@ export async function createCampaign(input: CampaignFormValues) {
       },
       body: JSON.stringify(serializeCampaignForm(input)),
     },
-    token,
   );
 }
 
 export async function updateCampaign(campaignId: string, input: CampaignFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignDetail>(
+  return authRequestJSON<CampaignDetail>(
     `/marketing/campaigns/${campaignId}`,
     {
       method: "PUT",
@@ -101,22 +92,18 @@ export async function updateCampaign(campaignId: string, input: CampaignFormValu
       },
       body: JSON.stringify(serializeCampaignForm(input)),
     },
-    token,
   );
 }
 
 export async function deleteCampaign(campaignId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     `/marketing/campaigns/${campaignId}`,
     { method: "DELETE" },
-    token,
   );
 }
 
 export async function moveCampaign(campaignId: string, columnId: string, position: number) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignDetail>(
+  return authRequestJSON<CampaignDetail>(
     `/marketing/campaigns/${campaignId}/move`,
     {
       method: "PATCH",
@@ -128,18 +115,15 @@ export async function moveCampaign(campaignId: string, columnId: string, positio
         position,
       }),
     },
-    token,
   );
 }
 
 export async function listCampaignColumns() {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignColumn[]>("/marketing/columns", { method: "GET" }, token);
+  return authRequestJSON<CampaignColumn[]>("/marketing/columns", { method: "GET" });
 }
 
 export async function createCampaignColumn(input: { name: string; color?: string; position?: number }) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignColumn>(
+  return authRequestJSON<CampaignColumn>(
     "/marketing/columns",
     {
       method: "POST",
@@ -148,13 +132,11 @@ export async function createCampaignColumn(input: { name: string; color?: string
       },
       body: JSON.stringify(input),
     },
-    token,
   );
 }
 
 export async function updateCampaignColumn(columnId: string, input: { name: string; color?: string }) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignColumn>(
+  return authRequestJSON<CampaignColumn>(
     `/marketing/columns/${columnId}`,
     {
       method: "PUT",
@@ -163,22 +145,18 @@ export async function updateCampaignColumn(columnId: string, input: { name: stri
       },
       body: JSON.stringify(input),
     },
-    token,
   );
 }
 
 export async function deleteCampaignColumn(columnId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     `/marketing/columns/${columnId}`,
     { method: "DELETE" },
-    token,
   );
 }
 
 export async function reorderCampaignColumns(columnIds: string[]) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     "/marketing/columns/reorder",
     {
       method: "PATCH",
@@ -187,42 +165,35 @@ export async function reorderCampaignColumns(columnIds: string[]) {
       },
       body: JSON.stringify({ column_ids: columnIds }),
     },
-    token,
   );
 }
 
 export async function uploadCampaignAttachments(campaignId: string, files: File[]) {
-  const token = await requireAccessToken();
   const body = new FormData();
   for (const file of files) {
     body.append("files", file);
   }
 
-  return requestJSON<CampaignDetail>(
+  return authRequestJSON<CampaignDetail>(
     `/marketing/campaigns/${campaignId}/attachments`,
     {
       method: "POST",
       body,
     },
-    token,
   );
 }
 
 export async function listCampaignAttachments(campaignId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<CampaignDetail["attachments"]>(
+  return authRequestJSON<CampaignDetail["attachments"]>(
     `/marketing/campaigns/${campaignId}/attachments`,
     { method: "GET" },
-    token,
   );
 }
 
 export async function deleteCampaignAttachment(campaignId: string, attachmentId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     `/marketing/campaigns/${campaignId}/attachments/${attachmentId}`,
     { method: "DELETE" },
-    token,
   );
 }
 
@@ -239,13 +210,4 @@ function serializeCampaignForm(input: CampaignFormValues) {
     brief_text: input.brief_text.trim() || null,
     status: input.status,
   };
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
 }
