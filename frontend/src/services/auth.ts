@@ -13,14 +13,6 @@ interface RegisterRequest {
   full_name: string;
 }
 
-interface RefreshRequest {
-  refresh_token: string;
-}
-
-interface LogoutRequest {
-  refresh_token: string;
-}
-
 export function login(payload: LoginRequest) {
   return postJSON<AuthPayload, LoginRequest>("/auth/login", payload);
 }
@@ -29,38 +21,35 @@ export function register(payload: RegisterRequest) {
   return postJSON<AuthPayload, RegisterRequest>("/auth/register", payload);
 }
 
-export function refresh(refreshToken: string) {
-  return postJSON<AuthPayload, RefreshRequest>("/auth/refresh", {
-    refresh_token: refreshToken,
-  });
+export function refresh() {
+  return postJSON<AuthPayload, Record<string, never>>("/auth/refresh", {});
 }
 
-export function revokeRefreshToken(refreshToken: string) {
-  return postJSON<{ revoked: boolean }, LogoutRequest>("/auth/logout", {
-    refresh_token: refreshToken,
-  });
+export function revokeRefreshToken() {
+  return postJSON<{ revoked: boolean }, Record<string, never>>(
+    "/auth/logout",
+    {},
+  );
 }
 
 export async function refreshSession() {
   const store = useAuthStore.getState();
-  const refreshToken = store.session?.tokens.refresh_token;
 
-  if (!refreshToken) {
-    throw new Error("Refresh token is not available");
+  if (!store.session) {
+    throw new Error("No active session");
   }
 
-  const refreshedSession = await refresh(refreshToken);
+  const refreshedSession = await refresh();
   store.setSession(refreshedSession);
   return refreshedSession;
 }
 
 export async function logout() {
   const store = useAuthStore.getState();
-  const refreshToken = store.session?.tokens.refresh_token;
 
   try {
-    if (refreshToken) {
-      await revokeRefreshToken(refreshToken);
+    if (store.session) {
+      await revokeRefreshToken();
     }
   } finally {
     store.clearSession();
@@ -79,13 +68,8 @@ export async function ensureAuthenticated(): Promise<AuthSession | null> {
     return session;
   }
 
-  if (!session.tokens.refresh_token) {
-    store.clearSession();
-    return null;
-  }
-
   try {
-    const refreshedSession = await refresh(session.tokens.refresh_token);
+    const refreshedSession = await refresh();
     store.setSession(refreshedSession);
     return refreshedSession;
   } catch {
