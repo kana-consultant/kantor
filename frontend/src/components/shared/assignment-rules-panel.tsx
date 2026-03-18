@@ -45,7 +45,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState<AssignmentRule | null>(null);
   const form = useForm<AssignmentRuleFormValues>({
-    resolver: zodResolver(ruleSchema) as any,
+    resolver: zodResolver(ruleSchema) as never,
     defaultValues: emptyRuleForm,
   });
 
@@ -269,6 +269,7 @@ export function AssignmentRulesPanel({ projectId }: { projectId: string }) {
           <EmptyState
             actionLabel="Add rule"
             description="Create the first assignment rule to enable auto-assign actions from the Kanban board."
+            icon={Plus}
             onAction={() => {
               setEditingRule(null);
               form.reset(emptyRuleForm);

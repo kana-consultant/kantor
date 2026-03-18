@@ -102,7 +102,7 @@ function MarketingDashboardPage() {
                     <Cell fill={chartColors[index % chartColors.length]} key={row.label} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: any) => value.toLocaleString("id-ID")} />
+                <Tooltip formatter={(value) => Number(value).toLocaleString("id-ID")} />
               </PieChart>
             </ResponsiveContainer>
           </div>

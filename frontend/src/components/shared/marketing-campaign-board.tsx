@@ -321,10 +321,10 @@ function moveCampaignInMemory(columns: CampaignColumn[], campaignId: string, ove
     return null;
   }
 
-  nextColumns[sourceColumnIndex].campaigns?.splice(sourceCampaignIndex, 1);
+  nextColumns[sourceColumnIndex]!.campaigns?.splice(sourceCampaignIndex, 1);
 
   let destinationColumnIndex = sourceColumnIndex;
-  let destinationIndex = nextColumns[sourceColumnIndex].campaigns?.length ?? 0;
+  let destinationIndex = nextColumns[sourceColumnIndex]!.campaigns?.length ?? 0;
 
   if (isCampaignDragData(overData)) {
     destinationColumnIndex = nextColumns.findIndex((column) => (column.campaigns ?? []).some((campaign) => campaign.id === overData.campaign.id));
@@ -343,11 +343,11 @@ function moveCampaignInMemory(columns: CampaignColumn[], campaignId: string, ove
     return columns;
   }
 
-  nextColumns[destinationColumnIndex].campaigns?.splice(destinationIndex, 0, {
+  nextColumns[destinationColumnIndex]!.campaigns?.splice(destinationIndex, 0, {
     ...movingCampaign,
-    column_id: nextColumns[destinationColumnIndex].id,
-    column_name: nextColumns[destinationColumnIndex].name,
-    column_color: nextColumns[destinationColumnIndex].color,
+    column_id: nextColumns[destinationColumnIndex]!.id,
+    column_name: nextColumns[destinationColumnIndex]!.name,
+    column_color: nextColumns[destinationColumnIndex]!.color,
   });
 
   return nextColumns;

@@ -112,10 +112,10 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 
   try {
-    const payloadSegment = segments[1]
+    const payloadSegment = segments[1]!
       .replace(/-/g, "+")
       .replace(/_/g, "/")
-      .padEnd(Math.ceil(segments[1].length / 4) * 4, "=");
+      .padEnd(Math.ceil(segments[1]!.length / 4) * 4, "=");
 
     const json = window.atob(payloadSegment);
     return JSON.parse(json) as Record<string, unknown>;

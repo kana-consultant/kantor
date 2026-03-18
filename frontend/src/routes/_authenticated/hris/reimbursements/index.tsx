@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Controller, useForm } from "react-hook-form";
-import { CircleDollarSign, FileText, Plus, Receipt, TimerReset } from "lucide-react";
+import { CircleDollarSign, Plus, Receipt, TimerReset } from "lucide-react";
 import { z } from "zod";
 
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -63,7 +63,7 @@ function ReimbursementsPage() {
   const [files, setFiles] = useState<File[]>([]);
 
   const form = useForm<ReimbursementFormValues>({
-    resolver: zodResolver(reimbursementSchema),
+    resolver: zodResolver(reimbursementSchema) as never,
     defaultValues: {
       employee_id: "",
       title: "",
