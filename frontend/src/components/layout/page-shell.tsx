@@ -14,11 +14,11 @@ export function PageShell({ children }: PropsWithChildren) {
   } = useSidebarStore();
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-6 p-4 lg:p-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-2 p-3 lg:gap-3 lg:p-4">
       <div
         className={cn(
           "hidden shrink-0 lg:block",
-          isDesktopCollapsed ? "w-[5.75rem]" : "w-[19rem] xl:w-[21rem]",
+          isDesktopCollapsed ? "w-[4.25rem]" : "w-64",
         )}
       >
         <Sidebar collapsed={isDesktopCollapsed} onToggleCollapse={toggleDesktopCollapsed} />
@@ -33,14 +33,14 @@ export function PageShell({ children }: PropsWithChildren) {
       />
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[19rem] max-w-[90vw] p-4 transition-transform lg:hidden",
+          "fixed inset-y-0 left-0 z-50 w-64 max-w-[88vw] p-3 transition-transform lg:hidden",
           isMobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <Sidebar mobile onNavigate={() => setMobileOpen(false)} />
       </div>
 
-      <main className="flex min-h-[calc(100vh-2rem)] flex-1 flex-col gap-6">
+      <main className="flex min-h-[calc(100vh-1.5rem)] flex-1 flex-col gap-3 lg:min-h-[calc(100vh-2rem)]">
         <Topbar />
         <section className="flex-1">{children}</section>
       </main>
