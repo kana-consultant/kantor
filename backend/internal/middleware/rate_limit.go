@@ -66,6 +66,11 @@ func (l *ipRateLimiter) retryAfter(key string, now time.Time) time.Duration {
 				delete(l.entries, candidate)
 			}
 		}
+		// Hard cap: if most entries are still live, nuke everything
+		// to prevent OOM under distributed attack
+		if len(l.entries) > 10000 {
+			clear(l.entries)
+		}
 	}
 
 	entry, exists := l.entries[key]
@@ -86,6 +91,9 @@ func (l *ipRateLimiter) retryAfter(key string, now time.Time) time.Duration {
 	return 0
 }
 
+// clientIPFromRequest returns the client IP from r.RemoteAddr.
+// Assumes chi's RealIP middleware has already rewritten RemoteAddr
+// from X-Real-IP / X-Forwarded-For when behind a reverse proxy.
 func clientIPFromRequest(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {

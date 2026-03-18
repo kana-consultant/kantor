@@ -29,10 +29,16 @@ func New(service *authservice.Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.NewIPRateLimit(5, time.Minute, "AUTH_RATE_LIMITED", "Too many registration attempts. Try again later.")).Post("/register", h.register)
-	router.With(platformmiddleware.NewIPRateLimit(10, time.Minute, "AUTH_RATE_LIMITED", "Too many login attempts. Try again later.")).Post("/login", h.login)
-	router.With(platformmiddleware.NewIPRateLimit(30, time.Minute, "AUTH_RATE_LIMITED", "Too many token refresh attempts. Try again later.")).Post("/refresh", h.refresh)
-	router.With(platformmiddleware.NewIPRateLimit(30, time.Minute, "AUTH_RATE_LIMITED", "Too many logout attempts. Try again later.")).Post("/logout", h.logout)
+	router.With(platformmiddleware.NewIPRateLimit(5, time.Minute,
+		"AUTH_RATE_LIMITED", "Too many registration attempts. Try again later.",
+	)).Post("/register", h.register)
+	router.With(platformmiddleware.NewIPRateLimit(10, time.Minute,
+		"AUTH_RATE_LIMITED", "Too many login attempts. Try again later.",
+	)).Post("/login", h.login)
+	router.With(platformmiddleware.NewIPRateLimit(30, time.Minute,
+		"AUTH_RATE_LIMITED", "Too many token refresh attempts. Try again later.",
+	)).Post("/refresh", h.refresh)
+	router.Post("/logout", h.logout)
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {

@@ -40,6 +40,25 @@ func TestNewIPRateLimitBlocksAfterConfiguredAttempts(t *testing.T) {
 	}
 }
 
+func TestRateLimitResetsAfterWindow(t *testing.T) {
+	limiter := &ipRateLimiter{
+		maxRequests: 1,
+		window:      time.Minute,
+		entries:     make(map[string]rateLimitEntry),
+	}
+	now := time.Now().UTC()
+
+	if d := limiter.retryAfter("10.0.0.1", now); d > 0 {
+		t.Fatal("expected first request to pass")
+	}
+	if d := limiter.retryAfter("10.0.0.1", now.Add(30*time.Second)); d == 0 {
+		t.Fatal("expected block within window")
+	}
+	if d := limiter.retryAfter("10.0.0.1", now.Add(61*time.Second)); d > 0 {
+		t.Fatal("expected pass after window reset")
+	}
+}
+
 func TestNewIPRateLimitIsScopedPerIP(t *testing.T) {
 	middleware := NewIPRateLimit(1, time.Minute, "RATE_LIMITED", "Too many requests")
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
