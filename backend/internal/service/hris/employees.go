@@ -17,11 +17,19 @@ var (
 	ErrEmployeeUserLinkedTwice = errors.New("user account is already linked to another employee")
 )
 
-type EmployeesService struct {
-	repo *hrisrepo.EmployeesRepository
+type employeesRepository interface {
+	CreateEmployee(ctx context.Context, params hrisrepo.UpsertEmployeeParams) (model.Employee, error)
+	ListEmployees(ctx context.Context, params hrisrepo.ListEmployeesParams) ([]model.Employee, int64, error)
+	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
+	UpdateEmployee(ctx context.Context, employeeID string, params hrisrepo.UpsertEmployeeParams) (model.Employee, error)
+	DeleteEmployee(ctx context.Context, employeeID string) error
 }
 
-func NewEmployeesService(repo *hrisrepo.EmployeesRepository) *EmployeesService {
+type EmployeesService struct {
+	repo employeesRepository
+}
+
+func NewEmployeesService(repo employeesRepository) *EmployeesService {
 	return &EmployeesService{repo: repo}
 }
 

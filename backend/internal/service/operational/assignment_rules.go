@@ -17,8 +17,17 @@ var (
 	ErrAutoAssignNoMatch           = errors.New("no project member matched the active assignment rules")
 )
 
+type assignmentRulesRepository interface {
+	CreateRule(ctx context.Context, projectID string, params operationalrepo.CreateAssignmentRuleParams) (model.AssignmentRule, error)
+	ListRules(ctx context.Context, projectID string) ([]model.AssignmentRule, error)
+	UpdateRule(ctx context.Context, projectID string, ruleID string, params operationalrepo.UpdateAssignmentRuleParams) (model.AssignmentRule, error)
+	DeleteRule(ctx context.Context, projectID string, ruleID string) error
+	ListCandidates(ctx context.Context, projectID string) ([]model.AssignmentCandidate, error)
+	AutoAssignTask(ctx context.Context, projectID string, taskID string, params operationalrepo.AutoAssignTaskParams) (model.KanbanTask, error)
+}
+
 type AssignmentRulesService struct {
-	repo *operationalrepo.AssignmentRulesRepository
+	repo assignmentRulesRepository
 }
 
 type AutoAssignResult struct {
@@ -27,7 +36,7 @@ type AutoAssignResult struct {
 	AssignedTo  model.AssignmentCandidate `json:"assigned_to"`
 }
 
-func NewAssignmentRulesService(repo *operationalrepo.AssignmentRulesRepository) *AssignmentRulesService {
+func NewAssignmentRulesService(repo assignmentRulesRepository) *AssignmentRulesService {
 	return &AssignmentRulesService{repo: repo}
 }
 
