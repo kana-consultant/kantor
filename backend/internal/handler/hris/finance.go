@@ -58,6 +58,7 @@ func (h *FinanceHandler) createCategory(w http.ResponseWriter, r *http.Request) 
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "finance_category", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -78,11 +79,13 @@ func (h *FinanceHandler) updateCategory(w http.ResponseWriter, r *http.Request) 
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, err := h.service.UpdateCategory(r.Context(), chi.URLParam(r, "categoryID"), input)
+	categoryID := chi.URLParam(r, "categoryID")
+	result, err := h.service.UpdateCategory(r.Context(), categoryID, input)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "finance_category", categoryID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -90,10 +93,12 @@ func (h *FinanceHandler) deleteCategory(w http.ResponseWriter, r *http.Request) 
 	if !requireFinanceAdmin(w, r) {
 		return
 	}
-	if err := h.service.DeleteCategory(r.Context(), chi.URLParam(r, "categoryID")); err != nil {
+	categoryID := chi.URLParam(r, "categoryID")
+	if err := h.service.DeleteCategory(r.Context(), categoryID); err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "finance_category", categoryID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Finance category deleted successfully"}, nil)
 }
 
@@ -122,6 +127,7 @@ func (h *FinanceHandler) createRecord(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "finance_record", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -156,19 +162,23 @@ func (h *FinanceHandler) updateRecord(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, err := h.service.UpdateRecord(r.Context(), chi.URLParam(r, "recordID"), input)
+	recordID := chi.URLParam(r, "recordID")
+	result, err := h.service.UpdateRecord(r.Context(), recordID, input)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "finance_record", recordID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *FinanceHandler) deleteRecord(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteRecord(r.Context(), chi.URLParam(r, "recordID")); err != nil {
+	recordID := chi.URLParam(r, "recordID")
+	if err := h.service.DeleteRecord(r.Context(), recordID); err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "finance_record", recordID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Finance record deleted successfully"}, nil)
 }
 
@@ -178,11 +188,13 @@ func (h *FinanceHandler) submitRecord(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
 		return
 	}
-	result, err := h.service.SubmitRecord(r.Context(), chi.URLParam(r, "recordID"), principal.UserID)
+	recordID := chi.URLParam(r, "recordID")
+	result, err := h.service.SubmitRecord(r.Context(), recordID, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "submit", "hris", "finance_record", recordID, nil, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -196,11 +208,13 @@ func (h *FinanceHandler) reviewRecord(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, err := h.service.ReviewRecord(r.Context(), chi.URLParam(r, "recordID"), input.Decision, principal.UserID)
+	recordID := chi.URLParam(r, "recordID")
+	result, err := h.service.ReviewRecord(r.Context(), recordID, input.Decision, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "review", "hris", "finance_record", recordID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 

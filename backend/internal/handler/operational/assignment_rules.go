@@ -50,6 +50,7 @@ func (h *AssignmentRulesHandler) AutoAssignTask(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "auto_assign", "operational", "kanban_task", taskID, nil, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -73,6 +74,7 @@ func (h *AssignmentRulesHandler) createRule(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "operational", "assignment_rule", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -103,6 +105,7 @@ func (h *AssignmentRulesHandler) updateRule(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "assignment_rule", ruleID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -115,6 +118,7 @@ func (h *AssignmentRulesHandler) deleteRule(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "operational", "assignment_rule", ruleID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Assignment rule deleted successfully"}, nil)
 }
 
