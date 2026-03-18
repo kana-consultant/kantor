@@ -25,7 +25,14 @@ type Encrypter struct {
 }
 
 // NewEncrypter creates an encrypter with the primary key for encryption.
-// Previous keys can be added with AddPreviousKey for decryption during rotation.
+// Previous keys are used only for decryption during key rotation.
+//
+// Key rotation procedure (requires application restart):
+//  1. Set DATA_ENCRYPTION_KEY to the new key
+//  2. Set DATA_ENCRYPTION_KEY_OLD to the previous key
+//  3. Restart the application
+//  4. New writes use the new key; old data decrypts via the old key
+//  5. Once all data is re-encrypted, DATA_ENCRYPTION_KEY_OLD can be removed
 func NewEncrypter(secret string, previousSecrets ...string) (*Encrypter, error) {
 	if strings.TrimSpace(secret) == "" {
 		return nil, errors.New("DATA_ENCRYPTION_KEY is required")
@@ -85,14 +92,14 @@ func (e *Encrypter) DecryptString(ciphertext string) (string, error) {
 		return string(plaintext), nil
 	}
 
-	// Legacy unversioned ciphertext: try all keys starting from v1
+	// Legacy unversioned ciphertext (pre-rotation data without "v1:" prefix):
+	// try all known keys to find the one that decrypts it.
 	decoded, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return "", fmt.Errorf("decode ciphertext: %w", err)
 	}
 
-	// Try v1 first (most likely for legacy data), then primary
-	for _, v := range []int{1, e.primaryVersion} {
+	for v := 1; v <= e.primaryVersion; v++ {
 		key, ok := e.keys[v]
 		if !ok {
 			continue
