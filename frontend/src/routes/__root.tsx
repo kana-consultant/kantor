@@ -33,7 +33,9 @@ function RootErrorComponent({ error }: ErrorComponentProps) {
         </p>
         <h1 className="mt-3 text-2xl font-bold">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {error.message || "An unexpected error occurred"}
+          {import.meta.env.DEV
+            ? error.message || "An unexpected error occurred"
+            : "An unexpected error occurred"}
         </p>
         <Button
           variant="outline"
