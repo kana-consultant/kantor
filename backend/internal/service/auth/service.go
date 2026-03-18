@@ -14,10 +14,16 @@ import (
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 )
 
+const (
+	maxFailedLoginAttempts = 5
+	accountLockDuration    = 15 * time.Minute
+)
+
 var (
 	ErrEmailAlreadyExists  = errors.New("email already exists")
 	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrInactiveUser        = errors.New("user account is inactive")
+	ErrAccountLocked       = errors.New("account is temporarily locked due to too many failed login attempts")
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 	ErrExpiredRefreshToken = errors.New("refresh token has expired")
 )
@@ -109,8 +115,17 @@ func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent s
 		return AuthResult{}, ErrInactiveUser
 	}
 
+	if user.LockedUntil != nil && user.LockedUntil.After(time.Now().UTC()) {
+		return AuthResult{}, ErrAccountLocked
+	}
+
 	if err := backendauth.ComparePassword(user.PasswordHash, input.Password); err != nil {
+		_ = s.repo.IncrementFailedLoginAttempts(ctx, user.ID, maxFailedLoginAttempts, accountLockDuration)
 		return AuthResult{}, ErrInvalidCredentials
+	}
+
+	if user.FailedLoginAttempts > 0 {
+		_ = s.repo.ResetFailedLoginAttempts(ctx, user.ID)
 	}
 
 	return s.issueAuthResult(ctx, user, "", userAgent, ipAddress)
