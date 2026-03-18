@@ -162,16 +162,16 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, currentPass
 		return ErrInvalidCredentials
 	}
 
+	if currentPassword == newPassword {
+		return errors.New("new password must differ from current password")
+	}
+
 	newHash, err := backendauth.HashPassword(newPassword)
 	if err != nil {
 		return err
 	}
 
-	if err := s.repo.UpdatePasswordHash(ctx, userID, newHash); err != nil {
-		return err
-	}
-
-	return s.repo.RevokeAllUserTokens(ctx, userID)
+	return s.repo.ChangePasswordAndRevokeTokens(ctx, userID, newHash)
 }
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) error {
