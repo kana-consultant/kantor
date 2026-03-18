@@ -132,6 +132,15 @@ func Load() (Config, error) {
 		return Config{}, errors.New("DATA_ENCRYPTION_KEY is required")
 	}
 
+	if cfg.AppEnv == "production" {
+		if cfg.JWTSecret == "change-me" {
+			return Config{}, errors.New("JWT_SECRET must be explicitly set in production (do not use the default value)")
+		}
+		if len(cfg.JWTSecret) < 32 {
+			return Config{}, errors.New("JWT_SECRET must be at least 32 characters in production")
+		}
+	}
+
 	if cfg.SeedSuperAdmin.Enabled {
 		if strings.TrimSpace(cfg.SeedSuperAdmin.Email) == "" {
 			return Config{}, errors.New("SEED_SUPERADMIN_EMAIL is required when seed is enabled")
