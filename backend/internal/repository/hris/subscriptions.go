@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -44,6 +45,9 @@ func NewSubscriptionsRepository(db *pgxpool.Pool) *SubscriptionsRepository {
 }
 
 func (r *SubscriptionsRepository) CreateSubscription(ctx context.Context, params CreateSubscriptionParams) (model.Subscription, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		INSERT INTO subscriptions (
 			name, vendor, description, cost_amount, cost_currency, billing_cycle,
@@ -80,6 +84,9 @@ func (r *SubscriptionsRepository) CreateSubscription(ctx context.Context, params
 }
 
 func (r *SubscriptionsRepository) ListSubscriptions(ctx context.Context) ([]model.Subscription, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			subscriptions.id::text,
@@ -121,6 +128,9 @@ func (r *SubscriptionsRepository) ListSubscriptions(ctx context.Context) ([]mode
 }
 
 func (r *SubscriptionsRepository) GetSubscriptionByID(ctx context.Context, subscriptionID string) (model.Subscription, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	row := r.db.QueryRow(ctx, `
 		SELECT
 			subscriptions.id::text,
@@ -154,6 +164,9 @@ func (r *SubscriptionsRepository) GetSubscriptionByID(ctx context.Context, subsc
 }
 
 func (r *SubscriptionsRepository) UpdateSubscription(ctx context.Context, subscriptionID string, params UpdateSubscriptionParams) (model.Subscription, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(ctx, `
 		UPDATE subscriptions
 		SET
@@ -183,6 +196,9 @@ func (r *SubscriptionsRepository) UpdateSubscription(ctx context.Context, subscr
 }
 
 func (r *SubscriptionsRepository) DeleteSubscription(ctx context.Context, subscriptionID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(ctx, `DELETE FROM subscriptions WHERE id = $1::uuid`, subscriptionID)
 	if err != nil {
 		return err
@@ -194,6 +210,9 @@ func (r *SubscriptionsRepository) DeleteSubscription(ctx context.Context, subscr
 }
 
 func (r *SubscriptionsRepository) ListSubscriptionsForAlertCheck(ctx context.Context) ([]model.Subscription, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			subscriptions.id::text,
@@ -235,6 +254,9 @@ func (r *SubscriptionsRepository) ListSubscriptionsForAlertCheck(ctx context.Con
 }
 
 func (r *SubscriptionsRepository) AlertExistsForDay(ctx context.Context, subscriptionID string, alertType string, day time.Time) (bool, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	var exists bool
 	err := r.db.QueryRow(ctx, `
 		SELECT EXISTS(
@@ -249,6 +271,9 @@ func (r *SubscriptionsRepository) AlertExistsForDay(ctx context.Context, subscri
 }
 
 func (r *SubscriptionsRepository) CreateSubscriptionAlert(ctx context.Context, subscriptionID string, alertType string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO subscription_alerts (subscription_id, alert_type)
 		VALUES ($1::uuid, $2)
@@ -257,6 +282,9 @@ func (r *SubscriptionsRepository) CreateSubscriptionAlert(ctx context.Context, s
 }
 
 func (r *SubscriptionsRepository) ListAlerts(ctx context.Context) ([]model.SubscriptionAlert, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			subscription_alerts.id::text,
@@ -293,6 +321,9 @@ func (r *SubscriptionsRepository) ListAlerts(ctx context.Context) ([]model.Subsc
 }
 
 func (r *SubscriptionsRepository) MarkAlertRead(ctx context.Context, alertID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(ctx, `UPDATE subscription_alerts SET is_read = TRUE WHERE id = $1::uuid`, alertID)
 	if err != nil {
 		return err
@@ -304,6 +335,9 @@ func (r *SubscriptionsRepository) MarkAlertRead(ctx context.Context, alertID str
 }
 
 func (r *SubscriptionsRepository) Summary(ctx context.Context) (model.SubscriptionSummary, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT category, cost_amount, billing_cycle, status
 		FROM subscriptions

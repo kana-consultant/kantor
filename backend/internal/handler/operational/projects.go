@@ -54,6 +54,7 @@ func (h *ProjectsHandler) createProject(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "operational", "project", result.Project.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -102,6 +103,7 @@ func (h *ProjectsHandler) updateProject(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "project", projectID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -113,6 +115,7 @@ func (h *ProjectsHandler) deleteProject(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "operational", "project", projectID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "Project deleted successfully",
 	}, nil)
@@ -132,6 +135,7 @@ func (h *ProjectsHandler) mutateMembers(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "project_members", projectID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 

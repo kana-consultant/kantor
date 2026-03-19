@@ -1,6 +1,5 @@
-import { ApiError, requestJSON } from "@/lib/api-client";
+import { authRequestJSON } from "@/lib/api-client";
 import { parseLooseCurrency } from "@/lib/currency";
-import { ensureAuthenticated } from "@/services/auth";
 import type {
   BonusRecord,
   BonusFormValues,
@@ -16,18 +15,15 @@ export const compensationKeys = {
 };
 
 export async function listSalaries(employeeId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<SalaryRecord[]>(`/hris/employees/${employeeId}/salaries`, { method: "GET" }, token);
+  return authRequestJSON<SalaryRecord[]>(`/hris/employees/${employeeId}/salaries`, { method: "GET" });
 }
 
 export async function getCurrentSalary(employeeId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<SalaryRecord>(`/hris/employees/${employeeId}/salaries/current`, { method: "GET" }, token);
+  return authRequestJSON<SalaryRecord>(`/hris/employees/${employeeId}/salaries/current`, { method: "GET" });
 }
 
 export async function createSalary(employeeId: string, input: SalaryFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<SalaryRecord>(
+  return authRequestJSON<SalaryRecord>(
     `/hris/employees/${employeeId}/salaries`,
     {
       method: "POST",
@@ -39,18 +35,15 @@ export async function createSalary(employeeId: string, input: SalaryFormValues) 
         effective_date: new Date(input.effective_date).toISOString(),
       }),
     },
-    token,
   );
 }
 
 export async function listBonuses(employeeId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<BonusRecord[]>(`/hris/employees/${employeeId}/bonuses`, { method: "GET" }, token);
+  return authRequestJSON<BonusRecord[]>(`/hris/employees/${employeeId}/bonuses`, { method: "GET" });
 }
 
 export async function createBonus(employeeId: string, input: BonusFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<BonusRecord>(
+  return authRequestJSON<BonusRecord>(
     `/hris/employees/${employeeId}/bonuses`,
     {
       method: "POST",
@@ -62,13 +55,11 @@ export async function createBonus(employeeId: string, input: BonusFormValues) {
         period_year: input.period_year,
       }),
     },
-    token,
   );
 }
 
 export async function updateBonus(bonusId: string, input: BonusFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<BonusRecord>(
+  return authRequestJSON<BonusRecord>(
     `/hris/bonuses/${bonusId}`,
     {
       method: "PUT",
@@ -80,23 +71,19 @@ export async function updateBonus(bonusId: string, input: BonusFormValues) {
         period_year: input.period_year,
       }),
     },
-    token,
   );
 }
 
 export async function deleteBonus(bonusId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(`/hris/bonuses/${bonusId}`, { method: "DELETE" }, token);
+  return authRequestJSON<{ message: string }>(`/hris/bonuses/${bonusId}`, { method: "DELETE" });
 }
 
 export async function approveBonus(bonusId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<BonusRecord>(`/hris/bonuses/${bonusId}/approve`, { method: "PATCH" }, token);
+  return authRequestJSON<BonusRecord>(`/hris/bonuses/${bonusId}/approve`, { method: "PATCH" });
 }
 
 export async function rejectBonus(bonusId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<BonusRecord>(`/hris/bonuses/${bonusId}/reject`, { method: "PATCH" }, token);
+  return authRequestJSON<BonusRecord>(`/hris/bonuses/${bonusId}/reject`, { method: "PATCH" });
 }
 
 function parseAmountMap(raw: string) {
@@ -114,13 +101,4 @@ function parseAmountMap(raw: string) {
     });
 
   return result;
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
 }

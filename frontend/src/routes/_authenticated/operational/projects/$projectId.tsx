@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { Plus, UserMinus, Users } from "lucide-react";
+import { Plus, UserMinus } from "lucide-react";
 
 import { AssignmentRulesPanel } from "@/components/shared/assignment-rules-panel";
 import { KanbanBoard } from "@/components/shared/kanban-board";
@@ -395,7 +395,7 @@ function ProjectWorkspacePage() {
                 <PermissionGate permission={permissions.operationalProjectDelete}>
                   <Button
                     disabled={deleteMutation.isPending}
-                    onClick={() => setProjectToDelete(project)}
+                    onClick={() => setIsDeleteDialogOpen(true)}
                     variant="ghost"
                   >
                     {deleteMutation.isPending ? "Deleting..." : "Delete project"}
