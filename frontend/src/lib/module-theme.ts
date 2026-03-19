@@ -9,7 +9,6 @@ import {
   UserPlus,
   Users,
   Wallet,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,10 +67,6 @@ const breadcrumbRules: Array<{
   {
     match: (pathname) => pathname.startsWith("/operational/projects"),
     meta: { module: moduleThemes.ops, title: "Projects", icon: FolderKanban },
-  },
-  {
-    match: (pathname) => pathname.startsWith("/operational/automation"),
-    meta: { module: moduleThemes.ops, title: "Automation", icon: Zap },
   },
   {
     match: (pathname) => pathname.startsWith("/operational/overview") || pathname === "/operational",

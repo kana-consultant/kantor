@@ -705,6 +705,13 @@ func (r *KanbanRepository) MoveTask(ctx context.Context, projectID string, taskI
 	return tx.Commit(ctx)
 }
 
+func (r *KanbanRepository) SetAssignedVia(ctx context.Context, projectID string, taskID string, via string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE kanban_tasks SET assigned_via = $3, updated_at = NOW() WHERE project_id = $1::uuid AND id = $2::uuid`,
+		projectID, taskID, via)
+	return err
+}
+
 func (r *KanbanRepository) Snapshot(ctx context.Context, projectID string) (KanbanSnapshot, error) {
 	columns, err := r.ListColumns(ctx, projectID)
 	if err != nil {

@@ -54,6 +54,12 @@ func (s *ProjectsService) CreateProject(ctx context.Context, request operational
 		}
 	}
 
+	if len(request.MemberEmails) > 0 {
+		if err := s.repo.BulkAssignMembers(ctx, project.ID, request.MemberEmails, "member"); err != nil {
+			return ProjectDetail{}, err
+		}
+	}
+
 	return s.GetProject(ctx, project.ID)
 }
 
@@ -108,11 +114,12 @@ func (s *ProjectsService) GetProject(ctx context.Context, projectID string) (Pro
 
 func (s *ProjectsService) UpdateProject(ctx context.Context, projectID string, request operational.UpdateProjectRequest) (ProjectDetail, error) {
 	_, err := s.repo.UpdateProject(ctx, projectID, operationalrepo.UpdateProjectParams{
-		Name:        strings.TrimSpace(request.Name),
-		Description: normalizeOptionalString(request.Description),
-		Deadline:    normalizeOptionalTime(request.Deadline),
-		Status:      request.Status,
-		Priority:    request.Priority,
+		Name:           strings.TrimSpace(request.Name),
+		Description:    normalizeOptionalString(request.Description),
+		Deadline:       normalizeOptionalTime(request.Deadline),
+		Status:         request.Status,
+		Priority:       request.Priority,
+		AutoAssignMode: request.AutoAssignMode,
 	})
 	if err != nil {
 		if errors.Is(err, operationalrepo.ErrProjectNotFound) {

@@ -7,6 +7,8 @@ export type ProjectStatus =
 
 export type ProjectPriority = "low" | "medium" | "high" | "critical";
 
+export type AutoAssignMode = "off" | "round_robin" | "least_busy";
+
 export interface Project {
   id: string;
   name: string;
@@ -14,6 +16,7 @@ export interface Project {
   deadline?: string | null;
   status: ProjectStatus;
   priority: ProjectPriority;
+  auto_assign_mode: AutoAssignMode;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -60,4 +63,13 @@ export interface ProjectFormValues {
   deadline: string;
   status: ProjectStatus;
   priority: ProjectPriority;
+  auto_assign_mode?: AutoAssignMode;
+  member_emails?: string[];
+}
+
+export interface AvailableUser {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string | null;
 }

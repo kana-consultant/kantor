@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
-import { EmployeeForm } from "@/components/shared/employee-form";
-import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,7 +13,6 @@ import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
 import { departmentsKeys, listDepartments } from "@/services/hris-departments";
 import {
-  createEmployee,
   deleteEmployee,
   employeesKeys,
   listEmployees,
@@ -42,7 +38,6 @@ function EmployeesPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = useRBAC();
   const [filters, setFilters] = useState<EmployeeFilters>(defaultFilters);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
 
   const departmentsQuery = useQuery({
@@ -53,14 +48,6 @@ function EmployeesPage() {
   const employeesQuery = useQuery({
     queryKey: employeesKeys.list(filters),
     queryFn: () => listEmployees(filters),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: createEmployee,
-    onSuccess: async () => {
-      setIsCreateOpen(false);
-      await queryClient.invalidateQueries({ queryKey: employeesKeys.all });
-    },
   });
 
   const deleteMutation = useMutation({
@@ -162,29 +149,11 @@ function EmployeesPage() {
             </p>
             <h3 className="text-[28px] font-[700] text-text-primary">Employees</h3>
             <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-text-secondary">
-              Manage employee profiles, department placement, and employment status from one directory.
+              Employee otomatis terdaftar saat mendaftar akun. Kelola profil, departemen, dan status dari sini.
             </p>
           </div>
-
-          <PermissionGate permission={permissions.hrisEmployeeCreate}>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Add employee
-            </Button>
-          </PermissionGate>
         </div>
       </Card>
-
-      <EmployeeForm
-        departments={departmentsQuery.data ?? []}
-        description="Capture employee identity, role, department, and emergency contact in one large dialog."
-        isOpen={isCreateOpen}
-        isSubmitting={createMutation.isPending}
-        onCancel={() => setIsCreateOpen(false)}
-        onSubmit={(values) => createMutation.mutate(values)}
-        submitLabel="Create employee"
-        title="New employee"
-      />
 
       <Card className="p-6">
         <div className="grid gap-4 md:grid-cols-4">
@@ -259,13 +228,11 @@ function EmployeesPage() {
       <DataTable
         columns={columns}
         data={employees}
-        emptyActionLabel={hasPermission(permissions.hrisEmployeeCreate) ? "Add employee" : undefined}
-        emptyDescription="No employees match the current filter. Create a record or widen the filter."
-        emptyTitle="No employees found"
+        emptyDescription="Tidak ada employee yang cocok dengan filter. Coba perluas filter."
+        emptyTitle="Tidak ada employee"
         getRowId={(employee) => employee.id}
         loading={employeesQuery.isLoading}
         loadingRows={6}
-        onEmptyAction={hasPermission(permissions.hrisEmployeeCreate) ? () => setIsCreateOpen(true) : undefined}
         pagination={
           meta
             ? {

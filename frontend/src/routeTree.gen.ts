@@ -20,7 +20,6 @@ import { Route as AuthenticatedMarketingIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedHrisIndexRouteImport } from './routes/_authenticated/hris/index'
 import { Route as AuthenticatedOperationalWaBroadcastRouteImport } from './routes/_authenticated/operational/wa-broadcast'
 import { Route as AuthenticatedOperationalOverviewRouteImport } from './routes/_authenticated/operational/overview'
-import { Route as AuthenticatedOperationalAutomationRouteImport } from './routes/_authenticated/operational/automation'
 import { Route as AuthenticatedMarketingOverviewRouteImport } from './routes/_authenticated/marketing/overview'
 import { Route as AuthenticatedMarketingLeadsRouteImport } from './routes/_authenticated/marketing/leads'
 import { Route as AuthenticatedMarketingDashboardRouteImport } from './routes/_authenticated/marketing/dashboard'
@@ -94,12 +93,6 @@ const AuthenticatedOperationalOverviewRoute =
   AuthenticatedOperationalOverviewRouteImport.update({
     id: '/operational/overview',
     path: '/operational/overview',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedOperationalAutomationRoute =
-  AuthenticatedOperationalAutomationRouteImport.update({
-    id: '/operational/automation',
-    path: '/operational/automation',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedMarketingOverviewRoute =
@@ -214,7 +207,6 @@ export interface FileRoutesByFullPath {
   '/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
   '/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
   '/marketing/overview': typeof AuthenticatedMarketingOverviewRoute
-  '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/operational/overview': typeof AuthenticatedOperationalOverviewRoute
   '/operational/wa-broadcast': typeof AuthenticatedOperationalWaBroadcastRoute
   '/hris/': typeof AuthenticatedHrisIndexRoute
@@ -243,7 +235,6 @@ export interface FileRoutesByTo {
   '/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
   '/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
   '/marketing/overview': typeof AuthenticatedMarketingOverviewRoute
-  '/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/operational/overview': typeof AuthenticatedOperationalOverviewRoute
   '/operational/wa-broadcast': typeof AuthenticatedOperationalWaBroadcastRoute
   '/hris': typeof AuthenticatedHrisIndexRoute
@@ -274,7 +265,6 @@ export interface FileRoutesById {
   '/_authenticated/marketing/dashboard': typeof AuthenticatedMarketingDashboardRoute
   '/_authenticated/marketing/leads': typeof AuthenticatedMarketingLeadsRoute
   '/_authenticated/marketing/overview': typeof AuthenticatedMarketingOverviewRoute
-  '/_authenticated/operational/automation': typeof AuthenticatedOperationalAutomationRoute
   '/_authenticated/operational/overview': typeof AuthenticatedOperationalOverviewRoute
   '/_authenticated/operational/wa-broadcast': typeof AuthenticatedOperationalWaBroadcastRoute
   '/_authenticated/hris/': typeof AuthenticatedHrisIndexRoute
@@ -305,7 +295,6 @@ export interface FileRouteTypes {
     | '/marketing/dashboard'
     | '/marketing/leads'
     | '/marketing/overview'
-    | '/operational/automation'
     | '/operational/overview'
     | '/operational/wa-broadcast'
     | '/hris/'
@@ -334,7 +323,6 @@ export interface FileRouteTypes {
     | '/marketing/dashboard'
     | '/marketing/leads'
     | '/marketing/overview'
-    | '/operational/automation'
     | '/operational/overview'
     | '/operational/wa-broadcast'
     | '/hris'
@@ -364,7 +352,6 @@ export interface FileRouteTypes {
     | '/_authenticated/marketing/dashboard'
     | '/_authenticated/marketing/leads'
     | '/_authenticated/marketing/overview'
-    | '/_authenticated/operational/automation'
     | '/_authenticated/operational/overview'
     | '/_authenticated/operational/wa-broadcast'
     | '/_authenticated/hris/'
@@ -462,13 +449,6 @@ declare module '@tanstack/react-router' {
       path: '/operational/overview'
       fullPath: '/operational/overview'
       preLoaderRoute: typeof AuthenticatedOperationalOverviewRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/operational/automation': {
-      id: '/_authenticated/operational/automation'
-      path: '/operational/automation'
-      fullPath: '/operational/automation'
-      preLoaderRoute: typeof AuthenticatedOperationalAutomationRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/marketing/overview': {
@@ -599,7 +579,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMarketingDashboardRoute: typeof AuthenticatedMarketingDashboardRoute
   AuthenticatedMarketingLeadsRoute: typeof AuthenticatedMarketingLeadsRoute
   AuthenticatedMarketingOverviewRoute: typeof AuthenticatedMarketingOverviewRoute
-  AuthenticatedOperationalAutomationRoute: typeof AuthenticatedOperationalAutomationRoute
   AuthenticatedOperationalOverviewRoute: typeof AuthenticatedOperationalOverviewRoute
   AuthenticatedOperationalWaBroadcastRoute: typeof AuthenticatedOperationalWaBroadcastRoute
   AuthenticatedHrisIndexRoute: typeof AuthenticatedHrisIndexRoute
@@ -626,8 +605,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMarketingDashboardRoute: AuthenticatedMarketingDashboardRoute,
   AuthenticatedMarketingLeadsRoute: AuthenticatedMarketingLeadsRoute,
   AuthenticatedMarketingOverviewRoute: AuthenticatedMarketingOverviewRoute,
-  AuthenticatedOperationalAutomationRoute:
-    AuthenticatedOperationalAutomationRoute,
   AuthenticatedOperationalOverviewRoute: AuthenticatedOperationalOverviewRoute,
   AuthenticatedOperationalWaBroadcastRoute:
     AuthenticatedOperationalWaBroadcastRoute,

@@ -3,19 +3,21 @@ package operational
 import "time"
 
 type CreateProjectRequest struct {
-	Name        string     `json:"name" validate:"required,min=3,max=150"`
-	Description *string    `json:"description"`
-	Deadline    *time.Time `json:"deadline"`
-	Status      string     `json:"status" validate:"required,oneof=draft active on_hold completed archived"`
-	Priority    string     `json:"priority" validate:"required,oneof=low medium high critical"`
+	Name         string     `json:"name" validate:"required,min=3,max=150"`
+	Description  *string    `json:"description"`
+	Deadline     *time.Time `json:"deadline"`
+	Status       string     `json:"status" validate:"required,oneof=draft active on_hold completed archived"`
+	Priority     string     `json:"priority" validate:"required,oneof=low medium high critical"`
+	MemberEmails []string   `json:"member_emails" validate:"omitempty,dive,email"`
 }
 
 type UpdateProjectRequest struct {
-	Name        string     `json:"name" validate:"required,min=3,max=150"`
-	Description *string    `json:"description"`
-	Deadline    *time.Time `json:"deadline"`
-	Status      string     `json:"status" validate:"required,oneof=draft active on_hold completed archived"`
-	Priority    string     `json:"priority" validate:"required,oneof=low medium high critical"`
+	Name           string     `json:"name" validate:"required,min=3,max=150"`
+	Description    *string    `json:"description"`
+	Deadline       *time.Time `json:"deadline"`
+	Status         string     `json:"status" validate:"required,oneof=draft active on_hold completed archived"`
+	Priority       string     `json:"priority" validate:"required,oneof=low medium high critical"`
+	AutoAssignMode *string    `json:"auto_assign_mode" validate:"omitempty,oneof=off round_robin least_busy"`
 }
 
 type ProjectMembersMutationRequest struct {

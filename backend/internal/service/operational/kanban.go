@@ -22,12 +22,13 @@ var (
 )
 
 type KanbanService struct {
-	repo     *operationalrepo.KanbanRepository
-	notifier TaskAssignNotifier
+	repo         *operationalrepo.KanbanRepository
+	projectsRepo *operationalrepo.ProjectsRepository
+	notifier     TaskAssignNotifier
 }
 
-func NewKanbanService(repo *operationalrepo.KanbanRepository) *KanbanService {
-	return &KanbanService{repo: repo}
+func NewKanbanService(repo *operationalrepo.KanbanRepository, projectsRepo *operationalrepo.ProjectsRepository) *KanbanService {
+	return &KanbanService{repo: repo, projectsRepo: projectsRepo}
 }
 
 func (s *KanbanService) SetTaskAssignNotifier(n TaskAssignNotifier) {
@@ -90,11 +91,20 @@ func (s *KanbanService) ListTasks(ctx context.Context, projectID string) ([]mode
 }
 
 func (s *KanbanService) CreateTask(ctx context.Context, projectID string, request operationaldto.CreateKanbanTaskRequest, createdBy string) (model.KanbanTask, error) {
+	assigneeID := normalizeStringPointer(request.AssigneeID)
+
+	// Auto-assign: if no assignee specified, try to auto-assign based on project mode
+	if (assigneeID == nil || *assigneeID == "") && s.projectsRepo != nil {
+		if autoID := s.resolveAutoAssign(ctx, projectID); autoID != "" {
+			assigneeID = &autoID
+		}
+	}
+
 	task, err := s.repo.CreateTask(ctx, projectID, operationalrepo.CreateKanbanTaskParams{
 		ColumnID:    request.ColumnID,
 		Title:       strings.TrimSpace(request.Title),
 		Description: normalizeStringPointer(request.Description),
-		AssigneeID:  normalizeStringPointer(request.AssigneeID),
+		AssigneeID:  assigneeID,
 		DueDate:     normalizeTimePointer(request.DueDate),
 		Priority:    request.Priority,
 		Label:       normalizeStringPointer(request.Label),
@@ -108,7 +118,13 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 		return task, err
 	}
 
-	// UC-3: notify assignee (skip self-assign)
+	// If auto-assigned, mark assigned_via = auto
+	if request.AssigneeID == nil && task.AssigneeID != nil {
+		_ = s.repo.SetAssignedVia(ctx, projectID, task.ID, "auto")
+		task.AssignedVia = "auto"
+	}
+
+	// Notify assignee (skip self-assign)
 	if task.AssigneeID != nil && *task.AssigneeID != createdBy && s.notifier != nil {
 		go s.notifier.SendTaskAssignedNotification(context.Background(), task.ID, *task.AssigneeID)
 	}
@@ -119,16 +135,23 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID string, request operationaldto.UpdateKanbanTaskRequest, actorID string) (model.KanbanTask, error) {
 	// Fetch old task to detect assignee changes
 	var oldAssigneeID string
-	if s.notifier != nil {
-		if old, err := s.repo.GetTask(ctx, projectID, taskID); err == nil && old.AssigneeID != nil {
-			oldAssigneeID = *old.AssigneeID
+	if old, err := s.repo.GetTask(ctx, projectID, taskID); err == nil && old.AssigneeID != nil {
+		oldAssigneeID = *old.AssigneeID
+	}
+
+	assigneeID := normalizeStringPointer(request.AssigneeID)
+
+	// Auto-assign: if assignee is being removed (was set, now nil), try auto-assign
+	if (assigneeID == nil || *assigneeID == "") && oldAssigneeID != "" && s.projectsRepo != nil {
+		if autoID := s.resolveAutoAssign(ctx, projectID); autoID != "" {
+			assigneeID = &autoID
 		}
 	}
 
 	task, err := s.repo.UpdateTask(ctx, projectID, taskID, operationalrepo.UpdateKanbanTaskParams{
 		Title:       strings.TrimSpace(request.Title),
 		Description: normalizeStringPointer(request.Description),
-		AssigneeID:  normalizeStringPointer(request.AssigneeID),
+		AssigneeID:  assigneeID,
 		DueDate:     normalizeTimePointer(request.DueDate),
 		Priority:    request.Priority,
 		Label:       normalizeStringPointer(request.Label),
@@ -141,7 +164,7 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 		return task, err
 	}
 
-	// UC-3: notify new assignee if changed and not self-assign
+	// Notify new assignee if changed and not self-assign
 	if s.notifier != nil && task.AssigneeID != nil {
 		newAssigneeID := *task.AssigneeID
 		if newAssigneeID != oldAssigneeID && newAssigneeID != actorID {
@@ -175,6 +198,35 @@ func (s *KanbanService) MoveTask(ctx context.Context, projectID string, taskID s
 
 func (s *KanbanService) Snapshot(ctx context.Context, projectID string) (operationalrepo.KanbanSnapshot, error) {
 	return s.repo.Snapshot(ctx, projectID)
+}
+
+func (s *KanbanService) resolveAutoAssign(ctx context.Context, projectID string) string {
+	project, err := s.projectsRepo.GetProjectByID(ctx, projectID)
+	if err != nil || project.AutoAssignMode == "off" {
+		return ""
+	}
+
+	switch project.AutoAssignMode {
+	case "round_robin":
+		members, err := s.projectsRepo.ListMemberIDsOrdered(ctx, projectID)
+		if err != nil || len(members) == 0 {
+			return ""
+		}
+		idx := project.AutoAssignCursor % len(members)
+		selected := members[idx]
+		_ = s.projectsRepo.AdvanceCursor(ctx, projectID, idx+1)
+		return selected
+
+	case "least_busy":
+		workloads, err := s.projectsRepo.GetMemberWorkloads(ctx, projectID)
+		if err != nil || len(workloads) == 0 {
+			return ""
+		}
+		return workloads[0].UserID
+
+	default:
+		return ""
+	}
 }
 
 func normalizeTimePointer(value *time.Time) *string {

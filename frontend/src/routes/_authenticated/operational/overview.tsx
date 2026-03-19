@@ -23,6 +23,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
 import { overviewKeys, getOperationalOverview } from "@/services/overview";
@@ -36,6 +37,8 @@ export const Route = createFileRoute("/_authenticated/operational/overview")({
 
 function OperationalOverviewPage() {
   const navigate = useNavigate();
+  const { hasPermission } = useRBAC();
+  const canCreateProject = hasPermission(permissions.operationalProjectCreate);
   const overviewQuery = useQuery({
     queryKey: overviewKeys.operational(),
     queryFn: getOperationalOverview,
@@ -75,13 +78,7 @@ function OperationalOverviewPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void navigate({ to: "/operational/projects" })}>
-            Open Projects
-          </Button>
-          <Button
-            onClick={() => void navigate({ to: "/operational/automation" })}
-            variant="secondary"
-          >
-            Open Automation
+            {canCreateProject ? "Manage Projects" : "View Projects"}
           </Button>
         </div>
       </div>

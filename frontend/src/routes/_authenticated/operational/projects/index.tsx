@@ -138,10 +138,10 @@ function ProjectsListPage() {
           <Link
             className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted"
             params={{ projectId: project.id }}
-            search={{ view: "automation" }}
+            search={{ view: "settings" }}
             to="/operational/projects/$projectId"
           >
-            Automation
+            Settings
           </Link>
           {hasPermission(permissions.operationalProjectDelete) ? (
             <Button
@@ -169,7 +169,7 @@ function ProjectsListPage() {
             </p>
             <h3 className="text-[28px] font-[700] text-text-primary">Projects</h3>
             <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-text-secondary">
-              Scan active projects, open the board directly, or jump into project automation settings.
+              Scan active projects, open the board directly, or configure project settings.
             </p>
           </div>
 
@@ -188,6 +188,7 @@ function ProjectsListPage() {
         isSubmitting={createMutation.isPending}
         onCancel={() => setIsCreateOpen(false)}
         onSubmit={(values) => createMutation.mutate(values)}
+        showMemberPicker
         submitLabel="Create project"
         title="New Project"
       />

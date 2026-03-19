@@ -143,7 +143,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
-	assignmentRulesRepository := operationalrepo.NewAssignmentRulesRepository(pool)
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
 	compensationRepository := hrisrepo.NewCompensationRepository(pool)
@@ -163,8 +162,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	}
 
 	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
-	kanbanService := operationalservice.NewKanbanService(kanbanRepository)
-	assignmentRulesService := operationalservice.NewAssignmentRulesService(assignmentRulesRepository)
+	kanbanService := operationalservice.NewKanbanService(kanbanRepository, projectsRepository)
 	operationalOverviewService := operationalservice.NewOverviewService(operationalOverviewRepository)
 	employeesService := hrisservice.NewEmployeesService(employeesRepository)
 	employeesService.SetAuthRepo(authRepository)
@@ -194,9 +192,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	application.router = application.buildRouter(
 		authService,
 		operationalhandler.NewOverviewHandler(operationalOverviewService),
-		operationalhandler.NewProjectsHandler(projectsService),
+		operationalhandler.NewProjectsHandler(projectsService, projectsRepository),
 		operationalhandler.NewKanbanHandler(kanbanService),
-		operationalhandler.NewAssignmentRulesHandler(assignmentRulesService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
 		hrishandler.NewEmployeesHandler(employeesService),
 		hrishandler.NewDepartmentsHandler(departmentsService),
@@ -239,7 +236,6 @@ func (a *App) buildRouter(
 	operationalOverviewHandler *operationalhandler.OverviewHandler,
 	projectsHandler *operationalhandler.ProjectsHandler,
 	kanbanHandler *operationalhandler.KanbanHandler,
-	assignmentRulesHandler *operationalhandler.AssignmentRulesHandler,
 	hrisOverviewHandler *hrishandler.OverviewHandler,
 	employeesHandler *hrishandler.EmployeesHandler,
 	departmentsHandler *hrishandler.DepartmentsHandler,
@@ -316,8 +312,6 @@ func (a *App) buildRouter(
 				module.Route("/projects", projectsHandler.RegisterRoutes)
 				module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
 				module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
-				module.Route("/projects/{projectID}/assignment-rules", assignmentRulesHandler.RegisterRuleRoutes)
-				module.With(platformmiddleware.RBACMiddleware("operational:assignment:edit")).Post("/projects/{projectID}/tasks/{taskID}/auto-assign", assignmentRulesHandler.AutoAssignTask)
 			})
 
 			protected.Route("/hris", func(module chi.Router) {

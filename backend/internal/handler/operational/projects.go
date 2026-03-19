@@ -11,18 +11,21 @@ import (
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
 )
 
 type ProjectsHandler struct {
 	service   *operationalservice.ProjectsService
+	repo      *operationalrepo.ProjectsRepository
 	validator *validator.Validate
 }
 
-func NewProjectsHandler(service *operationalservice.ProjectsService) *ProjectsHandler {
+func NewProjectsHandler(service *operationalservice.ProjectsService, repo *operationalrepo.ProjectsRepository) *ProjectsHandler {
 	return &ProjectsHandler{
 		service:   service,
+		repo:      repo,
 		validator: validator.New(validator.WithRequiredStructEnabled()),
 	}
 }
@@ -30,6 +33,7 @@ func NewProjectsHandler(service *operationalservice.ProjectsService) *ProjectsHa
 func (h *ProjectsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RBACMiddleware("operational:project:create")).Post("/", h.createProject)
 	router.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/", h.listProjects)
+	router.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/available-users", h.listAvailableUsers)
 	router.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/{projectID}", h.getProject)
 	router.With(platformmiddleware.RBACMiddleware("operational:project:edit")).Put("/{projectID}", h.updateProject)
 	router.With(platformmiddleware.RBACMiddleware("operational:project:delete")).Delete("/{projectID}", h.deleteProject)
@@ -133,6 +137,16 @@ func (h *ProjectsHandler) mutateMembers(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response.WriteJSON(w, http.StatusOK, result, nil)
+}
+
+func (h *ProjectsHandler) listAvailableUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.repo.ListActiveUsers(r.Context())
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list available users", nil)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, users, nil)
 }
 
 func (h *ProjectsHandler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {

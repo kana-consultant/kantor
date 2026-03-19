@@ -9,7 +9,6 @@ import {
   Wallet,
   Receipt,
   CreditCard,
-  Zap,
   BarChart3,
   UserPlus,
   ShieldCheck,
@@ -52,12 +51,6 @@ const sections: NavSection[] = [
         label: "Projects",
         icon: FolderKanban,
         permission: permissions.operationalProjectView,
-      },
-      {
-        to: "/operational/automation",
-        label: "Automation",
-        icon: Zap,
-        permission: permissions.operationalAssignmentView,
       },
       {
         to: "/operational/wa-broadcast",

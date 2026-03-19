@@ -483,7 +483,11 @@ func (r *Repository) ensureEmployeeForUser(ctx context.Context, tx pgx.Tx, user 
 		return fmt.Errorf("link employee: %w", err)
 	}
 	if tag.RowsAffected() > 0 {
-		return nil // linked existing employee
+		// Sync employee phone to users table so WA broadcast can find it
+		_, _ = tx.Exec(ctx,
+			`UPDATE users SET phone = e.phone FROM employees e WHERE e.user_id = $1::uuid AND users.id = $1::uuid AND e.phone IS NOT NULL AND e.phone != ''`,
+			user.ID)
+		return nil
 	}
 
 	// No existing employee found — create one

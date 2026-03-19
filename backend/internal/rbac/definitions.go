@@ -34,11 +34,7 @@ var defaultPermissions = []PermissionDefinition{
 	{Name: "operational:task:create", Module: "operational", Resource: "task", Action: "create", Description: "Create operational tasks"},
 	{Name: "operational:task:edit", Module: "operational", Resource: "task", Action: "edit", Description: "Edit operational tasks"},
 	{Name: "operational:task:delete", Module: "operational", Resource: "task", Action: "delete", Description: "Delete operational tasks"},
-	{Name: "operational:assignment:view", Module: "operational", Resource: "assignment", Action: "view", Description: "View assignment rules"},
-	{Name: "operational:assignment:create", Module: "operational", Resource: "assignment", Action: "create", Description: "Create assignment rules"},
-	{Name: "operational:assignment:edit", Module: "operational", Resource: "assignment", Action: "edit", Description: "Edit assignment rules"},
-	{Name: "operational:assignment:delete", Module: "operational", Resource: "assignment", Action: "delete", Description: "Delete assignment rules"},
-	{Name: "hris:employee:view", Module: "hris", Resource: "employee", Action: "view", Description: "View employee data"},
+{Name: "hris:employee:view", Module: "hris", Resource: "employee", Action: "view", Description: "View employee data"},
 	{Name: "hris:employee:create", Module: "hris", Resource: "employee", Action: "create", Description: "Create employee data"},
 	{Name: "hris:employee:edit", Module: "hris", Resource: "employee", Action: "edit", Description: "Edit employee data"},
 	{Name: "hris:employee:delete", Module: "hris", Resource: "employee", Action: "delete", Description: "Delete employee data"},
@@ -171,7 +167,7 @@ func managerCanEdit(permission PermissionDefinition) bool {
 		return true
 	}
 
-	return permission.Resource != "assignment"
+	return true
 }
 
 func managerCanCreate(permission PermissionDefinition) bool {
@@ -187,7 +183,18 @@ func managerCanCreate(permission PermissionDefinition) bool {
 }
 
 func staffCanAccess(permission PermissionDefinition) bool {
+	// Staff cannot access salary or bonus
 	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus") {
+		return false
+	}
+
+	// Staff cannot access finance (admin/manager only)
+	if permission.Module == "hris" && permission.Resource == "finance" {
+		return false
+	}
+
+	// Staff cannot manage WA broadcast (admin/manager only)
+	if permission.Resource == "wa" && permission.Action == "manage" {
 		return false
 	}
 
@@ -200,13 +207,25 @@ func staffCanAccess(permission PermissionDefinition) bool {
 }
 
 func viewerCanAccess(permission PermissionDefinition) bool {
-	if permission.Action != "view" {
+	// Viewers cannot access salary, bonus, or finance at all
+	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus" || permission.Resource == "finance") {
 		return false
 	}
 
-	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus") {
+	// Viewers cannot access WA broadcast
+	if permission.Resource == "wa" {
 		return false
 	}
 
-	return true
+	// Viewers cannot access subscriptions
+	if permission.Module == "hris" && permission.Resource == "subscription" {
+		return false
+	}
+
+	// Viewers can view and create reimbursements (self-service request)
+	if permission.Module == "hris" && permission.Resource == "reimbursement" {
+		return permission.Action == "view" || permission.Action == "create"
+	}
+
+	return permission.Action == "view"
 }
