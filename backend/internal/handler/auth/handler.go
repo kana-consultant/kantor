@@ -10,21 +10,30 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 
+	"github.com/kana-consultant/kantor/backend/internal/config"
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 )
 
+const refreshTokenCookie = "refresh_token"
+
 type Handler struct {
-	service   *authservice.Service
-	validator *validator.Validate
+	service        *authservice.Service
+	validator      *validator.Validate
+	cookieSecure   bool
+	cookiePath     string
+	refreshExpiry  time.Duration
 }
 
-func New(service *authservice.Service) *Handler {
+func New(service *authservice.Service, cfg config.Config) *Handler {
 	return &Handler{
-		service:   service,
-		validator: validator.New(validator.WithRequiredStructEnabled()),
+		service:       service,
+		validator:     validator.New(validator.WithRequiredStructEnabled()),
+		cookieSecure:  cfg.AppEnv == "production",
+		cookiePath:    "/api/v1/auth",
+		refreshExpiry: cfg.JWTRefreshExpiry,
 	}
 }
 
@@ -73,6 +82,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
 	response.WriteJSON(w, http.StatusCreated, dto.AuthResponse{
 		User:        result.User,
 		Roles:       result.Roles,
@@ -93,6 +103,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
 		User:        result.User,
 		Roles:       result.Roles,
@@ -102,17 +113,19 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
-	var input dto.RefreshRequest
-	if !h.decodeAndValidate(w, r, &input) {
+	refreshToken, err := h.readRefreshTokenCookie(r)
+	if err != nil {
+		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Refresh token cookie is missing", nil)
 		return
 	}
 
-	result, err := h.service.Refresh(r.Context(), input.RefreshToken, r.UserAgent(), clientIP(r))
+	result, err := h.service.Refresh(r.Context(), refreshToken, r.UserAgent(), clientIP(r))
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
 	}
 
+	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
 		User:        result.User,
 		Roles:       result.Roles,
@@ -122,17 +135,45 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
-	var input dto.LogoutRequest
-	if !h.decodeAndValidate(w, r, &input) {
-		return
+	refreshToken, err := h.readRefreshTokenCookie(r)
+	if err == nil {
+		_ = h.service.Logout(r.Context(), refreshToken)
 	}
 
-	if err := h.service.Logout(r.Context(), input.RefreshToken); err != nil {
-		h.writeAuthError(w, err)
-		return
-	}
-
+	h.clearRefreshTokenCookie(w)
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"revoked": true}, nil)
+}
+
+func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshTokenCookie,
+		Value:    token,
+		Path:     h.cookiePath,
+		MaxAge:   int(h.refreshExpiry.Seconds()),
+		HttpOnly: true,
+		Secure:   h.cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (h *Handler) clearRefreshTokenCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshTokenCookie,
+		Value:    "",
+		Path:     h.cookiePath,
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (h *Handler) readRefreshTokenCookie(r *http.Request) (string, error) {
+	cookie, err := r.Cookie(refreshTokenCookie)
+	if err != nil {
+		return "", err
+	}
+	return cookie.Value, nil
 }
 
 func (h *Handler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {

@@ -241,7 +241,7 @@ func (a *App) buildRouter(
 	filesHandler *fileshandler.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
-	authHandler := authhandler.New(authService)
+	authHandler := authhandler.New(authService, a.cfg)
 
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)

@@ -53,6 +53,7 @@ export async function requestEnvelope<TData>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
+    credentials: "include",
   });
 
   const payload = (await response.json()) as ApiSuccess<TData> | ApiFailure;
