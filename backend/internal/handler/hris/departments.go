@@ -45,6 +45,7 @@ func (h *DepartmentsHandler) createDepartment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "department", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -74,21 +75,25 @@ func (h *DepartmentsHandler) updateDepartment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	result, err := h.service.UpdateDepartment(r.Context(), chi.URLParam(r, "departmentID"), input)
+	departmentID := chi.URLParam(r, "departmentID")
+	result, err := h.service.UpdateDepartment(r.Context(), departmentID, input)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "department", departmentID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *DepartmentsHandler) deleteDepartment(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteDepartment(r.Context(), chi.URLParam(r, "departmentID")); err != nil {
+	departmentID := chi.URLParam(r, "departmentID")
+	if err := h.service.DeleteDepartment(r.Context(), departmentID); err != nil {
 		h.writeError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "department", departmentID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Department deleted successfully"}, nil)
 }
 

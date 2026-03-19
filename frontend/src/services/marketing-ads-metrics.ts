@@ -1,6 +1,7 @@
-import { ApiError, requestEnvelope, requestJSON } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { ensureAuthenticated } from "@/services/auth";
+import { ApiError, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { getStoredSession } from "@/stores/auth-store";
 import type {
   AdsMetric,
   AdsMetricFilters,
@@ -19,7 +20,6 @@ export const adsMetricsKeys = {
 };
 
 export async function listAdsMetrics(filters: AdsMetricFilters): Promise<AdsMetricsListResponse> {
-  const token = await requireAccessToken();
   const params = new URLSearchParams();
 
   params.set("page", String(filters.page));
@@ -37,10 +37,9 @@ export async function listAdsMetrics(filters: AdsMetricFilters): Promise<AdsMetr
     params.set("date_to", filters.dateTo);
   }
 
-  const payload = await requestEnvelope<AdsMetricsListResponse["items"]>(
+  const payload = await authRequestEnvelope<AdsMetricsListResponse["items"]>(
     `/marketing/ads-metrics?${params.toString()}`,
     { method: "GET" },
-    token,
   );
 
   return {
@@ -54,21 +53,18 @@ export async function listAdsMetrics(filters: AdsMetricFilters): Promise<AdsMetr
 }
 
 export async function createAdsMetric(input: AdsMetricFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<AdsMetric>(
+  return authRequestJSON<AdsMetric>(
     "/marketing/ads-metrics",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(serializeAdsMetric(input)),
     },
-    token,
   );
 }
 
 export async function batchCreateAdsMetrics(entries: AdsMetricFormValues[]) {
-  const token = await requireAccessToken();
-  return requestJSON<AdsMetric[]>(
+  return authRequestJSON<AdsMetric[]>(
     "/marketing/ads-metrics/batch",
     {
       method: "POST",
@@ -77,34 +73,28 @@ export async function batchCreateAdsMetrics(entries: AdsMetricFormValues[]) {
         entries: entries.map(serializeAdsMetric),
       }),
     },
-    token,
   );
 }
 
 export async function updateAdsMetric(metricId: string, input: AdsMetricFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<AdsMetric>(
+  return authRequestJSON<AdsMetric>(
     `/marketing/ads-metrics/${metricId}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(serializeAdsMetric(input)),
     },
-    token,
   );
 }
 
 export async function deleteAdsMetric(metricId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     `/marketing/ads-metrics/${metricId}`,
     { method: "DELETE" },
-    token,
   );
 }
 
 export async function getAdsMetricsSummary(groupBy: "campaign" | "platform" | "month", dateFrom: string, dateTo: string) {
-  const token = await requireAccessToken();
   const params = new URLSearchParams();
   params.set("group_by", groupBy);
   if (dateFrom) {
@@ -114,15 +104,14 @@ export async function getAdsMetricsSummary(groupBy: "campaign" | "platform" | "m
     params.set("date_to", dateTo);
   }
 
-  return requestJSON<AdsMetricsSummary>(
+  return authRequestJSON<AdsMetricsSummary>(
     `/marketing/ads-metrics/summary?${params.toString()}`,
     { method: "GET" },
-    token,
   );
 }
 
 export async function exportAdsMetricsCSV(dateFrom: string, dateTo: string) {
-  const token = await requireAccessToken();
+  const session = getStoredSession();
   const params = new URLSearchParams({ format: "csv" });
   if (dateFrom) {
     params.set("date_from", dateFrom);
@@ -134,7 +123,7 @@ export async function exportAdsMetricsCSV(dateFrom: string, dateTo: string) {
   const response = await fetch(`${env.VITE_API_BASE_URL}/marketing/ads-metrics/export?${params.toString()}`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${session?.tokens.access_token ?? ""}`,
     },
   });
 
@@ -158,13 +147,4 @@ function serializeAdsMetric(input: AdsMetricFormValues) {
     revenue: input.revenue,
     notes: input.notes.trim() || null,
   };
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
 }

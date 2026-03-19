@@ -11,9 +11,8 @@ import (
 
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/model"
-	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
-	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
+	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 )
 
 var (
@@ -23,16 +22,37 @@ var (
 	ErrLeadContactRequired      = errors.New("lead must include at least phone or email")
 )
 
+type leadsRepository interface {
+	CreateLead(ctx context.Context, params marketingrepo.UpsertLeadParams) (model.Lead, error)
+	ListLeads(ctx context.Context, params marketingrepo.ListLeadsParams) ([]model.Lead, int64, error)
+	GetLeadByID(ctx context.Context, leadID string) (model.Lead, error)
+	UpdateLead(ctx context.Context, leadID string, params marketingrepo.UpsertLeadParams) (model.Lead, error)
+	DeleteLead(ctx context.Context, leadID string) error
+	ListPipeline(ctx context.Context) ([]model.LeadPipelineColumn, error)
+	MoveLeadStatus(ctx context.Context, leadID string, status string, actorID string) (model.Lead, error)
+	ListActivities(ctx context.Context, leadID string) ([]model.LeadActivity, error)
+	CreateActivity(ctx context.Context, params marketingrepo.CreateLeadActivityParams) (model.LeadActivity, error)
+	Summary(ctx context.Context) (model.LeadSummary, error)
+}
+
+type leadsAuthRepository interface {
+	ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error)
+}
+
+type leadsNotificationsService interface {
+	CreateMany(ctx context.Context, params []notificationsrepo.CreateParams) error
+}
+
 type LeadsService struct {
-	repo                 *marketingrepo.LeadsRepository
-	authRepo             *authrepo.Repository
-	notificationsService *notificationsservice.Service
+	repo                 leadsRepository
+	authRepo             leadsAuthRepository
+	notificationsService leadsNotificationsService
 }
 
 func NewLeadsService(
-	repo *marketingrepo.LeadsRepository,
-	authRepo *authrepo.Repository,
-	notificationsService *notificationsservice.Service,
+	repo leadsRepository,
+	authRepo leadsAuthRepository,
+	notificationsService leadsNotificationsService,
 ) *LeadsService {
 	return &LeadsService{
 		repo:                 repo,

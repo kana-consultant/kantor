@@ -11,6 +11,11 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required,min=8"`
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
+}
+
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
@@ -21,7 +26,7 @@ type LogoutRequest struct {
 
 type TokenPair struct {
 	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"-"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int64  `json:"expires_in"`
 }

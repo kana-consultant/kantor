@@ -1,5 +1,5 @@
-import { getJSON, postJSON, requestEnvelope, requestJSON } from "@/lib/api-client";
 import { env } from "@/lib/env";
+import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import { getStoredSession } from "@/stores/auth-store";
 import type {
   FinanceCategory,
@@ -18,44 +18,36 @@ export const financeKeys = {
 };
 
 export async function listFinanceCategories(type = "") {
-  const session = getStoredSession();
   const query = type ? `?type=${encodeURIComponent(type)}` : "";
-  return getJSON<FinanceCategory[]>(`/hris/finance/categories${query}`, session?.tokens.access_token);
+  return authGetJSON<FinanceCategory[]>(`/hris/finance/categories${query}`);
 }
 
 export async function createFinanceCategory(values: FinanceCategoryFormValues) {
-  const session = getStoredSession();
-  return postJSON<FinanceCategory, FinanceCategoryFormValues>(
+  return authPostJSON<FinanceCategory, FinanceCategoryFormValues>(
     "/hris/finance/categories",
     values,
-    session?.tokens.access_token,
   );
 }
 
 export async function updateFinanceCategory(categoryId: string, values: FinanceCategoryFormValues) {
-  const session = getStoredSession();
-  return requestJSON<FinanceCategory>(
+  return authRequestJSON<FinanceCategory>(
     `/hris/finance/categories/${categoryId}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
     },
-    session?.tokens.access_token,
   );
 }
 
 export async function deleteFinanceCategory(categoryId: string) {
-  const session = getStoredSession();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     `/hris/finance/categories/${categoryId}`,
     { method: "DELETE" },
-    session?.tokens.access_token,
   );
 }
 
 export async function listFinanceRecords(filters: FinanceRecordFilters) {
-  const session = getStoredSession();
   const search = new URLSearchParams({
     page: String(filters.page),
     per_page: String(filters.perPage),
@@ -66,10 +58,9 @@ export async function listFinanceRecords(filters: FinanceRecordFilters) {
   if (filters.year) search.set("year", filters.year);
   if (filters.status) search.set("status", filters.status);
 
-  const envelope = await requestEnvelope<FinanceRecord[]>(
+  const envelope = await authRequestEnvelope<FinanceRecord[]>(
     `/hris/finance/records?${search.toString()}`,
     { method: "GET" },
-    session?.tokens.access_token,
   );
 
   return {
@@ -79,20 +70,17 @@ export async function listFinanceRecords(filters: FinanceRecordFilters) {
 }
 
 export async function createFinanceRecord(values: FinanceRecordFormValues) {
-  const session = getStoredSession();
-  return postJSON<FinanceRecord, Record<string, unknown>>(
+  return authPostJSON<FinanceRecord, Record<string, unknown>>(
     "/hris/finance/records",
     {
       ...values,
       record_date: new Date(`${values.record_date}T00:00:00`).toISOString(),
     },
-    session?.tokens.access_token,
   );
 }
 
 export async function updateFinanceRecord(recordId: string, values: FinanceRecordFormValues) {
-  const session = getStoredSession();
-  return requestJSON<FinanceRecord>(
+  return authRequestJSON<FinanceRecord>(
     `/hris/finance/records/${recordId}`,
     {
       method: "PUT",
@@ -102,44 +90,36 @@ export async function updateFinanceRecord(recordId: string, values: FinanceRecor
         record_date: new Date(`${values.record_date}T00:00:00`).toISOString(),
       }),
     },
-    session?.tokens.access_token,
   );
 }
 
 export async function deleteFinanceRecord(recordId: string) {
-  const session = getStoredSession();
-  return requestJSON<{ message: string }>(
+  return authRequestJSON<{ message: string }>(
     `/hris/finance/records/${recordId}`,
     { method: "DELETE" },
-    session?.tokens.access_token,
   );
 }
 
 export async function submitFinanceRecord(recordId: string) {
-  const session = getStoredSession();
-  return requestJSON<FinanceRecord>(
+  return authRequestJSON<FinanceRecord>(
     `/hris/finance/records/${recordId}/submit`,
     { method: "PATCH" },
-    session?.tokens.access_token,
   );
 }
 
 export async function reviewFinanceRecord(recordId: string, decision: "approved" | "rejected") {
-  const session = getStoredSession();
-  return requestJSON<FinanceRecord>(
+  return authRequestJSON<FinanceRecord>(
     `/hris/finance/records/${recordId}/review`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision }),
     },
-    session?.tokens.access_token,
   );
 }
 
 export async function getFinanceSummary(year: number) {
-  const session = getStoredSession();
-  return getJSON<FinanceSummary>(`/hris/finance/summary?year=${year}`, session?.tokens.access_token);
+  return authGetJSON<FinanceSummary>(`/hris/finance/summary?year=${year}`);
 }
 
 export async function exportFinanceCSV(year: number, month?: string) {

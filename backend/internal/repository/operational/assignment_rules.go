@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var ErrAssignmentRuleNotFound = errors.New("assignment rule not found")
@@ -45,6 +46,8 @@ func NewAssignmentRulesRepository(db *pgxpool.Pool) *AssignmentRulesRepository {
 }
 
 func (r *AssignmentRulesRepository) CreateRule(ctx context.Context, projectID string, params CreateAssignmentRuleParams) (model.AssignmentRule, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	configBytes, err := json.Marshal(params.RuleConfig)
 	if err != nil {
 		return model.AssignmentRule{}, err
@@ -80,6 +83,8 @@ func (r *AssignmentRulesRepository) CreateRule(ctx context.Context, projectID st
 }
 
 func (r *AssignmentRulesRepository) ListRules(ctx context.Context, projectID string) ([]model.AssignmentRule, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	rows, err := r.db.Query(ctx, `
 		SELECT id::text, project_id::text, rule_type, rule_config, priority, is_active, created_by::text, created_at
 		FROM assignment_rules
@@ -119,6 +124,8 @@ func (r *AssignmentRulesRepository) ListRules(ctx context.Context, projectID str
 }
 
 func (r *AssignmentRulesRepository) UpdateRule(ctx context.Context, projectID string, ruleID string, params UpdateAssignmentRuleParams) (model.AssignmentRule, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	configBytes, err := json.Marshal(params.RuleConfig)
 	if err != nil {
 		return model.AssignmentRule{}, err
@@ -156,6 +163,8 @@ func (r *AssignmentRulesRepository) UpdateRule(ctx context.Context, projectID st
 }
 
 func (r *AssignmentRulesRepository) DeleteRule(ctx context.Context, projectID string, ruleID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	commandTag, err := r.db.Exec(ctx, `DELETE FROM assignment_rules WHERE project_id = $1::uuid AND id = $2::uuid`, projectID, ruleID)
 	if err != nil {
 		return err
@@ -167,6 +176,8 @@ func (r *AssignmentRulesRepository) DeleteRule(ctx context.Context, projectID st
 }
 
 func (r *AssignmentRulesRepository) ListCandidates(ctx context.Context, projectID string) ([]model.AssignmentCandidate, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			project_members.user_id::text,
@@ -215,6 +226,8 @@ func (r *AssignmentRulesRepository) ListCandidates(ctx context.Context, projectI
 }
 
 func (r *AssignmentRulesRepository) AutoAssignTask(ctx context.Context, projectID string, taskID string, params AutoAssignTaskParams) (model.KanbanTask, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return model.KanbanTask{}, err

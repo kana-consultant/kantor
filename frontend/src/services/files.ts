@@ -72,5 +72,6 @@ export async function openProtectedFile(
 }
 
 export function getProtectedFileName(filePath: string) {
-  return filePath.split("/").at(-1) ?? filePath;
+  const parts = filePath.split("/");
+  return parts[parts.length - 1] ?? filePath;
 }

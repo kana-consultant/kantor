@@ -17,13 +17,31 @@ var (
 	ErrSubscriptionAlertNotFound = errors.New("subscription alert not found")
 )
 
+type subscriptionsRepository interface {
+	CreateSubscription(ctx context.Context, params hrisrepo.CreateSubscriptionParams) (model.Subscription, error)
+	ListSubscriptions(ctx context.Context) ([]model.Subscription, error)
+	GetSubscriptionByID(ctx context.Context, subscriptionID string) (model.Subscription, error)
+	UpdateSubscription(ctx context.Context, subscriptionID string, params hrisrepo.UpdateSubscriptionParams) (model.Subscription, error)
+	DeleteSubscription(ctx context.Context, subscriptionID string) error
+	Summary(ctx context.Context) (model.SubscriptionSummary, error)
+	ListAlerts(ctx context.Context) ([]model.SubscriptionAlert, error)
+	MarkAlertRead(ctx context.Context, alertID string) error
+	ListSubscriptionsForAlertCheck(ctx context.Context) ([]model.Subscription, error)
+	AlertExistsForDay(ctx context.Context, subscriptionID string, alertType string, day time.Time) (bool, error)
+	CreateSubscriptionAlert(ctx context.Context, subscriptionID string, alertType string) error
+}
+
+type subscriptionsEmployeesRepository interface {
+	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
+}
+
 type SubscriptionsService struct {
-	repo          *hrisrepo.SubscriptionsRepository
-	employeesRepo *hrisrepo.EmployeesRepository
+	repo          subscriptionsRepository
+	employeesRepo subscriptionsEmployeesRepository
 	encrypter     *security.Encrypter
 }
 
-func NewSubscriptionsService(repo *hrisrepo.SubscriptionsRepository, employeesRepo *hrisrepo.EmployeesRepository, encrypter *security.Encrypter) *SubscriptionsService {
+func NewSubscriptionsService(repo subscriptionsRepository, employeesRepo subscriptionsEmployeesRepository, encrypter *security.Encrypter) *SubscriptionsService {
 	return &SubscriptionsService{
 		repo:          repo,
 		employeesRepo: employeesRepo,

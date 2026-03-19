@@ -5,12 +5,15 @@ import (
 	"strings"
 
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
-	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 )
+
+type notificationSender interface {
+	CreateMany(ctx context.Context, params []notificationsrepo.CreateParams) error
+}
 
 func sendNotifications(
 	ctx context.Context,
-	service *notificationsservice.Service,
+	service notificationSender,
 	userIDs []string,
 	notificationType string,
 	title string,

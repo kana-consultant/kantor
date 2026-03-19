@@ -5,14 +5,17 @@ import (
 	"time"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
-	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 )
 
-type OverviewService struct {
-	repo *hrisrepo.OverviewRepository
+type hrisOverviewRepository interface {
+	GetOverview(ctx context.Context, now time.Time) (model.HrisOverview, error)
 }
 
-func NewOverviewService(repo *hrisrepo.OverviewRepository) *OverviewService {
+type OverviewService struct {
+	repo hrisOverviewRepository
+}
+
+func NewOverviewService(repo hrisOverviewRepository) *OverviewService {
 	return &OverviewService{repo: repo}
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 type OverviewRepository struct {
@@ -18,6 +19,9 @@ func NewOverviewRepository(db *pgxpool.Pool) *OverviewRepository {
 }
 
 func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (model.MarketingOverview, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	overview := model.MarketingOverview{}
 
 	if err := r.db.QueryRow(ctx, `

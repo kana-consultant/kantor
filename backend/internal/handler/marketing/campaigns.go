@@ -76,6 +76,7 @@ func (h *CampaignsHandler) createCampaign(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "marketing", "campaign", item.Campaign.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, item, nil)
 }
 
@@ -137,19 +138,23 @@ func (h *CampaignsHandler) updateCampaign(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	item, err := h.service.UpdateCampaign(r.Context(), chi.URLParam(r, "campaignID"), input, principal.UserID)
+	campaignID := chi.URLParam(r, "campaignID")
+	item, err := h.service.UpdateCampaign(r.Context(), campaignID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "campaign", campaignID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
 func (h *CampaignsHandler) deleteCampaign(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteCampaign(r.Context(), chi.URLParam(r, "campaignID")); err != nil {
+	campaignID := chi.URLParam(r, "campaignID")
+	if err := h.service.DeleteCampaign(r.Context(), campaignID); err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "campaign", campaignID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Campaign deleted successfully"}, nil)
 }
 
@@ -165,11 +170,13 @@ func (h *CampaignsHandler) moveCampaign(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	item, err := h.service.MoveCampaign(r.Context(), chi.URLParam(r, "campaignID"), input, principal.UserID)
+	campaignID := chi.URLParam(r, "campaignID")
+	item, err := h.service.MoveCampaign(r.Context(), campaignID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "move", "marketing", "campaign", campaignID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
@@ -225,6 +232,7 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "upload_attachments", "marketing", "campaign", campaignID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -238,12 +246,14 @@ func (h *CampaignsHandler) listAttachments(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *CampaignsHandler) deleteAttachment(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.DeleteAttachment(r.Context(), chi.URLParam(r, "campaignID"), chi.URLParam(r, "attachmentID"))
+	attachmentID := chi.URLParam(r, "attachmentID")
+	item, err := h.service.DeleteAttachment(r.Context(), chi.URLParam(r, "campaignID"), attachmentID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 	_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(item.FilePath)))
+	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "campaign_attachment", attachmentID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Campaign attachment deleted successfully"}, nil)
 }
 
@@ -271,6 +281,7 @@ func (h *CampaignsHandler) createColumn(w http.ResponseWriter, r *http.Request) 
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "marketing", "campaign_column", item.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, item, nil)
 }
 
@@ -284,11 +295,13 @@ func (h *CampaignsHandler) updateColumn(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	item, err := h.service.UpdateColumn(r.Context(), chi.URLParam(r, "columnID"), input)
+	columnID := chi.URLParam(r, "columnID")
+	item, err := h.service.UpdateColumn(r.Context(), columnID, input)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "campaign_column", columnID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
@@ -297,10 +310,12 @@ func (h *CampaignsHandler) deleteColumn(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.service.DeleteColumn(r.Context(), chi.URLParam(r, "columnID")); err != nil {
+	columnID := chi.URLParam(r, "columnID")
+	if err := h.service.DeleteColumn(r.Context(), columnID); err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "campaign_column", columnID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Campaign column deleted successfully"}, nil)
 }
 
@@ -318,6 +333,7 @@ func (h *CampaignsHandler) reorderColumns(w http.ResponseWriter, r *http.Request
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "reorder", "marketing", "campaign_columns", "bulk", nil, input)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Campaign columns reordered successfully"}, nil)
 }
 

@@ -18,9 +18,23 @@ var (
 	ErrProjectMemberNotFound = errors.New("project member user not found")
 )
 
+type projectsRepository interface {
+	CreateProject(ctx context.Context, params operationalrepo.CreateProjectParams) (model.Project, error)
+	ListProjects(ctx context.Context, params operationalrepo.ListProjectsParams) ([]model.Project, int64, error)
+	GetProjectByID(ctx context.Context, projectID string) (model.Project, error)
+	UpdateProject(ctx context.Context, projectID string, params operationalrepo.UpdateProjectParams) (model.Project, error)
+	DeleteProject(ctx context.Context, projectID string) error
+	ListProjectMembers(ctx context.Context, projectID string) ([]model.ProjectMember, error)
+	MutateProjectMember(ctx context.Context, projectID string, params operationalrepo.ProjectMemberMutationParams) error
+}
+
+type projectsKanbanRepository interface {
+	CreateDefaultColumns(ctx context.Context, projectID string) error
+}
+
 type ProjectsService struct {
-	repo       *operationalrepo.ProjectsRepository
-	kanbanRepo *operationalrepo.KanbanRepository
+	repo       projectsRepository
+	kanbanRepo projectsKanbanRepository
 }
 
 type ProjectDetail struct {
@@ -28,7 +42,7 @@ type ProjectDetail struct {
 	Members []model.ProjectMember `json:"members"`
 }
 
-func NewProjectsService(repo *operationalrepo.ProjectsRepository, kanbanRepo *operationalrepo.KanbanRepository) *ProjectsService {
+func NewProjectsService(repo projectsRepository, kanbanRepo projectsKanbanRepository) *ProjectsService {
 	return &ProjectsService{
 		repo:       repo,
 		kanbanRepo: kanbanRepo,

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { Download, FolderKanban, LayoutList, Paperclip, Plus } from "lucide-react";
 
@@ -89,7 +89,7 @@ export const Route = createFileRoute("/_authenticated/marketing/campaigns")({
 
 function MarketingCampaignsPage() {
   const search = Route.useSearch();
-  const navigate = useNavigate();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const { hasPermission } = useRBAC();
   const activeView = search.view ?? "kanban";

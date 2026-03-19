@@ -59,6 +59,7 @@ func (h *LeadsHandler) createLead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "marketing", "lead", item.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, item, nil)
 }
 
@@ -102,20 +103,24 @@ func (h *LeadsHandler) updateLead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.service.UpdateLead(r.Context(), chi.URLParam(r, "leadID"), input, principal.UserID)
+	leadID := chi.URLParam(r, "leadID")
+	item, err := h.service.UpdateLead(r.Context(), leadID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "lead", leadID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
 func (h *LeadsHandler) deleteLead(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteLead(r.Context(), chi.URLParam(r, "leadID")); err != nil {
+	leadID := chi.URLParam(r, "leadID")
+	if err := h.service.DeleteLead(r.Context(), leadID); err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "lead", leadID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Lead deleted successfully"}, nil)
 }
 
@@ -140,11 +145,13 @@ func (h *LeadsHandler) moveStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.service.MoveStatus(r.Context(), chi.URLParam(r, "leadID"), input, principal.UserID)
+	leadID := chi.URLParam(r, "leadID")
+	item, err := h.service.MoveStatus(r.Context(), leadID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "move_status", "marketing", "lead", leadID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
@@ -169,11 +176,13 @@ func (h *LeadsHandler) createActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.service.CreateActivity(r.Context(), chi.URLParam(r, "leadID"), input, principal.UserID)
+	leadID := chi.URLParam(r, "leadID")
+	item, err := h.service.CreateActivity(r.Context(), leadID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "marketing", "lead_activity", item.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, item, nil)
 }
 
@@ -202,6 +211,7 @@ func (h *LeadsHandler) importCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "import_csv", "marketing", "lead", "bulk", nil, summary)
 	response.WriteJSON(w, http.StatusOK, summary, nil)
 }
 
