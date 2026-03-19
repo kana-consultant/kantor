@@ -13,6 +13,7 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var ErrNotFound = errors.New("resource not found")
@@ -42,10 +43,14 @@ func New(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) CreateUser(ctx context.Context, params CreateUserParams) (model.User, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	return r.CreateUserWithRoles(ctx, params, nil)
 }
 
 func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserParams, roles []rbac.RoleKey) (model.User, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return model.User{}, err
@@ -101,6 +106,8 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 }
 
 func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserParams, roles []rbac.RoleKey) (model.User, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return model.User{}, err
@@ -148,6 +155,8 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 }
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.User, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
 		FROM users
@@ -181,6 +190,8 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 }
 
 func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
 		FROM users
@@ -214,6 +225,8 @@ func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User
 }
 
 func (r *Repository) GetUserRolesAndPermissions(ctx context.Context, userID string) ([]string, []string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	rolesQuery := `
 		SELECT DISTINCT
 			CASE
@@ -277,6 +290,8 @@ func (r *Repository) GetUserRolesAndPermissions(ctx context.Context, userID stri
 }
 
 func (r *Repository) CreateRefreshToken(ctx context.Context, params CreateRefreshTokenParams) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address)
 		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, '')::inet)
@@ -287,6 +302,8 @@ func (r *Repository) CreateRefreshToken(ctx context.Context, params CreateRefres
 }
 
 func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (model.RefreshToken, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT id::text, user_id::text, token_hash, expires_at, revoked_at, created_at, last_used_at
 		FROM refresh_tokens
@@ -315,6 +332,8 @@ func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string
 }
 
 func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string, params CreateRefreshTokenParams) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -402,6 +421,8 @@ func (r *Repository) ChangePasswordAndRevokeTokens(ctx context.Context, userID s
 }
 
 func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tag, err := r.db.Exec(
 		ctx,
 		`
@@ -450,6 +471,8 @@ func (r *Repository) IsUniqueViolation(err error) bool {
 }
 
 func (r *Repository) CountUsers(ctx context.Context) (int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	var count int64
 	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&count); err != nil {
 		return 0, fmt.Errorf("count users: %w", err)
@@ -459,6 +482,8 @@ func (r *Repository) CountUsers(ctx context.Context) (int64, error) {
 }
 
 func (r *Repository) ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT DISTINCT users.id::text
 		FROM users
@@ -487,6 +512,8 @@ func (r *Repository) ListUserIDsByRole(ctx context.Context, roleName string, mod
 }
 
 func (r *Repository) ListUserIDsByRoleAndDepartment(ctx context.Context, roleName string, module string, department string) ([]string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT DISTINCT users.id::text
 		FROM users

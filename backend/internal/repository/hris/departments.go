@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -33,6 +34,8 @@ func NewDepartmentsRepository(db *pgxpool.Pool) *DepartmentsRepository {
 }
 
 func (r *DepartmentsRepository) CreateDepartment(ctx context.Context, params UpsertDepartmentParams) (model.Department, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	if err := r.ensureHeadEmployeeExists(ctx, params.HeadID); err != nil {
 		return model.Department{}, err
 	}
@@ -59,6 +62,8 @@ func (r *DepartmentsRepository) CreateDepartment(ctx context.Context, params Ups
 }
 
 func (r *DepartmentsRepository) ListDepartments(ctx context.Context) ([]model.Department, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT
 			departments.id::text,
@@ -102,6 +107,8 @@ func (r *DepartmentsRepository) ListDepartments(ctx context.Context) ([]model.De
 }
 
 func (r *DepartmentsRepository) GetDepartmentByID(ctx context.Context, departmentID string) (model.Department, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT
 			departments.id::text,
@@ -136,6 +143,8 @@ func (r *DepartmentsRepository) GetDepartmentByID(ctx context.Context, departmen
 }
 
 func (r *DepartmentsRepository) UpdateDepartment(ctx context.Context, departmentID string, params UpsertDepartmentParams) (model.Department, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	if err := r.ensureHeadEmployeeExists(ctx, params.HeadID); err != nil {
 		return model.Department{}, err
 	}
@@ -170,6 +179,8 @@ func (r *DepartmentsRepository) UpdateDepartment(ctx context.Context, department
 }
 
 func (r *DepartmentsRepository) DeleteDepartment(ctx context.Context, departmentID string) (string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	var deletedName string
 	err := r.db.QueryRow(ctx, `DELETE FROM departments WHERE id = $1::uuid RETURNING name`, departmentID).Scan(&deletedName)
 	if err != nil {
