@@ -98,6 +98,10 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 		return model.User{}, err
 	}
 
+	if err = r.ensureEmployeeForUser(ctx, tx, user); err != nil {
+		return model.User{}, err
+	}
+
 	if err = tx.Commit(ctx); err != nil {
 		return model.User{}, err
 	}
@@ -144,6 +148,11 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 	}
 
 	if err = r.assignRoleKeys(ctx, tx, user.ID, roles); err != nil {
+		return model.User{}, err
+	}
+
+	// Auto-create or link employee record
+	if err = r.ensureEmployeeForUser(ctx, tx, user); err != nil {
 		return model.User{}, err
 	}
 
@@ -575,6 +584,189 @@ func (r *Repository) assignRoleKeys(ctx context.Context, tx pgx.Tx, userID strin
 	}
 
 	return nil
+}
+
+// ensureEmployeeForUser links an existing unlinked employee (by email) or creates
+// a new employee record within the given transaction.
+func (r *Repository) ensureEmployeeForUser(ctx context.Context, tx pgx.Tx, user model.User) error {
+	// Try to link an existing employee that has the same email but no user_id
+	linkQuery := `UPDATE employees SET user_id = $1::uuid, updated_at = NOW() WHERE email = $2 AND user_id IS NULL`
+	tag, err := tx.Exec(ctx, linkQuery, user.ID, user.Email)
+	if err != nil {
+		return fmt.Errorf("link employee: %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		// Sync employee phone to users table so WA broadcast can find it
+		_, _ = tx.Exec(ctx,
+			`UPDATE users SET phone = e.phone FROM employees e WHERE e.user_id = $1::uuid AND users.id = $1::uuid AND e.phone IS NOT NULL AND e.phone != ''`,
+			user.ID)
+		return nil
+	}
+
+	// No existing employee found — create one
+	createQuery := `
+		INSERT INTO employees (user_id, full_name, email, position, date_joined, employment_status)
+		VALUES ($1::uuid, $2, $3, 'Belum Ditentukan', NOW()::date, 'active')
+		ON CONFLICT (user_id) DO NOTHING
+	`
+	if _, err = tx.Exec(ctx, createQuery, user.ID, user.FullName, user.Email); err != nil {
+		return fmt.Errorf("create employee for user: %w", err)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// User management (admin)
+// ---------------------------------------------------------------------------
+
+type ListUsersParams struct {
+	Page    int
+	PerPage int
+	Search  string
+}
+
+type UserWithRoles struct {
+	User  model.User `json:"user"`
+	Roles []string   `json:"roles"`
+}
+
+func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]UserWithRoles, int64, error) {
+	filters := []string{"1=1"}
+	args := make([]interface{}, 0)
+	idx := 1
+
+	if search := strings.TrimSpace(params.Search); search != "" {
+		filters = append(filters, fmt.Sprintf("(u.full_name ILIKE $%d OR u.email ILIKE $%d)", idx, idx))
+		args = append(args, "%"+search+"%")
+		idx++
+	}
+
+	where := strings.Join(filters, " AND ")
+
+	var total int64
+	if err := r.db.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM users u WHERE %s", where), args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	page := params.Page
+	if page <= 0 {
+		page = 1
+	}
+	perPage := params.PerPage
+	if perPage <= 0 {
+		perPage = 20
+	}
+
+	offset := (page - 1) * perPage
+	listQuery := fmt.Sprintf(`
+		SELECT u.id::text, u.email, u.password_hash, u.full_name, u.avatar_url, u.department, u.skills, u.is_active, u.created_at, u.updated_at
+		FROM users u
+		WHERE %s
+		ORDER BY u.created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, where, idx, idx+1)
+	args = append(args, perPage, offset)
+
+	rows, err := r.db.Query(ctx, listQuery, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	result := make([]UserWithRoles, 0)
+	for rows.Next() {
+		var u model.User
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.Department, &u.Skills, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		result = append(result, UserWithRoles{User: u})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	// Fetch roles for each user
+	for i := range result {
+		roles, _, err := r.GetUserRolesAndPermissions(ctx, result[i].User.ID)
+		if err != nil {
+			return nil, 0, err
+		}
+		result[i].Roles = roles
+	}
+
+	return result, total, nil
+}
+
+func (r *Repository) SetUserActive(ctx context.Context, userID string, active bool) error {
+	tag, err := r.db.Exec(ctx, `UPDATE users SET is_active = $2, updated_at = NOW() WHERE id = $1::uuid`, userID, active)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	if _, err = tx.Exec(ctx, `DELETE FROM user_roles WHERE user_id = $1::uuid`, userID); err != nil {
+		return err
+	}
+
+	if err = r.assignRoleKeys(ctx, tx, userID, roles); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) UpdateUserFullName(ctx context.Context, userID string, fullName string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET full_name = $2, updated_at = NOW() WHERE id = $1::uuid`, userID, fullName)
+	return err
+}
+
+func (r *Repository) UpdateUserFullNameAndPhone(ctx context.Context, userID string, fullName string, phone *string) error {
+	normalized := normalizePhone(phone)
+	_, err := r.db.Exec(ctx,
+		`UPDATE users SET full_name = $2, phone = $3, updated_at = NOW() WHERE id = $1::uuid`,
+		userID, fullName, normalized)
+	return err
+}
+
+func (r *Repository) UpdateUserFields(ctx context.Context, userID string, fullName string, email string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE users SET full_name = $2, email = $3, updated_at = NOW() WHERE id = $1::uuid`,
+		userID, fullName, strings.ToLower(strings.TrimSpace(email)))
+	return err
+}
+
+func normalizePhone(phone *string) interface{} {
+	if phone == nil {
+		return nil
+	}
+	p := strings.TrimSpace(*phone)
+	p = strings.ReplaceAll(p, " ", "")
+	p = strings.ReplaceAll(p, "-", "")
+	if strings.HasPrefix(p, "+") {
+		p = p[1:]
+	}
+	if strings.HasPrefix(p, "08") {
+		p = "62" + p[1:]
+	}
+	if p == "" {
+		return nil
+	}
+	return p
 }
 
 func nullableText(value *string) interface{} {

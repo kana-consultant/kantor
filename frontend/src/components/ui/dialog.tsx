@@ -114,7 +114,10 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
       }
 
       const focusable = getFocusableElements(node);
-      const target = focusable[0] ?? node;
+      const inputElement = focusable.find(
+        (el) => el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT",
+      );
+      const target = inputElement ?? node;
       window.setTimeout(() => {
         if (context.open) {
           target.focus();

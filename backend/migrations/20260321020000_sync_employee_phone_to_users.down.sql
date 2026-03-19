@@ -1,0 +1,1 @@
+-- No-op: cannot reliably reverse a data sync

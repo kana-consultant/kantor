@@ -8,10 +8,6 @@ export const permissions = {
   operationalKanbanCreate: "operational:kanban:create",
   operationalKanbanEdit: "operational:kanban:edit",
   operationalKanbanDelete: "operational:kanban:delete",
-  operationalAssignmentView: "operational:assignment:view",
-  operationalAssignmentCreate: "operational:assignment:create",
-  operationalAssignmentEdit: "operational:assignment:edit",
-  operationalAssignmentDelete: "operational:assignment:delete",
   hrisOverview: "hris:employee:view",
   hrisEmployeeView: "hris:employee:view",
   hrisEmployeeCreate: "hris:employee:create",
@@ -52,4 +48,6 @@ export const permissions = {
   marketingLeadsCreate: "marketing:leads:create",
   marketingLeadsEdit: "marketing:leads:edit",
   marketingLeadsDelete: "marketing:leads:delete",
+  operationalWAView: "operational:wa:view",
+  operationalWAManage: "operational:wa:manage",
 } as const;

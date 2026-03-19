@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { Plus, UserMinus } from "lucide-react";
+import { Plus, UserMinus, X } from "lucide-react";
 
-import { AssignmentRulesPanel } from "@/components/shared/assignment-rules-panel";
 import { KanbanBoard } from "@/components/shared/kanban-board";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormModal } from "@/components/shared/form-modal";
@@ -13,21 +12,21 @@ import { ProjectForm } from "@/components/shared/project-form";
 import { StatusBadge as SharedStatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
 import {
   deleteProject,
   getProject,
+  listAvailableUsers,
   mutateProjectMember,
   projectsKeys,
   updateProject,
 } from "@/services/operational-projects";
-import type { ProjectFormValues } from "@/types/project";
+import type { AutoAssignMode, ProjectFormValues } from "@/types/project";
 
 const searchSchema = z.object({
-  view: z.enum(["board", "settings", "automation"]).optional().catch("board"),
+  view: z.enum(["board", "settings"]).optional().catch("board"),
 });
 
 export const Route = createFileRoute("/_authenticated/operational/projects/$projectId")({
@@ -82,6 +81,21 @@ function ProjectWorkspacePage() {
     },
   });
 
+  const autoAssignMutation = useMutation({
+    mutationFn: (mode: AutoAssignMode) =>
+      updateProject(projectId, {
+        name: project!.name,
+        description: project!.description ?? "",
+        deadline: project!.deadline ? project!.deadline.slice(0, 10) : "",
+        status: project!.status,
+        priority: project!.priority,
+        auto_assign_mode: mode,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: projectsKeys.detail(projectId) });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteProject(projectId),
     onSuccess: async () => {
@@ -125,20 +139,11 @@ function ProjectWorkspacePage() {
               <div className="mt-6 flex flex-wrap gap-3">
                 <Skeleton className="h-10 w-[80px] rounded-[6px] bg-muted/60" />
                 <Skeleton className="h-10 w-[90px] rounded-[6px] bg-muted/60" />
-                <Skeleton className="h-10 w-[120px] rounded-[6px] bg-muted/60" />
               </div>
             </div>
             <Skeleton className="h-[180px] w-full min-w-[20rem] xl:w-[320px] rounded-[28px] bg-muted/60" />
           </div>
         </Card>
-        
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Skeleton className="h-[500px] w-full rounded-[24px] bg-muted/60" />
-          <div className="space-y-6">
-            <Skeleton className="h-[250px] w-full rounded-[24px] bg-muted/60" />
-            <Skeleton className="h-[300px] w-full rounded-[24px] bg-muted/60" />
-          </div>
-        </div>
       </div>
     );
   }
@@ -150,6 +155,12 @@ function ProjectWorkspacePage() {
       </Card>
     );
   }
+
+  const autoAssignLabels: Record<AutoAssignMode, string> = {
+    off: "Off",
+    round_robin: "Round Robin",
+    least_busy: "Least Busy",
+  };
 
   return (
     <div className="space-y-6">
@@ -185,11 +196,11 @@ function ProjectWorkspacePage() {
 
             <h3 className="mt-5 max-w-4xl text-4xl font-bold leading-tight tracking-tight text-foreground">{project.name}</h3>
             <p className="mt-3 max-w-3xl text-muted-foreground">
-              {project.description || "This board is ready for daily task execution, collaboration, and automation."}
+              {project.description || "This board is ready for daily task execution and collaboration."}
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              {(["board", "settings", "automation"] as const).map((view) => (
+              {(["board", "settings"] as const).map((view) => (
                 <Button
                   key={view}
                   onClick={() =>
@@ -237,14 +248,6 @@ function ProjectWorkspacePage() {
               >
                 Open board
               </Link>
-              <Link
-                className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-5 text-sm font-medium transition hover:bg-muted"
-                params={{ projectId }}
-                search={{ view: "automation" }}
-                to="/operational/projects/$projectId"
-              >
-                Manage automation
-              </Link>
             </div>
           </div>
         </div>
@@ -276,6 +279,7 @@ function ProjectWorkspacePage() {
                   value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"}
                 />
                 <SummaryRow label="Members" value={String(project.member_count)} />
+                <SummaryRow label="Auto-assign" value={autoAssignLabels[project.auto_assign_mode] ?? "Off"} />
               </div>
             </Card>
 
@@ -340,31 +344,64 @@ function ProjectWorkspacePage() {
 
       {activeView === "settings" ? (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                  Project settings
-                </p>
-                <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Core project details</h4>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Update the project brief, deadline, and priority without pushing the page layout.
-                </p>
+          <div className="space-y-6">
+            <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
+                    Project settings
+                  </p>
+                  <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Core project details</h4>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Update the project brief, deadline, and priority.
+                  </p>
+                </div>
+                <PermissionGate permission={permissions.operationalProjectEdit}>
+                  <Button onClick={() => setIsEditOpen(true)} variant="ops">
+                    Edit project
+                  </Button>
+                </PermissionGate>
               </div>
-              <PermissionGate permission={permissions.operationalProjectEdit}>
-                <Button onClick={() => setIsEditOpen(true)} variant="ops">
-                  Edit project
-                </Button>
-              </PermissionGate>
-            </div>
 
-            <div className="mt-5 grid gap-3">
-              <SummaryRow label="Status" value={project.status.replace("_", " ")} />
-              <SummaryRow label="Priority" value={project.priority} />
-              <SummaryRow label="Deadline" value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"} />
-              <SummaryRow label="Description" value={project.description || "-"} />
-            </div>
-          </Card>
+              <div className="mt-5 grid gap-3">
+                <SummaryRow label="Status" value={project.status.replace("_", " ")} />
+                <SummaryRow label="Priority" value={project.priority} />
+                <SummaryRow label="Deadline" value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"} />
+                <SummaryRow label="Description" value={project.description || "-"} />
+              </div>
+            </Card>
+
+            <PermissionGate permission={permissions.operationalProjectEdit}>
+              <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
+                  Auto-assign
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Task baru tanpa assignee akan otomatis di-assign ke member project.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(["off", "round_robin", "least_busy"] as const).map((mode) => (
+                    <Button
+                      key={mode}
+                      disabled={autoAssignMutation.isPending}
+                      onClick={() => autoAssignMutation.mutate(mode)}
+                      variant={project.auto_assign_mode === mode ? "ops" : "outline"}
+                      size="sm"
+                    >
+                      {autoAssignLabels[mode]}
+                    </Button>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {project.auto_assign_mode === "off"
+                    ? "Auto-assign tidak aktif. Task harus di-assign manual."
+                    : project.auto_assign_mode === "round_robin"
+                      ? "Task di-assign bergantian merata antar member project."
+                      : "Task di-assign ke member dengan task aktif paling sedikit."}
+                </p>
+              </Card>
+            </PermissionGate>
+          </div>
 
           <div className="space-y-6">
             <PermissionGate permission={permissions.operationalProjectEdit}>
@@ -392,15 +429,6 @@ function ProjectWorkspacePage() {
                   </p>
                   <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Project collaborators</h4>
                 </div>
-                <PermissionGate permission={permissions.operationalProjectDelete}>
-                  <Button
-                    disabled={deleteMutation.isPending}
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    variant="ghost"
-                  >
-                    {deleteMutation.isPending ? "Deleting..." : "Delete project"}
-                  </Button>
-                </PermissionGate>
               </div>
 
               <div className="mt-5 space-y-3">
@@ -458,19 +486,6 @@ function ProjectWorkspacePage() {
         </div>
       ) : null}
 
-      {activeView === "automation" ? (
-        <PermissionGate
-          fallback={
-            <Card className="p-8 text-sm text-muted-foreground">
-              You do not have permission to access automation for this project.
-            </Card>
-          }
-          permission={permissions.operationalAssignmentView}
-        >
-          <AssignmentRulesPanel projectId={projectId} />
-        </PermissionGate>
-      ) : null}
-
       {editDefaults ? (
         <ProjectForm
           defaultValues={editDefaults}
@@ -484,38 +499,23 @@ function ProjectWorkspacePage() {
         />
       ) : null}
 
-      <FormModal
-        isLoading={memberMutation.isPending}
+      <AddMemberModal
+        existingMemberIds={members.map((m) => m.user_id)}
         isOpen={isMemberModalOpen}
+        isPending={memberMutation.isPending}
+        onAdd={(email, role) => {
+          memberMutation.mutate({
+            operation: "assign",
+            user_email: email,
+            role_in_project: role,
+          });
+        }}
         onClose={() => {
           setIsMemberModalOpen(false);
           setMemberUserRef("");
           setMemberRole("");
         }}
-        onSubmit={(event) => {
-          event.preventDefault();
-          memberMutation.mutate({
-            operation: "assign",
-            ...(memberUserRef.includes("@") ? { user_email: memberUserRef } : { user_id: memberUserRef }),
-            role_in_project: memberRole,
-          });
-        }}
-        size="md"
-        submitLabel="Add member"
-        title="Add project member"
-        subtitle="Use a seed email like staff.ops@kantor.local or a user ID to attach a collaborator to this project."
-      >
-        <div className="grid gap-4">
-          <div className="space-y-2">
-            <label className="text-[13px] font-[600] text-text-primary">Email or user ID</label>
-            <Input onChange={(event) => setMemberUserRef(event.target.value)} placeholder="staff.ops@kantor.local" value={memberUserRef} />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[13px] font-[600] text-text-primary">Role in project</label>
-            <Input onChange={(event) => setMemberRole(event.target.value)} placeholder="developer, qa, lead" value={memberRole} />
-          </div>
-        </div>
-      </FormModal>
+      />
 
       <ConfirmDialog
         confirmLabel="Hapus project"
@@ -545,6 +545,175 @@ function ProjectWorkspacePage() {
         title={memberToRemove ? `Keluarkan ${memberToRemove.name}?` : "Keluarkan member?"}
       />
     </div>
+  );
+}
+
+function AddMemberModal({
+  existingMemberIds,
+  isOpen,
+  isPending,
+  onAdd,
+  onClose,
+}: {
+  existingMemberIds: string[];
+  isOpen: boolean;
+  isPending: boolean;
+  onAdd: (email: string, role: string) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [selectedEmail, setSelectedEmail] = useState("");
+  const [role, setRole] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const usersQuery = useQuery({
+    queryKey: [...projectsKeys.all, "available-users"],
+    queryFn: listAvailableUsers,
+    enabled: isOpen,
+  });
+
+  const availableUsers = (usersQuery.data ?? []).filter(
+    (u) => !existingMemberIds.includes(u.id),
+  );
+
+  const filtered = availableUsers.filter(
+    (u) =>
+      u.email !== selectedEmail &&
+      (search === "" ||
+        u.full_name.toLowerCase().includes(search.toLowerCase()) ||
+        u.email.toLowerCase().includes(search.toLowerCase())),
+  );
+
+  const selectedUser = availableUsers.find((u) => u.email === selectedEmail);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearch("");
+      setSelectedEmail("");
+      setRole("");
+      setDropdownOpen(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }
+  }, [dropdownOpen]);
+
+  return (
+    <FormModal
+      isLoading={isPending}
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (selectedEmail) {
+          onAdd(selectedEmail, role);
+        }
+      }}
+      size="md"
+      submitLabel="Add member"
+      title="Add project member"
+      subtitle="Pilih user yang akan ditambahkan ke project ini."
+    >
+      <div className="grid gap-4">
+        <div className="space-y-2">
+          <label className="text-[13px] font-[600] text-text-primary">
+            Pilih user <span className="text-priority-high">*</span>
+          </label>
+
+          {selectedUser ? (
+            <div className="flex items-center justify-between rounded-[6px] border border-ops/30 bg-ops/5 px-3 py-2.5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ops/15 text-[11px] font-semibold text-ops">
+                  {initials(selectedUser.full_name)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-text-primary">{selectedUser.full_name}</p>
+                  <p className="truncate text-xs text-text-tertiary">{selectedUser.email}</p>
+                </div>
+              </div>
+              <button
+                className="rounded-full p-1 hover:bg-ops/10"
+                onClick={() => {
+                  setSelectedEmail("");
+                  setSearch("");
+                }}
+                type="button"
+              >
+                <X className="h-4 w-4 text-text-secondary" />
+              </button>
+            </div>
+          ) : (
+            <div className="relative" ref={dropdownRef}>
+              <input
+                className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setDropdownOpen(true);
+                }}
+                onFocus={() => setDropdownOpen(true)}
+                placeholder="Cari nama atau email..."
+                value={search}
+              />
+              {dropdownOpen && filtered.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
+                  {filtered.slice(0, 10).map((user) => (
+                    <button
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-surface-muted"
+                      key={user.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSelectedEmail(user.email);
+                        setSearch("");
+                        setDropdownOpen(false);
+                      }}
+                      type="button"
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ops/15 text-[10px] font-semibold text-ops">
+                        {initials(user.full_name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-text-primary">{user.full_name}</p>
+                        <p className="truncate text-xs text-text-tertiary">{user.email}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {dropdownOpen && filtered.length === 0 && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
+                  {availableUsers.length === 0 ? "Semua user sudah menjadi member" : "Tidak ada hasil"}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
+          <label className="text-[13px] font-[600] text-text-primary">Role in project</label>
+          <select
+            className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
+            onChange={(e) => setRole(e.target.value)}
+            value={role}
+          >
+            <option value="">Pilih role...</option>
+            <option value="lead">Lead</option>
+            <option value="developer">Developer</option>
+            <option value="designer">Designer</option>
+            <option value="qa">QA</option>
+            <option value="member">Member</option>
+          </select>
+        </div>
+      </div>
+    </FormModal>
   );
 }
 

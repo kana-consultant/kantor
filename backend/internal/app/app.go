@@ -30,6 +30,7 @@ import (
 	marketinghandler "github.com/kana-consultant/kantor/backend/internal/handler/marketing"
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
+	wahandler "github.com/kana-consultant/kantor/backend/internal/handler/whatsapp"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	auditrepo "github.com/kana-consultant/kantor/backend/internal/repository/audit"
@@ -38,6 +39,7 @@ import (
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
+	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	"github.com/kana-consultant/kantor/backend/internal/security"
 	auditservice "github.com/kana-consultant/kantor/backend/internal/service/audit"
@@ -47,6 +49,7 @@ import (
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
 	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
+	waservice "github.com/kana-consultant/kantor/backend/internal/service/whatsapp"
 )
 
 type App struct {
@@ -86,7 +89,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	auditService := auditservice.NewService(auditRepository)
 
 	authRepository := authrepo.New(pool)
-	authService := authservice.New(authRepository, cfg)
+	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
+	authService := authservice.New(authRepository, employeesRepository, cfg)
 
 	if cfg.SeedSuperAdmin.Enabled {
 		if err := authService.EnsureSeedSuperAdmin(
@@ -144,9 +148,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
-	assignmentRulesRepository := operationalrepo.NewAssignmentRulesRepository(pool)
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
-	employeesRepository := hrisrepo.NewEmployeesRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
 	compensationRepository := hrisrepo.NewCompensationRepository(pool)
 	financeRepository := hrisrepo.NewFinanceRepository(pool)
@@ -169,10 +171,10 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	}
 
 	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
-	kanbanService := operationalservice.NewKanbanService(kanbanRepository)
-	assignmentRulesService := operationalservice.NewAssignmentRulesService(assignmentRulesRepository)
+	kanbanService := operationalservice.NewKanbanService(kanbanRepository, projectsRepository)
 	operationalOverviewService := operationalservice.NewOverviewService(operationalOverviewRepository)
 	employeesService := hrisservice.NewEmployeesService(employeesRepository)
+	employeesService.SetAuthRepo(authRepository)
 	departmentsService := hrisservice.NewDepartmentsService(departmentsRepository, employeesRepository)
 	compensationService := hrisservice.NewCompensationService(compensationRepository, employeesRepository, encrypter)
 	financeService := hrisservice.NewFinanceService(financeRepository)
@@ -186,14 +188,22 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	marketingOverviewService := marketingservice.NewOverviewService(marketingOverviewRepository)
 	filesService := filesservice.New(cfg.UploadsDir, reimbursementsRepository, campaignsRepository)
 
+	// WhatsApp Broadcast
+	waRepository := warepo.New(pool)
+	waClient := waservice.NewWAHAClient(cfg.WAHA)
+	whatsappService := waservice.NewService(waRepository, waClient, cfg)
+
+	// Wire event triggers
+	kanbanService.SetTaskAssignNotifier(whatsappService)
+	reimbursementsService.SetWANotifier(whatsappService)
+
 	application := &App{cfg: cfg, db: pool}
 	application.router = application.buildRouter(
 		auditService,
 		authService,
 		operationalhandler.NewOverviewHandler(operationalOverviewService),
-		operationalhandler.NewProjectsHandler(projectsService),
+		operationalhandler.NewProjectsHandler(projectsService, projectsRepository),
 		operationalhandler.NewKanbanHandler(kanbanService),
-		operationalhandler.NewAssignmentRulesHandler(assignmentRulesService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
 		hrishandler.NewEmployeesHandler(employeesService),
 		hrishandler.NewDepartmentsHandler(departmentsService),
@@ -207,8 +217,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		marketinghandler.NewLeadsHandler(leadsService),
 		notificationshandler.New(notificationsService),
 		fileshandler.New(filesService),
+		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(subscriptionsService)
+	application.startBackgroundJobs(subscriptionsService, whatsappService)
 
 	return application, nil
 }
@@ -236,7 +247,6 @@ func (a *App) buildRouter(
 	operationalOverviewHandler *operationalhandler.OverviewHandler,
 	projectsHandler *operationalhandler.ProjectsHandler,
 	kanbanHandler *operationalhandler.KanbanHandler,
-	assignmentRulesHandler *operationalhandler.AssignmentRulesHandler,
 	hrisOverviewHandler *hrishandler.OverviewHandler,
 	employeesHandler *hrishandler.EmployeesHandler,
 	departmentsHandler *hrishandler.DepartmentsHandler,
@@ -250,6 +260,7 @@ func (a *App) buildRouter(
 	leadsHandler *marketinghandler.LeadsHandler,
 	notificationsHandler *notificationshandler.Handler,
 	filesHandler *fileshandler.Handler,
+	waHandler *wahandler.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
 	authHandler := authhandler.New(authService, a.cfg)
@@ -296,9 +307,20 @@ func (a *App) buildRouter(
 		r.Group(func(protected chi.Router) {
 			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken))
 			protected.Get("/auth/me", authHandler.Me)
+			protected.Get("/auth/profile", authHandler.GetProfile)
+			protected.Put("/auth/profile", authHandler.UpdateProfile)
+			protected.Post("/auth/change-password", authHandler.ChangePassword)
 			protected.Post("/auth/change-password", authHandler.ChangePassword)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
+
+			protected.Route("/admin", func(admin chi.Router) {
+				admin.Use(platformmiddleware.SuperAdminMiddleware())
+				admin.Get("/users", authHandler.ListUsers)
+				admin.Get("/users/{userID}", authHandler.GetUser)
+				admin.Put("/users/{userID}/roles", authHandler.UpdateUserRoles)
+				admin.Patch("/users/{userID}/active", authHandler.ToggleUserActive)
+			})
 
 			protected.Route("/operational", func(module chi.Router) {
 				module.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/overview", operationalOverviewHandler.Get)
@@ -306,8 +328,6 @@ func (a *App) buildRouter(
 				module.Route("/projects", projectsHandler.RegisterRoutes)
 				module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
 				module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
-				module.Route("/projects/{projectID}/assignment-rules", assignmentRulesHandler.RegisterRuleRoutes)
-				module.With(platformmiddleware.RBACMiddleware("operational:assignment:edit")).Post("/projects/{projectID}/tasks/{taskID}/auto-assign", assignmentRulesHandler.AutoAssignTask)
 			})
 
 			protected.Route("/hris", func(module chi.Router) {
@@ -334,13 +354,15 @@ func (a *App) buildRouter(
 				module.Route("/leads", leadsHandler.RegisterRoutes)
 				module.Route("/columns", campaignsHandler.RegisterColumnRoutes)
 			})
+
+			protected.Route("/wa", waHandler.RegisterRoutes)
 		})
 	})
 
 	return router
 }
 
-func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService) {
+func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, whatsappService *waservice.Service) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -357,6 +379,15 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 		if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now()); err != nil {
 			slog.Error("subscription alert generation failed", "error", err)
 		}
+
+		// Run daily WA reminders on startup
+		go whatsappService.RunDailyReminders(ctx)
+
+		// Check if today is Monday for weekly digest
+		if time.Now().Weekday() == time.Monday {
+			go whatsappService.RunWeeklyDigest(ctx)
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -364,6 +395,16 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			case tickAt := <-ticker.C:
 				if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt); err != nil {
 					slog.Error("subscription alert generation failed", "error", err, "tick", tickAt)
+				}
+
+				// Daily WA reminders (weekdays only)
+				if tickAt.Weekday() >= time.Monday && tickAt.Weekday() <= time.Friday {
+					go whatsappService.RunDailyReminders(ctx)
+				}
+
+				// Weekly digest on Mondays
+				if tickAt.Weekday() == time.Monday {
+					go whatsappService.RunWeeklyDigest(ctx)
 				}
 			}
 		}

@@ -40,11 +40,12 @@ type CreateProjectParams struct {
 }
 
 type UpdateProjectParams struct {
-	Name        string
-	Description *string
-	Deadline    *string
-	Status      string
-	Priority    string
+	Name           string
+	Description    *string
+	Deadline       *string
+	Status         string
+	Priority       string
+	AutoAssignMode *string
 }
 
 type ProjectMemberMutationParams struct {
@@ -64,7 +65,7 @@ func (r *ProjectsRepository) CreateProject(ctx context.Context, params CreatePro
 	query := `
 		INSERT INTO projects (name, description, deadline, status, priority, created_by)
 		VALUES ($1, NULLIF($2, ''), $3::timestamptz, $4, $5, $6::uuid)
-		RETURNING id::text, name, description, deadline, status, priority, created_by::text, created_at, updated_at
+		RETURNING id::text, name, description, deadline, status, priority, auto_assign_mode, created_by::text, created_at, updated_at
 	`
 
 	var project model.Project
@@ -84,6 +85,7 @@ func (r *ProjectsRepository) CreateProject(ctx context.Context, params CreatePro
 		&project.Deadline,
 		&project.Status,
 		&project.Priority,
+		&project.AutoAssignMode,
 		&project.CreatedBy,
 		&project.CreatedAt,
 		&project.UpdatedAt,
@@ -137,6 +139,7 @@ func (r *ProjectsRepository) ListProjects(ctx context.Context, params ListProjec
 			projects.deadline,
 			projects.status,
 			projects.priority,
+			projects.auto_assign_mode,
 			projects.created_by::text,
 			projects.created_at,
 			projects.updated_at,
@@ -166,6 +169,7 @@ func (r *ProjectsRepository) ListProjects(ctx context.Context, params ListProjec
 			&project.Deadline,
 			&project.Status,
 			&project.Priority,
+			&project.AutoAssignMode,
 			&project.CreatedBy,
 			&project.CreatedAt,
 			&project.UpdatedAt,
@@ -194,6 +198,8 @@ func (r *ProjectsRepository) GetProjectByID(ctx context.Context, projectID strin
 			projects.deadline,
 			projects.status,
 			projects.priority,
+			projects.auto_assign_mode,
+			projects.auto_assign_cursor,
 			projects.created_by::text,
 			projects.created_at,
 			projects.updated_at,
@@ -212,6 +218,8 @@ func (r *ProjectsRepository) GetProjectByID(ctx context.Context, projectID strin
 		&project.Deadline,
 		&project.Status,
 		&project.Priority,
+		&project.AutoAssignMode,
+		&project.AutoAssignCursor,
 		&project.CreatedBy,
 		&project.CreatedAt,
 		&project.UpdatedAt,
@@ -231,6 +239,11 @@ func (r *ProjectsRepository) GetProjectByID(ctx context.Context, projectID strin
 func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string, params UpdateProjectParams) (model.Project, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
+
+	autoAssignMode := ""
+	if params.AutoAssignMode != nil && *params.AutoAssignMode != "" {
+		autoAssignMode = *params.AutoAssignMode
+	}
 	query := `
 		UPDATE projects
 		SET
@@ -239,9 +252,10 @@ func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string
 			deadline = $4::timestamptz,
 			status = $5,
 			priority = $6,
+			auto_assign_mode = COALESCE(NULLIF($7, ''), auto_assign_mode),
 			updated_at = NOW()
 		WHERE id = $1::uuid
-		RETURNING id::text, name, description, deadline, status, priority, created_by::text, created_at, updated_at
+		RETURNING id::text, name, description, deadline, status, priority, auto_assign_mode, created_by::text, created_at, updated_at
 	`
 
 	var project model.Project
@@ -254,6 +268,7 @@ func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string
 		nullableTimestampString(params.Deadline),
 		params.Status,
 		params.Priority,
+		autoAssignMode,
 	).Scan(
 		&project.ID,
 		&project.Name,
@@ -261,6 +276,7 @@ func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string
 		&project.Deadline,
 		&project.Status,
 		&project.Priority,
+		&project.AutoAssignMode,
 		&project.CreatedBy,
 		&project.CreatedAt,
 		&project.UpdatedAt,
@@ -368,6 +384,111 @@ func (r *ProjectsRepository) MutateProjectMember(ctx context.Context, projectID 
 	default:
 		return fmt.Errorf("unsupported project member operation")
 	}
+}
+
+func (r *ProjectsRepository) AdvanceCursor(ctx context.Context, projectID string, newCursor int) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE projects SET auto_assign_cursor = $2 WHERE id = $1::uuid`,
+		projectID, newCursor)
+	return err
+}
+
+func (r *ProjectsRepository) ListMemberIDsOrdered(ctx context.Context, projectID string) ([]string, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT user_id::text FROM project_members WHERE project_id = $1::uuid ORDER BY assigned_at ASC, user_id ASC`,
+		projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r *ProjectsRepository) GetMemberWorkloads(ctx context.Context, projectID string) ([]MemberWorkload, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			pm.user_id::text,
+			COALESCE((SELECT COUNT(*) FROM kanban_tasks WHERE assignee_id = pm.user_id AND project_id = pm.project_id), 0)::int AS workload
+		FROM project_members pm
+		WHERE pm.project_id = $1::uuid
+		ORDER BY workload ASC, pm.assigned_at ASC, pm.user_id ASC
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []MemberWorkload
+	for rows.Next() {
+		var mw MemberWorkload
+		if err := rows.Scan(&mw.UserID, &mw.Workload); err != nil {
+			return nil, err
+		}
+		result = append(result, mw)
+	}
+	return result, rows.Err()
+}
+
+type MemberWorkload struct {
+	UserID   string
+	Workload int
+}
+
+type AvailableUser struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	FullName  string  `json:"full_name"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
+func (r *ProjectsRepository) ListActiveUsers(ctx context.Context) ([]AvailableUser, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id::text, email, full_name, avatar_url
+		FROM users
+		WHERE is_active = TRUE
+		ORDER BY full_name ASC, email ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []AvailableUser
+	for rows.Next() {
+		var u AvailableUser
+		if err := rows.Scan(&u.ID, &u.Email, &u.FullName, &u.AvatarURL); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+func (r *ProjectsRepository) BulkAssignMembers(ctx context.Context, projectID string, userEmails []string, roleInProject string) error {
+	for _, email := range userEmails {
+		userID, err := r.resolveProjectMemberUserID(ctx, "", email)
+		if err != nil {
+			continue // skip users that don't exist
+		}
+		_, err = r.db.Exec(ctx, `
+			INSERT INTO project_members (project_id, user_id, role_in_project)
+			VALUES ($1::uuid, $2::uuid, $3)
+			ON CONFLICT (project_id, user_id) DO NOTHING
+		`, projectID, userID, roleInProject)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *ProjectsRepository) countProjectMembers(ctx context.Context, projectID string) int {

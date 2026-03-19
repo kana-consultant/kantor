@@ -41,10 +41,24 @@ type authRepository interface {
 	RevokeRefreshToken(ctx context.Context, tokenHash string) error
 	IsUniqueViolation(err error) bool
 	CountUsers(ctx context.Context) (int64, error)
+	IncrementFailedLoginAttempts(ctx context.Context, userID string, maxAttempts int, lockDuration time.Duration) error
+	ResetFailedLoginAttempts(ctx context.Context, userID string) error
+	ChangePasswordAndRevokeTokens(ctx context.Context, userID string, passwordHash string) error
+	ListUsers(ctx context.Context, params authrepo.ListUsersParams) ([]authrepo.UserWithRoles, int64, error)
+	ReplaceUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error
+	SetUserActive(ctx context.Context, userID string, active bool) error
+	UpdateUserFullNameAndPhone(ctx context.Context, userID string, fullName string, phone *string) error
+	UpdateUserFields(ctx context.Context, userID string, fullName string, email string) error
+}
+
+type authEmployeesRepository interface {
+	GetEmployeeByUserID(ctx context.Context, userID string) (model.Employee, error)
+	UpdateEmployeeProfile(ctx context.Context, userID string, fullName string, phone *string, address *string, emergencyContact *string, avatarURL *string) (model.Employee, error)
 }
 
 type Service struct {
 	repo         authRepository
+	employeeRepo authEmployeesRepository
 	tokenManager *backendauth.TokenManager
 }
 
@@ -55,9 +69,10 @@ type AuthResult struct {
 	Tokens      dto.TokenPair
 }
 
-func New(repo authRepository, cfg config.Config) *Service {
+func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config) *Service {
 	return &Service{
 		repo:         repo,
+		employeeRepo: employeeRepo,
 		tokenManager: backendauth.NewTokenManager(cfg.JWTSecret, cfg.JWTAccessExpiry, cfg.JWTRefreshExpiry),
 	}
 }
@@ -246,6 +261,62 @@ func (s *Service) GetSession(ctx context.Context, userID string) (AuthResult, er
 		Roles:       roles,
 		Permissions: permissions,
 	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
+func (s *Service) GetProfile(ctx context.Context, userID string) (model.Employee, error) {
+	return s.employeeRepo.GetEmployeeByUserID(ctx, userID)
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, userID string, input dto.UpdateProfileRequest) (model.Employee, error) {
+	fullName := strings.TrimSpace(input.FullName)
+
+	employee, err := s.employeeRepo.UpdateEmployeeProfile(ctx, userID, fullName, input.Phone, input.Address, input.EmergencyContact, input.AvatarURL)
+	if err != nil {
+		return model.Employee{}, err
+	}
+
+	// Sync full_name + phone to users table (phone is used by WA broadcast)
+	if err := s.repo.UpdateUserFullNameAndPhone(ctx, userID, fullName, input.Phone); err != nil {
+		return model.Employee{}, err
+	}
+
+	return employee, nil
+}
+
+// ---------------------------------------------------------------------------
+// User management (admin)
+// ---------------------------------------------------------------------------
+
+func (s *Service) ListUsers(ctx context.Context, params authrepo.ListUsersParams) ([]authrepo.UserWithRoles, int64, error) {
+	return s.repo.ListUsers(ctx, params)
+}
+
+func (s *Service) GetUserWithRoles(ctx context.Context, userID string) (*authrepo.UserWithRoles, error) {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	roles, _, err := s.repo.GetUserRolesAndPermissions(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &authrepo.UserWithRoles{User: user, Roles: roles}, nil
+}
+
+func (s *Service) UpdateUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error {
+	// Verify user exists
+	if _, err := s.repo.GetUserByID(ctx, userID); err != nil {
+		return err
+	}
+	return s.repo.ReplaceUserRoles(ctx, userID, roles)
+}
+
+func (s *Service) SetUserActive(ctx context.Context, userID string, active bool) error {
+	return s.repo.SetUserActive(ctx, userID, active)
 }
 
 func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldTokenHash string, userAgent string, ipAddress string) (AuthResult, error) {

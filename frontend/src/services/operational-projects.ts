@@ -1,5 +1,6 @@
 import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type {
+  AvailableUser,
   ListProjectsResponse,
   PaginationMeta,
   ProjectDetail,
@@ -20,6 +21,11 @@ export const projectsKeys = {
     [...projectsKeys.all, { ...filters }] as const,
   detail: (projectId: string) => [...projectsKeys.all, projectId] as const,
 };
+
+export async function listAvailableUsers(): Promise<AvailableUser[]> {
+  const token = await requireAccessToken();
+  return requestJSON<AvailableUser[]>("/operational/projects/available-users", { method: "GET" }, token);
+}
 
 export async function listProjects(filters: ProjectFilters): Promise<ListProjectsResponse> {
   const params = new URLSearchParams();
@@ -113,5 +119,7 @@ function serializeProjectForm(input: ProjectFormValues) {
     deadline: input.deadline ? new Date(input.deadline).toISOString() : null,
     status: input.status,
     priority: input.priority,
+    ...(input.auto_assign_mode ? { auto_assign_mode: input.auto_assign_mode } : {}),
+    ...(input.member_emails && input.member_emails.length > 0 ? { member_emails: input.member_emails } : {}),
   };
 }

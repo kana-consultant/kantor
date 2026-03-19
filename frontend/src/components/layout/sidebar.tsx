@@ -3,19 +3,21 @@ import {
   FolderKanban,
   LayoutDashboard,
   Megaphone,
+  MessageCircle,
   Users,
   Building2,
   Wallet,
   Receipt,
   CreditCard,
-  Zap,
   BarChart3,
-  UserPlus
+  UserPlus,
+  ShieldCheck,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 
 import { KantorLogo } from "@/components/layout/kantor-logo";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -28,7 +30,7 @@ interface NavItem {
 }
 
 interface NavSection {
-  id: 'ops' | 'hr' | 'mkt';
+  id: 'ops' | 'hr' | 'mkt' | 'admin';
   label: string;
   items: NavItem[];
 }
@@ -51,10 +53,10 @@ const sections: NavSection[] = [
         permission: permissions.operationalProjectView,
       },
       {
-        to: "/operational/automation",
-        label: "Automation",
-        icon: Zap,
-        permission: permissions.operationalAssignmentView,
+        to: "/operational/wa-broadcast",
+        label: "WA Broadcast",
+        icon: MessageCircle,
+        permission: permissions.operationalWAView,
       },
     ],
   },
@@ -144,13 +146,30 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
     select: (state) => state.location.pathname,
   });
   const { hasPermission } = useRBAC();
+  const { roles } = useAuth();
+  const isSuperAdmin = roles.includes("super_admin");
 
-  const visibleSections = sections
+  const visibleSections: NavSection[] = sections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => hasPermission(item.permission)),
     }))
     .filter((section) => section.items.length > 0);
+
+  if (isSuperAdmin) {
+    visibleSections.push({
+      id: "admin",
+      label: "ADMIN",
+      items: [
+        {
+          to: "/admin/users",
+          label: "Kelola Pengguna",
+          icon: ShieldCheck,
+          permission: "",
+        },
+      ],
+    });
+  }
 
   return (
     <aside
@@ -171,7 +190,7 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
              {!collapsed ? (
                 <div className={cn(
                   "mt-6 mb-2 px-3 text-[11px] font-[700] uppercase tracking-[0.08em]",
-                  section.id === 'ops' ? 'text-ops' : section.id === 'hr' ? 'text-hr' : 'text-mkt'
+                  section.id === 'ops' ? 'text-ops' : section.id === 'hr' ? 'text-hr' : section.id === 'mkt' ? 'text-mkt' : 'text-purple-500 dark:text-purple-400'
                 )}>
                  {section.label}
                 </div>
@@ -180,7 +199,7 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
                   <Tooltip content={section.label}>
                     <div className={cn(
                       "w-2 h-2 rounded-full",
-                      section.id === 'ops' ? 'bg-ops' : section.id === 'hr' ? 'bg-hr' : 'bg-mkt'
+                      section.id === 'ops' ? 'bg-ops' : section.id === 'hr' ? 'bg-hr' : section.id === 'mkt' ? 'bg-mkt' : 'bg-purple-500'
                     )} />
                   </Tooltip>
                 </div>
@@ -197,6 +216,7 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
                      if (section.id === 'ops') activeColors = "bg-ops-light text-ops font-[600]";
                      if (section.id === 'hr') activeColors = "bg-hr-light text-hr font-[600]";
                      if (section.id === 'mkt') activeColors = "bg-mkt-light text-mkt font-[600]";
+                     if (section.id === 'admin') activeColors = "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 font-[600]";
                   }
 
                   return (

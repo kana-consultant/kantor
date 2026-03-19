@@ -84,6 +84,11 @@ func SeedDefaults(ctx context.Context, db *pgxpool.Pool) error {
 			return fmt.Errorf("role %s missing from seed map", roleKey)
 		}
 
+		// Clear existing role_permissions so revoked access is actually removed
+		if _, err = tx.Exec(ctx, `DELETE FROM role_permissions WHERE role_id = $1::uuid`, roleID); err != nil {
+			return fmt.Errorf("clear permissions for role %s: %w", roleKey, err)
+		}
+
 		for _, permissionName := range PermissionNamesForRole(role) {
 			permissionID, permissionFound := permissionIDs[permissionName]
 			if !permissionFound {

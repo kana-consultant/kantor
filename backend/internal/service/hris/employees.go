@@ -12,10 +12,13 @@ import (
 
 var (
 	ErrEmployeeNotFound        = errors.New("employee not found")
-	ErrEmployeeLinkedUser      = errors.New("linked user account not found")
 	ErrEmployeeEmailExists     = errors.New("employee email already exists")
 	ErrEmployeeUserLinkedTwice = errors.New("user account is already linked to another employee")
 )
+
+type userFieldsSyncer interface {
+	UpdateUserFields(ctx context.Context, userID string, fullName string, email string) error
+}
 
 type employeesRepository interface {
 	CreateEmployee(ctx context.Context, params hrisrepo.UpsertEmployeeParams) (model.Employee, error)
@@ -26,16 +29,20 @@ type employeesRepository interface {
 }
 
 type EmployeesService struct {
-	repo employeesRepository
+	repo     employeesRepository
+	authRepo userFieldsSyncer
 }
 
 func NewEmployeesService(repo employeesRepository) *EmployeesService {
 	return &EmployeesService{repo: repo}
 }
 
+func (s *EmployeesService) SetAuthRepo(syncer userFieldsSyncer) {
+	s.authRepo = syncer
+}
+
 func (s *EmployeesService) CreateEmployee(ctx context.Context, request hrisdto.CreateEmployeeRequest) (model.Employee, error) {
 	employee, err := s.repo.CreateEmployee(ctx, hrisrepo.UpsertEmployeeParams{
-		UserID:           trimOptionalString(request.UserID),
 		FullName:         strings.TrimSpace(request.FullName),
 		Email:            strings.ToLower(strings.TrimSpace(request.Email)),
 		Phone:            trimOptionalString(request.Phone),
@@ -90,7 +97,6 @@ func (s *EmployeesService) GetEmployee(ctx context.Context, employeeID string) (
 
 func (s *EmployeesService) UpdateEmployee(ctx context.Context, employeeID string, request hrisdto.UpdateEmployeeRequest) (model.Employee, error) {
 	employee, err := s.repo.UpdateEmployee(ctx, employeeID, hrisrepo.UpsertEmployeeParams{
-		UserID:           trimOptionalString(request.UserID),
 		FullName:         strings.TrimSpace(request.FullName),
 		Email:            strings.ToLower(strings.TrimSpace(request.Email)),
 		Phone:            trimOptionalString(request.Phone),
@@ -106,6 +112,11 @@ func (s *EmployeesService) UpdateEmployee(ctx context.Context, employeeID string
 		return model.Employee{}, mapEmployeeError(err)
 	}
 
+	// Sync full_name and email back to users table if linked
+	if employee.UserID != nil && s.authRepo != nil {
+		_ = s.authRepo.UpdateUserFields(ctx, *employee.UserID, employee.FullName, employee.Email)
+	}
+
 	return employee, nil
 }
 
@@ -117,8 +128,6 @@ func mapEmployeeError(err error) error {
 	switch {
 	case errors.Is(err, hrisrepo.ErrEmployeeNotFound):
 		return ErrEmployeeNotFound
-	case errors.Is(err, hrisrepo.ErrEmployeeLinkedUserAbsent):
-		return ErrEmployeeLinkedUser
 	case errors.Is(err, hrisrepo.ErrEmployeeEmailExists):
 		return ErrEmployeeEmailExists
 	case errors.Is(err, hrisrepo.ErrEmployeeUserAlreadyUsed):

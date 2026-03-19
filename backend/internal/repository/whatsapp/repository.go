@@ -1,0 +1,735 @@
+package whatsapp
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/kana-consultant/kantor/backend/internal/model"
+)
+
+var (
+	ErrTemplateNotFound = errors.New("wa template not found")
+	ErrScheduleNotFound = errors.New("wa schedule not found")
+	ErrSystemTemplate   = errors.New("cannot delete system template")
+)
+
+type Repository struct {
+	db *pgxpool.Pool
+}
+
+func New(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db}
+}
+
+// --------------- Templates ---------------
+
+type CreateTemplateParams struct {
+	Name               string
+	Slug               string
+	Category           string
+	TriggerType        string
+	BodyTemplate       string
+	Description        *string
+	AvailableVariables []string
+	IsActive           bool
+	CreatedBy          *string
+}
+
+type UpdateTemplateParams struct {
+	Name               *string
+	Category           *string
+	TriggerType        *string
+	BodyTemplate       string
+	Description        *string
+	AvailableVariables []string
+	IsActive           bool
+}
+
+func (r *Repository) ListTemplates(ctx context.Context, category string, triggerType string) ([]model.WAMessageTemplate, error) {
+	query := `SELECT id, name, slug, category, trigger_type, body_template, description,
+		available_variables, is_active, is_system, created_by, created_at, updated_at
+		FROM wa_message_templates WHERE 1=1`
+	args := []interface{}{}
+	argIdx := 1
+
+	if category != "" {
+		query += fmt.Sprintf(" AND category = $%d", argIdx)
+		args = append(args, category)
+		argIdx++
+	}
+	if triggerType != "" {
+		query += fmt.Sprintf(" AND trigger_type = $%d", argIdx)
+		args = append(args, triggerType)
+		argIdx++
+	}
+
+	query += " ORDER BY is_system DESC, name ASC"
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list templates: %w", err)
+	}
+	defer rows.Close()
+
+	var templates []model.WAMessageTemplate
+	for rows.Next() {
+		var t model.WAMessageTemplate
+		if err := rows.Scan(&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType,
+			&t.BodyTemplate, &t.Description, &t.AvailableVariables, &t.IsActive,
+			&t.IsSystem, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan template: %w", err)
+		}
+		templates = append(templates, t)
+	}
+	return templates, nil
+}
+
+func (r *Repository) GetTemplateByID(ctx context.Context, id string) (model.WAMessageTemplate, error) {
+	var t model.WAMessageTemplate
+	err := r.db.QueryRow(ctx, `SELECT id, name, slug, category, trigger_type, body_template,
+		description, available_variables, is_active, is_system, created_by, created_at, updated_at
+		FROM wa_message_templates WHERE id = $1`, id).Scan(
+		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
+		&t.Description, &t.AvailableVariables, &t.IsActive, &t.IsSystem,
+		&t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return t, ErrTemplateNotFound
+	}
+	return t, err
+}
+
+func (r *Repository) GetTemplateBySlug(ctx context.Context, slug string) (model.WAMessageTemplate, error) {
+	var t model.WAMessageTemplate
+	err := r.db.QueryRow(ctx, `SELECT id, name, slug, category, trigger_type, body_template,
+		description, available_variables, is_active, is_system, created_by, created_at, updated_at
+		FROM wa_message_templates WHERE slug = $1`, slug).Scan(
+		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
+		&t.Description, &t.AvailableVariables, &t.IsActive, &t.IsSystem,
+		&t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return t, ErrTemplateNotFound
+	}
+	return t, err
+}
+
+func (r *Repository) CreateTemplate(ctx context.Context, params CreateTemplateParams) (model.WAMessageTemplate, error) {
+	var t model.WAMessageTemplate
+	err := r.db.QueryRow(ctx, `INSERT INTO wa_message_templates
+		(name, slug, category, trigger_type, body_template, description, available_variables, is_active, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id, name, slug, category, trigger_type, body_template, description,
+		available_variables, is_active, is_system, created_by, created_at, updated_at`,
+		params.Name, params.Slug, params.Category, params.TriggerType, params.BodyTemplate,
+		params.Description, params.AvailableVariables, params.IsActive, params.CreatedBy).Scan(
+		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
+		&t.Description, &t.AvailableVariables, &t.IsActive, &t.IsSystem,
+		&t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	return t, err
+}
+
+func (r *Repository) UpdateTemplate(ctx context.Context, id string, params UpdateTemplateParams, isSystem bool) (model.WAMessageTemplate, error) {
+	var query string
+	var args []interface{}
+
+	if isSystem {
+		// System templates: only body_template and is_active can be changed
+		query = `UPDATE wa_message_templates SET body_template = $1, is_active = $2, updated_at = NOW()
+			WHERE id = $3
+			RETURNING id, name, slug, category, trigger_type, body_template, description,
+			available_variables, is_active, is_system, created_by, created_at, updated_at`
+		args = []interface{}{params.BodyTemplate, params.IsActive, id}
+	} else {
+		query = `UPDATE wa_message_templates SET
+			name = COALESCE($1, name), category = COALESCE($2, category),
+			trigger_type = COALESCE($3, trigger_type), body_template = $4,
+			description = $5, available_variables = $6, is_active = $7, updated_at = NOW()
+			WHERE id = $8
+			RETURNING id, name, slug, category, trigger_type, body_template, description,
+			available_variables, is_active, is_system, created_by, created_at, updated_at`
+		args = []interface{}{params.Name, params.Category, params.TriggerType, params.BodyTemplate,
+			params.Description, params.AvailableVariables, params.IsActive, id}
+	}
+
+	var t model.WAMessageTemplate
+	err := r.db.QueryRow(ctx, query, args...).Scan(
+		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
+		&t.Description, &t.AvailableVariables, &t.IsActive, &t.IsSystem,
+		&t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return t, ErrTemplateNotFound
+	}
+	return t, err
+}
+
+func (r *Repository) DeleteTemplate(ctx context.Context, id string) error {
+	var isSystem bool
+	err := r.db.QueryRow(ctx, "SELECT is_system FROM wa_message_templates WHERE id = $1", id).Scan(&isSystem)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrTemplateNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if isSystem {
+		return ErrSystemTemplate
+	}
+
+	_, err = r.db.Exec(ctx, "DELETE FROM wa_message_templates WHERE id = $1", id)
+	return err
+}
+
+// --------------- Schedules ---------------
+
+type CreateScheduleParams struct {
+	Name           string
+	TemplateID     string
+	ScheduleType   string
+	CronExpression *string
+	TargetType     string
+	TargetConfig   *string
+	IsActive       bool
+	CreatedBy      *string
+}
+
+type UpdateScheduleParams struct {
+	Name           string
+	TemplateID     string
+	ScheduleType   string
+	CronExpression *string
+	TargetType     string
+	TargetConfig   *string
+	IsActive       bool
+}
+
+func (r *Repository) ListSchedules(ctx context.Context) ([]model.WABroadcastSchedule, error) {
+	rows, err := r.db.Query(ctx, `SELECT s.id, s.name, s.template_id, t.name, s.schedule_type,
+		s.cron_expression, s.target_type, s.target_config::text, s.is_active,
+		s.last_run_at, s.next_run_at, s.created_by, s.created_at, s.updated_at
+		FROM wa_broadcast_schedules s
+		JOIN wa_message_templates t ON t.id = s.template_id
+		ORDER BY s.created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list schedules: %w", err)
+	}
+	defer rows.Close()
+
+	var schedules []model.WABroadcastSchedule
+	for rows.Next() {
+		var s model.WABroadcastSchedule
+		if err := rows.Scan(&s.ID, &s.Name, &s.TemplateID, &s.TemplateName, &s.ScheduleType,
+			&s.CronExpression, &s.TargetType, &s.TargetConfig, &s.IsActive,
+			&s.LastRunAt, &s.NextRunAt, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan schedule: %w", err)
+		}
+		schedules = append(schedules, s)
+	}
+	return schedules, nil
+}
+
+func (r *Repository) GetScheduleByID(ctx context.Context, id string) (model.WABroadcastSchedule, error) {
+	var s model.WABroadcastSchedule
+	err := r.db.QueryRow(ctx, `SELECT s.id, s.name, s.template_id, t.name, s.schedule_type,
+		s.cron_expression, s.target_type, s.target_config::text, s.is_active,
+		s.last_run_at, s.next_run_at, s.created_by, s.created_at, s.updated_at
+		FROM wa_broadcast_schedules s
+		JOIN wa_message_templates t ON t.id = s.template_id
+		WHERE s.id = $1`, id).Scan(
+		&s.ID, &s.Name, &s.TemplateID, &s.TemplateName, &s.ScheduleType,
+		&s.CronExpression, &s.TargetType, &s.TargetConfig, &s.IsActive,
+		&s.LastRunAt, &s.NextRunAt, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s, ErrScheduleNotFound
+	}
+	return s, err
+}
+
+func (r *Repository) CreateSchedule(ctx context.Context, params CreateScheduleParams) (model.WABroadcastSchedule, error) {
+	var s model.WABroadcastSchedule
+	err := r.db.QueryRow(ctx, `INSERT INTO wa_broadcast_schedules
+		(name, template_id, schedule_type, cron_expression, target_type, target_config, is_active, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+		RETURNING id, name, template_id, schedule_type, cron_expression, target_type,
+		target_config::text, is_active, last_run_at, next_run_at, created_by, created_at, updated_at`,
+		params.Name, params.TemplateID, params.ScheduleType, params.CronExpression,
+		params.TargetType, params.TargetConfig, params.IsActive, params.CreatedBy).Scan(
+		&s.ID, &s.Name, &s.TemplateID, &s.ScheduleType, &s.CronExpression,
+		&s.TargetType, &s.TargetConfig, &s.IsActive, &s.LastRunAt, &s.NextRunAt,
+		&s.CreatedBy, &s.CreatedAt, &s.UpdatedAt)
+	return s, err
+}
+
+func (r *Repository) UpdateSchedule(ctx context.Context, id string, params UpdateScheduleParams) (model.WABroadcastSchedule, error) {
+	var s model.WABroadcastSchedule
+	err := r.db.QueryRow(ctx, `UPDATE wa_broadcast_schedules SET
+		name = $1, template_id = $2, schedule_type = $3, cron_expression = $4,
+		target_type = $5, target_config = $6::jsonb, is_active = $7, updated_at = NOW()
+		WHERE id = $8
+		RETURNING id, name, template_id, schedule_type, cron_expression, target_type,
+		target_config::text, is_active, last_run_at, next_run_at, created_by, created_at, updated_at`,
+		params.Name, params.TemplateID, params.ScheduleType, params.CronExpression,
+		params.TargetType, params.TargetConfig, params.IsActive, id).Scan(
+		&s.ID, &s.Name, &s.TemplateID, &s.ScheduleType, &s.CronExpression,
+		&s.TargetType, &s.TargetConfig, &s.IsActive, &s.LastRunAt, &s.NextRunAt,
+		&s.CreatedBy, &s.CreatedAt, &s.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s, ErrScheduleNotFound
+	}
+	return s, err
+}
+
+func (r *Repository) ToggleSchedule(ctx context.Context, id string, active bool) (model.WABroadcastSchedule, error) {
+	var s model.WABroadcastSchedule
+	err := r.db.QueryRow(ctx, `UPDATE wa_broadcast_schedules SET is_active = $1, updated_at = NOW()
+		WHERE id = $2
+		RETURNING id, name, template_id, schedule_type, cron_expression, target_type,
+		target_config::text, is_active, last_run_at, next_run_at, created_by, created_at, updated_at`,
+		active, id).Scan(
+		&s.ID, &s.Name, &s.TemplateID, &s.ScheduleType, &s.CronExpression,
+		&s.TargetType, &s.TargetConfig, &s.IsActive, &s.LastRunAt, &s.NextRunAt,
+		&s.CreatedBy, &s.CreatedAt, &s.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s, ErrScheduleNotFound
+	}
+	return s, err
+}
+
+func (r *Repository) DeleteSchedule(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, "DELETE FROM wa_broadcast_schedules WHERE id = $1", id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrScheduleNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdateScheduleLastRun(ctx context.Context, id string) error {
+	_, err := r.db.Exec(ctx, "UPDATE wa_broadcast_schedules SET last_run_at = NOW() WHERE id = $1", id)
+	return err
+}
+
+// --------------- Broadcast Logs ---------------
+
+type CreateLogParams struct {
+	ScheduleID      *string
+	TemplateID      *string
+	TemplateSlug    *string
+	TriggerType     string
+	RecipientUserID *string
+	RecipientPhone  string
+	MessageBody     string
+	Status          string
+	ErrorMessage    *string
+	ReferenceType   *string
+	ReferenceID     *string
+}
+
+type ListLogsParams struct {
+	Page         int
+	PerPage      int
+	ScheduleID   string
+	TriggerType  string
+	TemplateSlug string
+	Status       string
+	DateFrom     string
+	DateTo       string
+	Search       string
+}
+
+func (r *Repository) CreateLog(ctx context.Context, params CreateLogParams) (model.WABroadcastLog, error) {
+	sentAt := (*time.Time)(nil)
+	if params.Status == "sent" {
+		now := time.Now().UTC()
+		sentAt = &now
+	}
+
+	var log model.WABroadcastLog
+	err := r.db.QueryRow(ctx, `INSERT INTO wa_broadcast_logs
+		(schedule_id, template_id, template_slug, trigger_type, recipient_user_id, recipient_phone,
+		 message_body, status, error_message, reference_type, reference_id, sent_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id, schedule_id, template_id, template_slug, trigger_type, recipient_user_id,
+		recipient_phone, message_body, status, error_message, reference_type, reference_id,
+		sent_at, created_at`,
+		params.ScheduleID, params.TemplateID, params.TemplateSlug, params.TriggerType,
+		params.RecipientUserID, params.RecipientPhone, params.MessageBody, params.Status,
+		params.ErrorMessage, params.ReferenceType, params.ReferenceID, sentAt).Scan(
+		&log.ID, &log.ScheduleID, &log.TemplateID, &log.TemplateSlug, &log.TriggerType,
+		&log.RecipientUserID, &log.RecipientPhone, &log.MessageBody, &log.Status,
+		&log.ErrorMessage, &log.ReferenceType, &log.ReferenceID, &log.SentAt, &log.CreatedAt)
+	return log, err
+}
+
+func (r *Repository) ListLogs(ctx context.Context, params ListLogsParams) ([]model.WABroadcastLog, int64, error) {
+	page := params.Page
+	if page < 1 {
+		page = 1
+	}
+	perPage := params.PerPage
+	if perPage < 1 {
+		perPage = 20
+	}
+
+	where := "WHERE 1=1"
+	args := []interface{}{}
+	argIdx := 1
+
+	if params.ScheduleID != "" {
+		where += fmt.Sprintf(" AND l.schedule_id = $%d", argIdx)
+		args = append(args, params.ScheduleID)
+		argIdx++
+	}
+	if params.TriggerType != "" {
+		where += fmt.Sprintf(" AND l.trigger_type = $%d", argIdx)
+		args = append(args, params.TriggerType)
+		argIdx++
+	}
+	if params.TemplateSlug != "" {
+		where += fmt.Sprintf(" AND l.template_slug = $%d", argIdx)
+		args = append(args, params.TemplateSlug)
+		argIdx++
+	}
+	if params.Status != "" {
+		where += fmt.Sprintf(" AND l.status = $%d", argIdx)
+		args = append(args, params.Status)
+		argIdx++
+	}
+	if params.DateFrom != "" {
+		where += fmt.Sprintf(" AND l.created_at >= $%d::timestamptz", argIdx)
+		args = append(args, params.DateFrom)
+		argIdx++
+	}
+	if params.DateTo != "" {
+		where += fmt.Sprintf(" AND l.created_at <= $%d::timestamptz", argIdx)
+		args = append(args, params.DateTo+"T23:59:59Z")
+		argIdx++
+	}
+	if params.Search != "" {
+		where += fmt.Sprintf(" AND (l.recipient_phone ILIKE $%d OR u.full_name ILIKE $%d)", argIdx, argIdx)
+		args = append(args, "%"+params.Search+"%")
+		argIdx++
+	}
+
+	var total int64
+	countArgs := make([]interface{}, len(args))
+	copy(countArgs, args)
+	err := r.db.QueryRow(ctx,
+		"SELECT COUNT(*) FROM wa_broadcast_logs l LEFT JOIN users u ON u.id = l.recipient_user_id "+where,
+		countArgs...).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count logs: %w", err)
+	}
+
+	query := fmt.Sprintf(`SELECT l.id, l.schedule_id, l.template_id, l.template_slug, l.trigger_type,
+		l.recipient_user_id, l.recipient_phone, u.full_name, l.message_body, l.status,
+		l.error_message, l.reference_type, l.reference_id, l.sent_at, l.created_at
+		FROM wa_broadcast_logs l
+		LEFT JOIN users u ON u.id = l.recipient_user_id
+		%s ORDER BY l.created_at DESC
+		LIMIT $%d OFFSET $%d`, where, argIdx, argIdx+1)
+	args = append(args, perPage, (page-1)*perPage)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []model.WABroadcastLog
+	for rows.Next() {
+		var log model.WABroadcastLog
+		if err := rows.Scan(&log.ID, &log.ScheduleID, &log.TemplateID, &log.TemplateSlug,
+			&log.TriggerType, &log.RecipientUserID, &log.RecipientPhone, &log.RecipientName,
+			&log.MessageBody, &log.Status, &log.ErrorMessage, &log.ReferenceType,
+			&log.ReferenceID, &log.SentAt, &log.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan log: %w", err)
+		}
+		logs = append(logs, log)
+	}
+	return logs, total, nil
+}
+
+func (r *Repository) GetLogSummary(ctx context.Context, date string) (model.WALogSummary, error) {
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+	var summary model.WALogSummary
+	err := r.db.QueryRow(ctx, `SELECT
+		COALESCE(SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status LIKE 'skipped%' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status = 'sent' AND created_at::date = $1::date THEN 1 ELSE 0 END), 0)
+		FROM wa_broadcast_logs WHERE created_at::date = $1::date`, date).Scan(
+		&summary.TotalSent, &summary.TotalFailed, &summary.TotalSkipped, &summary.SentToday)
+	return summary, err
+}
+
+// CheckDuplicateToday checks if a message was already sent today for a given user+template+reference combo.
+func (r *Repository) CheckDuplicateToday(ctx context.Context, userID string, templateSlug string, referenceID string) (bool, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM wa_broadcast_logs
+		WHERE recipient_user_id = $1 AND template_slug = $2 AND reference_id = $3
+		AND created_at::date = CURRENT_DATE AND status = 'sent'`,
+		userID, templateSlug, referenceID).Scan(&count)
+	return count > 0, err
+}
+
+// --------------- Query helpers for scheduled jobs ---------------
+
+type TaskDueInfo struct {
+	TaskID      string
+	TaskTitle   string
+	ProjectID   string
+	ProjectName string
+	AssigneeID  string
+	UserName    string
+	UserPhone   *string
+	DueDate     string
+	Priority    string
+}
+
+func (r *Repository) GetTasksDueToday(ctx context.Context) ([]TaskDueInfo, error) {
+	return r.queryTasksByDue(ctx, `kt.due_date::date = CURRENT_DATE`)
+}
+
+func (r *Repository) GetTasksOverdue(ctx context.Context) ([]TaskDueInfo, error) {
+	return r.queryTasksByDue(ctx, `kt.due_date::date < CURRENT_DATE`)
+}
+
+func (r *Repository) queryTasksByDue(ctx context.Context, dateCondition string) ([]TaskDueInfo, error) {
+	query := fmt.Sprintf(`SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.phone,
+		COALESCE(to_char(kt.due_date, 'YYYY-MM-DD'), ''), kt.priority
+		FROM kanban_tasks kt
+		JOIN kanban_columns kc ON kc.id = kt.column_id
+		JOIN projects p ON p.id = kt.project_id
+		JOIN users u ON u.id = kt.assignee_id
+		WHERE %s AND LOWER(kc.name) NOT IN ('done', 'archived')
+		AND kt.assignee_id IS NOT NULL`, dateCondition)
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []TaskDueInfo
+	for rows.Next() {
+		var t TaskDueInfo
+		if err := rows.Scan(&t.TaskID, &t.TaskTitle, &t.ProjectID, &t.ProjectName,
+			&t.AssigneeID, &t.UserName, &t.UserPhone, &t.DueDate, &t.Priority); err != nil {
+			return nil, fmt.Errorf("scan task: %w", err)
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, nil
+}
+
+type ProjectDeadlineInfo struct {
+	ProjectID      string
+	ProjectName    string
+	Deadline       string
+	Status         string
+	OpenTaskCount  int
+	TotalTaskCount int
+	Members        []ProjectMemberInfo
+}
+
+type ProjectMemberInfo struct {
+	UserID   string
+	UserName string
+	Phone    *string
+}
+
+func (r *Repository) GetProjectsDeadlineIn3Days(ctx context.Context) ([]ProjectDeadlineInfo, error) {
+	rows, err := r.db.Query(ctx, `SELECT p.id, p.name,
+		COALESCE(to_char(p.deadline, 'YYYY-MM-DD'), ''), p.status,
+		COALESCE((
+			SELECT COUNT(*)
+			FROM kanban_tasks kt
+			JOIN kanban_columns kc ON kc.id = kt.column_id
+			WHERE kt.project_id = p.id AND LOWER(kc.name) NOT IN ('done', 'archived')
+		), 0),
+		COALESCE((SELECT COUNT(*) FROM kanban_tasks kt WHERE kt.project_id = p.id), 0)
+		FROM projects p
+		WHERE p.deadline::date = (CURRENT_DATE + INTERVAL '3 days')::date
+		AND p.status IN ('active', 'in_progress')`)
+	if err != nil {
+		return nil, fmt.Errorf("query projects: %w", err)
+	}
+	defer rows.Close()
+
+	var projects []ProjectDeadlineInfo
+	for rows.Next() {
+		var p ProjectDeadlineInfo
+		if err := rows.Scan(&p.ProjectID, &p.ProjectName, &p.Deadline, &p.Status,
+			&p.OpenTaskCount, &p.TotalTaskCount); err != nil {
+			return nil, fmt.Errorf("scan project: %w", err)
+		}
+		projects = append(projects, p)
+	}
+
+	for i := range projects {
+		members, err := r.getProjectMembers(ctx, projects[i].ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		projects[i].Members = members
+	}
+
+	return projects, nil
+}
+
+func (r *Repository) getProjectMembers(ctx context.Context, projectID string) ([]ProjectMemberInfo, error) {
+	rows, err := r.db.Query(ctx, `SELECT u.id, u.full_name, u.phone
+		FROM project_members pm
+		JOIN users u ON u.id = pm.user_id
+		WHERE pm.project_id = $1`, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("query members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []ProjectMemberInfo
+	for rows.Next() {
+		var m ProjectMemberInfo
+		if err := rows.Scan(&m.UserID, &m.UserName, &m.Phone); err != nil {
+			return nil, fmt.Errorf("scan member: %w", err)
+		}
+		members = append(members, m)
+	}
+	return members, nil
+}
+
+type WeeklyDigestInfo struct {
+	UserID         string
+	UserName       string
+	Phone          *string
+	CompletedCount int
+	OpenCount      int
+	OverdueCount   int
+}
+
+func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInfo, error) {
+	rows, err := r.db.Query(ctx, `SELECT u.id, u.full_name, u.phone,
+		COALESCE(SUM(CASE WHEN LOWER(kc.name) = 'done' AND kt.updated_at >= (CURRENT_DATE - INTERVAL '7 days') THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') AND kt.due_date < CURRENT_DATE THEN 1 ELSE 0 END), 0)
+		FROM users u
+		JOIN kanban_tasks kt ON kt.assignee_id = u.id
+		JOIN kanban_columns kc ON kc.id = kt.column_id
+		WHERE u.is_active = true
+		GROUP BY u.id, u.full_name, u.phone
+		HAVING SUM(1) > 0`)
+	if err != nil {
+		return nil, fmt.Errorf("query weekly digest: %w", err)
+	}
+	defer rows.Close()
+
+	var items []WeeklyDigestInfo
+	for rows.Next() {
+		var d WeeklyDigestInfo
+		if err := rows.Scan(&d.UserID, &d.UserName, &d.Phone,
+			&d.CompletedCount, &d.OpenCount, &d.OverdueCount); err != nil {
+			return nil, fmt.Errorf("scan digest: %w", err)
+		}
+		items = append(items, d)
+	}
+	return items, nil
+}
+
+// GetTaskWithProject returns task and project info for a single task.
+func (r *Repository) GetTaskWithProject(ctx context.Context, taskID string) (*TaskDueInfo, error) {
+	var t TaskDueInfo
+	err := r.db.QueryRow(ctx, `SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.phone,
+		COALESCE(to_char(kt.due_date, 'YYYY-MM-DD'), ''), kt.priority
+		FROM kanban_tasks kt
+		JOIN projects p ON p.id = kt.project_id
+		JOIN users u ON u.id = kt.assignee_id
+		WHERE kt.id = $1`, taskID).Scan(
+		&t.TaskID, &t.TaskTitle, &t.ProjectID, &t.ProjectName,
+		&t.AssigneeID, &t.UserName, &t.UserPhone, &t.DueDate, &t.Priority)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+// GetReimbursementWithSubmitter returns reimbursement and submitter user info.
+type ReimbursementNotifyInfo struct {
+	ReimbursementID string
+	Title           string
+	Amount          int64
+	Status          string
+	SubmitterID     string
+	SubmitterName   string
+	SubmitterPhone  *string
+}
+
+func (r *Repository) GetReimbursementWithSubmitter(ctx context.Context, reimbursementID string) (*ReimbursementNotifyInfo, error) {
+	var info ReimbursementNotifyInfo
+	err := r.db.QueryRow(ctx, `SELECT r.id, r.title, r.amount, r.status,
+		u.id, u.full_name, u.phone
+		FROM reimbursements r
+		JOIN users u ON u.id = r.submitted_by
+		WHERE r.id = $1`, reimbursementID).Scan(
+		&info.ReimbursementID, &info.Title, &info.Amount, &info.Status,
+		&info.SubmitterID, &info.SubmitterName, &info.SubmitterPhone)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+// GetUserPhone returns the phone number of a user.
+func (r *Repository) GetUserPhone(ctx context.Context, userID string) (*string, error) {
+	var phone *string
+	err := r.db.QueryRow(ctx, "SELECT phone FROM users WHERE id = $1", userID).Scan(&phone)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return phone, err
+}
+
+// UpdateUserPhone updates the phone number of a user.
+func (r *Repository) UpdateUserPhone(ctx context.Context, userID string, phone *string) error {
+	normalized := (*string)(nil)
+	if phone != nil {
+		p := normalizePhone(strings.TrimSpace(*phone))
+		if p != "" {
+			normalized = &p
+		}
+	}
+	_, err := r.db.Exec(ctx, "UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2", normalized, userID)
+	if err != nil {
+		return err
+	}
+	// Sync phone to employees table so both stay in sync.
+	_, _ = r.db.Exec(ctx, "UPDATE employees SET phone = $1, updated_at = NOW() WHERE user_id = $2::uuid", normalized, userID)
+	return nil
+}
+
+func normalizePhone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	phone = strings.ReplaceAll(phone, " ", "")
+	phone = strings.ReplaceAll(phone, "-", "")
+	if strings.HasPrefix(phone, "+") {
+		phone = phone[1:]
+	}
+	if strings.HasPrefix(phone, "08") {
+		phone = "62" + phone[1:]
+	}
+	return phone
+}

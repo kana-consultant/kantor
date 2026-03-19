@@ -33,7 +33,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
-import { autoAssignTask } from "@/services/operational-assignment-rules";
 import {
   createKanbanColumn,
   createKanbanTask,
@@ -182,14 +181,6 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
       form.reset(emptyTaskForm);
       setTaskModal(null);
       setTaskToDelete(null);
-      await invalidateBoard(queryClient, projectId);
-    },
-    onError: (error) => setBoardError(extractErrorMessage(error)),
-  });
-
-  const autoAssignMutation = useMutation({
-    mutationFn: (taskId: string) => autoAssignTask(projectId, taskId),
-    onSuccess: async () => {
       await invalidateBoard(queryClient, projectId);
     },
     onError: (error) => setBoardError(extractErrorMessage(error)),
@@ -470,7 +461,6 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
                 onEditColumn={() => startColumnEdit(column)}
                 onQuickAdd={() => void handleQuickAdd(column.id)}
                 onQuickDraftChange={(value) => setQuickDrafts((current) => ({ ...current, [column.id]: value }))}
-                onAutoAssignTask={(taskId) => autoAssignMutation.mutate(taskId)}
                 onTaskClick={(task) => setTaskModal({ mode: "edit", columnId: task.column_id, taskId: task.id })}
                 onTaskCreate={() => setTaskModal({ mode: "create", columnId: column.id })}
                 quickDraft={quickDrafts[column.id] ?? ""}
@@ -777,7 +767,6 @@ interface KanbanColumnCardProps {
   quickDraft: string;
   onQuickDraftChange: (value: string) => void;
   onQuickAdd: () => void;
-  onAutoAssignTask: (taskId: string) => void;
   onTaskClick: (task: KanbanTask) => void;
   onTaskCreate: () => void;
   onEditColumn: () => void;
@@ -835,7 +824,6 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
             {props.tasks.map((task) => (
               <KanbanTaskCard
                 key={task.id}
-                onAutoAssign={() => props.onAutoAssignTask(task.id)}
                 onClick={() => props.onTaskClick(task)}
                 task={task}
               />
@@ -875,11 +863,9 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
 function KanbanTaskCard({
   task,
   onClick,
-  onAutoAssign,
 }: {
   task: KanbanTask;
   onClick: () => void;
-  onAutoAssign: () => void;
 }) {
   const sortable = useSortable({
     id: task.id,
@@ -929,23 +915,6 @@ function KanbanTaskCard({
           <span className="text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">{task.due_date ? formatDate(task.due_date) : "No due date"}</span>
         </div>
 
-        {!task.assignee_id ? (
-          <PermissionGate permission={permissions.operationalAssignmentEdit}>
-            <div className="mt-3">
-              <Button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onAutoAssign();
-                }}
-                size="sm"
-                variant="ops"
-                className="w-full text-[12px] h-8"
-              >
-                Auto assign
-              </Button>
-            </div>
-          </PermissionGate>
-        ) : null}
       </Card>
     </div>
   );

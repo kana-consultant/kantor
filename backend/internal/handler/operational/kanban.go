@@ -166,7 +166,13 @@ func (h *KanbanHandler) updateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.UpdateTask(r.Context(), projectID, taskID, input)
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	result, err := h.service.UpdateTask(r.Context(), projectID, taskID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return

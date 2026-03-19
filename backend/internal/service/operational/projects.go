@@ -26,6 +26,7 @@ type projectsRepository interface {
 	DeleteProject(ctx context.Context, projectID string) error
 	ListProjectMembers(ctx context.Context, projectID string) ([]model.ProjectMember, error)
 	MutateProjectMember(ctx context.Context, projectID string, params operationalrepo.ProjectMemberMutationParams) error
+	BulkAssignMembers(ctx context.Context, projectID string, userEmails []string, roleInProject string) error
 }
 
 type projectsKanbanRepository interface {
@@ -64,6 +65,12 @@ func (s *ProjectsService) CreateProject(ctx context.Context, request operational
 
 	if s.kanbanRepo != nil {
 		if err := s.kanbanRepo.CreateDefaultColumns(ctx, project.ID); err != nil {
+			return ProjectDetail{}, err
+		}
+	}
+
+	if len(request.MemberEmails) > 0 {
+		if err := s.repo.BulkAssignMembers(ctx, project.ID, request.MemberEmails, "member"); err != nil {
 			return ProjectDetail{}, err
 		}
 	}
@@ -122,11 +129,12 @@ func (s *ProjectsService) GetProject(ctx context.Context, projectID string) (Pro
 
 func (s *ProjectsService) UpdateProject(ctx context.Context, projectID string, request operational.UpdateProjectRequest) (ProjectDetail, error) {
 	_, err := s.repo.UpdateProject(ctx, projectID, operationalrepo.UpdateProjectParams{
-		Name:        strings.TrimSpace(request.Name),
-		Description: normalizeOptionalString(request.Description),
-		Deadline:    normalizeOptionalTime(request.Deadline),
-		Status:      request.Status,
-		Priority:    request.Priority,
+		Name:           strings.TrimSpace(request.Name),
+		Description:    normalizeOptionalString(request.Description),
+		Deadline:       normalizeOptionalTime(request.Deadline),
+		Status:         request.Status,
+		Priority:       request.Priority,
+		AutoAssignMode: request.AutoAssignMode,
 	})
 	if err != nil {
 		if errors.Is(err, operationalrepo.ErrProjectNotFound) {

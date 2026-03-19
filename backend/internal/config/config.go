@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,8 @@ type Config struct {
 	CORSOrigins       []string
 	SeedSuperAdmin    SeedSuperAdminConfig
 	SeedDemoUsers     SeedDemoUsersConfig
+	WAHA              WAHAConfig
+	AppURL            string
 }
 
 type SeedSuperAdminConfig struct {
@@ -47,6 +50,18 @@ type SeedUserConfig struct {
 	FullName   string
 	Department string
 	Skills     []string
+}
+
+type WAHAConfig struct {
+	APIURL           string
+	APIKey           string
+	Session          string
+	Enabled          bool
+	MaxDailyMessages int
+	MinDelayMS       int
+	MaxDelayMS       int
+	ReminderCron     string
+	WeeklyDigestCron string
 }
 
 func Load() (Config, error) {
@@ -77,6 +92,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	wahaEnabled, err := parseBool("WAHA_ENABLED", false)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		AppEnv:            appEnv,
 		Port:              getEnv("PORT", "8080"),
@@ -88,6 +108,18 @@ func Load() (Config, error) {
 		JWTAccessExpiry:   accessExpiry,
 		JWTRefreshExpiry:  refreshExpiry,
 		CORSOrigins:       splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),
+		AppURL:            getEnv("APP_URL", "http://localhost:3000"),
+		WAHA: WAHAConfig{
+			APIURL:           getEnv("WAHA_API_URL", "http://localhost:3000"),
+			APIKey:           os.Getenv("WAHA_API_KEY"),
+			Session:          getEnv("WAHA_SESSION", "default"),
+			Enabled:          wahaEnabled,
+			MaxDailyMessages: parseIntEnv("WAHA_MAX_DAILY_MESSAGES", 50),
+			MinDelayMS:       parseIntEnv("WAHA_MIN_DELAY_MS", 2000),
+			MaxDelayMS:       parseIntEnv("WAHA_MAX_DELAY_MS", 5000),
+			ReminderCron:     getEnv("WA_REMINDER_CRON", "0 8 * * 1-5"),
+			WeeklyDigestCron: getEnv("WA_WEEKLY_DIGEST_CRON", "0 8 * * 1"),
+		},
 		SeedSuperAdmin: SeedSuperAdminConfig{
 			Enabled:  seedEnabled,
 			Email:    getEnv("SEED_SUPERADMIN_EMAIL", "superadmin@kantor.local"),
@@ -233,6 +265,18 @@ func splitCSV(value string) []string {
 	}
 
 	return result
+}
+
+func parseIntEnv(key string, fallback int) int {
+	value, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func getEnv(key string, fallback string) string {

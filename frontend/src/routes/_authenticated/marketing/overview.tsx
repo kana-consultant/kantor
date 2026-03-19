@@ -30,6 +30,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
+import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensurePermission } from "@/lib/rbac";
 import { getMarketingOverview, overviewKeys } from "@/services/overview";
@@ -54,6 +55,9 @@ export const Route = createFileRoute("/_authenticated/marketing/overview")({
 
 function MarketingOverviewPage() {
   const navigate = useNavigate();
+  const { hasPermission } = useRBAC();
+  const canManageCampaigns = hasPermission(permissions.marketingCampaignCreate);
+  const canManageAds = hasPermission(permissions.marketingAdsMetricsCreate);
   const overviewQuery = useQuery({
     queryKey: overviewKeys.marketing(),
     queryFn: getMarketingOverview,
@@ -135,14 +139,16 @@ function MarketingOverviewPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void navigate({ to: "/marketing/campaigns" })}>
-            Open Campaigns
+            {canManageCampaigns ? "Manage Campaigns" : "View Campaigns"}
           </Button>
-          <Button
-            onClick={() => void navigate({ to: "/marketing/ads-metrics" })}
-            variant="secondary"
-          >
-            Open Ads Metrics
-          </Button>
+          {canManageAds && (
+            <Button
+              onClick={() => void navigate({ to: "/marketing/ads-metrics" })}
+              variant="secondary"
+            >
+              Open Ads Metrics
+            </Button>
+          )}
         </div>
       </div>
 

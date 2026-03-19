@@ -28,6 +28,27 @@ func RBACMiddleware(requiredPermission string) func(http.Handler) http.Handler {
 	}
 }
 
+func SuperAdminMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			principal, ok := PrincipalFromContext(r.Context())
+			if !ok {
+				response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+				return
+			}
+
+			for _, role := range principal.Roles {
+				if role == "super_admin" || strings.HasPrefix(role, "super_admin:") {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			response.WriteError(w, http.StatusForbidden, "FORBIDDEN", "Super admin access required", nil)
+		})
+	}
+}
+
 func hasPermission(principal Principal, requiredPermission string) bool {
 	for _, role := range principal.Roles {
 		if role == "super_admin" || strings.HasPrefix(role, "super_admin:") {
