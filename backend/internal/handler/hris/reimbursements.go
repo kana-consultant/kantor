@@ -63,6 +63,7 @@ func (h *ReimbursementsHandler) create(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "reimbursement", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -133,11 +134,13 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 		return
 	}
 
-	item, err := h.service.AddAttachments(r.Context(), chi.URLParam(r, "reimbursementID"), paths, principal.UserID, principal.Roles)
+	reimbursementID := chi.URLParam(r, "reimbursementID")
+	item, err := h.service.AddAttachments(r.Context(), reimbursementID, paths, principal.UserID, principal.Roles)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "upload_attachments", "hris", "reimbursement", reimbursementID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
@@ -153,11 +156,13 @@ func (h *ReimbursementsHandler) markPaid(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	item, err := h.service.MarkPaid(r.Context(), chi.URLParam(r, "reimbursementID"), input.Notes, principal.UserID, principal.Roles)
+	reimbursementID := chi.URLParam(r, "reimbursementID")
+	item, err := h.service.MarkPaid(r.Context(), reimbursementID, input.Notes, principal.UserID, principal.Roles)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "mark_paid", "hris", "reimbursement", reimbursementID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
@@ -190,11 +195,13 @@ func (h *ReimbursementsHandler) review(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.service.ManagerReview(r.Context(), chi.URLParam(r, "reimbursementID"), input, principal.UserID, principal.Roles)
+	reimbursementID := chi.URLParam(r, "reimbursementID")
+	item, err := h.service.ManagerReview(r.Context(), reimbursementID, input, principal.UserID, principal.Roles)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "review", "hris", "reimbursement", reimbursementID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 

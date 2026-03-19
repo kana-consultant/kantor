@@ -56,6 +56,7 @@ func (h *AdsMetricsHandler) createMetric(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "marketing", "ads_metric", item.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, item, nil)
 }
 
@@ -77,6 +78,7 @@ func (h *AdsMetricsHandler) batchCreateMetrics(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "batch_create", "marketing", "ads_metric", "bulk", nil, input)
 	response.WriteJSON(w, http.StatusCreated, items, nil)
 }
 
@@ -115,21 +117,25 @@ func (h *AdsMetricsHandler) updateMetric(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	item, err := h.service.UpdateMetric(r.Context(), chi.URLParam(r, "metricID"), input)
+	metricID := chi.URLParam(r, "metricID")
+	item, err := h.service.UpdateMetric(r.Context(), metricID, input)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "ads_metric", metricID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
 func (h *AdsMetricsHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteMetric(r.Context(), chi.URLParam(r, "metricID")); err != nil {
+	metricID := chi.URLParam(r, "metricID")
+	if err := h.service.DeleteMetric(r.Context(), metricID); err != nil {
 		h.writeError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "ads_metric", metricID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Ads metric deleted successfully"}, nil)
 }
 

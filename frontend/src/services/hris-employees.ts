@@ -1,5 +1,4 @@
-import { ApiError, requestEnvelope, requestJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type {
   Employee,
   EmployeeFilters,
@@ -15,7 +14,6 @@ export const employeesKeys = {
 };
 
 export async function listEmployees(filters: EmployeeFilters): Promise<ListEmployeesResponse> {
-  const token = await requireAccessToken();
   const params = new URLSearchParams();
 
   params.set("page", String(filters.page));
@@ -30,10 +28,9 @@ export async function listEmployees(filters: EmployeeFilters): Promise<ListEmplo
     params.set("status", filters.status);
   }
 
-  const payload = await requestEnvelope<ListEmployeesResponse["items"]>(
+  const payload = await authRequestEnvelope<ListEmployeesResponse["items"]>(
     `/hris/employees?${params.toString()}`,
     { method: "GET" },
-    token,
   );
 
   return {
@@ -47,13 +44,11 @@ export async function listEmployees(filters: EmployeeFilters): Promise<ListEmplo
 }
 
 export async function getEmployee(employeeId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<Employee>(`/hris/employees/${employeeId}`, { method: "GET" }, token);
+  return authRequestJSON<Employee>(`/hris/employees/${employeeId}`, { method: "GET" });
 }
 
 export async function createEmployee(input: EmployeeFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<Employee>(
+  return authRequestJSON<Employee>(
     "/hris/employees",
     {
       method: "POST",
@@ -62,13 +57,11 @@ export async function createEmployee(input: EmployeeFormValues) {
       },
       body: JSON.stringify(serializeEmployeeForm(input)),
     },
-    token,
   );
 }
 
 export async function updateEmployee(employeeId: string, input: EmployeeFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<Employee>(
+  return authRequestJSON<Employee>(
     `/hris/employees/${employeeId}`,
     {
       method: "PUT",
@@ -77,13 +70,11 @@ export async function updateEmployee(employeeId: string, input: EmployeeFormValu
       },
       body: JSON.stringify(serializeEmployeeForm(input)),
     },
-    token,
   );
 }
 
 export async function deleteEmployee(employeeId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(`/hris/employees/${employeeId}`, { method: "DELETE" }, token);
+  return authRequestJSON<{ message: string }>(`/hris/employees/${employeeId}`, { method: "DELETE" });
 }
 
 function serializeEmployeeForm(input: EmployeeFormValues) {
@@ -100,13 +91,4 @@ function serializeEmployeeForm(input: EmployeeFormValues) {
     emergency_contact: input.emergency_contact.trim() || null,
     avatar_url: input.avatar_url.trim() || null,
   };
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
 }
