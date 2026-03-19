@@ -153,7 +153,11 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	leadsRepository := marketingrepo.NewLeadsRepository(pool)
 	marketingOverviewRepository := marketingrepo.NewOverviewRepository(pool)
 	notificationsRepository := notificationsrepo.New(pool)
-	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey)
+	var previousKeys []string
+	if cfg.DataEncryptionKeyPrevious != "" {
+		previousKeys = append(previousKeys, cfg.DataEncryptionKeyPrevious)
+	}
+	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey, previousKeys...)
 	if err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("configure data encryption: %w", err)
