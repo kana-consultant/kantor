@@ -220,6 +220,8 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", err.Error(), nil)
 	case errors.Is(err, authservice.ErrInactiveUser):
 		response.WriteError(w, http.StatusForbidden, "INACTIVE_USER", err.Error(), nil)
+	case errors.Is(err, authservice.ErrAccountLocked):
+		response.WriteError(w, http.StatusTooManyRequests, "ACCOUNT_LOCKED", err.Error(), nil)
 	case errors.Is(err, authservice.ErrInvalidRefreshToken), errors.Is(err, authservice.ErrExpiredRefreshToken):
 		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", err.Error(), nil)
 	default:
