@@ -509,8 +509,8 @@ type ListUsersParams struct {
 }
 
 type UserWithRoles struct {
-	User  model.User
-	Roles []string
+	User  model.User `json:"user"`
+	Roles []string   `json:"roles"`
 }
 
 func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]UserWithRoles, int64, error) {

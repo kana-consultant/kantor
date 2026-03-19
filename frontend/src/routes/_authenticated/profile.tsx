@@ -166,7 +166,7 @@ function ProfilePage() {
         <InfoCard
           icon={Phone}
           label="Telepon"
-          value={employee?.phone ?? "-"}
+          value={employee?.phone ? formatPhone(employee.phone) : "-"}
           editable={isEditing}
           editValue={form.phone}
           onEdit={(v) => setForm((f) => ({ ...f, phone: v }))}
@@ -209,6 +209,10 @@ function ProfilePage() {
       </div>
     </div>
   );
+}
+
+function formatPhone(phone: string) {
+  return phone.startsWith("+") ? phone : `+${phone}`;
 }
 
 function InfoCard({

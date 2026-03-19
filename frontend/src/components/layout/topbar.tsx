@@ -266,7 +266,7 @@ export function Topbar() {
                     }}
                     type="button"
                   >
-                    {phoneQuery.data?.phone ?? "Set phone number"}
+                    {phoneQuery.data?.phone ? formatPhone(phoneQuery.data.phone) : "Set phone number"}
                   </button>
                 )}
               </div>
@@ -296,6 +296,10 @@ export function Topbar() {
       </div>
     </header>
   );
+}
+
+function formatPhone(phone: string) {
+  return phone.startsWith("+") ? phone : `+${phone}`;
 }
 
 function initials(value: string) {
