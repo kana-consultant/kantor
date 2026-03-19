@@ -1,5 +1,4 @@
-import { ApiError, requestEnvelope, requestJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type {
   Lead,
   LeadActivity,
@@ -22,7 +21,6 @@ export const leadsKeys = {
 };
 
 export async function listLeads(filters: LeadFilters): Promise<LeadsListResponse> {
-  const token = await requireAccessToken();
   const params = new URLSearchParams();
   params.set("page", String(filters.page));
   params.set("per_page", String(filters.perPage));
@@ -48,10 +46,9 @@ export async function listLeads(filters: LeadFilters): Promise<LeadsListResponse
     params.set("search", filters.search);
   }
 
-  const payload = await requestEnvelope<LeadsListResponse["items"]>(
+  const payload = await authRequestEnvelope<LeadsListResponse["items"]>(
     `/marketing/leads?${params.toString()}`,
     { method: "GET" },
-    token,
   );
 
   return {
@@ -65,95 +62,80 @@ export async function listLeads(filters: LeadFilters): Promise<LeadsListResponse
 }
 
 export async function getLead(leadId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<Lead>(`/marketing/leads/${leadId}`, { method: "GET" }, token);
+  return authRequestJSON<Lead>(`/marketing/leads/${leadId}`, { method: "GET" });
 }
 
 export async function createLead(input: LeadFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<Lead>(
+  return authRequestJSON<Lead>(
     "/marketing/leads",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(serializeLead(input)),
     },
-    token,
   );
 }
 
 export async function updateLead(leadId: string, input: LeadFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<Lead>(
+  return authRequestJSON<Lead>(
     `/marketing/leads/${leadId}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(serializeLead(input)),
     },
-    token,
   );
 }
 
 export async function deleteLead(leadId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(`/marketing/leads/${leadId}`, { method: "DELETE" }, token);
+  return authRequestJSON<{ message: string }>(`/marketing/leads/${leadId}`, { method: "DELETE" });
 }
 
 export async function listLeadPipeline() {
-  const token = await requireAccessToken();
-  return requestJSON<LeadPipelineColumn[]>("/marketing/leads/pipeline", { method: "GET" }, token);
+  return authRequestJSON<LeadPipelineColumn[]>("/marketing/leads/pipeline", { method: "GET" });
 }
 
 export async function moveLeadStatus(leadId: string, pipelineStatus: string) {
-  const token = await requireAccessToken();
-  return requestJSON<Lead>(
+  return authRequestJSON<Lead>(
     `/marketing/leads/${leadId}/status`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pipeline_status: pipelineStatus }),
     },
-    token,
   );
 }
 
 export async function listLeadActivities(leadId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<LeadActivity[]>(`/marketing/leads/${leadId}/activities`, { method: "GET" }, token);
+  return authRequestJSON<LeadActivity[]>(`/marketing/leads/${leadId}/activities`, { method: "GET" });
 }
 
 export async function createLeadActivity(leadId: string, payload: { activity_type: string; description: string }) {
-  const token = await requireAccessToken();
-  return requestJSON<LeadActivity>(
+  return authRequestJSON<LeadActivity>(
     `/marketing/leads/${leadId}/activities`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     },
-    token,
   );
 }
 
 export async function importLeadsCSV(file: File) {
-  const token = await requireAccessToken();
   const body = new FormData();
   body.append("file", file);
 
-  return requestJSON<LeadImportSummary>(
+  return authRequestJSON<LeadImportSummary>(
     "/marketing/leads/import",
     {
       method: "POST",
       body,
     },
-    token,
   );
 }
 
 export async function getLeadSummary() {
-  const token = await requireAccessToken();
-  return requestJSON<LeadSummary>("/marketing/leads/summary", { method: "GET" }, token);
+  return authRequestJSON<LeadSummary>("/marketing/leads/summary", { method: "GET" });
 }
 
 function serializeLead(input: LeadFormValues) {
@@ -169,12 +151,4 @@ function serializeLead(input: LeadFormValues) {
     company_name: input.company_name.trim() || null,
     estimated_value: input.estimated_value,
   };
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-  return session.tokens.access_token;
 }
