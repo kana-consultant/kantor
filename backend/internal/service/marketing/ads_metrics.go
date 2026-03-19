@@ -20,11 +20,22 @@ var (
 	ErrAdsMetricUnsupportedExport = errors.New("ads metrics export format is not supported")
 )
 
-type AdsMetricsService struct {
-	repo *marketingrepo.AdsMetricsRepository
+type adsMetricsRepository interface {
+	CreateMetric(ctx context.Context, params marketingrepo.UpsertAdsMetricParams) (model.AdsMetric, error)
+	BatchCreateMetrics(ctx context.Context, params []marketingrepo.UpsertAdsMetricParams) ([]model.AdsMetric, error)
+	ListMetrics(ctx context.Context, params marketingrepo.ListAdsMetricsParams) ([]model.AdsMetric, int64, error)
+	GetMetricByID(ctx context.Context, metricID string) (model.AdsMetric, error)
+	UpdateMetric(ctx context.Context, metricID string, params marketingrepo.UpsertAdsMetricParams) (model.AdsMetric, error)
+	DeleteMetric(ctx context.Context, metricID string) error
+	Summary(ctx context.Context, params marketingrepo.AdsMetricsSummaryParams) (model.AdsMetricsSummary, error)
+	ListForExport(ctx context.Context, params marketingrepo.AdsMetricsExportParams) ([]model.AdsMetric, error)
 }
 
-func NewAdsMetricsService(repo *marketingrepo.AdsMetricsRepository) *AdsMetricsService {
+type AdsMetricsService struct {
+	repo adsMetricsRepository
+}
+
+func NewAdsMetricsService(repo adsMetricsRepository) *AdsMetricsService {
 	return &AdsMetricsService{repo: repo}
 }
 

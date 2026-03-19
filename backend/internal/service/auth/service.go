@@ -29,8 +29,22 @@ var (
 	ErrExpiredRefreshToken = errors.New("refresh token has expired")
 )
 
+type authRepository interface {
+	EnsureUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
+	CreateUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
+	GetUserByEmail(ctx context.Context, email string) (model.User, error)
+	GetUserByID(ctx context.Context, userID string) (model.User, error)
+	GetUserRolesAndPermissions(ctx context.Context, userID string) ([]string, []string, error)
+	CreateRefreshToken(ctx context.Context, params authrepo.CreateRefreshTokenParams) error
+	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (model.RefreshToken, error)
+	RotateRefreshToken(ctx context.Context, oldTokenHash string, params authrepo.CreateRefreshTokenParams) error
+	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+	IsUniqueViolation(err error) bool
+	CountUsers(ctx context.Context) (int64, error)
+}
+
 type Service struct {
-	repo         *authrepo.Repository
+	repo         authRepository
 	tokenManager *backendauth.TokenManager
 }
 
@@ -41,7 +55,7 @@ type AuthResult struct {
 	Tokens      dto.TokenPair
 }
 
-func New(repo *authrepo.Repository, cfg config.Config) *Service {
+func New(repo authRepository, cfg config.Config) *Service {
 	return &Service{
 		repo:         repo,
 		tokenManager: backendauth.NewTokenManager(cfg.JWTSecret, cfg.JWTAccessExpiry, cfg.JWTRefreshExpiry),

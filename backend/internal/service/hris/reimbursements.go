@@ -8,10 +8,8 @@ import (
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
-	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
-	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 )
 
 var (
@@ -20,18 +18,41 @@ var (
 	ErrReimbursementInvalidState = errors.New("reimbursement status transition is invalid")
 )
 
+type reimbursementsRepository interface {
+	Create(ctx context.Context, params hrisrepo.CreateReimbursementParams) (model.Reimbursement, error)
+	List(ctx context.Context, params hrisrepo.ListReimbursementsParams) ([]model.Reimbursement, int64, error)
+	GetByID(ctx context.Context, reimbursementID string) (model.Reimbursement, error)
+	AddAttachments(ctx context.Context, reimbursementID string, attachments []string) (model.Reimbursement, error)
+	ApplyManagerReview(ctx context.Context, reimbursementID string, params hrisrepo.ReviewReimbursementParams) (model.Reimbursement, error)
+	MarkPaid(ctx context.Context, reimbursementID string, actorID string, notes *string) (model.Reimbursement, error)
+	Summary(ctx context.Context, month int, year int, employeeID string, department string) (model.ReimbursementSummary, error)
+}
+
+type reimbursementsEmployeesRepository interface {
+	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
+	GetEmployeeByUserID(ctx context.Context, userID string) (model.Employee, error)
+}
+
+type reimbursementsAuthRepository interface {
+	ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error)
+}
+
+type reimbursementsNotificationsService interface {
+	CreateMany(ctx context.Context, params []notificationsrepo.CreateParams) error
+}
+
 type ReimbursementsService struct {
-	repo                 *hrisrepo.ReimbursementsRepository
-	employeesRepo        *hrisrepo.EmployeesRepository
-	authRepo             *authrepo.Repository
-	notificationsService *notificationsservice.Service
+	repo                 reimbursementsRepository
+	employeesRepo        reimbursementsEmployeesRepository
+	authRepo             reimbursementsAuthRepository
+	notificationsService reimbursementsNotificationsService
 }
 
 func NewReimbursementsService(
-	repo *hrisrepo.ReimbursementsRepository,
-	employeesRepo *hrisrepo.EmployeesRepository,
-	authRepo *authrepo.Repository,
-	notificationsService *notificationsservice.Service,
+	repo reimbursementsRepository,
+	employeesRepo reimbursementsEmployeesRepository,
+	authRepo reimbursementsAuthRepository,
+	notificationsService reimbursementsNotificationsService,
 ) *ReimbursementsService {
 	return &ReimbursementsService{
 		repo:                 repo,

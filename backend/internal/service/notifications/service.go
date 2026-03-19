@@ -11,8 +11,16 @@ import (
 
 var ErrNotificationNotFound = errors.New("notification not found")
 
+type notificationsRepository interface {
+	CreateMany(ctx context.Context, params []notificationsrepo.CreateParams) error
+	List(ctx context.Context, params notificationsrepo.ListParams) ([]model.Notification, int64, error)
+	CountUnread(ctx context.Context, userID string) (int64, error)
+	MarkRead(ctx context.Context, notificationID string, userID string) error
+	MarkAllRead(ctx context.Context, userID string) error
+}
+
 type Service struct {
-	repo *notificationsrepo.Repository
+	repo notificationsRepository
 }
 
 type ListParams struct {
@@ -22,7 +30,7 @@ type ListParams struct {
 	PerPage int
 }
 
-func New(repo *notificationsrepo.Repository) *Service {
+func New(repo notificationsRepository) *Service {
 	return &Service{repo: repo}
 }
 

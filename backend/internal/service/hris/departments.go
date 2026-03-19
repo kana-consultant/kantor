@@ -16,12 +16,25 @@ var (
 	ErrDepartmentHeadMissing = errors.New("department head employee not found")
 )
 
-type DepartmentsService struct {
-	repo          *hrisrepo.DepartmentsRepository
-	employeesRepo *hrisrepo.EmployeesRepository
+type departmentsRepository interface {
+	CreateDepartment(ctx context.Context, params hrisrepo.UpsertDepartmentParams) (model.Department, error)
+	ListDepartments(ctx context.Context) ([]model.Department, error)
+	GetDepartmentByID(ctx context.Context, departmentID string) (model.Department, error)
+	UpdateDepartment(ctx context.Context, departmentID string, params hrisrepo.UpsertDepartmentParams) (model.Department, error)
+	DeleteDepartment(ctx context.Context, departmentID string) (string, error)
 }
 
-func NewDepartmentsService(repo *hrisrepo.DepartmentsRepository, employeesRepo *hrisrepo.EmployeesRepository) *DepartmentsService {
+type departmentsEmployeesRepository interface {
+	RenameDepartmentReferences(ctx context.Context, oldName string, newName string) error
+	ClearDepartmentReferences(ctx context.Context, departmentName string) error
+}
+
+type DepartmentsService struct {
+	repo          departmentsRepository
+	employeesRepo departmentsEmployeesRepository
+}
+
+func NewDepartmentsService(repo departmentsRepository, employeesRepo departmentsEmployeesRepository) *DepartmentsService {
 	return &DepartmentsService{
 		repo:          repo,
 		employeesRepo: employeesRepo,

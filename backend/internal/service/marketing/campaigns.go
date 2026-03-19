@@ -8,9 +8,8 @@ import (
 
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/model"
-	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
-	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
+	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 )
 
 var (
@@ -21,10 +20,38 @@ var (
 	ErrCampaignColumnInUse        = errors.New("campaign column still has campaigns assigned")
 )
 
+type campaignsRepository interface {
+	CreateCampaign(ctx context.Context, params marketingrepo.UpsertCampaignParams) (model.Campaign, error)
+	ListCampaigns(ctx context.Context, params marketingrepo.ListCampaignsParams) ([]model.Campaign, int64, error)
+	GetCampaignByID(ctx context.Context, campaignID string) (model.Campaign, error)
+	UpdateCampaign(ctx context.Context, campaignID string, params marketingrepo.UpsertCampaignParams) (model.Campaign, error)
+	DeleteCampaign(ctx context.Context, campaignID string) error
+	ListKanban(ctx context.Context) ([]model.CampaignColumn, error)
+	MoveCampaign(ctx context.Context, campaignID string, columnID string, position int, movedBy string) (model.Campaign, error)
+	ListColumns(ctx context.Context) ([]model.CampaignColumn, error)
+	CreateColumn(ctx context.Context, params marketingrepo.CreateCampaignColumnParams) (model.CampaignColumn, error)
+	UpdateColumn(ctx context.Context, columnID string, params marketingrepo.UpdateCampaignColumnParams) (model.CampaignColumn, error)
+	DeleteColumn(ctx context.Context, columnID string) error
+	ReorderColumns(ctx context.Context, columnIDs []string) error
+	CreateAttachment(ctx context.Context, params marketingrepo.CreateCampaignAttachmentParams) (model.CampaignAttachment, error)
+	ListAttachments(ctx context.Context, campaignID string) ([]model.CampaignAttachment, error)
+	DeleteAttachment(ctx context.Context, campaignID string, attachmentID string) (model.CampaignAttachment, error)
+	ListActivities(ctx context.Context, campaignID string) ([]model.CampaignActivity, error)
+	LogActivity(ctx context.Context, campaignID string, actorID string, action string, payload map[string]any) error
+}
+
+type campaignsAuthRepository interface {
+	ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error)
+}
+
+type campaignsNotificationsService interface {
+	CreateMany(ctx context.Context, params []notificationsrepo.CreateParams) error
+}
+
 type CampaignsService struct {
-	repo                 *marketingrepo.CampaignsRepository
-	authRepo             *authrepo.Repository
-	notificationsService *notificationsservice.Service
+	repo                 campaignsRepository
+	authRepo             campaignsAuthRepository
+	notificationsService campaignsNotificationsService
 }
 
 type CampaignDetail struct {
@@ -33,9 +60,9 @@ type CampaignDetail struct {
 }
 
 func NewCampaignsService(
-	repo *marketingrepo.CampaignsRepository,
-	authRepo *authrepo.Repository,
-	notificationsService *notificationsservice.Service,
+	repo campaignsRepository,
+	authRepo campaignsAuthRepository,
+	notificationsService campaignsNotificationsService,
 ) *CampaignsService {
 	return &CampaignsService{
 		repo:                 repo,

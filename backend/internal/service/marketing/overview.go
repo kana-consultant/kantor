@@ -5,14 +5,17 @@ import (
 	"time"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
-	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 )
 
-type OverviewService struct {
-	repo *marketingrepo.OverviewRepository
+type marketingOverviewRepository interface {
+	GetOverview(ctx context.Context, now time.Time) (model.MarketingOverview, error)
 }
 
-func NewOverviewService(repo *marketingrepo.OverviewRepository) *OverviewService {
+type OverviewService struct {
+	repo marketingOverviewRepository
+}
+
+func NewOverviewService(repo marketingOverviewRepository) *OverviewService {
 	return &OverviewService{repo: repo}
 }
 
