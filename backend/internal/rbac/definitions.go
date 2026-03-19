@@ -82,6 +82,8 @@ var defaultPermissions = []PermissionDefinition{
 	{Name: "marketing:leads:create", Module: "marketing", Resource: "leads", Action: "create", Description: "Create leads"},
 	{Name: "marketing:leads:edit", Module: "marketing", Resource: "leads", Action: "edit", Description: "Edit leads"},
 	{Name: "marketing:leads:delete", Module: "marketing", Resource: "leads", Action: "delete", Description: "Delete leads"},
+	{Name: "operational:wa:view", Module: "operational", Resource: "wa", Action: "view", Description: "View WA broadcast dashboard and logs"},
+	{Name: "operational:wa:manage", Module: "operational", Resource: "wa", Action: "manage", Description: "Manage WA broadcast templates, schedules, and send messages"},
 }
 
 func DefaultRoles() []RoleDefinition {
@@ -143,7 +145,7 @@ func PermissionNamesForRole(role RoleDefinition) []string {
 		case "admin":
 			names = append(names, permission.Name)
 		case "manager":
-			if permission.Action == "view" || permission.Action == "approve" || managerCanEdit(permission) || managerCanCreate(permission) {
+			if permission.Action == "view" || permission.Action == "approve" || permission.Action == "manage" || managerCanEdit(permission) || managerCanCreate(permission) {
 				names = append(names, permission.Name)
 			}
 		case "staff":

@@ -20,11 +20,17 @@ var (
 	ErrReimbursementInvalidState = errors.New("reimbursement status transition is invalid")
 )
 
+// ReimbursementStatusNotifier is called when a reimbursement status changes.
+type ReimbursementStatusNotifier interface {
+	SendReimbursementStatusNotification(ctx context.Context, reimbursementID string, newStatus string, reviewerNotes string)
+}
+
 type ReimbursementsService struct {
 	repo                 *hrisrepo.ReimbursementsRepository
 	employeesRepo        *hrisrepo.EmployeesRepository
 	authRepo             *authrepo.Repository
 	notificationsService *notificationsservice.Service
+	waNotifier           ReimbursementStatusNotifier
 }
 
 func NewReimbursementsService(
@@ -39,6 +45,10 @@ func NewReimbursementsService(
 		authRepo:             authRepo,
 		notificationsService: notificationsService,
 	}
+}
+
+func (s *ReimbursementsService) SetWANotifier(n ReimbursementStatusNotifier) {
+	s.waNotifier = n
 }
 
 func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.CreateReimbursementRequest, actorID string, roles []string) (model.Reimbursement, error) {
@@ -153,6 +163,15 @@ func (s *ReimbursementsService) ManagerReview(ctx context.Context, reimbursement
 		return model.Reimbursement{}, err
 	}
 
+	// UC-6: WA notification
+	if s.waNotifier != nil {
+		notes := ""
+		if request.Notes != nil {
+			notes = *request.Notes
+		}
+		go s.waNotifier.SendReimbursementStatusNotification(context.Background(), reimbursementID, updated.Status, notes)
+	}
+
 	return updated, nil
 }
 
@@ -171,6 +190,16 @@ func (s *ReimbursementsService) MarkPaid(ctx context.Context, reimbursementID st
 	if err := s.notifyRequester(ctx, updated, "reimbursement.paid", "Reimbursement has been marked as paid"); err != nil {
 		return model.Reimbursement{}, err
 	}
+
+	// UC-6: WA notification
+	if s.waNotifier != nil {
+		n := ""
+		if notes != nil {
+			n = *notes
+		}
+		go s.waNotifier.SendReimbursementStatusNotification(context.Background(), reimbursementID, updated.Status, n)
+	}
+
 	return updated, nil
 }
 

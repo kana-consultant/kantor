@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Sun } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useModuleTheme } from "@/hooks/use-module-theme";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ import {
   notificationsKeys,
 } from "@/services/notifications";
 import { logout } from "@/services/auth";
+import { getUserPhone, updateUserPhone, waKeys } from "@/services/wa-broadcast";
 import { useSidebarStore } from "@/stores/sidebar-store";
 import { useThemeStore } from "@/stores/theme-store";
 
@@ -26,6 +28,8 @@ export function Topbar() {
   const { isDesktopCollapsed, toggleDesktopCollapsed, toggleMobileOpen } = useSidebarStore();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
 
   const notificationsQuery = useQuery({
     queryKey: notificationsKeys.list({ page: 1, perPage: 8 }),
@@ -50,6 +54,19 @@ export function Topbar() {
     mutationFn: markAllNotificationsRead,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: notificationsKeys.all });
+    },
+  });
+
+  const phoneQuery = useQuery({
+    queryKey: waKeys.phone(),
+    queryFn: getUserPhone,
+  });
+
+  const phoneUpdateMutation = useMutation({
+    mutationFn: (phone: string | null) => updateUserPhone(phone),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: waKeys.phone() });
+      setIsEditingPhone(false);
     },
   });
 
@@ -204,10 +221,53 @@ export function Topbar() {
           </button>
 
           {isProfileOpen ? (
-            <div className="absolute right-0 top-12 w-[240px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
+            <div className="absolute right-0 top-12 w-[280px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
               <div className="border-b border-border px-4 py-4">
                 <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
                 <p className="mt-1 text-xs text-text-secondary">{user?.email ?? "guest@kantor.local"}</p>
+              </div>
+              <div className="border-b border-border px-4 py-3">
+                <div className="flex items-center gap-2 text-xs text-text-secondary mb-2">
+                  <Phone className="h-3.5 w-3.5" />
+                  <span>WhatsApp Number</span>
+                </div>
+                {isEditingPhone ? (
+                  <div className="flex gap-2">
+                    <Input
+                      className="h-8 text-sm"
+                      placeholder="08xxxxxxxxxx"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          phoneUpdateMutation.mutate(phoneInput.trim() || null);
+                        }
+                        if (e.key === "Escape") {
+                          setIsEditingPhone(false);
+                        }
+                      }}
+                    />
+                    <Button
+                      className="h-8 px-2 text-xs"
+                      disabled={phoneUpdateMutation.isPending}
+                      onClick={() => phoneUpdateMutation.mutate(phoneInput.trim() || null)}
+                      size="sm"
+                    >
+                      {phoneUpdateMutation.isPending ? "..." : "Save"}
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    className="text-sm text-text-primary hover:text-module transition"
+                    onClick={() => {
+                      setPhoneInput(phoneQuery.data?.phone ?? "");
+                      setIsEditingPhone(true);
+                    }}
+                    type="button"
+                  >
+                    {phoneQuery.data?.phone ?? "Set phone number"}
+                  </button>
+                )}
               </div>
               <div className="p-2">
                 <Button

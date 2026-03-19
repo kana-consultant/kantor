@@ -52,4 +52,6 @@ export const permissions = {
   marketingLeadsCreate: "marketing:leads:create",
   marketingLeadsEdit: "marketing:leads:edit",
   marketingLeadsDelete: "marketing:leads:delete",
+  operationalWAView: "operational:wa:view",
+  operationalWAManage: "operational:wa:manage",
 } as const;

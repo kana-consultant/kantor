@@ -11,17 +11,27 @@ import (
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 )
 
+// TaskAssignNotifier is called when a task is assigned to a user.
+type TaskAssignNotifier interface {
+	SendTaskAssignedNotification(ctx context.Context, taskID string, assigneeID string)
+}
+
 var (
 	ErrKanbanColumnNotFound = errors.New("kanban column not found")
 	ErrKanbanTaskNotFound   = errors.New("kanban task not found")
 )
 
 type KanbanService struct {
-	repo *operationalrepo.KanbanRepository
+	repo     *operationalrepo.KanbanRepository
+	notifier TaskAssignNotifier
 }
 
 func NewKanbanService(repo *operationalrepo.KanbanRepository) *KanbanService {
 	return &KanbanService{repo: repo}
+}
+
+func (s *KanbanService) SetTaskAssignNotifier(n TaskAssignNotifier) {
+	s.notifier = n
 }
 
 func (s *KanbanService) CreateDefaultColumns(ctx context.Context, projectID string) error {
@@ -93,12 +103,28 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 	switch {
 	case errors.Is(err, operationalrepo.ErrKanbanColumnNotFound):
 		return model.KanbanTask{}, ErrKanbanColumnNotFound
-	default:
+	}
+	if err != nil {
 		return task, err
 	}
+
+	// UC-3: notify assignee (skip self-assign)
+	if task.AssigneeID != nil && *task.AssigneeID != createdBy && s.notifier != nil {
+		go s.notifier.SendTaskAssignedNotification(context.Background(), task.ID, *task.AssigneeID)
+	}
+
+	return task, nil
 }
 
-func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID string, request operationaldto.UpdateKanbanTaskRequest) (model.KanbanTask, error) {
+func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID string, request operationaldto.UpdateKanbanTaskRequest, actorID string) (model.KanbanTask, error) {
+	// Fetch old task to detect assignee changes
+	var oldAssigneeID string
+	if s.notifier != nil {
+		if old, err := s.repo.GetTask(ctx, projectID, taskID); err == nil && old.AssigneeID != nil {
+			oldAssigneeID = *old.AssigneeID
+		}
+	}
+
 	task, err := s.repo.UpdateTask(ctx, projectID, taskID, operationalrepo.UpdateKanbanTaskParams{
 		Title:       strings.TrimSpace(request.Title),
 		Description: normalizeStringPointer(request.Description),
@@ -110,9 +136,20 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 	switch {
 	case errors.Is(err, operationalrepo.ErrKanbanTaskNotFound):
 		return model.KanbanTask{}, ErrKanbanTaskNotFound
-	default:
+	}
+	if err != nil {
 		return task, err
 	}
+
+	// UC-3: notify new assignee if changed and not self-assign
+	if s.notifier != nil && task.AssigneeID != nil {
+		newAssigneeID := *task.AssigneeID
+		if newAssigneeID != oldAssigneeID && newAssigneeID != actorID {
+			go s.notifier.SendTaskAssignedNotification(context.Background(), task.ID, newAssigneeID)
+		}
+	}
+
+	return task, nil
 }
 
 func (s *KanbanService) DeleteTask(ctx context.Context, projectID string, taskID string) error {

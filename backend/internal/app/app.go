@@ -30,6 +30,7 @@ import (
 	marketinghandler "github.com/kana-consultant/kantor/backend/internal/handler/marketing"
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
+	wahandler "github.com/kana-consultant/kantor/backend/internal/handler/whatsapp"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
@@ -37,6 +38,7 @@ import (
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
+	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	"github.com/kana-consultant/kantor/backend/internal/security"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
@@ -45,6 +47,7 @@ import (
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
 	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
+	waservice "github.com/kana-consultant/kantor/backend/internal/service/whatsapp"
 )
 
 type App struct {
@@ -177,6 +180,15 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	marketingOverviewService := marketingservice.NewOverviewService(marketingOverviewRepository)
 	filesService := filesservice.New(cfg.UploadsDir, reimbursementsRepository, campaignsRepository)
 
+	// WhatsApp Broadcast
+	waRepository := warepo.New(pool)
+	waClient := waservice.NewWAHAClient(cfg.WAHA)
+	whatsappService := waservice.NewService(waRepository, waClient, cfg)
+
+	// Wire event triggers
+	kanbanService.SetTaskAssignNotifier(whatsappService)
+	reimbursementsService.SetWANotifier(whatsappService)
+
 	application := &App{cfg: cfg, db: pool}
 	application.router = application.buildRouter(
 		authService,
@@ -197,8 +209,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		marketinghandler.NewLeadsHandler(leadsService),
 		notificationshandler.New(notificationsService),
 		fileshandler.New(filesService),
+		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(subscriptionsService)
+	application.startBackgroundJobs(subscriptionsService, whatsappService)
 
 	return application, nil
 }
@@ -239,6 +252,7 @@ func (a *App) buildRouter(
 	leadsHandler *marketinghandler.LeadsHandler,
 	notificationsHandler *notificationshandler.Handler,
 	filesHandler *fileshandler.Handler,
+	waHandler *wahandler.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
 	authHandler := authhandler.New(authService)
@@ -319,13 +333,15 @@ func (a *App) buildRouter(
 				module.Route("/leads", leadsHandler.RegisterRoutes)
 				module.Route("/columns", campaignsHandler.RegisterColumnRoutes)
 			})
+
+			protected.Route("/wa", waHandler.RegisterRoutes)
 		})
 	})
 
 	return router
 }
 
-func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService) {
+func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, whatsappService *waservice.Service) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -342,6 +358,15 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 		if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now()); err != nil {
 			slog.Error("subscription alert generation failed", "error", err)
 		}
+
+		// Run daily WA reminders on startup
+		go whatsappService.RunDailyReminders(ctx)
+
+		// Check if today is Monday for weekly digest
+		if time.Now().Weekday() == time.Monday {
+			go whatsappService.RunWeeklyDigest(ctx)
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -349,6 +374,16 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			case tickAt := <-ticker.C:
 				if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt); err != nil {
 					slog.Error("subscription alert generation failed", "error", err, "tick", tickAt)
+				}
+
+				// Daily WA reminders (weekdays only)
+				if tickAt.Weekday() >= time.Monday && tickAt.Weekday() <= time.Friday {
+					go whatsappService.RunDailyReminders(ctx)
+				}
+
+				// Weekly digest on Mondays
+				if tickAt.Weekday() == time.Monday {
+					go whatsappService.RunWeeklyDigest(ctx)
 				}
 			}
 		}

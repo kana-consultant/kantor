@@ -361,6 +361,41 @@ func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]m
 	return tasks, rows.Err()
 }
 
+func (r *KanbanRepository) GetTask(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error) {
+	var task model.KanbanTask
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			kanban_tasks.id::text,
+			kanban_tasks.column_id::text,
+			kanban_tasks.project_id::text,
+			kanban_tasks.title,
+			kanban_tasks.description,
+			kanban_tasks.assignee_id::text,
+			users.full_name,
+			users.avatar_url,
+			kanban_tasks.due_date,
+			kanban_tasks.priority,
+			kanban_tasks.label,
+			kanban_tasks.assigned_via,
+			kanban_tasks.position,
+			kanban_tasks.created_by::text,
+			kanban_tasks.created_at,
+			kanban_tasks.updated_at
+		FROM kanban_tasks
+		LEFT JOIN users ON users.id = kanban_tasks.assignee_id
+		WHERE kanban_tasks.project_id = $1::uuid AND kanban_tasks.id = $2::uuid
+	`, projectID, taskID).Scan(
+		&task.ID, &task.ColumnID, &task.ProjectID, &task.Title, &task.Description,
+		&task.AssigneeID, &task.AssigneeName, &task.AvatarURL, &task.DueDate,
+		&task.Priority, &task.Label, &task.AssignedVia, &task.Position,
+		&task.CreatedBy, &task.CreatedAt, &task.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return task, ErrKanbanTaskNotFound
+	}
+	return task, err
+}
+
 func (r *KanbanRepository) CreateTask(ctx context.Context, projectID string, params CreateKanbanTaskParams) (model.KanbanTask, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
