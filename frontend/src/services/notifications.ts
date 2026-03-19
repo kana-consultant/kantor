@@ -1,5 +1,4 @@
-import { requestEnvelope, requestJSON } from "@/lib/api-client";
-import { getStoredSession } from "@/stores/auth-store";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type { NotificationFilters, NotificationItem } from "@/types/notification";
 
 export const notificationsKeys = {
@@ -9,7 +8,6 @@ export const notificationsKeys = {
 };
 
 export async function listNotifications(filters: NotificationFilters = {}) {
-  const session = getStoredSession();
   const search = new URLSearchParams();
 
   search.set("page", String(filters.page ?? 1));
@@ -18,10 +16,9 @@ export async function listNotifications(filters: NotificationFilters = {}) {
     search.set("read", String(filters.read));
   }
 
-  const envelope = await requestEnvelope<NotificationItem[]>(
+  const envelope = await authRequestEnvelope<NotificationItem[]>(
     `/notifications?${search.toString()}`,
     { method: "GET" },
-    session?.tokens.access_token,
   );
 
   return {
@@ -31,28 +28,22 @@ export async function listNotifications(filters: NotificationFilters = {}) {
 }
 
 export async function markNotificationRead(notificationId: string) {
-  const session = getStoredSession();
-  return requestJSON<{ marked: boolean }>(
+  return authRequestJSON<{ marked: boolean }>(
     `/notifications/${notificationId}/read`,
     { method: "PATCH" },
-    session?.tokens.access_token,
   );
 }
 
 export async function markAllNotificationsRead() {
-  const session = getStoredSession();
-  return requestJSON<{ marked_all: boolean }>(
+  return authRequestJSON<{ marked_all: boolean }>(
     "/notifications/read-all",
     { method: "PATCH" },
-    session?.tokens.access_token,
   );
 }
 
 export async function getUnreadNotificationsCount() {
-  const session = getStoredSession();
-  return requestJSON<{ unread_count: number }>(
+  return authRequestJSON<{ unread_count: number }>(
     "/notifications/unread-count",
     { method: "GET" },
-    session?.tokens.access_token,
   );
 }

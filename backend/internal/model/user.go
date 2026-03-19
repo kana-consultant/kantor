@@ -3,16 +3,18 @@ package model
 import "time"
 
 type User struct {
-	ID           string    `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	FullName     string    `json:"full_name"`
-	AvatarURL    *string   `json:"avatar_url,omitempty"`
-	Department   *string   `json:"department,omitempty"`
-	Skills       []string  `json:"skills,omitempty"`
-	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                  string     `json:"id"`
+	Email               string     `json:"email"`
+	PasswordHash        string     `json:"-"`
+	FullName            string     `json:"full_name"`
+	AvatarURL           *string    `json:"avatar_url,omitempty"`
+	Department          *string    `json:"department,omitempty"`
+	Skills              []string   `json:"skills,omitempty"`
+	IsActive            bool       `json:"is_active"`
+	FailedLoginAttempts int        `json:"-"`
+	LockedUntil         *time.Time `json:"-"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type RefreshToken struct {

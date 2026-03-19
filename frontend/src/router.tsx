@@ -16,6 +16,19 @@ export function createAppRouter(queryClient: QueryClient) {
     defaultPreload: "intent",
     defaultPendingMinMs: 150,
     scrollRestoration: true,
+    defaultErrorComponent: ({ error }) => (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-sm uppercase tracking-[0.3em] text-destructive">
+            Error
+          </p>
+          <h1 className="mt-3 text-2xl font-bold">Something went wrong</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {error.message || "An unexpected error occurred"}
+          </p>
+        </div>
+      </div>
+    ),
   });
 }
 

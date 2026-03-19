@@ -67,7 +67,7 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 			skills = EXCLUDED.skills,
 			is_active = TRUE,
 			updated_at = NOW()
-		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
+		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
 	`
 
 	var user model.User
@@ -80,6 +80,8 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -112,7 +114,7 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 	query := `
 		INSERT INTO users (email, password_hash, full_name, department, skills)
 		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]))
-		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
+		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
 	`
 
 	var user model.User
@@ -125,6 +127,8 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -145,7 +149,7 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.User, error) {
 	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
+		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -160,6 +164,8 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -176,7 +182,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 
 func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User, error) {
 	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, created_at, updated_at
+		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -191,6 +197,8 @@ func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -339,6 +347,60 @@ func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string
 	return tx.Commit(ctx)
 }
 
+func (r *Repository) RevokeAllUserTokens(ctx context.Context, userID string) error {
+	_, err := r.db.Exec(
+		ctx,
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+		userID,
+	)
+	return err
+}
+
+func (r *Repository) UpdatePasswordHash(ctx context.Context, userID string, passwordHash string) error {
+	tag, err := r.db.Exec(
+		ctx,
+		`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+		passwordHash, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) ChangePasswordAndRevokeTokens(ctx context.Context, userID string, passwordHash string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(
+		ctx,
+		`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+		passwordHash, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+		userID,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
 	tag, err := r.db.Exec(
 		ctx,
@@ -356,6 +418,30 @@ func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenHash string) e
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (r *Repository) IncrementFailedLoginAttempts(ctx context.Context, userID string, maxAttempts int, lockDuration time.Duration) error {
+	query := `
+		UPDATE users
+		SET failed_login_attempts = failed_login_attempts + 1,
+			locked_until = CASE
+				WHEN failed_login_attempts + 1 >= $2 THEN NOW() + ($3 || ' seconds')::interval
+				ELSE locked_until
+			END,
+			updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(ctx, query, userID, maxAttempts, int(lockDuration.Seconds()))
+	return err
+}
+
+func (r *Repository) ResetFailedLoginAttempts(ctx context.Context, userID string) error {
+	_, err := r.db.Exec(
+		ctx,
+		`UPDATE users SET failed_login_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = $1`,
+		userID,
+	)
+	return err
 }
 
 func (r *Repository) IsUniqueViolation(err error) bool {

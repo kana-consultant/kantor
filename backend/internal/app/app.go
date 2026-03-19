@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -156,7 +158,11 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	leadsRepository := marketingrepo.NewLeadsRepository(pool)
 	marketingOverviewRepository := marketingrepo.NewOverviewRepository(pool)
 	notificationsRepository := notificationsrepo.New(pool)
-	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey)
+	var previousKeys []string
+	if cfg.DataEncryptionKeyPrevious != "" {
+		previousKeys = append(previousKeys, cfg.DataEncryptionKeyPrevious)
+	}
+	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey, previousKeys...)
 	if err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("configure data encryption: %w", err)
@@ -246,12 +252,14 @@ func (a *App) buildRouter(
 	filesHandler *fileshandler.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
-	authHandler := authhandler.New(authService)
+	authHandler := authhandler.New(authService, a.cfg)
 
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
 	router.Use(chimiddleware.Recoverer)
 	router.Use(platformmiddleware.AuditMiddleware(auditService))
+	router.Use(platformmiddleware.MaxBodySize(1 << 20)) // 1 MB default for JSON endpoints
+	router.Use(platformmiddleware.LoggingMiddleware)
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   a.cfg.CORSOrigins,
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
@@ -262,6 +270,17 @@ func (a *App) buildRouter(
 	}))
 
 	router.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		response.WriteJSON(w, http.StatusOK, map[string]string{
+			"status": "ok",
+		}, nil)
+	})
+	router.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := a.db.Ping(ctx); err != nil {
+			response.WriteError(w, http.StatusServiceUnavailable, "DB_UNHEALTHY", "Database is not reachable", nil)
+			return
+		}
 		response.WriteJSON(w, http.StatusOK, map[string]string{
 			"status": "ok",
 		}, nil)
@@ -277,6 +296,7 @@ func (a *App) buildRouter(
 		r.Group(func(protected chi.Router) {
 			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken))
 			protected.Get("/auth/me", authHandler.Me)
+			protected.Post("/auth/change-password", authHandler.ChangePassword)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
 
@@ -325,16 +345,26 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 	a.backgroundCancel = cancel
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("background job panicked", "panic", r, "stack", string(debug.Stack()))
+			}
+		}()
+
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now())
+		if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now()); err != nil {
+			slog.Error("subscription alert generation failed", "error", err)
+		}
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case tickAt := <-ticker.C:
-				_ = subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt)
+				if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt); err != nil {
+					slog.Error("subscription alert generation failed", "error", err, "tick", tickAt)
+				}
 			}
 		}
 	}()
