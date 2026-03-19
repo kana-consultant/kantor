@@ -139,8 +139,6 @@ func (h *EmployeesHandler) writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusNotFound, "EMPLOYEE_NOT_FOUND", err.Error(), nil)
-	case errors.Is(err, hrisservice.ErrEmployeeLinkedUser):
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"user_id": "linked user account not found"})
 	case errors.Is(err, hrisservice.ErrEmployeeEmailExists):
 		response.WriteError(w, http.StatusConflict, "EMPLOYEE_EMAIL_EXISTS", err.Error(), map[string]string{"email": "already exists"})
 	case errors.Is(err, hrisservice.ErrEmployeeUserLinkedTwice):

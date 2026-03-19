@@ -16,9 +16,8 @@ import (
 
 var (
 	ErrEmployeeNotFound         = errors.New("employee not found")
-	ErrEmployeeLinkedUserAbsent = errors.New("linked user account not found")
-	ErrEmployeeEmailExists      = errors.New("employee email already exists")
-	ErrEmployeeUserAlreadyUsed  = errors.New("user account is already linked to another employee")
+	ErrEmployeeEmailExists     = errors.New("employee email already exists")
+	ErrEmployeeUserAlreadyUsed = errors.New("user account is already linked to another employee")
 )
 
 type EmployeesRepository struct {
@@ -34,7 +33,6 @@ type ListEmployeesParams struct {
 }
 
 type UpsertEmployeeParams struct {
-	UserID           *string
 	FullName         string
 	Email            string
 	Phone            *string
@@ -52,13 +50,8 @@ func NewEmployeesRepository(db *pgxpool.Pool) *EmployeesRepository {
 }
 
 func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertEmployeeParams) (model.Employee, error) {
-	if err := r.ensureLinkedUserExists(ctx, params.UserID); err != nil {
-		return model.Employee{}, err
-	}
-
 	query := `
 		INSERT INTO employees (
-			user_id,
 			full_name,
 			email,
 			phone,
@@ -71,17 +64,16 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 			avatar_url
 		)
 		VALUES (
-			$1::uuid,
+			$1,
 			$2,
-			$3,
-			NULLIF($4, ''),
-			$5,
-			NULLIF($6, ''),
-			$7::date,
-			$8,
+			NULLIF($3, ''),
+			$4,
+			NULLIF($5, ''),
+			$6::date,
+			$7,
+			NULLIF($8, ''),
 			NULLIF($9, ''),
-			NULLIF($10, ''),
-			NULLIF($11, '')
+			NULLIF($10, '')
 		)
 		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
 	`
@@ -90,7 +82,6 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 	err := r.db.QueryRow(
 		ctx,
 		query,
-		nullableUUID(params.UserID),
 		params.FullName,
 		strings.ToLower(strings.TrimSpace(params.Email)),
 		nullableString(params.Phone),
@@ -272,24 +263,19 @@ func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID st
 }
 
 func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID string, params UpsertEmployeeParams) (model.Employee, error) {
-	if err := r.ensureLinkedUserExists(ctx, params.UserID); err != nil {
-		return model.Employee{}, err
-	}
-
 	query := `
 		UPDATE employees
 		SET
-			user_id = $2::uuid,
-			full_name = $3,
-			email = $4,
-			phone = NULLIF($5, ''),
-			position = $6,
-			department = NULLIF($7, ''),
-			date_joined = $8::date,
-			employment_status = $9,
-			address = NULLIF($10, ''),
-			emergency_contact = NULLIF($11, ''),
-			avatar_url = NULLIF($12, ''),
+			full_name = $2,
+			email = $3,
+			phone = NULLIF($4, ''),
+			position = $5,
+			department = NULLIF($6, ''),
+			date_joined = $7::date,
+			employment_status = $8,
+			address = NULLIF($9, ''),
+			emergency_contact = NULLIF($10, ''),
+			avatar_url = NULLIF($11, ''),
 			updated_at = NOW()
 		WHERE id = $1::uuid
 		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
@@ -300,7 +286,6 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 		ctx,
 		query,
 		employeeID,
-		nullableUUID(params.UserID),
 		params.FullName,
 		strings.ToLower(strings.TrimSpace(params.Email)),
 		nullableString(params.Phone),
@@ -361,21 +346,48 @@ func (r *EmployeesRepository) ClearDepartmentReferences(ctx context.Context, dep
 	return err
 }
 
-func (r *EmployeesRepository) ensureLinkedUserExists(ctx context.Context, userID *string) error {
-	if userID == nil || strings.TrimSpace(*userID) == "" {
-		return nil
-	}
+func (r *EmployeesRepository) UpdateEmployeeProfile(ctx context.Context, userID string, fullName string, phone *string, address *string, emergencyContact *string, avatarURL *string) (model.Employee, error) {
+	query := `
+		UPDATE employees
+		SET
+			full_name = $2,
+			phone = NULLIF($3, ''),
+			address = NULLIF($4, ''),
+			emergency_contact = NULLIF($5, ''),
+			avatar_url = NULLIF($6, ''),
+			updated_at = NOW()
+		WHERE user_id = $1::uuid
+		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
+	`
 
-	var exists bool
-	if err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1::uuid)`, strings.TrimSpace(*userID)).Scan(&exists); err != nil {
-		return err
+	var employee model.Employee
+	err := r.db.QueryRow(ctx, query,
+		userID,
+		fullName,
+		nullableString(phone),
+		nullableString(address),
+		nullableString(emergencyContact),
+		nullableString(avatarURL),
+	).Scan(
+		&employee.ID, &employee.UserID, &employee.FullName, &employee.Email,
+		&employee.Phone, &employee.Position, &employee.Department, &employee.DateJoined,
+		&employee.EmploymentStatus, &employee.Address, &employee.EmergencyContact,
+		&employee.AvatarURL, &employee.CreatedAt, &employee.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Employee{}, ErrEmployeeNotFound
+		}
+		return model.Employee{}, err
 	}
+	return employee, nil
+}
 
-	if !exists {
-		return ErrEmployeeLinkedUserAbsent
-	}
-
-	return nil
+func (r *EmployeesRepository) SyncUserFieldsToEmployee(ctx context.Context, userID string, fullName string, email string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE employees SET full_name = $2, email = $3, updated_at = NOW() WHERE user_id = $1::uuid`,
+		userID, fullName, strings.ToLower(strings.TrimSpace(email)))
+	return err
 }
 
 func mapEmployeeDBError(err error) error {
@@ -398,7 +410,6 @@ func nullableUUID(value *string) interface{} {
 	if value == nil || strings.TrimSpace(*value) == "" {
 		return nil
 	}
-
 	return strings.TrimSpace(*value)
 }
 

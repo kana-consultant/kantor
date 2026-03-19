@@ -860,7 +860,6 @@ function Field({
 
 function toEmployeeFormValues(employee: Employee): EmployeeFormValues {
   return {
-    user_id: employee.user_id ?? "",
     full_name: employee.full_name,
     email: employee.email,
     phone: employee.phone ?? "",

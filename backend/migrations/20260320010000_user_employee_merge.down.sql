@@ -1,0 +1,2 @@
+-- Data-only migration; down is a no-op to avoid accidental data loss.
+-- Employees created by the backfill have position = 'Belum Ditentukan'.

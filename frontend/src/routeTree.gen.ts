@@ -13,6 +13,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedForbiddenRouteImport } from './routes/_authenticated/forbidden'
 import { Route as AuthenticatedOperationalIndexRouteImport } from './routes/_authenticated/operational/index'
 import { Route as AuthenticatedMarketingIndexRouteImport } from './routes/_authenticated/marketing/index'
@@ -29,6 +30,7 @@ import { Route as AuthenticatedHrisSubscriptionsRouteImport } from './routes/_au
 import { Route as AuthenticatedHrisOverviewRouteImport } from './routes/_authenticated/hris/overview'
 import { Route as AuthenticatedHrisFinanceRouteImport } from './routes/_authenticated/hris/finance'
 import { Route as AuthenticatedHrisDepartmentsRouteImport } from './routes/_authenticated/hris/departments'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedOperationalProjectsIndexRouteImport } from './routes/_authenticated/operational/projects/index'
 import { Route as AuthenticatedHrisReimbursementsIndexRouteImport } from './routes/_authenticated/hris/reimbursements/index'
 import { Route as AuthenticatedHrisEmployeesIndexRouteImport } from './routes/_authenticated/hris/employees/index'
@@ -54,6 +56,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedForbiddenRoute = AuthenticatedForbiddenRouteImport.update({
   id: '/forbidden',
@@ -149,6 +156,11 @@ const AuthenticatedHrisDepartmentsRoute =
     path: '/hris/departments',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedOperationalProjectsIndexRoute =
   AuthenticatedOperationalProjectsIndexRouteImport.update({
     id: '/operational/projects/',
@@ -191,6 +203,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/hris/finance': typeof AuthenticatedHrisFinanceRoute
   '/hris/overview': typeof AuthenticatedHrisOverviewRoute
@@ -218,6 +232,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/hris/finance': typeof AuthenticatedHrisFinanceRoute
   '/hris/overview': typeof AuthenticatedHrisOverviewRoute
@@ -247,6 +263,8 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/_authenticated/forbidden': typeof AuthenticatedForbiddenRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/hris/departments': typeof AuthenticatedHrisDepartmentsRoute
   '/_authenticated/hris/finance': typeof AuthenticatedHrisFinanceRoute
   '/_authenticated/hris/overview': typeof AuthenticatedHrisOverviewRoute
@@ -276,6 +294,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/forbidden'
+    | '/profile'
+    | '/admin/users'
     | '/hris/departments'
     | '/hris/finance'
     | '/hris/overview'
@@ -303,6 +323,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/forbidden'
+    | '/profile'
+    | '/admin/users'
     | '/hris/departments'
     | '/hris/finance'
     | '/hris/overview'
@@ -331,6 +353,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/_authenticated/forbidden'
+    | '/_authenticated/profile'
+    | '/_authenticated/admin/users'
     | '/_authenticated/hris/departments'
     | '/_authenticated/hris/finance'
     | '/_authenticated/hris/overview'
@@ -390,6 +414,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/forbidden': {
       id: '/_authenticated/forbidden'
@@ -503,6 +534,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHrisDepartmentsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/operational/projects/': {
       id: '/_authenticated/operational/projects/'
       path: '/operational/projects'
@@ -550,6 +588,8 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedForbiddenRoute: typeof AuthenticatedForbiddenRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedHrisDepartmentsRoute: typeof AuthenticatedHrisDepartmentsRoute
   AuthenticatedHrisFinanceRoute: typeof AuthenticatedHrisFinanceRoute
   AuthenticatedHrisOverviewRoute: typeof AuthenticatedHrisOverviewRoute
@@ -575,6 +615,8 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedForbiddenRoute: AuthenticatedForbiddenRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedHrisDepartmentsRoute: AuthenticatedHrisDepartmentsRoute,
   AuthenticatedHrisFinanceRoute: AuthenticatedHrisFinanceRoute,
   AuthenticatedHrisOverviewRoute: AuthenticatedHrisOverviewRoute,

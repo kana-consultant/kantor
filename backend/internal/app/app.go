@@ -84,7 +84,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	}
 
 	authRepository := authrepo.New(pool)
-	authService := authservice.New(authRepository, cfg)
+	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
+	authService := authservice.New(authRepository, employeesRepository, cfg)
 
 	if cfg.SeedSuperAdmin.Enabled {
 		if err := authService.EnsureSeedSuperAdmin(
@@ -144,7 +145,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
 	assignmentRulesRepository := operationalrepo.NewAssignmentRulesRepository(pool)
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
-	employeesRepository := hrisrepo.NewEmployeesRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
 	compensationRepository := hrisrepo.NewCompensationRepository(pool)
 	financeRepository := hrisrepo.NewFinanceRepository(pool)
@@ -167,6 +167,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	assignmentRulesService := operationalservice.NewAssignmentRulesService(assignmentRulesRepository)
 	operationalOverviewService := operationalservice.NewOverviewService(operationalOverviewRepository)
 	employeesService := hrisservice.NewEmployeesService(employeesRepository)
+	employeesService.SetAuthRepo(authRepository)
 	departmentsService := hrisservice.NewDepartmentsService(departmentsRepository, employeesRepository)
 	compensationService := hrisservice.NewCompensationService(compensationRepository, employeesRepository, encrypter)
 	financeService := hrisservice.NewFinanceService(financeRepository)
@@ -296,8 +297,18 @@ func (a *App) buildRouter(
 		r.Group(func(protected chi.Router) {
 			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken))
 			protected.Get("/auth/me", authHandler.Me)
+			protected.Get("/auth/profile", authHandler.GetProfile)
+			protected.Put("/auth/profile", authHandler.UpdateProfile)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
+
+			protected.Route("/admin", func(admin chi.Router) {
+				admin.Use(platformmiddleware.SuperAdminMiddleware())
+				admin.Get("/users", authHandler.ListUsers)
+				admin.Get("/users/{userID}", authHandler.GetUser)
+				admin.Put("/users/{userID}/roles", authHandler.UpdateUserRoles)
+				admin.Patch("/users/{userID}/active", authHandler.ToggleUserActive)
+			})
 
 			protected.Route("/operational", func(module chi.Router) {
 				module.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/overview", operationalOverviewHandler.Get)

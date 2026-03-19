@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun, User } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -268,6 +269,16 @@ export function Topbar() {
                     {phoneQuery.data?.phone ?? "Set phone number"}
                   </button>
                 )}
+              </div>
+              <div className="border-b border-border p-2">
+                <Link
+                  to="/profile"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-text-primary hover:bg-surface-muted transition-colors"
+                >
+                  <User className="h-4 w-4" />
+                  Profil Saya
+                </Link>
               </div>
               <div className="p-2">
                 <Button

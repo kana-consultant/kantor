@@ -706,7 +706,12 @@ func (r *Repository) UpdateUserPhone(ctx context.Context, userID string, phone *
 		}
 	}
 	_, err := r.db.Exec(ctx, "UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2", normalized, userID)
-	return err
+	if err != nil {
+		return err
+	}
+	// Sync phone to employees table so both stay in sync.
+	_, _ = r.db.Exec(ctx, "UPDATE employees SET phone = $1, updated_at = NOW() WHERE user_id = $2::uuid", normalized, userID)
+	return nil
 }
 
 func normalizePhone(phone string) string {

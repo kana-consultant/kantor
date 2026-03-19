@@ -12,6 +12,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 )
 
 var (
@@ -24,6 +25,7 @@ var (
 
 type Service struct {
 	repo         *authrepo.Repository
+	employeeRepo *hrisrepo.EmployeesRepository
 	tokenManager *backendauth.TokenManager
 }
 
@@ -34,9 +36,10 @@ type AuthResult struct {
 	Tokens      dto.TokenPair
 }
 
-func New(repo *authrepo.Repository, cfg config.Config) *Service {
+func New(repo *authrepo.Repository, employeeRepo *hrisrepo.EmployeesRepository, cfg config.Config) *Service {
 	return &Service{
 		repo:         repo,
+		employeeRepo: employeeRepo,
 		tokenManager: backendauth.NewTokenManager(cfg.JWTSecret, cfg.JWTAccessExpiry, cfg.JWTRefreshExpiry),
 	}
 }
@@ -188,6 +191,62 @@ func (s *Service) GetSession(ctx context.Context, userID string) (AuthResult, er
 		Roles:       roles,
 		Permissions: permissions,
 	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
+func (s *Service) GetProfile(ctx context.Context, userID string) (model.Employee, error) {
+	return s.employeeRepo.GetEmployeeByUserID(ctx, userID)
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, userID string, input dto.UpdateProfileRequest) (model.Employee, error) {
+	fullName := strings.TrimSpace(input.FullName)
+
+	employee, err := s.employeeRepo.UpdateEmployeeProfile(ctx, userID, fullName, input.Phone, input.Address, input.EmergencyContact, input.AvatarURL)
+	if err != nil {
+		return model.Employee{}, err
+	}
+
+	// Sync full_name + phone to users table (phone is used by WA broadcast)
+	if err := s.repo.UpdateUserFullNameAndPhone(ctx, userID, fullName, input.Phone); err != nil {
+		return model.Employee{}, err
+	}
+
+	return employee, nil
+}
+
+// ---------------------------------------------------------------------------
+// User management (admin)
+// ---------------------------------------------------------------------------
+
+func (s *Service) ListUsers(ctx context.Context, params authrepo.ListUsersParams) ([]authrepo.UserWithRoles, int64, error) {
+	return s.repo.ListUsers(ctx, params)
+}
+
+func (s *Service) GetUserWithRoles(ctx context.Context, userID string) (*authrepo.UserWithRoles, error) {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	roles, _, err := s.repo.GetUserRolesAndPermissions(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &authrepo.UserWithRoles{User: user, Roles: roles}, nil
+}
+
+func (s *Service) UpdateUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error {
+	// Verify user exists
+	if _, err := s.repo.GetUserByID(ctx, userID); err != nil {
+		return err
+	}
+	return s.repo.ReplaceUserRoles(ctx, userID, roles)
+}
+
+func (s *Service) SetUserActive(ctx context.Context, userID string, active bool) error {
+	return s.repo.SetUserActive(ctx, userID, active)
 }
 
 func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldTokenHash string, userAgent string, ipAddress string) (AuthResult, error) {

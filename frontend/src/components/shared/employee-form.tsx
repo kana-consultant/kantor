@@ -10,7 +10,6 @@ import type { Department, EmployeeFormValues } from "@/types/hris";
 import { cn } from "@/lib/utils";
 
 const employeeFormSchema = z.object({
-  user_id: z.string(),
   full_name: z.string().min(3, "Nama minimal 3 karakter"),
   email: z.string().email("Email tidak valid"),
   phone: z.string(),
@@ -24,7 +23,6 @@ const employeeFormSchema = z.object({
 });
 
 const baseValues: EmployeeFormValues = {
-  user_id: "",
   full_name: "",
   email: "",
   phone: "",
@@ -121,15 +119,12 @@ export function EmployeeForm({
           </Field>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.phone?.message} label="Phone">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("phone")} placeholder="+62..." />
           </Field>
           <Field error={errors.date_joined?.message} label="Tanggal join">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("date_joined")} type="date" />
-          </Field>
-          <Field error={errors.user_id?.message} label="User ID">
-            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("user_id")} placeholder="Kosongkan jika belum punya akses login" />
           </Field>
         </div>
 

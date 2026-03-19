@@ -3,7 +3,6 @@ package hris
 import "time"
 
 type CreateEmployeeRequest struct {
-	UserID           *string   `json:"user_id" validate:"omitempty,uuid4"`
 	FullName         string    `json:"full_name" validate:"required,min=3,max=150"`
 	Email            string    `json:"email" validate:"required,email,max=255"`
 	Phone            *string   `json:"phone" validate:"omitempty,max=50"`
@@ -17,7 +16,6 @@ type CreateEmployeeRequest struct {
 }
 
 type UpdateEmployeeRequest struct {
-	UserID           *string   `json:"user_id" validate:"omitempty,uuid4"`
 	FullName         string    `json:"full_name" validate:"required,min=3,max=150"`
 	Email            string    `json:"email" validate:"required,email,max=255"`
 	Phone            *string   `json:"phone" validate:"omitempty,max=50"`

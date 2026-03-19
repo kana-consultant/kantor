@@ -88,7 +88,6 @@ export async function deleteEmployee(employeeId: string) {
 
 function serializeEmployeeForm(input: EmployeeFormValues) {
   return {
-    user_id: input.user_id.trim() || null,
     full_name: input.full_name.trim(),
     email: input.email.trim().toLowerCase(),
     phone: input.phone.trim() || null,
