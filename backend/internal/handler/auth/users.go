@@ -39,15 +39,12 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		totalPages++
 	}
 
-	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"items": users,
-		"meta": map[string]interface{}{
-			"total":       total,
-			"page":        page,
-			"per_page":    perPage,
-			"total_pages": totalPages,
-		},
-	}, nil)
+	response.WriteJSON(w, http.StatusOK, users, map[string]interface{}{
+		"total":       total,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
+	})
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {

@@ -23,7 +23,7 @@ export async function listUsers(filters: AdminUserFilters): Promise<ListUsersRes
   );
 
   return {
-    items: payload.data,
+    items: payload.data ?? [],
     meta: (payload.meta as PaginationMeta | undefined) ?? {
       page: filters.page,
       per_page: filters.perPage,

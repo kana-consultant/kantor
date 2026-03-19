@@ -364,7 +364,7 @@ func (r *EmployeesRepository) UpdateEmployeeProfile(ctx context.Context, userID 
 	err := r.db.QueryRow(ctx, query,
 		userID,
 		fullName,
-		nullableString(phone),
+		normalizePhone(phone),
 		nullableString(address),
 		nullableString(emergencyContact),
 		nullableString(avatarURL),
@@ -419,4 +419,20 @@ func nullableString(value *string) string {
 	}
 
 	return strings.TrimSpace(*value)
+}
+
+func normalizePhone(phone *string) string {
+	if phone == nil {
+		return ""
+	}
+	p := strings.TrimSpace(*phone)
+	p = strings.ReplaceAll(p, " ", "")
+	p = strings.ReplaceAll(p, "-", "")
+	if strings.HasPrefix(p, "+") {
+		p = p[1:]
+	}
+	if strings.HasPrefix(p, "08") {
+		p = "62" + p[1:]
+	}
+	return p
 }

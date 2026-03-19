@@ -619,9 +619,10 @@ func (r *Repository) UpdateUserFullName(ctx context.Context, userID string, full
 }
 
 func (r *Repository) UpdateUserFullNameAndPhone(ctx context.Context, userID string, fullName string, phone *string) error {
+	normalized := normalizePhone(phone)
 	_, err := r.db.Exec(ctx,
-		`UPDATE users SET full_name = $2, phone = NULLIF($3, ''), updated_at = NOW() WHERE id = $1::uuid`,
-		userID, fullName, nullableText(phone))
+		`UPDATE users SET full_name = $2, phone = $3, updated_at = NOW() WHERE id = $1::uuid`,
+		userID, fullName, normalized)
 	return err
 }
 
@@ -630,6 +631,25 @@ func (r *Repository) UpdateUserFields(ctx context.Context, userID string, fullNa
 		`UPDATE users SET full_name = $2, email = $3, updated_at = NOW() WHERE id = $1::uuid`,
 		userID, fullName, strings.ToLower(strings.TrimSpace(email)))
 	return err
+}
+
+func normalizePhone(phone *string) interface{} {
+	if phone == nil {
+		return nil
+	}
+	p := strings.TrimSpace(*phone)
+	p = strings.ReplaceAll(p, " ", "")
+	p = strings.ReplaceAll(p, "-", "")
+	if strings.HasPrefix(p, "+") {
+		p = p[1:]
+	}
+	if strings.HasPrefix(p, "08") {
+		p = "62" + p[1:]
+	}
+	if p == "" {
+		return nil
+	}
+	return p
 }
 
 func nullableText(value *string) interface{} {
