@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+import { ensureAuthenticated } from "@/services/auth";
 import { ApiError, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import { getStoredSession } from "@/stores/auth-store";
 import type {
@@ -118,7 +120,7 @@ export async function exportAdsMetricsCSV(dateFrom: string, dateTo: string) {
     params.set("date_to", dateTo);
   }
 
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1"}/marketing/ads-metrics/export?${params.toString()}`, {
+  const response = await fetch(`${env.VITE_API_BASE_URL}/marketing/ads-metrics/export?${params.toString()}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${session?.tokens.access_token ?? ""}`,

@@ -9,6 +9,7 @@ import {
   Youtube,
 } from "lucide-react";
 
+import { env } from "@/lib/env";
 import type {
   AdsMetricPlatform,
   Campaign,
@@ -258,7 +259,7 @@ export function campaignMatchesFilters(
 }
 
 export function uploadsURL(filePath: string) {
-  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
+  const apiBase = env.VITE_API_BASE_URL;
   const origin = apiBase.replace(/\/api\/v1\/?$/, "");
   return `${origin}/uploads/${filePath}`;
 }

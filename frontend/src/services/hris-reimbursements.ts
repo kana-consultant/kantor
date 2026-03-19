@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import { getStoredSession } from "@/stores/auth-store";
 import type {
@@ -54,7 +55,7 @@ export async function uploadReimbursementAttachments(reimbursementId: string, fi
   const payload = new FormData();
   files.forEach((file) => payload.append("files", file));
   const response = await fetch(
-    `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1"}/hris/reimbursements/${reimbursementId}/attachments`,
+    `${env.VITE_API_BASE_URL}/hris/reimbursements/${reimbursementId}/attachments`,
     {
       method: "POST",
       headers: {
