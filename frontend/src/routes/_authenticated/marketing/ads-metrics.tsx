@@ -670,7 +670,7 @@ function AdsMetricsPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="group_label" tick={{ fontSize: 12 }} />
                     <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000000)} jt`} />
-                    <Tooltip formatter={(value: number) => formatIDR(value)} />
+                    <Tooltip formatter={(value) => formatIDR(Number(value))} />
                     <Bar dataKey="total_spent" fill="#FF5630" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="total_revenue" fill="#36B37E" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -691,7 +691,7 @@ function AdsMetricsPage() {
                         <Cell fill={summaryColors[index % summaryColors.length]} key={row.group_key} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatIDR(value)} />
+                    <Tooltip formatter={(value) => formatIDR(Number(value))} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -722,7 +722,7 @@ function AdsMetricsPage() {
                     <XAxis dataKey="group_label" />
                     <YAxis tickFormatter={(value) => `${Number(value).toFixed(1)}`} yAxisId="left" />
                     <YAxis orientation="right" tickFormatter={(value) => `${Number(value).toFixed(1)}%`} yAxisId="right" />
-                    <Tooltip formatter={(value: number, name: string) => (name === "ctr" ? `${Number(value).toFixed(2)}%` : Number(value).toFixed(2))} />
+                    <Tooltip formatter={(value, name) => (name === "ctr" ? `${Number(value).toFixed(2)}%` : Number(value).toFixed(2))} />
                     <Line dataKey="roas" name="roas" stroke="#36B37E" strokeWidth={2} type="monotone" yAxisId="left" />
                     <Line dataKey="ctr" name="ctr" stroke="#FF5630" strokeWidth={2} type="monotone" yAxisId="right" />
                   </LineChart>
