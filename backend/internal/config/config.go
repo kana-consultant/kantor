@@ -17,7 +17,8 @@ type Config struct {
 	Port              string
 	DatabaseURL       string
 	JWTSecret         string
-	DataEncryptionKey string
+	DataEncryptionKey         string
+	DataEncryptionKeyPrevious string
 	UploadsDir        string
 	JWTAccessExpiry   time.Duration
 	JWTRefreshExpiry  time.Duration
@@ -79,6 +80,7 @@ func Load() (Config, error) {
 
 	jwtSecret := getEnv("JWT_SECRET", "change-me")
 	dataEncryptionKey := strings.TrimSpace(os.Getenv("DATA_ENCRYPTION_KEY"))
+	dataEncryptionKeyPrevious := strings.TrimSpace(os.Getenv("DATA_ENCRYPTION_KEY_PREVIOUS"))
 
 	seedEnabled, err := parseBool("SEED_SUPERADMIN_ENABLED", appEnv != "production")
 	if err != nil {
@@ -100,7 +102,8 @@ func Load() (Config, error) {
 		Port:              getEnv("PORT", "8080"),
 		DatabaseURL:       os.Getenv("DATABASE_URL"),
 		JWTSecret:         jwtSecret,
-		DataEncryptionKey: dataEncryptionKey,
+		DataEncryptionKey:         dataEncryptionKey,
+		DataEncryptionKeyPrevious: dataEncryptionKeyPrevious,
 		UploadsDir:        getEnv("UPLOADS_DIR", "uploads"),
 		JWTAccessExpiry:   accessExpiry,
 		JWTRefreshExpiry:  refreshExpiry,

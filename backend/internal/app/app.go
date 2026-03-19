@@ -33,6 +33,7 @@ import (
 	wahandler "github.com/kana-consultant/kantor/backend/internal/handler/whatsapp"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
+	auditrepo "github.com/kana-consultant/kantor/backend/internal/repository/audit"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
@@ -41,6 +42,7 @@ import (
 	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	"github.com/kana-consultant/kantor/backend/internal/security"
+	auditservice "github.com/kana-consultant/kantor/backend/internal/service/audit"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 	filesservice "github.com/kana-consultant/kantor/backend/internal/service/files"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
@@ -82,6 +84,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("seed rbac defaults: %w", err)
 	}
+
+	auditRepository := auditrepo.NewRepository(pool)
+	auditService := auditservice.NewService(auditRepository)
 
 	authRepository := authrepo.New(pool)
 	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
@@ -155,7 +160,11 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	leadsRepository := marketingrepo.NewLeadsRepository(pool)
 	marketingOverviewRepository := marketingrepo.NewOverviewRepository(pool)
 	notificationsRepository := notificationsrepo.New(pool)
-	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey)
+	var previousKeys []string
+	if cfg.DataEncryptionKeyPrevious != "" {
+		previousKeys = append(previousKeys, cfg.DataEncryptionKeyPrevious)
+	}
+	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey, previousKeys...)
 	if err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("configure data encryption: %w", err)
@@ -190,6 +199,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	application := &App{cfg: cfg, db: pool}
 	application.router = application.buildRouter(
+		auditService,
 		authService,
 		operationalhandler.NewOverviewHandler(operationalOverviewService),
 		operationalhandler.NewProjectsHandler(projectsService, projectsRepository),
@@ -232,6 +242,7 @@ func (a *App) Close() {
 }
 
 func (a *App) buildRouter(
+	auditService *auditservice.Service,
 	authService *authservice.Service,
 	operationalOverviewHandler *operationalhandler.OverviewHandler,
 	projectsHandler *operationalhandler.ProjectsHandler,
@@ -252,11 +263,14 @@ func (a *App) buildRouter(
 	waHandler *wahandler.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
-	authHandler := authhandler.New(authService)
+	authHandler := authhandler.New(authService, a.cfg)
 
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
 	router.Use(chimiddleware.Recoverer)
+	router.Use(platformmiddleware.AuditMiddleware(auditService))
+	router.Use(platformmiddleware.MaxBodySize(1 << 20)) // 1 MB default for JSON endpoints
+	router.Use(platformmiddleware.LoggingMiddleware)
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   a.cfg.CORSOrigins,
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
@@ -295,6 +309,8 @@ func (a *App) buildRouter(
 			protected.Get("/auth/me", authHandler.Me)
 			protected.Get("/auth/profile", authHandler.GetProfile)
 			protected.Put("/auth/profile", authHandler.UpdateProfile)
+			protected.Post("/auth/change-password", authHandler.ChangePassword)
+			protected.Post("/auth/change-password", authHandler.ChangePassword)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
 

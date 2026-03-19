@@ -632,7 +632,7 @@ function moveTaskInMemory(tasks: KanbanTask[], activeTaskId: string, overData: u
 
   const destinationList =
     destinationColumnId === activeTask.column_id ? sourceList : [...(buckets[destinationColumnId] ?? [])];
-  destinationList.splice(destinationIndex, 0, { ...movingTask, column_id: destinationColumnId });
+  destinationList.splice(destinationIndex, 0, { ...movingTask!, column_id: destinationColumnId });
   buckets[destinationColumnId] = destinationList;
 
   return flattenTaskBuckets(buckets);
@@ -644,7 +644,7 @@ function buildTaskBuckets(tasks: KanbanTask[]) {
     if (!buckets[task.column_id]) {
       buckets[task.column_id] = [];
     }
-    buckets[task.column_id].push(task);
+    buckets[task.column_id]!.push(task);
   }
   return buckets;
 }
@@ -652,7 +652,7 @@ function buildTaskBuckets(tasks: KanbanTask[]) {
 function flattenTaskBuckets(buckets: Record<string, KanbanTask[]>) {
   const nextTasks: KanbanTask[] = [];
   for (const columnId of Object.keys(buckets)) {
-    buckets[columnId].forEach((task, index) => {
+    buckets[columnId]!.forEach((task, index) => {
       nextTasks.push({ ...task, column_id: columnId, position: index + 1 });
     });
   }

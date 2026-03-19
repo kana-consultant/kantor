@@ -56,6 +56,7 @@ func (h *KanbanHandler) createColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "operational", "kanban_column", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -86,6 +87,7 @@ func (h *KanbanHandler) updateColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "kanban_column", columnID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -98,6 +100,7 @@ func (h *KanbanHandler) deleteColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "operational", "kanban_column", columnID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Column deleted successfully"}, nil)
 }
 
@@ -114,6 +117,7 @@ func (h *KanbanHandler) reorderColumns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "kanban_columns", projectID, nil, input)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Columns reordered successfully"}, nil)
 }
 
@@ -137,6 +141,7 @@ func (h *KanbanHandler) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "operational", "kanban_task", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -173,6 +178,7 @@ func (h *KanbanHandler) updateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "kanban_task", taskID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -185,6 +191,7 @@ func (h *KanbanHandler) deleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "operational", "kanban_task", taskID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Task deleted successfully"}, nil)
 }
 
@@ -202,6 +209,7 @@ func (h *KanbanHandler) moveTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "kanban_task", taskID, nil, input)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Task moved successfully"}, nil)
 }
 

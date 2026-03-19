@@ -82,7 +82,7 @@ function EmployeeDetailPage() {
   const [bonusToReject, setBonusToReject] = useState<BonusRecord | null>(null);
 
   const salaryForm = useForm<SalaryFormValues>({
-    resolver: zodResolver(salarySchema),
+    resolver: zodResolver(salarySchema) as never,
     defaultValues: {
       base_salary: 0,
       allowances: "",
@@ -92,7 +92,7 @@ function EmployeeDetailPage() {
   });
 
   const bonusForm = useForm<BonusFormValues>({
-    resolver: zodResolver(bonusSchema),
+    resolver: zodResolver(bonusSchema) as never,
     defaultValues: {
       amount: 0,
       reason: "",
@@ -877,7 +877,7 @@ function sumAmountMap(values: Record<string, number>) {
   return Object.values(values).reduce((total, amount) => total + amount, 0);
 }
 
-function resetBonusForm(form: ReturnType<typeof useForm<BonusFormValues>>) {
+function resetBonusForm(form: Pick<ReturnType<typeof useForm<BonusFormValues>>, "reset">) {
   form.reset({
     amount: 0,
     reason: "",

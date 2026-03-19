@@ -207,7 +207,7 @@ function MarketingOverviewPage() {
                     borderRadius: 8,
                     boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
                   }}
-                  formatter={(value: number) => formatRoas(value)}
+                  formatter={(value) => formatRoas(Number(value))}
                 />
                 <Line
                   dataKey="roas"

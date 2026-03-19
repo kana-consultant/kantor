@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var ErrNotificationNotFound = errors.New("notification not found")
@@ -39,6 +40,9 @@ func New(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, params CreateParams) (model.Notification, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
 		VALUES ($1::uuid, $2, $3, $4, NULLIF($5, ''), $6::uuid)
@@ -70,6 +74,9 @@ func (r *Repository) Create(ctx context.Context, params CreateParams) (model.Not
 }
 
 func (r *Repository) CreateMany(ctx context.Context, params []CreateParams) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	if len(params) == 0 {
 		return nil
 	}
@@ -105,6 +112,9 @@ func (r *Repository) CreateMany(ctx context.Context, params []CreateParams) erro
 }
 
 func (r *Repository) List(ctx context.Context, params ListParams) ([]model.Notification, int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"user_id = $1::uuid"}
 	args := []interface{}{params.UserID}
 
@@ -163,6 +173,9 @@ func (r *Repository) List(ctx context.Context, params ListParams) ([]model.Notif
 }
 
 func (r *Repository) CountUnread(ctx context.Context, userID string) (int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	var count int64
 	err := r.db.QueryRow(
 		ctx,
@@ -173,6 +186,9 @@ func (r *Repository) CountUnread(ctx context.Context, userID string) (int64, err
 }
 
 func (r *Repository) MarkRead(ctx context.Context, notificationID string, userID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(
 		ctx,
 		`UPDATE notifications SET is_read = TRUE WHERE id = $1::uuid AND user_id = $2::uuid`,
@@ -189,6 +205,9 @@ func (r *Repository) MarkRead(ctx context.Context, notificationID string, userID
 }
 
 func (r *Repository) MarkAllRead(ctx context.Context, userID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	_, err := r.db.Exec(ctx, `UPDATE notifications SET is_read = TRUE WHERE user_id = $1::uuid AND is_read = FALSE`, userID)
 	return err
 }

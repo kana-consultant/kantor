@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export interface ApiSuccess<TData> {
   success: true;
   data: TData;
@@ -27,8 +29,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
+const API_BASE_URL = env.VITE_API_BASE_URL;
 
 export async function requestJSON<TData>(
   path: string,
@@ -53,6 +54,7 @@ export async function requestEnvelope<TData>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
+    credentials: "include",
   });
 
   const payload = (await response.json()) as ApiSuccess<TData> | ApiFailure;
@@ -99,4 +101,68 @@ export async function getJSON<TData>(path: string, token?: string) {
     },
     token,
   );
+}
+
+// --- Authenticated wrappers (auto-attach token + 401 refresh retry) ---
+
+import { getStoredSession } from "@/stores/auth-store";
+
+function getAccessToken(): string | undefined {
+  return getStoredSession()?.tokens.access_token;
+}
+
+let refreshPromise: Promise<unknown> | null = null;
+
+async function handleAuthRetry<T>(
+  fn: (token?: string) => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn(getAccessToken());
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      try {
+        if (!refreshPromise) {
+          const { refreshSession } = await import("@/services/auth");
+          refreshPromise = refreshSession();
+        }
+        await refreshPromise;
+        return await fn(getAccessToken());
+      } catch {
+        const { useAuthStore } = await import("@/stores/auth-store");
+        useAuthStore.getState().clearSession();
+        // Hard navigation: app state is potentially corrupted at this
+        // point, so a full reload ensures no stale data remains.
+        window.location.href = "/login";
+        throw err;
+      } finally {
+        refreshPromise = null;
+      }
+    }
+    throw err;
+  }
+}
+
+export function authGetJSON<TData>(path: string): Promise<TData> {
+  return handleAuthRetry((token) => getJSON<TData>(path, token));
+}
+
+export function authPostJSON<TData, TBody>(
+  path: string,
+  body: TBody,
+): Promise<TData> {
+  return handleAuthRetry((token) => postJSON<TData, TBody>(path, body, token));
+}
+
+export function authRequestJSON<TData>(
+  path: string,
+  init: RequestInit = {},
+): Promise<TData> {
+  return handleAuthRetry((token) => requestJSON<TData>(path, init, token));
+}
+
+export function authRequestEnvelope<TData>(
+  path: string,
+  init: RequestInit = {},
+): Promise<ApiSuccess<TData>> {
+  return handleAuthRetry((token) => requestEnvelope<TData>(path, init, token));
 }

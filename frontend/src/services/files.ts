@@ -1,10 +1,10 @@
 import { ApiError } from "@/lib/api-client";
+import { env } from "@/lib/env";
 import { ensureAuthenticated } from "@/services/auth";
 
 export type ProtectedFileType = "campaigns" | "reimbursements";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
+const API_BASE_URL = env.VITE_API_BASE_URL;
 
 export async function fetchProtectedFileBlob(
   type: ProtectedFileType,
@@ -72,5 +72,6 @@ export async function openProtectedFile(
 }
 
 export function getProtectedFileName(filePath: string) {
-  return filePath.split("/").at(-1) ?? filePath;
+  const parts = filePath.split("/");
+  return parts[parts.length - 1] ?? filePath;
 }

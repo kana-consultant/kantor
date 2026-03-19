@@ -162,7 +162,7 @@ function HrisOverviewPage() {
                         borderRadius: 8,
                         boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
                       }}
-                      formatter={(value: number) => formatIDR(value)}
+                      formatter={(value) => formatIDR(Number(value))}
                     />
                     <Bar dataKey="income" fill="#36B37E" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="outcome" fill="#FF5630" radius={[4, 4, 0, 0]} />

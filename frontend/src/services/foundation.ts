@@ -1,5 +1,4 @@
-import { ApiError, getJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authGetJSON, getJSON } from "@/lib/api-client";
 import type { AuthUser } from "@/types/auth";
 
 export interface HealthStatus {
@@ -17,15 +16,5 @@ export function fetchApiHealth() {
 }
 
 export async function fetchSessionProfile() {
-  const token = await requireAccessToken();
-  return getJSON<SessionProfile>("/auth/me", token);
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
+  return authGetJSON<SessionProfile>("/auth/me");
 }

@@ -53,6 +53,7 @@ func (h *CompensationHandler) createSalary(w http.ResponseWriter, r *http.Reques
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "salary", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -103,6 +104,7 @@ func (h *CompensationHandler) createBonus(w http.ResponseWriter, r *http.Request
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "bonus", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -121,11 +123,13 @@ func (h *CompensationHandler) ApproveBonus(w http.ResponseWriter, r *http.Reques
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
 		return
 	}
-	result, err := h.service.ApproveBonus(r.Context(), chi.URLParam(r, "bonusID"), principal.UserID)
+	bonusID := chi.URLParam(r, "bonusID")
+	result, err := h.service.ApproveBonus(r.Context(), bonusID, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "approve", "hris", "bonus", bonusID, nil, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -135,11 +139,13 @@ func (h *CompensationHandler) UpdateBonus(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := h.service.UpdateBonus(r.Context(), chi.URLParam(r, "bonusID"), input)
+	bonusID := chi.URLParam(r, "bonusID")
+	result, err := h.service.UpdateBonus(r.Context(), bonusID, input)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "bonus", bonusID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -149,19 +155,23 @@ func (h *CompensationHandler) RejectBonus(w http.ResponseWriter, r *http.Request
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
 		return
 	}
-	result, err := h.service.RejectBonus(r.Context(), chi.URLParam(r, "bonusID"), principal.UserID)
+	bonusID := chi.URLParam(r, "bonusID")
+	result, err := h.service.RejectBonus(r.Context(), bonusID, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "reject", "hris", "bonus", bonusID, nil, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *CompensationHandler) DeleteBonus(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteBonus(r.Context(), chi.URLParam(r, "bonusID")); err != nil {
+	bonusID := chi.URLParam(r, "bonusID")
+	if err := h.service.DeleteBonus(r.Context(), bonusID); err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "bonus", bonusID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Bonus deleted successfully"}, nil)
 }
 

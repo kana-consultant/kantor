@@ -65,7 +65,7 @@ export function CampaignForm({
   onCancel,
 }: CampaignFormProps) {
   const form = useForm<CampaignFormValues>({
-    resolver: zodResolver(campaignFormSchema) as any,
+    resolver: zodResolver(campaignFormSchema) as never,
     defaultValues: initialValues ?? defaultValues,
   });
 

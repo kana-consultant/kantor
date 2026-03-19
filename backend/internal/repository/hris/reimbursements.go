@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var ErrReimbursementNotFound = errors.New("reimbursement not found")
@@ -53,6 +54,9 @@ func NewReimbursementsRepository(db *pgxpool.Pool) *ReimbursementsRepository {
 }
 
 func (r *ReimbursementsRepository) Create(ctx context.Context, params CreateReimbursementParams) (model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		INSERT INTO reimbursements (employee_id, title, category, amount, transaction_date, description, submitted_by, status)
 		VALUES ($1::uuid, $2, $3, $4, $5::date, $6, $7::uuid, 'submitted')
@@ -76,6 +80,9 @@ func (r *ReimbursementsRepository) Create(ctx context.Context, params CreateReim
 }
 
 func (r *ReimbursementsRepository) List(ctx context.Context, params ListReimbursementsParams) ([]model.Reimbursement, int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
@@ -166,6 +173,9 @@ func (r *ReimbursementsRepository) List(ctx context.Context, params ListReimburs
 }
 
 func (r *ReimbursementsRepository) GetByID(ctx context.Context, reimbursementID string) (model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		SELECT
 			reimbursements.id::text,
@@ -200,6 +210,9 @@ func (r *ReimbursementsRepository) GetByID(ctx context.Context, reimbursementID 
 }
 
 func (r *ReimbursementsRepository) FindAttachmentPath(ctx context.Context, reimbursementID string, filename string) (string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	item, err := r.GetByID(ctx, reimbursementID)
 	if err != nil {
 		return "", err
@@ -216,6 +229,9 @@ func (r *ReimbursementsRepository) FindAttachmentPath(ctx context.Context, reimb
 }
 
 func (r *ReimbursementsRepository) AddAttachments(ctx context.Context, reimbursementID string, attachments []string) (model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	payload, err := json.Marshal(attachments)
 	if err != nil {
 		return model.Reimbursement{}, err
@@ -235,6 +251,9 @@ func (r *ReimbursementsRepository) AddAttachments(ctx context.Context, reimburse
 }
 
 func (r *ReimbursementsRepository) ApplyManagerReview(ctx context.Context, reimbursementID string, params ReviewReimbursementParams) (model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	nextStatus := "approved"
 	if params.Decision == "rejected" {
 		nextStatus = "rejected"
@@ -257,10 +276,16 @@ func (r *ReimbursementsRepository) ApplyManagerReview(ctx context.Context, reimb
 }
 
 func (r *ReimbursementsRepository) ApplyFinanceReview(ctx context.Context, reimbursementID string, params ReviewReimbursementParams) (model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	return r.ApplyManagerReview(ctx, reimbursementID, params)
 }
 
 func (r *ReimbursementsRepository) MarkPaid(ctx context.Context, reimbursementID string, actorID string, notes *string) (model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		UPDATE reimbursements
 		SET status = 'paid',
@@ -280,6 +305,9 @@ func (r *ReimbursementsRepository) MarkPaid(ctx context.Context, reimbursementID
 }
 
 func (r *ReimbursementsRepository) Summary(ctx context.Context, month int, year int, employeeID string, department string) (model.ReimbursementSummary, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"EXTRACT(MONTH FROM reimbursements.transaction_date) = $1", "EXTRACT(YEAR FROM reimbursements.transaction_date) = $2"}
 	args := []interface{}{month, year}
 	index := 3

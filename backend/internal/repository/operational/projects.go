@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -59,6 +60,8 @@ func NewProjectsRepository(db *pgxpool.Pool) *ProjectsRepository {
 }
 
 func (r *ProjectsRepository) CreateProject(ctx context.Context, params CreateProjectParams) (model.Project, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		INSERT INTO projects (name, description, deadline, status, priority, created_by)
 		VALUES ($1, NULLIF($2, ''), $3::timestamptz, $4, $5, $6::uuid)
@@ -95,6 +98,8 @@ func (r *ProjectsRepository) CreateProject(ctx context.Context, params CreatePro
 }
 
 func (r *ProjectsRepository) ListProjects(ctx context.Context, params ListProjectsParams) ([]model.Project, int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
@@ -183,6 +188,8 @@ func (r *ProjectsRepository) ListProjects(ctx context.Context, params ListProjec
 }
 
 func (r *ProjectsRepository) GetProjectByID(ctx context.Context, projectID string) (model.Project, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT
 			projects.id::text,
@@ -230,11 +237,13 @@ func (r *ProjectsRepository) GetProjectByID(ctx context.Context, projectID strin
 }
 
 func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string, params UpdateProjectParams) (model.Project, error) {
-	autoAssignMode := "off"
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	autoAssignMode := ""
 	if params.AutoAssignMode != nil && *params.AutoAssignMode != "" {
 		autoAssignMode = *params.AutoAssignMode
 	}
-
 	query := `
 		UPDATE projects
 		SET
@@ -285,6 +294,8 @@ func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string
 }
 
 func (r *ProjectsRepository) DeleteProject(ctx context.Context, projectID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	commandTag, err := r.db.Exec(ctx, `DELETE FROM projects WHERE id = $1::uuid`, projectID)
 	if err != nil {
 		return err
@@ -298,6 +309,8 @@ func (r *ProjectsRepository) DeleteProject(ctx context.Context, projectID string
 }
 
 func (r *ProjectsRepository) ListProjectMembers(ctx context.Context, projectID string) ([]model.ProjectMember, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT
 			project_members.project_id::text,
@@ -344,6 +357,8 @@ func (r *ProjectsRepository) ListProjectMembers(ctx context.Context, projectID s
 }
 
 func (r *ProjectsRepository) MutateProjectMember(ctx context.Context, projectID string, params ProjectMemberMutationParams) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	if _, err := r.GetProjectByID(ctx, projectID); err != nil {
 		return err
 	}
@@ -429,9 +444,9 @@ type MemberWorkload struct {
 }
 
 type AvailableUser struct {
-	ID       string  `json:"id"`
-	Email    string  `json:"email"`
-	FullName string  `json:"full_name"`
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	FullName  string  `json:"full_name"`
 	AvatarURL *string `json:"avatar_url"`
 }
 

@@ -17,7 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import { z } from "zod";
-import { ArrowDownCircle, ArrowUpCircle, ChartColumn, Plus, Scale } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Plus, Scale } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -119,7 +119,7 @@ function FinancePage() {
   });
 
   const recordForm = useForm<FinanceRecordFormValues>({
-    resolver: zodResolver(recordSchema),
+    resolver: zodResolver(recordSchema) as never,
     defaultValues: {
       category_id: "",
       type: "income",
@@ -587,7 +587,7 @@ function FinancePage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" />
                     <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000000)} jt`} />
-                    <Tooltip formatter={(value: number) => formatIDR(value)} />
+                    <Tooltip formatter={(value) => formatIDR(Number(value))} />
                     <Bar dataKey="income" fill="#36B37E" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="outcome" fill="#FF5630" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -618,7 +618,7 @@ function FinancePage() {
                         <Cell fill={pieColors[index % pieColors.length]} key={name} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatIDR(value)} />
+                    <Tooltip formatter={(value) => formatIDR(Number(value))} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -750,7 +750,7 @@ function FinancePage() {
   );
 }
 
-function resetRecordForm(form: ReturnType<typeof useForm<FinanceRecordFormValues>>) {
+function resetRecordForm(form: Pick<ReturnType<typeof useForm<FinanceRecordFormValues>>, "reset">) {
   form.reset({
     category_id: "",
     type: "income",

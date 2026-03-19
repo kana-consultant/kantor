@@ -18,11 +18,27 @@ var (
 	ErrFinanceCategoryExists   = errors.New("finance category already exists")
 )
 
-type FinanceService struct {
-	repo *hrisrepo.FinanceRepository
+type financeRepository interface {
+	CreateCategory(ctx context.Context, params hrisrepo.UpsertFinanceCategoryParams) (model.FinanceCategory, error)
+	ListCategories(ctx context.Context, recordType string) ([]model.FinanceCategory, error)
+	UpdateCategory(ctx context.Context, categoryID string, params hrisrepo.UpsertFinanceCategoryParams) (model.FinanceCategory, error)
+	DeleteCategory(ctx context.Context, categoryID string) error
+	CreateRecord(ctx context.Context, params hrisrepo.UpsertFinanceRecordParams) (model.FinanceRecord, error)
+	ListRecords(ctx context.Context, params hrisrepo.ListFinanceRecordsParams) ([]model.FinanceRecord, int64, error)
+	GetRecordByID(ctx context.Context, recordID string) (model.FinanceRecord, error)
+	UpdateRecord(ctx context.Context, recordID string, params hrisrepo.UpsertFinanceRecordParams) (model.FinanceRecord, error)
+	DeleteRecord(ctx context.Context, recordID string) error
+	SubmitRecord(ctx context.Context, recordID string, actorID string) (model.FinanceRecord, error)
+	ReviewRecord(ctx context.Context, recordID string, decision string, actorID string) (model.FinanceRecord, error)
+	Summary(ctx context.Context, year int) (model.FinanceSummary, error)
+	ListForExport(ctx context.Context, params hrisrepo.ListFinanceExportParams) ([]model.FinanceRecord, error)
 }
 
-func NewFinanceService(repo *hrisrepo.FinanceRepository) *FinanceService {
+type FinanceService struct {
+	repo financeRepository
+}
+
+func NewFinanceService(repo financeRepository) *FinanceService {
 	return &FinanceService{repo: repo}
 }
 

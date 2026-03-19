@@ -507,9 +507,10 @@ func (r *Repository) queryTasksByDue(ctx context.Context, dateCondition string) 
 	query := fmt.Sprintf(`SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.phone,
 		COALESCE(to_char(kt.due_date, 'YYYY-MM-DD'), ''), kt.priority
 		FROM kanban_tasks kt
+		JOIN kanban_columns kc ON kc.id = kt.column_id
 		JOIN projects p ON p.id = kt.project_id
 		JOIN users u ON u.id = kt.assignee_id
-		WHERE %s AND kt.status NOT IN ('done', 'archived')
+		WHERE %s AND LOWER(kc.name) NOT IN ('done', 'archived')
 		AND kt.assignee_id IS NOT NULL`, dateCondition)
 
 	rows, err := r.db.Query(ctx, query)
@@ -549,7 +550,12 @@ type ProjectMemberInfo struct {
 func (r *Repository) GetProjectsDeadlineIn3Days(ctx context.Context) ([]ProjectDeadlineInfo, error) {
 	rows, err := r.db.Query(ctx, `SELECT p.id, p.name,
 		COALESCE(to_char(p.deadline, 'YYYY-MM-DD'), ''), p.status,
-		COALESCE((SELECT COUNT(*) FROM kanban_tasks kt WHERE kt.project_id = p.id AND kt.status NOT IN ('done','archived')), 0),
+		COALESCE((
+			SELECT COUNT(*)
+			FROM kanban_tasks kt
+			JOIN kanban_columns kc ON kc.id = kt.column_id
+			WHERE kt.project_id = p.id AND LOWER(kc.name) NOT IN ('done', 'archived')
+		), 0),
 		COALESCE((SELECT COUNT(*) FROM kanban_tasks kt WHERE kt.project_id = p.id), 0)
 		FROM projects p
 		WHERE p.deadline::date = (CURRENT_DATE + INTERVAL '3 days')::date
@@ -612,11 +618,12 @@ type WeeklyDigestInfo struct {
 
 func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInfo, error) {
 	rows, err := r.db.Query(ctx, `SELECT u.id, u.full_name, u.phone,
-		COALESCE(SUM(CASE WHEN kt.status = 'done' AND kt.updated_at >= (CURRENT_DATE - INTERVAL '7 days') THEN 1 ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN kt.status NOT IN ('done','archived') THEN 1 ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN kt.status NOT IN ('done','archived') AND kt.due_date < CURRENT_DATE THEN 1 ELSE 0 END), 0)
+		COALESCE(SUM(CASE WHEN LOWER(kc.name) = 'done' AND kt.updated_at >= (CURRENT_DATE - INTERVAL '7 days') THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') AND kt.due_date < CURRENT_DATE THEN 1 ELSE 0 END), 0)
 		FROM users u
 		JOIN kanban_tasks kt ON kt.assignee_id = u.id
+		JOIN kanban_columns kc ON kc.id = kt.column_id
 		WHERE u.is_active = true
 		GROUP BY u.id, u.full_name, u.phone
 		HAVING SUM(1) > 0`)

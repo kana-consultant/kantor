@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -57,6 +58,9 @@ func NewFinanceRepository(db *pgxpool.Pool) *FinanceRepository {
 }
 
 func (r *FinanceRepository) CreateCategory(ctx context.Context, params UpsertFinanceCategoryParams) (model.FinanceCategory, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		INSERT INTO finance_categories (name, type)
 		VALUES ($1, $2)
@@ -77,6 +81,9 @@ func (r *FinanceRepository) CreateCategory(ctx context.Context, params UpsertFin
 }
 
 func (r *FinanceRepository) ListCategories(ctx context.Context, recordType string) ([]model.FinanceCategory, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		SELECT id::text, name, type, is_default, created_at
 		FROM finance_categories
@@ -101,6 +108,9 @@ func (r *FinanceRepository) ListCategories(ctx context.Context, recordType strin
 }
 
 func (r *FinanceRepository) UpdateCategory(ctx context.Context, categoryID string, params UpsertFinanceCategoryParams) (model.FinanceCategory, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		UPDATE finance_categories
 		SET name = $2, type = $3
@@ -125,6 +135,9 @@ func (r *FinanceRepository) UpdateCategory(ctx context.Context, categoryID strin
 }
 
 func (r *FinanceRepository) DeleteCategory(ctx context.Context, categoryID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(ctx, `DELETE FROM finance_categories WHERE id = $1::uuid AND is_default = FALSE`, categoryID)
 	if err != nil {
 		return err
@@ -136,6 +149,9 @@ func (r *FinanceRepository) DeleteCategory(ctx context.Context, categoryID strin
 }
 
 func (r *FinanceRepository) CreateRecord(ctx context.Context, params UpsertFinanceRecordParams) (model.FinanceRecord, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		INSERT INTO finance_records (category_id, type, amount, description, record_date, record_month, record_year)
 		VALUES ($1::uuid, $2, $3, $4, $5::date, EXTRACT(MONTH FROM $5::date)::int, EXTRACT(YEAR FROM $5::date)::int)
@@ -149,6 +165,9 @@ func (r *FinanceRepository) CreateRecord(ctx context.Context, params UpsertFinan
 }
 
 func (r *FinanceRepository) ListRecords(ctx context.Context, params ListFinanceRecordsParams) ([]model.FinanceRecord, int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
@@ -249,6 +268,9 @@ func (r *FinanceRepository) ListRecords(ctx context.Context, params ListFinanceR
 }
 
 func (r *FinanceRepository) GetRecordByID(ctx context.Context, recordID string) (model.FinanceRecord, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		SELECT
 			finance_records.id::text,
@@ -302,6 +324,9 @@ func (r *FinanceRepository) GetRecordByID(ctx context.Context, recordID string) 
 }
 
 func (r *FinanceRepository) UpdateRecord(ctx context.Context, recordID string, params UpsertFinanceRecordParams) (model.FinanceRecord, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		UPDATE finance_records
 		SET category_id = $2::uuid,
@@ -323,6 +348,9 @@ func (r *FinanceRepository) UpdateRecord(ctx context.Context, recordID string, p
 }
 
 func (r *FinanceRepository) DeleteRecord(ctx context.Context, recordID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	tag, err := r.db.Exec(ctx, `DELETE FROM finance_records WHERE id = $1::uuid AND approval_status IN ('draft', 'rejected')`, recordID)
 	if err != nil {
 		return err
@@ -334,6 +362,9 @@ func (r *FinanceRepository) DeleteRecord(ctx context.Context, recordID string) e
 }
 
 func (r *FinanceRepository) SubmitRecord(ctx context.Context, recordID string, actorID string) (model.FinanceRecord, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		UPDATE finance_records
 		SET approval_status = 'pending_review',
@@ -350,6 +381,9 @@ func (r *FinanceRepository) SubmitRecord(ctx context.Context, recordID string, a
 }
 
 func (r *FinanceRepository) ReviewRecord(ctx context.Context, recordID string, decision string, actorID string) (model.FinanceRecord, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	query := `
 		UPDATE finance_records
 		SET approval_status = $2,
@@ -369,6 +403,9 @@ func (r *FinanceRepository) ReviewRecord(ctx context.Context, recordID string, d
 }
 
 func (r *FinanceRepository) Summary(ctx context.Context, year int) (model.FinanceSummary, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			record_month,
@@ -453,6 +490,9 @@ func (r *FinanceRepository) Summary(ctx context.Context, year int) (model.Financ
 }
 
 func (r *FinanceRepository) ListForExport(ctx context.Context, params ListFinanceExportParams) ([]model.FinanceRecord, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
 	filters := []string{"finance_records.record_year = $1"}
 	args := []interface{}{params.Year}
 	index := 2

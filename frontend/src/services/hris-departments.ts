@@ -1,5 +1,4 @@
-import { ApiError, requestJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authRequestJSON } from "@/lib/api-client";
 import type { Department, DepartmentFormValues } from "@/types/hris";
 
 export const departmentsKeys = {
@@ -9,18 +8,15 @@ export const departmentsKeys = {
 };
 
 export async function listDepartments() {
-  const token = await requireAccessToken();
-  return requestJSON<Department[]>("/hris/departments", { method: "GET" }, token);
+  return authRequestJSON<Department[]>("/hris/departments", { method: "GET" });
 }
 
 export async function getDepartment(departmentId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<Department>(`/hris/departments/${departmentId}`, { method: "GET" }, token);
+  return authRequestJSON<Department>(`/hris/departments/${departmentId}`, { method: "GET" });
 }
 
 export async function createDepartment(input: DepartmentFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<Department>(
+  return authRequestJSON<Department>(
     "/hris/departments",
     {
       method: "POST",
@@ -29,13 +25,11 @@ export async function createDepartment(input: DepartmentFormValues) {
       },
       body: JSON.stringify(serializeDepartmentForm(input)),
     },
-    token,
   );
 }
 
 export async function updateDepartment(departmentId: string, input: DepartmentFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<Department>(
+  return authRequestJSON<Department>(
     `/hris/departments/${departmentId}`,
     {
       method: "PUT",
@@ -44,13 +38,11 @@ export async function updateDepartment(departmentId: string, input: DepartmentFo
       },
       body: JSON.stringify(serializeDepartmentForm(input)),
     },
-    token,
   );
 }
 
 export async function deleteDepartment(departmentId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<{ message: string }>(`/hris/departments/${departmentId}`, { method: "DELETE" }, token);
+  return authRequestJSON<{ message: string }>(`/hris/departments/${departmentId}`, { method: "DELETE" });
 }
 
 function serializeDepartmentForm(input: DepartmentFormValues) {
@@ -59,13 +51,4 @@ function serializeDepartmentForm(input: DepartmentFormValues) {
     description: input.description.trim() || null,
     head_id: input.head_id.trim() || null,
   };
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
 }

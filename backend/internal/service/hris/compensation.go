@@ -19,13 +19,30 @@ var (
 	ErrBonusNotPending = errors.New("only pending bonus records can be changed")
 )
 
+type compensationRepository interface {
+	CreateSalary(ctx context.Context, params hrisrepo.CreateSalaryParams) (hrisrepo.SalaryRow, error)
+	ListSalaries(ctx context.Context, employeeID string) ([]hrisrepo.SalaryRow, error)
+	GetCurrentSalary(ctx context.Context, employeeID string) (hrisrepo.SalaryRow, error)
+	LogSalaryAccess(ctx context.Context, userID string, employeeID string, action string) error
+	CreateBonus(ctx context.Context, params hrisrepo.CreateBonusParams) (hrisrepo.BonusRow, error)
+	ListBonuses(ctx context.Context, employeeID string) ([]hrisrepo.BonusRow, error)
+	GetBonusByID(ctx context.Context, bonusID string) (hrisrepo.BonusRow, error)
+	UpdateBonus(ctx context.Context, bonusID string, params hrisrepo.UpdateBonusParams) (hrisrepo.BonusRow, error)
+	UpdateBonusApprovalStatus(ctx context.Context, bonusID string, status string, approverID string) (hrisrepo.BonusRow, error)
+	DeleteBonus(ctx context.Context, bonusID string) error
+}
+
+type compensationEmployeesRepository interface {
+	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
+}
+
 type CompensationService struct {
-	repo          *hrisrepo.CompensationRepository
-	employeesRepo *hrisrepo.EmployeesRepository
+	repo          compensationRepository
+	employeesRepo compensationEmployeesRepository
 	encrypter     *security.Encrypter
 }
 
-func NewCompensationService(repo *hrisrepo.CompensationRepository, employeesRepo *hrisrepo.EmployeesRepository, encrypter *security.Encrypter) *CompensationService {
+func NewCompensationService(repo compensationRepository, employeesRepo compensationEmployeesRepository, encrypter *security.Encrypter) *CompensationService {
 	return &CompensationService{
 		repo:          repo,
 		employeesRepo: employeesRepo,

@@ -149,14 +149,14 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
         if (event.shiftKey) {
           if (active === first || active === node) {
             event.preventDefault();
-            last.focus();
+            last!.focus();
           }
           return;
         }
 
         if (active === last) {
           event.preventDefault();
-          first.focus();
+          first!.focus();
         }
       };
 

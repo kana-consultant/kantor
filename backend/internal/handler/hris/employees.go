@@ -46,6 +46,7 @@ func (h *EmployeesHandler) createEmployee(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "employee", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -84,21 +85,25 @@ func (h *EmployeesHandler) updateEmployee(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := h.service.UpdateEmployee(r.Context(), chi.URLParam(r, "employeeID"), input)
+	employeeID := chi.URLParam(r, "employeeID")
+	result, err := h.service.UpdateEmployee(r.Context(), employeeID, input)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "employee", employeeID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *EmployeesHandler) deleteEmployee(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteEmployee(r.Context(), chi.URLParam(r, "employeeID")); err != nil {
+	employeeID := chi.URLParam(r, "employeeID")
+	if err := h.service.DeleteEmployee(r.Context(), employeeID); err != nil {
 		h.writeError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "employee", employeeID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Employee deleted successfully"}, nil)
 }
 

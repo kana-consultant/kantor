@@ -1,4 +1,5 @@
-import { getJSON, postJSON, requestEnvelope, requestJSON } from "@/lib/api-client";
+import { env } from "@/lib/env";
+import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import { getStoredSession } from "@/stores/auth-store";
 import type {
   Reimbursement,
@@ -15,7 +16,6 @@ export const reimbursementsKeys = {
 };
 
 export async function listReimbursements(filters: ReimbursementFilters) {
-  const session = getStoredSession();
   const search = new URLSearchParams({
     page: String(filters.page),
     per_page: String(filters.perPage),
@@ -25,10 +25,9 @@ export async function listReimbursements(filters: ReimbursementFilters) {
   if (filters.month) search.set("month", filters.month);
   if (filters.year) search.set("year", filters.year);
 
-  const envelope = await requestEnvelope<Reimbursement[]>(
+  const envelope = await authRequestEnvelope<Reimbursement[]>(
     `/hris/reimbursements?${search.toString()}`,
     { method: "GET" },
-    session?.tokens.access_token,
   );
 
   return {
@@ -38,19 +37,16 @@ export async function listReimbursements(filters: ReimbursementFilters) {
 }
 
 export async function getReimbursement(reimbursementId: string) {
-  const session = getStoredSession();
-  return getJSON<Reimbursement>(`/hris/reimbursements/${reimbursementId}`, session?.tokens.access_token);
+  return authGetJSON<Reimbursement>(`/hris/reimbursements/${reimbursementId}`);
 }
 
 export async function createReimbursement(values: ReimbursementFormValues) {
-  const session = getStoredSession();
-  return postJSON<Reimbursement, Record<string, unknown>>(
+  return authPostJSON<Reimbursement, Record<string, unknown>>(
     "/hris/reimbursements",
     {
       ...values,
       transaction_date: new Date(`${values.transaction_date}T00:00:00`).toISOString(),
     },
-    session?.tokens.access_token,
   );
 }
 
@@ -59,7 +55,7 @@ export async function uploadReimbursementAttachments(reimbursementId: string, fi
   const payload = new FormData();
   files.forEach((file) => payload.append("files", file));
   const response = await fetch(
-    `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1"}/hris/reimbursements/${reimbursementId}/attachments`,
+    `${env.VITE_API_BASE_URL}/hris/reimbursements/${reimbursementId}/attachments`,
     {
       method: "POST",
       headers: {
@@ -76,35 +72,30 @@ export async function uploadReimbursementAttachments(reimbursementId: string, fi
 }
 
 export async function reviewReimbursement(reimbursementId: string, decision: "approved" | "rejected", notes = "") {
-  const session = getStoredSession();
-  return requestJSON<Reimbursement>(
+  return authRequestJSON<Reimbursement>(
     `/hris/reimbursements/${reimbursementId}/review`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision, notes }),
     },
-    session?.tokens.access_token,
   );
 }
 
 export async function markReimbursementPaid(reimbursementId: string, notes = "") {
-  const session = getStoredSession();
-  return requestJSON<Reimbursement>(
+  return authRequestJSON<Reimbursement>(
     `/hris/reimbursements/${reimbursementId}/mark-paid`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notes }),
     },
-    session?.tokens.access_token,
   );
 }
 
 export async function getReimbursementSummary(month: string, year: string) {
-  const session = getStoredSession();
   const search = new URLSearchParams();
   if (month) search.set("month", month);
   if (year) search.set("year", year);
-  return getJSON<ReimbursementSummary>(`/hris/reimbursements/summary?${search.toString()}`, session?.tokens.access_token);
+  return authGetJSON<ReimbursementSummary>(`/hris/reimbursements/summary?${search.toString()}`);
 }

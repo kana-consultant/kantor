@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -12,20 +13,52 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
-	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
+)
+
+const (
+	maxFailedLoginAttempts = 5
+	accountLockDuration    = 15 * time.Minute
 )
 
 var (
 	ErrEmailAlreadyExists  = errors.New("email already exists")
 	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrInactiveUser        = errors.New("user account is inactive")
+	ErrAccountLocked       = errors.New("account is temporarily locked due to too many failed login attempts")
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 	ErrExpiredRefreshToken = errors.New("refresh token has expired")
 )
 
+type authRepository interface {
+	EnsureUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
+	CreateUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
+	GetUserByEmail(ctx context.Context, email string) (model.User, error)
+	GetUserByID(ctx context.Context, userID string) (model.User, error)
+	GetUserRolesAndPermissions(ctx context.Context, userID string) ([]string, []string, error)
+	CreateRefreshToken(ctx context.Context, params authrepo.CreateRefreshTokenParams) error
+	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (model.RefreshToken, error)
+	RotateRefreshToken(ctx context.Context, oldTokenHash string, params authrepo.CreateRefreshTokenParams) error
+	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+	IsUniqueViolation(err error) bool
+	CountUsers(ctx context.Context) (int64, error)
+	IncrementFailedLoginAttempts(ctx context.Context, userID string, maxAttempts int, lockDuration time.Duration) error
+	ResetFailedLoginAttempts(ctx context.Context, userID string) error
+	ChangePasswordAndRevokeTokens(ctx context.Context, userID string, passwordHash string) error
+	ListUsers(ctx context.Context, params authrepo.ListUsersParams) ([]authrepo.UserWithRoles, int64, error)
+	ReplaceUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error
+	SetUserActive(ctx context.Context, userID string, active bool) error
+	UpdateUserFullNameAndPhone(ctx context.Context, userID string, fullName string, phone *string) error
+	UpdateUserFields(ctx context.Context, userID string, fullName string, email string) error
+}
+
+type authEmployeesRepository interface {
+	GetEmployeeByUserID(ctx context.Context, userID string) (model.Employee, error)
+	UpdateEmployeeProfile(ctx context.Context, userID string, fullName string, phone *string, address *string, emergencyContact *string, avatarURL *string) (model.Employee, error)
+}
+
 type Service struct {
-	repo         *authrepo.Repository
-	employeeRepo *hrisrepo.EmployeesRepository
+	repo         authRepository
+	employeeRepo authEmployeesRepository
 	tokenManager *backendauth.TokenManager
 }
 
@@ -36,7 +69,7 @@ type AuthResult struct {
 	Tokens      dto.TokenPair
 }
 
-func New(repo *authrepo.Repository, employeeRepo *hrisrepo.EmployeesRepository, cfg config.Config) *Service {
+func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config) *Service {
 	return &Service{
 		repo:         repo,
 		employeeRepo: employeeRepo,
@@ -112,8 +145,23 @@ func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent s
 		return AuthResult{}, ErrInactiveUser
 	}
 
-	if err := backendauth.ComparePassword(user.PasswordHash, input.Password); err != nil {
+	// Always run bcrypt before checking lock status to prevent
+	// timing oracle that reveals whether an account is locked.
+	passwordErr := backendauth.ComparePassword(user.PasswordHash, input.Password)
+
+	if user.LockedUntil != nil && user.LockedUntil.After(time.Now().UTC()) {
+		return AuthResult{}, ErrAccountLocked
+	}
+
+	if passwordErr != nil {
+		if err := s.repo.IncrementFailedLoginAttempts(ctx, user.ID, maxFailedLoginAttempts, accountLockDuration); err != nil {
+			slog.Error("failed to increment login attempts", "error", err, "user_id", user.ID)
+		}
 		return AuthResult{}, ErrInvalidCredentials
+	}
+
+	if user.FailedLoginAttempts > 0 {
+		_ = s.repo.ResetFailedLoginAttempts(ctx, user.ID)
 	}
 
 	return s.issueAuthResult(ctx, user, "", userAgent, ipAddress)
@@ -153,6 +201,28 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, userAgent st
 	}
 
 	return s.issueAuthResult(ctx, user, tokenHash, userAgent, ipAddress)
+}
+
+func (s *Service) ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if err := backendauth.ComparePassword(user.PasswordHash, currentPassword); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	if currentPassword == newPassword {
+		return errors.New("new password must differ from current password")
+	}
+
+	newHash, err := backendauth.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.ChangePasswordAndRevokeTokens(ctx, userID, newHash)
 }
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) error {

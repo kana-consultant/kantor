@@ -22,13 +22,21 @@ type ResolvedFile struct {
 	Permission string
 }
 
-type Service struct {
-	uploadsDir         string
-	reimbursementsRepo *hrisrepo.ReimbursementsRepository
-	campaignsRepo      *marketingrepo.CampaignsRepository
+type filesReimbursementsRepository interface {
+	FindAttachmentPath(ctx context.Context, reimbursementID string, filename string) (string, error)
 }
 
-func New(uploadsDir string, reimbursementsRepo *hrisrepo.ReimbursementsRepository, campaignsRepo *marketingrepo.CampaignsRepository) *Service {
+type filesCampaignsRepository interface {
+	FindAttachmentPath(ctx context.Context, campaignID string, filename string) (string, error)
+}
+
+type Service struct {
+	uploadsDir         string
+	reimbursementsRepo filesReimbursementsRepository
+	campaignsRepo      filesCampaignsRepository
+}
+
+func New(uploadsDir string, reimbursementsRepo filesReimbursementsRepository, campaignsRepo filesCampaignsRepository) *Service {
 	return &Service{
 		uploadsDir:         uploadsDir,
 		reimbursementsRepo: reimbursementsRepo,

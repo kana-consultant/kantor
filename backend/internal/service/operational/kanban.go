@@ -21,13 +21,37 @@ var (
 	ErrKanbanTaskNotFound   = errors.New("kanban task not found")
 )
 
+type kanbanRepository interface {
+	CreateDefaultColumns(ctx context.Context, projectID string) error
+	ListColumns(ctx context.Context, projectID string) ([]model.KanbanColumn, error)
+	CreateColumn(ctx context.Context, projectID string, params operationalrepo.CreateKanbanColumnParams) (model.KanbanColumn, error)
+	UpdateColumn(ctx context.Context, projectID string, columnID string, params operationalrepo.UpdateKanbanColumnParams) (model.KanbanColumn, error)
+	DeleteColumn(ctx context.Context, projectID string, columnID string) error
+	ReorderColumns(ctx context.Context, projectID string, columnIDs []string) error
+	ListTasks(ctx context.Context, projectID string) ([]model.KanbanTask, error)
+	CreateTask(ctx context.Context, projectID string, params operationalrepo.CreateKanbanTaskParams) (model.KanbanTask, error)
+	UpdateTask(ctx context.Context, projectID string, taskID string, params operationalrepo.UpdateKanbanTaskParams) (model.KanbanTask, error)
+	DeleteTask(ctx context.Context, projectID string, taskID string) error
+	MoveTask(ctx context.Context, projectID string, taskID string, destinationColumnID string, destinationPosition int) error
+	Snapshot(ctx context.Context, projectID string) (operationalrepo.KanbanSnapshot, error)
+	GetTask(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error)
+	SetAssignedVia(ctx context.Context, projectID string, taskID string, via string) error
+}
+
+type kanbanProjectsRepository interface {
+	GetProjectByID(ctx context.Context, projectID string) (model.Project, error)
+	ListMemberIDsOrdered(ctx context.Context, projectID string) ([]string, error)
+	AdvanceCursor(ctx context.Context, projectID string, newCursor int) error
+	GetMemberWorkloads(ctx context.Context, projectID string) ([]operationalrepo.MemberWorkload, error)
+}
+
 type KanbanService struct {
-	repo         *operationalrepo.KanbanRepository
-	projectsRepo *operationalrepo.ProjectsRepository
+	repo         kanbanRepository
+	projectsRepo kanbanProjectsRepository
 	notifier     TaskAssignNotifier
 }
 
-func NewKanbanService(repo *operationalrepo.KanbanRepository, projectsRepo *operationalrepo.ProjectsRepository) *KanbanService {
+func NewKanbanService(repo kanbanRepository, projectsRepo kanbanProjectsRepository) *KanbanService {
 	return &KanbanService{repo: repo, projectsRepo: projectsRepo}
 }
 

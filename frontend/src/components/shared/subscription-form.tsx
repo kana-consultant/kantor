@@ -71,7 +71,7 @@ export function SubscriptionForm({
     handleSubmit,
     formState: { errors },
   } = useForm<SubscriptionFormValues>({
-    resolver: zodResolver(subscriptionSchema) as any,
+    resolver: zodResolver(subscriptionSchema) as never,
     defaultValues: defaultValues ?? baseValues,
   });
 

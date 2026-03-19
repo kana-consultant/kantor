@@ -12,10 +12,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
-	ErrEmployeeNotFound         = errors.New("employee not found")
+	ErrEmployeeNotFound        = errors.New("employee not found")
 	ErrEmployeeEmailExists     = errors.New("employee email already exists")
 	ErrEmployeeUserAlreadyUsed = errors.New("user account is already linked to another employee")
 )
@@ -50,6 +51,8 @@ func NewEmployeesRepository(db *pgxpool.Pool) *EmployeesRepository {
 }
 
 func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertEmployeeParams) (model.Employee, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		INSERT INTO employees (
 			full_name,
@@ -116,6 +119,8 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 }
 
 func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmployeesParams) ([]model.Employee, int64, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	filters := []string{"1=1"}
 	args := make([]interface{}, 0)
 	index := 1
@@ -194,6 +199,8 @@ func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmpl
 }
 
 func (r *EmployeesRepository) GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
 		FROM employees
@@ -229,6 +236,8 @@ func (r *EmployeesRepository) GetEmployeeByID(ctx context.Context, employeeID st
 }
 
 func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID string) (model.Employee, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
 		FROM employees
@@ -263,6 +272,8 @@ func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID st
 }
 
 func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID string, params UpsertEmployeeParams) (model.Employee, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	query := `
 		UPDATE employees
 		SET
@@ -324,6 +335,8 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 }
 
 func (r *EmployeesRepository) DeleteEmployee(ctx context.Context, employeeID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	commandTag, err := r.db.Exec(ctx, `DELETE FROM employees WHERE id = $1::uuid`, employeeID)
 	if err != nil {
 		return err
@@ -337,11 +350,15 @@ func (r *EmployeesRepository) DeleteEmployee(ctx context.Context, employeeID str
 }
 
 func (r *EmployeesRepository) RenameDepartmentReferences(ctx context.Context, oldName string, newName string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	_, err := r.db.Exec(ctx, `UPDATE employees SET department = $2, updated_at = NOW() WHERE department = $1`, oldName, newName)
 	return err
 }
 
 func (r *EmployeesRepository) ClearDepartmentReferences(ctx context.Context, departmentName string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	_, err := r.db.Exec(ctx, `UPDATE employees SET department = NULL, updated_at = NOW() WHERE department = $1`, departmentName)
 	return err
 }

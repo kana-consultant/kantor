@@ -18,7 +18,7 @@ import { Clock3 } from "lucide-react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
-import { formatLeadStatus, initials, leadSourceMeta } from "@/lib/marketing";
+import { initials, leadSourceMeta } from "@/lib/marketing";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadPipelineColumn } from "@/types/marketing";
 
@@ -291,10 +291,10 @@ function moveLeadInMemory(columns: LeadPipelineColumn[], leadId: string, overId:
     return null;
   }
 
-  nextColumns[sourceColumnIndex].leads.splice(sourceLeadIndex, 1);
+  nextColumns[sourceColumnIndex]!.leads.splice(sourceLeadIndex, 1);
 
   let destinationColumnIndex = sourceColumnIndex;
-  let destinationIndex = nextColumns[sourceColumnIndex].leads.length;
+  let destinationIndex = nextColumns[sourceColumnIndex]!.leads.length;
 
   if (isLeadDragData(overData)) {
     destinationColumnIndex = nextColumns.findIndex((column) => column.leads.some((lead) => lead.id === overData.lead.id));
@@ -312,9 +312,9 @@ function moveLeadInMemory(columns: LeadPipelineColumn[], leadId: string, overId:
     return columns;
   }
 
-  nextColumns[destinationColumnIndex].leads.splice(destinationIndex, 0, {
+  nextColumns[destinationColumnIndex]!.leads.splice(destinationIndex, 0, {
     ...movingLead,
-    pipeline_status: nextColumns[destinationColumnIndex].status,
+    pipeline_status: nextColumns[destinationColumnIndex]!.status,
   });
 
   return nextColumns;

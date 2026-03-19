@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -67,6 +68,8 @@ func NewKanbanRepository(db *pgxpool.Pool) *KanbanRepository {
 }
 
 func (r *KanbanRepository) CreateDefaultColumns(ctx context.Context, projectID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	defaults := []struct {
 		Name  string
 		Color string
@@ -106,6 +109,8 @@ func (r *KanbanRepository) CreateDefaultColumns(ctx context.Context, projectID s
 }
 
 func (r *KanbanRepository) ListColumns(ctx context.Context, projectID string) ([]model.KanbanColumn, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	rows, err := r.db.Query(ctx, `
 		SELECT id::text, project_id::text, name, position, color, created_at
 		FROM kanban_columns
@@ -137,6 +142,8 @@ func (r *KanbanRepository) ListColumns(ctx context.Context, projectID string) ([
 }
 
 func (r *KanbanRepository) CreateColumn(ctx context.Context, projectID string, params CreateKanbanColumnParams) (model.KanbanColumn, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return model.KanbanColumn{}, err
@@ -193,6 +200,8 @@ func (r *KanbanRepository) CreateColumn(ctx context.Context, projectID string, p
 }
 
 func (r *KanbanRepository) UpdateColumn(ctx context.Context, projectID string, columnID string, params UpdateKanbanColumnParams) (model.KanbanColumn, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	var column model.KanbanColumn
 	err := r.db.QueryRow(
 		ctx,
@@ -226,6 +235,8 @@ func (r *KanbanRepository) UpdateColumn(ctx context.Context, projectID string, c
 }
 
 func (r *KanbanRepository) DeleteColumn(ctx context.Context, projectID string, columnID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -264,6 +275,8 @@ func (r *KanbanRepository) DeleteColumn(ctx context.Context, projectID string, c
 }
 
 func (r *KanbanRepository) ReorderColumns(ctx context.Context, projectID string, columnIDs []string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -304,6 +317,8 @@ func (r *KanbanRepository) ReorderColumns(ctx context.Context, projectID string,
 }
 
 func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]model.KanbanTask, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			kanban_tasks.id::text,
@@ -397,6 +412,8 @@ func (r *KanbanRepository) GetTask(ctx context.Context, projectID string, taskID
 }
 
 func (r *KanbanRepository) CreateTask(ctx context.Context, projectID string, params CreateKanbanTaskParams) (model.KanbanTask, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return model.KanbanTask{}, err
@@ -480,6 +497,8 @@ func (r *KanbanRepository) CreateTask(ctx context.Context, projectID string, par
 }
 
 func (r *KanbanRepository) UpdateTask(ctx context.Context, projectID string, taskID string, params UpdateKanbanTaskParams) (model.KanbanTask, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	var task model.KanbanTask
 	err := r.db.QueryRow(
 		ctx,
@@ -545,6 +564,8 @@ func (r *KanbanRepository) UpdateTask(ctx context.Context, projectID string, tas
 }
 
 func (r *KanbanRepository) DeleteTask(ctx context.Context, projectID string, taskID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -585,6 +606,8 @@ func (r *KanbanRepository) DeleteTask(ctx context.Context, projectID string, tas
 }
 
 func (r *KanbanRepository) MoveTask(ctx context.Context, projectID string, taskID string, destinationColumnID string, destinationPosition int) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -713,6 +736,8 @@ func (r *KanbanRepository) SetAssignedVia(ctx context.Context, projectID string,
 }
 
 func (r *KanbanRepository) Snapshot(ctx context.Context, projectID string) (KanbanSnapshot, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
 	columns, err := r.ListColumns(ctx, projectID)
 	if err != nil {
 		return KanbanSnapshot{}, err
