@@ -1,5 +1,4 @@
-import { ApiError, getJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authGetJSON } from "@/lib/api-client";
 import type {
   HrisOverview,
   MarketingOverview,
@@ -13,25 +12,13 @@ export const overviewKeys = {
 };
 
 export async function getOperationalOverview() {
-  const token = await requireAccessToken();
-  return getJSON<OperationalOverview>("/operational/overview", token);
+  return authGetJSON<OperationalOverview>("/operational/overview");
 }
 
 export async function getHrisOverview() {
-  const token = await requireAccessToken();
-  return getJSON<HrisOverview>("/hris/overview", token);
+  return authGetJSON<HrisOverview>("/hris/overview");
 }
 
 export async function getMarketingOverview() {
-  const token = await requireAccessToken();
-  return getJSON<MarketingOverview>("/marketing/overview", token);
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
+  return authGetJSON<MarketingOverview>("/marketing/overview");
 }

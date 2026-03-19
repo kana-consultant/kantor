@@ -1,5 +1,4 @@
-import { ApiError, requestJSON } from "@/lib/api-client";
-import { ensureAuthenticated } from "@/services/auth";
+import { authRequestJSON } from "@/lib/api-client";
 import type { KanbanColumn, KanbanTask, TaskFormValues } from "@/types/kanban";
 
 export const kanbanKeys = {
@@ -9,17 +8,14 @@ export const kanbanKeys = {
 };
 
 export async function listKanbanColumns(projectId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<KanbanColumn[]>(
+  return authRequestJSON<KanbanColumn[]>(
     `/operational/projects/${projectId}/columns`,
     { method: "GET" },
-    token,
   );
 }
 
 export async function createKanbanColumn(projectId: string, input: { name: string; color?: string }) {
-  const token = await requireAccessToken();
-  return requestJSON<KanbanColumn>(
+  return authRequestJSON<KanbanColumn>(
     `/operational/projects/${projectId}/columns`,
     {
       method: "POST",
@@ -28,13 +24,11 @@ export async function createKanbanColumn(projectId: string, input: { name: strin
       },
       body: JSON.stringify(input),
     },
-    token,
   );
 }
 
 export async function updateKanbanColumn(projectId: string, columnId: string, input: { name: string; color?: string }) {
-  const token = await requireAccessToken();
-  return requestJSON<KanbanColumn>(
+  return authRequestJSON<KanbanColumn>(
     `/operational/projects/${projectId}/columns/${columnId}`,
     {
       method: "PUT",
@@ -43,24 +37,20 @@ export async function updateKanbanColumn(projectId: string, columnId: string, in
       },
       body: JSON.stringify(input),
     },
-    token,
   );
 }
 
 export async function deleteKanbanColumn(projectId: string, columnId: string) {
-  const token = await requireAccessToken();
-  await requestJSON<{ message: string }>(
+  await authRequestJSON<{ message: string }>(
     `/operational/projects/${projectId}/columns/${columnId}`,
     {
       method: "DELETE",
     },
-    token,
   );
 }
 
 export async function reorderKanbanColumns(projectId: string, columnIds: string[]) {
-  const token = await requireAccessToken();
-  await requestJSON<{ message: string }>(
+  await authRequestJSON<{ message: string }>(
     `/operational/projects/${projectId}/columns/reorder`,
     {
       method: "PATCH",
@@ -69,22 +59,18 @@ export async function reorderKanbanColumns(projectId: string, columnIds: string[
       },
       body: JSON.stringify({ column_ids: columnIds }),
     },
-    token,
   );
 }
 
 export async function listKanbanTasks(projectId: string) {
-  const token = await requireAccessToken();
-  return requestJSON<KanbanTask[]>(
+  return authRequestJSON<KanbanTask[]>(
     `/operational/projects/${projectId}/tasks`,
     { method: "GET" },
-    token,
   );
 }
 
 export async function createKanbanTask(projectId: string, input: { column_id: string } & TaskFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<KanbanTask>(
+  return authRequestJSON<KanbanTask>(
     `/operational/projects/${projectId}/tasks`,
     {
       method: "POST",
@@ -93,13 +79,11 @@ export async function createKanbanTask(projectId: string, input: { column_id: st
       },
       body: JSON.stringify(serializeTaskForm(input)),
     },
-    token,
   );
 }
 
 export async function updateKanbanTask(projectId: string, taskId: string, input: TaskFormValues) {
-  const token = await requireAccessToken();
-  return requestJSON<KanbanTask>(
+  return authRequestJSON<KanbanTask>(
     `/operational/projects/${projectId}/tasks/${taskId}`,
     {
       method: "PUT",
@@ -108,24 +92,20 @@ export async function updateKanbanTask(projectId: string, taskId: string, input:
       },
       body: JSON.stringify(serializeTaskForm(input)),
     },
-    token,
   );
 }
 
 export async function deleteKanbanTask(projectId: string, taskId: string) {
-  const token = await requireAccessToken();
-  await requestJSON<{ message: string }>(
+  await authRequestJSON<{ message: string }>(
     `/operational/projects/${projectId}/tasks/${taskId}`,
     {
       method: "DELETE",
     },
-    token,
   );
 }
 
 export async function moveKanbanTask(projectId: string, taskId: string, columnId: string, position: number) {
-  const token = await requireAccessToken();
-  await requestJSON<{ message: string }>(
+  await authRequestJSON<{ message: string }>(
     `/operational/projects/${projectId}/tasks/${taskId}/move`,
     {
       method: "PATCH",
@@ -137,7 +117,6 @@ export async function moveKanbanTask(projectId: string, taskId: string, columnId
         position,
       }),
     },
-    token,
   );
 }
 
@@ -151,13 +130,4 @@ function serializeTaskForm(input: Partial<{ column_id: string }> & TaskFormValue
     priority: input.priority,
     label: input.label.trim() || null,
   };
-}
-
-async function requireAccessToken() {
-  const session = await ensureAuthenticated();
-  if (!session?.tokens.access_token) {
-    throw new ApiError(401, "Session is not available");
-  }
-
-  return session.tokens.access_token;
 }
