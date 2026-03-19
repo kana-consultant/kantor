@@ -51,6 +51,7 @@ func (h *SubscriptionsHandler) createSubscription(w http.ResponseWriter, r *http
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "subscription", result.ID, nil, input)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
@@ -82,19 +83,23 @@ func (h *SubscriptionsHandler) updateSubscription(w http.ResponseWriter, r *http
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
 		return
 	}
-	result, err := h.service.UpdateSubscription(r.Context(), chi.URLParam(r, "subscriptionID"), input, principal.UserID)
+	subscriptionID := chi.URLParam(r, "subscriptionID")
+	result, err := h.service.UpdateSubscription(r.Context(), subscriptionID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "subscription", subscriptionID, nil, input)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *SubscriptionsHandler) deleteSubscription(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteSubscription(r.Context(), chi.URLParam(r, "subscriptionID")); err != nil {
+	subscriptionID := chi.URLParam(r, "subscriptionID")
+	if err := h.service.DeleteSubscription(r.Context(), subscriptionID); err != nil {
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "subscription", subscriptionID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Subscription deleted successfully"}, nil)
 }
 
