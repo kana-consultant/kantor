@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
@@ -28,9 +29,15 @@ func New(service *authservice.Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router chi.Router) {
-	router.Post("/register", h.register)
-	router.Post("/login", h.login)
-	router.Post("/refresh", h.refresh)
+	router.With(platformmiddleware.NewIPRateLimit(5, time.Minute,
+		"AUTH_RATE_LIMITED", "Too many registration attempts. Try again later.",
+	)).Post("/register", h.register)
+	router.With(platformmiddleware.NewIPRateLimit(10, time.Minute,
+		"AUTH_RATE_LIMITED", "Too many login attempts. Try again later.",
+	)).Post("/login", h.login)
+	router.With(platformmiddleware.NewIPRateLimit(30, time.Minute,
+		"AUTH_RATE_LIMITED", "Too many token refresh attempts. Try again later.",
+	)).Post("/refresh", h.refresh)
 	router.Post("/logout", h.logout)
 }
 
