@@ -70,6 +70,28 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	var input dto.ChangePasswordRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	if err := h.service.ChangePassword(r.Context(), principal.UserID, input.CurrentPassword, input.NewPassword); err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": "Password changed successfully. All sessions have been revoked.",
+	}, nil)
+}
+
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	var input dto.RegisterRequest
 	if !h.decodeAndValidate(w, r, &input) {

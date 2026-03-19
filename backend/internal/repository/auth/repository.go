@@ -339,6 +339,60 @@ func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string
 	return tx.Commit(ctx)
 }
 
+func (r *Repository) RevokeAllUserTokens(ctx context.Context, userID string) error {
+	_, err := r.db.Exec(
+		ctx,
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+		userID,
+	)
+	return err
+}
+
+func (r *Repository) UpdatePasswordHash(ctx context.Context, userID string, passwordHash string) error {
+	tag, err := r.db.Exec(
+		ctx,
+		`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+		passwordHash, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) ChangePasswordAndRevokeTokens(ctx context.Context, userID string, passwordHash string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(
+		ctx,
+		`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+		passwordHash, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+		userID,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
 	tag, err := r.db.Exec(
 		ctx,

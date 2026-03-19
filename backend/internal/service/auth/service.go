@@ -152,6 +152,28 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, userAgent st
 	return s.issueAuthResult(ctx, user, tokenHash, userAgent, ipAddress)
 }
 
+func (s *Service) ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if err := backendauth.ComparePassword(user.PasswordHash, currentPassword); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	if currentPassword == newPassword {
+		return errors.New("new password must differ from current password")
+	}
+
+	newHash, err := backendauth.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.ChangePasswordAndRevokeTokens(ctx, userID, newHash)
+}
+
 func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 	tokenHash := backendauth.HashRefreshToken(strings.TrimSpace(refreshToken))
 	if tokenHash == "" {
