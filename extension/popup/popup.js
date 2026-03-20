@@ -15,6 +15,7 @@ const elements = {
   openSettingsButton: document.getElementById("open-settings-button"),
   dashboardLink: document.getElementById("dashboard-link"),
   loginLink: document.getElementById("login-link"),
+  dashboardHelp: document.getElementById("dashboard-help"),
   statusLabel: document.getElementById("status-label"),
   statusDot: document.getElementById("status-dot"),
   activeTimer: document.getElementById("active-timer"),
@@ -25,6 +26,8 @@ const elements = {
   topDomains: document.getElementById("top-domains"),
   errorBanner: document.getElementById("error-banner"),
 };
+
+let lastState = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
@@ -70,6 +73,26 @@ function bindEvents() {
     await refreshState();
   });
 
+  elements.loginLink.addEventListener("click", (event) => {
+    const dashboardUrl = resolveDashboardUrl(lastState);
+    if (!dashboardUrl) {
+      event.preventDefault();
+      showError("Dashboard belum diketahui. Buka web KANTOR Anda lalu masuk ke Operational -> Activity Tracker.");
+      return;
+    }
+    elements.loginLink.href = dashboardUrl;
+  });
+
+  elements.dashboardLink.addEventListener("click", (event) => {
+    const dashboardUrl = resolveDashboardUrl(lastState);
+    if (!dashboardUrl) {
+      event.preventDefault();
+      showError("Dashboard belum diketahui. Hubungkan extension dari dashboard KANTOR terlebih dahulu.");
+      return;
+    }
+    elements.dashboardLink.href = dashboardUrl;
+  });
+
   elements.openSettingsButton.addEventListener("click", () => {
     chrome.runtime.openOptionsPage();
   });
@@ -81,8 +104,10 @@ async function refreshState() {
 }
 
 function render(state) {
+  lastState = state;
   const hasSetup = Boolean(state.apiBaseUrl && state.token);
   const hasConsent = Boolean(state.consented);
+  const dashboardUrl = resolveDashboardUrl(state);
 
   elements.setupState.classList.toggle("hidden", hasSetup);
   elements.consentState.classList.toggle("hidden", !hasSetup || hasConsent);
@@ -90,12 +115,14 @@ function render(state) {
 
   elements.apiUrlInput.value = state.apiBaseUrl || "";
   elements.tokenInput.value = state.token || "";
-  elements.dashboardLink.href = state.dashboardUrl || "#";
-  elements.loginLink.href = state.dashboardUrl || "http://localhost:3000/operational/tracker";
+  elements.dashboardLink.href = dashboardUrl || "#";
+  elements.loginLink.href = dashboardUrl || "#";
+  elements.loginLink.classList.toggle("is-disabled", !dashboardUrl);
+  elements.dashboardLink.classList.toggle("is-disabled", !dashboardUrl);
+  elements.dashboardHelp.classList.toggle("hidden", Boolean(dashboardUrl));
 
   if (state.lastError) {
-    elements.errorBanner.textContent = state.lastError;
-    elements.errorBanner.classList.remove("hidden");
+    showError(state.lastError);
   } else {
     elements.errorBanner.classList.add("hidden");
   }
@@ -147,6 +174,18 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function resolveDashboardUrl(state) {
+  if (!state) {
+    return "";
+  }
+  return String(state.dashboardUrl || "").trim();
+}
+
+function showError(message) {
+  elements.errorBanner.textContent = message;
+  elements.errorBanner.classList.remove("hidden");
 }
 
 function sendMessage(type, payload = {}) {

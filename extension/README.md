@@ -2,6 +2,8 @@
 
 Chrome extension untuk mengirim heartbeat aktivitas kerja ke platform KANTOR.
 
+Extension ini tidak khusus untuk localhost. Flow utamanya adalah menerima konfigurasi runtime dari dashboard web KANTOR yang sedang dipakai user, sehingga bisa dipakai di environment development maupun domain server publik.
+
 ## Fitur
 
 - Manifest V3 service worker
@@ -28,7 +30,7 @@ Flow utama sekarang dilakukan dari web app KANTOR, bukan dari repository.
 10. Kembali ke dashboard tracker KANTOR
 11. Klik `Hubungkan & Aktifkan`
 
-Setelah langkah itu, extension akan menerima konfigurasi browser ini dari dashboard web. User biasa tidak perlu paste token secara manual.
+Setelah langkah itu, extension akan menerima konfigurasi browser ini langsung dari dashboard web. User biasa tidak perlu paste token atau API URL secara manual.
 
 ## Setup Manual untuk IT / Debugging
 
@@ -44,7 +46,7 @@ Gunakan ini hanya jika auto-connect dari dashboard tidak bisa dipakai.
    - salin `state.session.tokens.access_token`
 3. Buka popup extension
 4. Klik `Setup manual untuk IT`
-5. Isi `API URL` dengan `http://localhost:3000/api/v1`
+5. Isi `API URL` dengan endpoint API KANTOR Anda, misalnya `https://your-kantor-domain/api/v1`
 6. Paste access token
 7. Klik `Simpan Konfigurasi Manual`
 8. Klik `Aktifkan Tracking`
@@ -96,9 +98,10 @@ Catatan:
 - saat access token expired, extension akan mencoba `POST /api/v1/auth/refresh` dengan cookie browser yang masih aktif
 - jika refresh gagal, user perlu menghubungkan ulang dari dashboard atau melakukan setup manual lagi
 
-## Catatan Development
+## Catatan Deployment dan Development
 
-- default API URL untuk dev adalah `http://localhost:3000/api/v1`
-- dashboard web tracker ada di `http://localhost:3000/operational/tracker`
+- extension tidak hardcode ke satu host tertentu untuk flow utama
+- saat user klik `Hubungkan & Aktifkan`, dashboard web mengirim API URL aktif ke extension
+- untuk development lokal, URL seperti `http://localhost:3000/api/v1` tetap bisa dipakai lewat setup manual
 - domain seperti `chrome://`, `chrome-extension://`, `about:`, `edge:`, dan `file:` tidak di-track
 - jika Anda mengembangkan extension langsung dari repository, folder yang di-load unpacked adalah folder `extension/`

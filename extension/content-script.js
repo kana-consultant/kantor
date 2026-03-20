@@ -24,12 +24,12 @@
         postToPage({ type: "KANTOR_TRACKER_READY" });
         return;
       case "KANTOR_TRACKER_CONNECT":
-        await ensureTrustedOrigin(message.payload?.apiBaseUrl);
+        await ensureTrustedOrigin(message.payload);
         await saveConfig(message.payload);
         await refreshState(message.requestId);
         return;
       case "KANTOR_TRACKER_ENABLE":
-        await ensureTrustedOrigin(message.payload?.apiBaseUrl);
+        await ensureTrustedOrigin(message.payload);
         await saveConfig(message.payload);
         await sendRuntimeMessage("tracker:grant-consent");
         await refreshState(message.requestId);
@@ -45,12 +45,13 @@
     }
 
     const apiBaseUrl = String(payload.apiBaseUrl || "").trim();
+    const dashboardUrl = String(payload.dashboardUrl || "").trim();
     const token = String(payload.token || "").trim();
     if (!apiBaseUrl || !token) {
       throw new Error("API URL atau token tracker belum tersedia.");
     }
 
-    const response = await sendRuntimeMessage("tracker:save-config", { apiBaseUrl, token });
+    const response = await sendRuntimeMessage("tracker:save-config", { apiBaseUrl, dashboardUrl, token });
     if (!response?.ok) {
       throw new Error(response?.error || "Gagal menyimpan konfigurasi extension.");
     }
@@ -65,10 +66,10 @@
     postResult(requestId, true, response);
   }
 
-  async function ensureTrustedOrigin(apiBaseUrl) {
-    const expectedOrigin = toDashboardOrigin(apiBaseUrl);
+  async function ensureTrustedOrigin(payload) {
+    const expectedOrigin = toTrustedOrigin(payload);
     if (!expectedOrigin) {
-      throw new Error("API URL tracker tidak valid.");
+      throw new Error("Origin dashboard tracker tidak valid.");
     }
 
     if (window.location.origin !== expectedOrigin) {
@@ -76,9 +77,13 @@
     }
   }
 
-  function toDashboardOrigin(apiBaseUrl) {
+  function toTrustedOrigin(payload) {
     try {
-      const parsed = new URL(String(apiBaseUrl || ""), window.location.origin);
+      const dashboardUrl = String(payload?.dashboardUrl || "").trim();
+      if (dashboardUrl) {
+        return new URL(dashboardUrl, window.location.origin).origin;
+      }
+      const parsed = new URL(String(payload?.apiBaseUrl || ""), window.location.origin);
       return parsed.origin;
     } catch {
       return "";

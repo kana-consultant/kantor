@@ -300,6 +300,7 @@ function OperationalTrackerPage() {
           requestId,
           payload: {
             apiBaseUrl: trackerApiBaseUrl,
+            dashboardUrl: window.location.href,
             token: session.tokens.access_token,
           },
         },

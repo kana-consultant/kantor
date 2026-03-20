@@ -1,5 +1,6 @@
 const DEFAULT_STATE = {
-  apiBaseUrl: "http://localhost:3000/api/v1",
+  apiBaseUrl: "",
+  dashboardUrl: "",
   token: "",
   sessionId: "",
   consented: false,
@@ -59,6 +60,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         case "tracker:save-config":
           await updateState({
             apiBaseUrl: sanitizeApiBaseUrl(message.payload.apiBaseUrl),
+            dashboardUrl: sanitizeDashboardUrl(message.payload.dashboardUrl),
             token: String(message.payload.token || "").trim(),
           });
           await refreshConsent();
@@ -126,7 +128,7 @@ async function getExtensionState() {
   const state = await loadState();
   return {
     ...state,
-    dashboardUrl: toDashboardUrl(state.apiBaseUrl),
+    dashboardUrl: resolveDashboardUrl(state),
   };
 }
 
@@ -378,7 +380,7 @@ async function fetchTodaySummary() {
 async function authorizedRequest(path, init) {
   const state = await loadState();
   if (!state.apiBaseUrl || !state.token) {
-    throw new Error("API URL dan token harus diisi");
+    throw new Error("Extension belum terhubung. Hubungkan dari dashboard KANTOR atau gunakan setup manual.");
   }
 
   const response = await fetch(`${sanitizeApiBaseUrl(state.apiBaseUrl)}${path}`, {
@@ -477,6 +479,10 @@ function sanitizeApiBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
+function sanitizeDashboardUrl(value) {
+  return String(value || "").trim();
+}
+
 function normalizeExcludedDomains(items) {
   return Array.from(
     new Set(
@@ -497,10 +503,21 @@ function normalizeIdleTimeout(value) {
 
 function toDashboardUrl(apiBaseUrl) {
   const value = sanitizeApiBaseUrl(apiBaseUrl);
+  if (!value) {
+    return "";
+  }
   if (value.endsWith("/api/v1")) {
     return `${value.slice(0, -7)}/operational/tracker`;
   }
   return value.replace(/\/$/, "");
+}
+
+function resolveDashboardUrl(state) {
+  const explicit = sanitizeDashboardUrl(state.dashboardUrl);
+  if (explicit) {
+    return explicit;
+  }
+  return toDashboardUrl(state.apiBaseUrl);
 }
 
 async function loadState() {

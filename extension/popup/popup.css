@@ -311,6 +311,11 @@ textarea:focus {
   text-decoration: none;
 }
 
+.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .hidden {
   display: none !important;
 }
