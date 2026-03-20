@@ -252,17 +252,6 @@ textarea:focus {
   border-top: 1px solid #dfe1e6;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #deebff;
-  color: #0065ff;
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .status-dot {
   width: 10px;
   height: 10px;
@@ -309,6 +298,10 @@ textarea:focus {
   background: #ffebe6;
   color: #bf2600;
   font-size: 13px;
+}
+
+.current-tab-note {
+  margin-top: 8px;
 }
 
 .popup-footer a,

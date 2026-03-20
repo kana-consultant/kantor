@@ -88,7 +88,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse({ ok: true });
           break;
         case "tracker:stop":
-          await stopTracking();
+          await stopTracking({ revokeConsent: true });
           sendResponse({ ok: true });
           break;
         case "tracker:refresh":
@@ -260,7 +260,8 @@ async function ensureActiveSession(forceRestart = false) {
   }
 }
 
-async function stopTracking() {
+async function stopTracking(options = {}) {
+  const revokeConsentOnStop = Boolean(options?.revokeConsent);
   const state = await loadState();
   if (state.sessionId) {
     try {
@@ -273,7 +274,22 @@ async function stopTracking() {
     }
   }
 
+  if (revokeConsentOnStop && state.consented) {
+    try {
+      await authorizedRequest("/tracker/consent", {
+        method: "DELETE",
+        body: JSON.stringify({}),
+      });
+    } catch (error) {
+      await updateState({
+        lastError: error instanceof Error ? error.message : "Failed to revoke tracker consent",
+      });
+      throw error;
+    }
+  }
+
   await updateState({
+    consented: revokeConsentOnStop ? false : state.consented,
     sessionId: "",
     paused: true,
     trackerState: "stopped",

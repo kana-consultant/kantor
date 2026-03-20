@@ -7,48 +7,60 @@ Chrome extension untuk mengirim heartbeat aktivitas kerja ke platform KANTOR.
 - Manifest V3 service worker
 - Heartbeat tiap 30 detik ke `/api/v1/tracker/heartbeat`
 - Consent wajib sebelum tracking aktif
-- Offline queue + batch sync saat online kembali
-- Popup status tracker
-- Options page untuk API URL, token, idle timeout, dan excluded domains
+- Offline queue + batch sync saat koneksi kembali
+- Popup status tracker yang fokus pada status, waktu aktif, dan domain aktif
+- Options page untuk fallback manual, idle timeout, dan excluded domains
 
-## Cara Load di Chrome
+## Cara Pasang untuk User
 
-1. Buka `chrome://extensions`
-2. Aktifkan `Developer mode`
-3. Klik `Load unpacked`
-4. Pilih folder `extension/`
+Flow utama sekarang dilakukan dari web app KANTOR, bukan dari repository.
 
-## Setup Awal
-
-### Jalur yang disarankan untuk user biasa
-
-1. Pastikan stack KANTOR berjalan:
+1. Jalankan stack KANTOR:
    - `docker compose up --build -d`
 2. Login ke web KANTOR di `http://localhost:3000/login`
 3. Buka `http://localhost:3000/operational/tracker`
 4. Klik `Download Extension`
-5. Extract file ZIP
-6. Load extension hasil extract sebagai unpacked di `chrome://extensions`
-7. Kembali ke dashboard tracker lalu klik `Hubungkan & Aktifkan`
-8. Consent akan aktif dan extension menyimpan konfigurasi browser ini secara otomatis
+5. Extract file ZIP yang terunduh
+6. Buka `chrome://extensions`
+7. Aktifkan `Developer mode`
+8. Klik `Load unpacked`
+9. Pilih folder hasil extract ZIP
+10. Kembali ke dashboard tracker KANTOR
+11. Klik `Hubungkan & Aktifkan`
 
-### Setup manual untuk tim IT / debugging
+Setelah langkah itu, extension akan menerima konfigurasi browser ini dari dashboard web. User biasa tidak perlu paste token secara manual.
 
-1. Pastikan stack KANTOR berjalan:
-   - `docker compose up --build -d`
-2. Login ke web KANTOR di `http://localhost:3000/login`
-3. Ambil access token:
+## Setup Manual untuk IT / Debugging
+
+Gunakan ini hanya jika auto-connect dari dashboard tidak bisa dipakai.
+
+1. Login ke web KANTOR di `http://localhost:3000/login`
+2. Ambil access token dari browser:
    - buka DevTools
-   - masuk ke tab `Application`
+   - tab `Application`
    - buka `Local Storage`
    - pilih origin `http://localhost:3000`
    - buka key `kantor-auth`
-   - salin nilai `state.session.tokens.access_token`
-4. Buka popup extension
+   - salin `state.session.tokens.access_token`
+3. Buka popup extension
+4. Klik `Setup manual untuk IT`
 5. Isi `API URL` dengan `http://localhost:3000/api/v1`
 6. Paste access token
-7. Klik `Simpan Konfigurasi`
+7. Klik `Simpan Konfigurasi Manual`
 8. Klik `Aktifkan Tracking`
+
+## Cara Kerja Singkat
+
+1. Dashboard web mengirim konfigurasi ke extension.
+2. Extension menyimpan `apiBaseUrl` dan access token di `chrome.storage.local`.
+3. Extension memulai session tracker.
+4. Setiap 30 detik extension mengirim heartbeat berisi URL aktif, domain, judul halaman, dan status idle.
+5. Backend menyimpan data ke `activity_sessions` dan `activity_entries`.
+6. Dashboard KANTOR menampilkan agregasi hasil tracking.
+
+Catatan:
+- kategori domain yang dianggap benar tetap mengikuti data di dashboard KANTOR
+- popup extension sengaja tidak menampilkan badge kategori agar tidak menyesatkan saat domain aktif belum masuk ringkasan lokal popup
 
 ## Alur Uji Manual
 
@@ -56,36 +68,37 @@ Chrome extension untuk mengirim heartbeat aktivitas kerja ke platform KANTOR.
    - `github.com`
    - `docs.google.com`
    - `figma.com`
-2. Diamkan tab aktif minimal 30-60 detik agar heartbeat terkirim beberapa kali
+2. Diamkan tab aktif minimal 30-60 detik
 3. Buka dashboard web di `http://localhost:3000/operational/tracker`
 4. Verifikasi:
    - consent banner hilang
    - `Total Active Time` bertambah
    - `Most Used Domain` tampil
    - `Top Domains` menampilkan domain yang dibuka
-   - untuk admin, tab `Team Activity` juga menampilkan tabel `Consent Audit` yang menunjukkan siapa yang sedang on/off tracker
+   - untuk admin, tab `Team Activity` menampilkan `Consent Audit`
 5. Uji idle:
    - diamkan browser sesuai idle timeout
    - popup harus berubah ke status `Idle`
 6. Uji excluded domains:
-   - tambahkan domain seperti `youtube.com` di settings
+   - tambahkan domain seperti `youtube.com` di settings extension
    - buka domain itu
    - domain tersebut tidak boleh tampil di dashboard tracker
 7. Uji revoke consent:
    - buka settings extension
    - klik `Revoke Consent`
    - tracking harus berhenti
-   - backend akan menolak session/heartbeat baru sampai consent diaktifkan lagi
+   - backend akan menolak session dan heartbeat baru sampai consent diaktifkan lagi
 
 ## Catatan Auth
 
-- Extension menyimpan access token di `chrome.storage.local`
-- Refresh token tidak disimpan langsung oleh extension
-- Saat access token expired, extension akan mencoba `POST /api/v1/auth/refresh` dengan cookie browser yang masih aktif
-- Jika refresh gagal, user perlu mengambil access token baru dari web KANTOR
+- extension menyimpan access token di `chrome.storage.local`
+- refresh token tidak disimpan langsung oleh extension
+- saat access token expired, extension akan mencoba `POST /api/v1/auth/refresh` dengan cookie browser yang masih aktif
+- jika refresh gagal, user perlu menghubungkan ulang dari dashboard atau melakukan setup manual lagi
 
 ## Catatan Development
 
-- Default API URL untuk dev adalah `http://localhost:3000/api/v1`
-- Dashboard web tracker ada di `http://localhost:3000/operational/tracker`
-- Domain seperti `chrome://`, `chrome-extension://`, `about:`, `edge:` dan `file:` tidak di-track
+- default API URL untuk dev adalah `http://localhost:3000/api/v1`
+- dashboard web tracker ada di `http://localhost:3000/operational/tracker`
+- domain seperti `chrome://`, `chrome-extension://`, `about:`, `edge:`, dan `file:` tidak di-track
+- jika Anda mengembangkan extension langsung dari repository, folder yang di-load unpacked adalah folder `extension/`

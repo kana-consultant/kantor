@@ -21,7 +21,6 @@ const elements = {
   totalActive: document.getElementById("total-active"),
   totalIdle: document.getElementById("total-idle"),
   currentDomain: document.getElementById("current-domain"),
-  currentCategory: document.getElementById("current-category"),
   idleState: document.getElementById("idle-state"),
   topDomains: document.getElementById("top-domains"),
   errorBanner: document.getElementById("error-banner"),
@@ -115,7 +114,6 @@ function renderTrackerState(state) {
   elements.totalActive.textContent = formatSeconds(summary.total_active_seconds || 0);
   elements.totalIdle.textContent = formatSeconds(summary.total_idle_seconds || 0);
   elements.currentDomain.textContent = state.currentTab?.domain || "-";
-  elements.currentCategory.textContent = state.currentTab?.category || "uncategorized";
   elements.idleState.textContent = state.currentTab?.idleState === "idle" ? "Idle" : "Active";
 
   elements.pauseButton.classList.toggle("hidden", state.paused);
