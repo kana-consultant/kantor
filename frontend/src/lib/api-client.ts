@@ -166,3 +166,52 @@ export function authRequestEnvelope<TData>(
 ): Promise<ApiSuccess<TData>> {
   return handleAuthRetry((token) => requestEnvelope<TData>(path, init, token));
 }
+
+export interface DownloadResult {
+  blob: Blob;
+  filename?: string;
+}
+
+async function requestBinary(
+  path: string,
+  init: RequestInit = {},
+  token?: string,
+): Promise<DownloadResult> {
+  const headers = new Headers(init.headers);
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as ApiFailure | null;
+    if (payload && "error" in payload) {
+      throw new ApiError(
+        response.status,
+        payload.error.message,
+        payload.error.code,
+        payload.error.details,
+      );
+    }
+
+    throw new ApiError(response.status, "Request failed");
+  }
+
+  const contentDisposition = response.headers.get("Content-Disposition") || "";
+  const filenameMatch = /filename="?(?<filename>[^";]+)"?/i.exec(contentDisposition);
+
+  return {
+    blob: await response.blob(),
+    filename: filenameMatch?.groups?.filename,
+  };
+}
+
+export function authDownload(path: string, init: RequestInit = {}): Promise<DownloadResult> {
+  return handleAuthRetry((token) => requestBinary(path, init, token));
+}

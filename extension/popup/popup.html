@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KANTOR Tracker</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="popup-header">
+        <div>
+          <p class="overline">KANTOR</p>
+          <h1>Activity Tracker</h1>
+        </div>
+        <button class="icon-button" id="refresh-button" type="button" aria-label="Refresh">
+          &#8635;
+        </button>
+      </header>
+
+      <section id="setup-state" class="state-card hidden">
+        <h2>Hubungkan extension</h2>
+        <p>Untuk user biasa, tidak perlu isi token atau konfigurasi apa pun di sini.</p>
+        <div class="simple-steps">
+          <div class="step-row">
+            <span class="step-number">1</span>
+            <p>Pastikan extension ini sudah terpasang di Chrome.</p>
+          </div>
+          <div class="step-row">
+            <span class="step-number">2</span>
+            <p>Klik tombol di bawah untuk membuka dashboard tracker KANTOR.</p>
+          </div>
+          <div class="step-row">
+            <span class="step-number">3</span>
+            <p>Di dashboard, klik <strong>Hubungkan &amp; Aktifkan</strong>.</p>
+          </div>
+        </div>
+        <a class="primary-link-button" href="http://localhost:3000/operational/tracker" id="login-link" target="_blank" rel="noreferrer">
+          Buka Dashboard Tracker
+        </a>
+        <button class="link-button align-left" id="toggle-manual-button" type="button">Setup manual untuk IT</button>
+
+        <div id="manual-setup" class="manual-setup hidden">
+          <p class="helper-text">
+            Gunakan bagian ini hanya jika auto-connect dari dashboard tidak bisa dipakai.
+          </p>
+          <label class="field">
+            <span>API URL</span>
+            <input id="api-url-input" placeholder="http://localhost:3000/api/v1" type="url" />
+          </label>
+          <label class="field">
+            <span>Access Token</span>
+            <textarea id="token-input" placeholder="Paste JWT access token di sini"></textarea>
+          </label>
+          <p class="helper-text">
+            Tips cepat: login ke web KANTOR lalu buka DevTools -> Application -> Local Storage -> key
+            <code>kantor-auth</code>, lalu salin <code>state.session.tokens.access_token</code>.
+          </p>
+          <button class="secondary-button full-width" id="save-config-button" type="button">Simpan Konfigurasi Manual</button>
+        </div>
+      </section>
+
+      <section id="consent-state" class="state-card hidden">
+        <h2>Aktifkan consent tracker</h2>
+        <p>
+          Extension ini merekam domain aktif, judul halaman, dan durasi aktif/idle untuk dashboard internal perusahaan.
+          Anda bisa revoke consent kapan saja dari settings extension atau dashboard.
+        </p>
+        <button class="primary-button" id="grant-consent-button" type="button">Aktifkan Tracking</button>
+      </section>
+
+      <section id="tracker-state" class="hidden">
+        <div class="status-card">
+          <div>
+            <p class="overline">Status</p>
+            <div class="status-row">
+              <span class="status-dot" id="status-dot"></span>
+              <strong id="status-label">Tracking Active</strong>
+            </div>
+          </div>
+          <div class="timer-block">
+            <span class="overline">Hari Ini</span>
+            <strong id="active-timer">00:00:00</strong>
+          </div>
+        </div>
+
+        <div class="state-card compact">
+          <p class="overline">Current Tab</p>
+          <strong id="current-domain">-</strong>
+          <div class="inline-meta">
+            <span class="badge" id="current-category">uncategorized</span>
+            <span id="idle-state">Active</span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <article class="mini-stat">
+            <span class="overline">Active</span>
+            <strong id="total-active">00:00:00</strong>
+          </article>
+          <article class="mini-stat">
+            <span class="overline">Idle</span>
+            <strong id="total-idle">00:00:00</strong>
+          </article>
+        </div>
+
+        <section class="state-card compact">
+          <p class="overline">Top Domains</p>
+          <ul class="domain-list" id="top-domains"></ul>
+        </section>
+
+        <div class="action-row">
+          <button class="secondary-button" id="pause-button" type="button">Pause</button>
+          <button class="secondary-button hidden" id="resume-button" type="button">Resume</button>
+          <button class="danger-button" id="stop-button" type="button">Stop</button>
+        </div>
+      </section>
+
+      <p class="error-banner hidden" id="error-banner"></p>
+
+      <footer class="popup-footer">
+        <a href="#" id="dashboard-link" target="_blank" rel="noreferrer">Buka Dashboard</a>
+        <button class="link-button" id="open-settings-button" type="button">Settings</button>
+      </footer>
+    </main>
+    <script src="./popup.js"></script>
+  </body>
+</html>

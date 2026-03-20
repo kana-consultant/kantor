@@ -1,4 +1,5 @@
 import {
+  Activity,
   ChevronsLeft,
   FolderKanban,
   LayoutDashboard,
@@ -51,6 +52,12 @@ const sections: NavSection[] = [
         label: "Projects",
         icon: FolderKanban,
         permission: permissions.operationalProjectView,
+      },
+      {
+        to: "/operational/tracker",
+        label: "Activity Tracker",
+        icon: Activity,
+        permission: permissions.operationalTrackerView,
       },
       {
         to: "/operational/wa-broadcast",

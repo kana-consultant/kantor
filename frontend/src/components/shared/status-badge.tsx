@@ -235,6 +235,10 @@ function resolveTone(status: string, variant: StatusVariant): Tone {
     case "draft":
     case "new":
       return tones.draft;
+    case "productive":
+      return tones.success;
+    case "unproductive":
+      return tones.error;
     case "archived":
     case "inactive":
       return tones.archived;

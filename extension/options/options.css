@@ -1,0 +1,168 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #fafbfc;
+  color: #172b4d;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.options-shell {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+.overline {
+  margin: 0;
+  color: #5e6c84;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  font-family: Sora, Inter, system-ui, sans-serif;
+}
+
+h1 {
+  margin: 8px 0 0;
+  font-size: 28px;
+}
+
+.helper-text {
+  margin: 12px 0 0;
+  color: #5e6c84;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.helper-text code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.panel {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #dfe1e6;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(23, 43, 77, 0.04);
+}
+
+.field {
+  display: block;
+  margin-top: 16px;
+}
+
+.field span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  background: #f4f5f7;
+  padding: 12px;
+  font-size: 14px;
+  color: #172b4d;
+}
+
+textarea {
+  min-height: 120px;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: #4c9aff;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(0, 101, 255, 0.18);
+}
+
+.button-row,
+.inline-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.button-row {
+  margin-top: 16px;
+}
+
+.inline-row {
+  margin-top: 16px;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button {
+  height: 40px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: #0065ff;
+  color: #ffffff;
+}
+
+.secondary-button {
+  background: #deebff;
+  color: #0065ff;
+}
+
+.danger-button {
+  background: #ff5630;
+  color: #ffffff;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 16px 0 0;
+  list-style: none;
+}
+
+.tag-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #deebff;
+  color: #0065ff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tag-list button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.notice {
+  margin-top: 20px;
+  color: #5e6c84;
+  font-size: 13px;
+}

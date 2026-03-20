@@ -149,6 +149,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
+	trackerRepository := operationalrepo.NewTrackerRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
 	compensationRepository := hrisrepo.NewCompensationRepository(pool)
 	financeRepository := hrisrepo.NewFinanceRepository(pool)
@@ -173,6 +174,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
 	kanbanService := operationalservice.NewKanbanService(kanbanRepository, projectsRepository)
 	operationalOverviewService := operationalservice.NewOverviewService(operationalOverviewRepository)
+	trackerService := operationalservice.NewTrackerService(trackerRepository, cfg.TrackerRetentionDays)
 	employeesService := hrisservice.NewEmployeesService(employeesRepository)
 	employeesService.SetAuthRepo(authRepository)
 	departmentsService := hrisservice.NewDepartmentsService(departmentsRepository, employeesRepository)
@@ -204,6 +206,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		operationalhandler.NewOverviewHandler(operationalOverviewService),
 		operationalhandler.NewProjectsHandler(projectsService, projectsRepository),
 		operationalhandler.NewKanbanHandler(kanbanService),
+		operationalhandler.NewTrackerHandler(trackerService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
 		hrishandler.NewEmployeesHandler(employeesService),
 		hrishandler.NewDepartmentsHandler(departmentsService),
@@ -219,7 +222,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		fileshandler.New(filesService),
 		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(subscriptionsService, whatsappService)
+	application.startBackgroundJobs(subscriptionsService, trackerService, whatsappService)
 
 	return application, nil
 }
@@ -247,6 +250,7 @@ func (a *App) buildRouter(
 	operationalOverviewHandler *operationalhandler.OverviewHandler,
 	projectsHandler *operationalhandler.ProjectsHandler,
 	kanbanHandler *operationalhandler.KanbanHandler,
+	trackerHandler *operationalhandler.TrackerHandler,
 	hrisOverviewHandler *hrishandler.OverviewHandler,
 	employeesHandler *hrishandler.EmployeesHandler,
 	departmentsHandler *hrishandler.DepartmentsHandler,
@@ -330,6 +334,8 @@ func (a *App) buildRouter(
 				module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
 			})
 
+			protected.Route("/tracker", trackerHandler.RegisterRoutes)
+
 			protected.Route("/hris", func(module chi.Router) {
 				module.With(platformmiddleware.RBACMiddleware("hris:employee:view")).Get("/overview", hrisOverviewHandler.Get)
 
@@ -362,7 +368,7 @@ func (a *App) buildRouter(
 	return router
 }
 
-func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, whatsappService *waservice.Service) {
+func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, whatsappService *waservice.Service) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -378,6 +384,9 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 
 		if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now()); err != nil {
 			slog.Error("subscription alert generation failed", "error", err)
+		}
+		if _, err := trackerService.PurgeOldData(ctx, time.Now()); err != nil {
+			slog.Error("tracker retention cleanup failed", "error", err)
 		}
 
 		// Run daily WA reminders on startup
@@ -395,6 +404,9 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			case tickAt := <-ticker.C:
 				if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt); err != nil {
 					slog.Error("subscription alert generation failed", "error", err, "tick", tickAt)
+				}
+				if _, err := trackerService.PurgeOldData(ctx, tickAt); err != nil {
+					slog.Error("tracker retention cleanup failed", "error", err, "tick", tickAt)
 				}
 
 				// Daily WA reminders (weekdays only)

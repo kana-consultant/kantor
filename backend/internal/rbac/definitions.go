@@ -34,7 +34,11 @@ var defaultPermissions = []PermissionDefinition{
 	{Name: "operational:task:create", Module: "operational", Resource: "task", Action: "create", Description: "Create operational tasks"},
 	{Name: "operational:task:edit", Module: "operational", Resource: "task", Action: "edit", Description: "Edit operational tasks"},
 	{Name: "operational:task:delete", Module: "operational", Resource: "task", Action: "delete", Description: "Delete operational tasks"},
-{Name: "hris:employee:view", Module: "hris", Resource: "employee", Action: "view", Description: "View employee data"},
+	{Name: "operational:tracker:view", Module: "operational", Resource: "tracker", Action: "view", Description: "View personal activity tracker data"},
+	{Name: "operational:tracker:view_team", Module: "operational", Resource: "tracker", Action: "view_team", Description: "View team activity tracker data"},
+	{Name: "operational:tracker_consent:audit", Module: "operational", Resource: "tracker_consent", Action: "audit", Description: "View tracker consent audit report"},
+	{Name: "operational:tracker_domain:manage", Module: "operational", Resource: "tracker_domain", Action: "manage", Description: "Manage activity tracker domain categories"},
+	{Name: "hris:employee:view", Module: "hris", Resource: "employee", Action: "view", Description: "View employee data"},
 	{Name: "hris:employee:create", Module: "hris", Resource: "employee", Action: "create", Description: "Create employee data"},
 	{Name: "hris:employee:edit", Module: "hris", Resource: "employee", Action: "edit", Description: "Edit employee data"},
 	{Name: "hris:employee:delete", Module: "hris", Resource: "employee", Action: "delete", Description: "Delete employee data"},
@@ -141,7 +145,7 @@ func PermissionNamesForRole(role RoleDefinition) []string {
 		case "admin":
 			names = append(names, permission.Name)
 		case "manager":
-			if permission.Action == "view" || permission.Action == "approve" || permission.Action == "manage" || managerCanEdit(permission) || managerCanCreate(permission) {
+			if permission.Action == "view" || permission.Action == "approve" || permission.Action == "view_team" || managerCanManage(permission) || managerCanEdit(permission) || managerCanCreate(permission) {
 				names = append(names, permission.Name)
 			}
 		case "staff":
@@ -156,6 +160,14 @@ func PermissionNamesForRole(role RoleDefinition) []string {
 	}
 
 	return names
+}
+
+func managerCanManage(permission PermissionDefinition) bool {
+	if permission.Action != "manage" {
+		return false
+	}
+
+	return permission.Module == "operational" && permission.Resource == "wa"
 }
 
 func managerCanEdit(permission PermissionDefinition) bool {

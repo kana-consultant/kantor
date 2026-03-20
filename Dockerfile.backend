@@ -19,6 +19,7 @@ RUN mkdir -p /app/data/uploads && chown -R appuser:appuser /app/data
 
 COPY --from=build /out/server /usr/local/bin/server
 COPY backend/migrations ./migrations
+COPY extension /app/extension
 
 USER appuser
 

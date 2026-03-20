@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KANTOR Tracker Settings</title>
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <main class="options-shell">
+      <header>
+        <p class="overline">KANTOR Extension</p>
+        <h1>Activity Tracker Settings</h1>
+      </header>
+
+      <section class="panel">
+        <h2>Connection</h2>
+        <p class="helper-text">
+          Cara termudah untuk user biasa: buka dashboard web KANTOR, masuk ke menu
+          <strong>Operational → Activity Tracker</strong>, download paket extension di sana, pasang sekali di Chrome,
+          lalu klik <strong>Hubungkan &amp; Aktifkan</strong>.
+        </p>
+        <p class="helper-text">
+          Form di bawah disediakan sebagai fallback manual. Gunakan API URL <code>http://localhost:3000/api/v1</code>
+          untuk development. Access token bisa diambil dari DevTools web KANTOR pada key local storage
+          <code>kantor-auth</code>.
+        </p>
+        <label class="field">
+          <span>API URL</span>
+          <input id="api-url" placeholder="http://localhost:3000/api/v1" type="url" />
+        </label>
+        <label class="field">
+          <span>Access Token</span>
+          <textarea id="token" placeholder="Paste JWT access token di sini"></textarea>
+        </label>
+        <button class="primary-button" id="save-config" type="button">Simpan Konfigurasi</button>
+      </section>
+
+      <section class="panel">
+        <h2>Consent</h2>
+        <p id="consent-status">Consent belum aktif.</p>
+        <div class="button-row">
+          <button class="primary-button" id="grant-consent" type="button">Aktifkan Tracking</button>
+          <button class="danger-button" id="revoke-consent" type="button">Revoke Consent</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Behaviour</h2>
+        <p class="helper-text">Idle timeout default 300 detik. Domain di excluded list tidak akan dikirim ke tracker.</p>
+        <label class="field">
+          <span>Idle Timeout (detik)</span>
+          <input id="idle-timeout" min="60" step="30" type="number" />
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Excluded Domains</h2>
+        <div class="inline-row">
+          <input id="domain-input" placeholder="contoh: youtube.com" type="text" />
+          <button class="secondary-button" id="add-domain" type="button">Tambah</button>
+        </div>
+        <ul class="tag-list" id="excluded-domain-list"></ul>
+      </section>
+
+      <p class="notice" id="notice"></p>
+    </main>
+    <script src="./options.js"></script>
+  </body>
+</html>

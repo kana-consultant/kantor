@@ -13,20 +13,21 @@ import (
 )
 
 type Config struct {
-	AppEnv            string
-	Port              string
-	DatabaseURL       string
-	JWTSecret         string
+	AppEnv                    string
+	Port                      string
+	DatabaseURL               string
+	JWTSecret                 string
 	DataEncryptionKey         string
 	DataEncryptionKeyPrevious string
-	UploadsDir        string
-	JWTAccessExpiry   time.Duration
-	JWTRefreshExpiry  time.Duration
-	CORSOrigins       []string
-	SeedSuperAdmin    SeedSuperAdminConfig
-	SeedDemoUsers     SeedDemoUsersConfig
-	WAHA              WAHAConfig
-	AppURL            string
+	UploadsDir                string
+	JWTAccessExpiry           time.Duration
+	JWTRefreshExpiry          time.Duration
+	CORSOrigins               []string
+	TrackerRetentionDays      int
+	SeedSuperAdmin            SeedSuperAdminConfig
+	SeedDemoUsers             SeedDemoUsersConfig
+	WAHA                      WAHAConfig
+	AppURL                    string
 }
 
 type SeedSuperAdminConfig struct {
@@ -98,17 +99,18 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		AppEnv:            appEnv,
-		Port:              getEnv("PORT", "8080"),
-		DatabaseURL:       os.Getenv("DATABASE_URL"),
-		JWTSecret:         jwtSecret,
+		AppEnv:                    appEnv,
+		Port:                      getEnv("PORT", "8080"),
+		DatabaseURL:               os.Getenv("DATABASE_URL"),
+		JWTSecret:                 jwtSecret,
 		DataEncryptionKey:         dataEncryptionKey,
 		DataEncryptionKeyPrevious: dataEncryptionKeyPrevious,
-		UploadsDir:        getEnv("UPLOADS_DIR", "uploads"),
-		JWTAccessExpiry:   accessExpiry,
-		JWTRefreshExpiry:  refreshExpiry,
-		CORSOrigins:       splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),
-		AppURL:            getEnv("APP_URL", "http://localhost:3000"),
+		UploadsDir:                getEnv("UPLOADS_DIR", "uploads"),
+		JWTAccessExpiry:           accessExpiry,
+		JWTRefreshExpiry:          refreshExpiry,
+		CORSOrigins:               splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),
+		TrackerRetentionDays:      parseIntEnv("TRACKER_RETENTION_DAYS", 90),
+		AppURL:                    getEnv("APP_URL", "http://localhost:3000"),
 		WAHA: WAHAConfig{
 			APIURL:           getEnv("WAHA_API_URL", "http://localhost:3000"),
 			APIKey:           os.Getenv("WAHA_API_KEY"),
