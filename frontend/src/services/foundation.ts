@@ -1,5 +1,5 @@
 import { authGetJSON, getJSON } from "@/lib/api-client";
-import type { AuthUser } from "@/types/auth";
+import type { AuthModuleRole, AuthUser } from "@/types/auth";
 
 export interface HealthStatus {
   status: string;
@@ -7,8 +7,9 @@ export interface HealthStatus {
 
 export interface SessionProfile {
   user: AuthUser;
-  roles: string[];
+  module_roles: Record<string, AuthModuleRole>;
   permissions: string[];
+  is_super_admin: boolean;
 }
 
 export function fetchApiHealth() {

@@ -37,25 +37,25 @@ func NewCampaignsHandler(service *marketingservice.CampaignsService, uploadsDir 
 }
 
 func (h *CampaignsHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:create")).Post("/", h.createCampaign)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/", h.listCampaigns)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/kanban", h.kanban)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/{campaignID}", h.getCampaign)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/{campaignID}/activities", h.listActivities)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:edit")).Put("/{campaignID}", h.updateCampaign)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:delete")).Delete("/{campaignID}", h.deleteCampaign)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:edit")).Patch("/{campaignID}/move", h.moveCampaign)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:edit")).Post("/{campaignID}/attachments", h.uploadAttachment)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/{campaignID}/attachments", h.listAttachments)
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:delete")).Delete("/{campaignID}/attachments/{attachmentID}", h.deleteAttachment)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:create")).Post("/", h.createCampaign)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/", h.listCampaigns)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/kanban", h.kanban)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/{campaignID}", h.getCampaign)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/{campaignID}/activities", h.listActivities)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:edit")).Put("/{campaignID}", h.updateCampaign)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:delete")).Delete("/{campaignID}", h.deleteCampaign)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:edit")).Patch("/{campaignID}/move", h.moveCampaign)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:edit")).Post("/{campaignID}/attachments", h.uploadAttachment)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/{campaignID}/attachments", h.listAttachments)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:delete")).Delete("/{campaignID}/attachments/{attachmentID}", h.deleteAttachment)
 }
 
 func (h *CampaignsHandler) RegisterColumnRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/", h.listColumns)
-	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Post("/", h.createColumn)
-	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Put("/{columnID}", h.updateColumn)
-	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Delete("/{columnID}", h.deleteColumn)
-	router.With(platformmiddleware.RBACMiddleware("marketing:column:manage")).Patch("/reorder", h.reorderColumns)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/", h.listColumns)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:manage_columns")).Post("/", h.createColumn)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:manage_columns")).Put("/{columnID}", h.updateColumn)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:manage_columns")).Delete("/{columnID}", h.deleteColumn)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:manage_columns")).Patch("/reorder", h.reorderColumns)
 }
 
 func (h *CampaignsHandler) createCampaign(w http.ResponseWriter, r *http.Request) {

@@ -31,9 +31,16 @@ type TokenPair struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
+type ModuleRoleDTO struct {
+	RoleID   string `json:"role_id"`
+	RoleName string `json:"role_name"`
+	RoleSlug string `json:"role_slug"`
+}
+
 type AuthResponse struct {
-	User        interface{} `json:"user"`
-	Roles       []string    `json:"roles"`
-	Permissions []string    `json:"permissions"`
-	Tokens      TokenPair   `json:"tokens"`
+	User         interface{}               `json:"user"`
+	ModuleRoles  map[string]ModuleRoleDTO `json:"module_roles"`
+	Permissions  []string                 `json:"permissions"`
+	IsSuperAdmin bool                     `json:"is_super_admin"`
+	Tokens       TokenPair                `json:"tokens"`
 }

@@ -33,7 +33,7 @@ import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
 import { leadSourceMeta, leadSourceOptions, leadStatusOptions } from "@/lib/marketing";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { campaignsKeys, listCampaigns } from "@/services/marketing-campaigns";
 import {
   createLead,
@@ -133,6 +133,7 @@ type LeadImportPreviewRow = {
 
 export const Route = createFileRoute("/_authenticated/marketing/leads")({
   beforeLoad: async () => {
+    await ensureModuleAccess("marketing");
     await ensurePermission(permissions.marketingLeadsView);
   },
   component: MarketingLeadsPage,

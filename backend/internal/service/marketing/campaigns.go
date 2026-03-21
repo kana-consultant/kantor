@@ -41,7 +41,7 @@ type campaignsRepository interface {
 }
 
 type campaignsAuthRepository interface {
-	ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error)
+	ListUserIDsByPermission(ctx context.Context, permissionID string) ([]string, error)
 }
 
 type campaignsNotificationsService interface {
@@ -300,15 +300,7 @@ func (s *CampaignsService) notifyCampaignLive(ctx context.Context, campaign mode
 		return nil
 	}
 
-	managers, err := s.authRepo.ListUserIDsByRole(ctx, "manager", "marketing")
-	if err != nil {
-		return err
-	}
-	admins, err := s.authRepo.ListUserIDsByRole(ctx, "admin", "marketing")
-	if err != nil {
-		return err
-	}
-	superAdmins, err := s.authRepo.ListUserIDsByRole(ctx, "super_admin", "")
+	recipients, err := s.authRepo.ListUserIDsByPermission(ctx, "marketing:campaign:edit")
 	if err != nil {
 		return err
 	}
@@ -317,7 +309,7 @@ func (s *CampaignsService) notifyCampaignLive(ctx context.Context, campaign mode
 	return sendNotifications(
 		ctx,
 		s.notificationsService,
-		append(append(append(managers, admins...), superAdmins...), campaign.CreatedBy),
+		append(recipients, campaign.CreatedBy),
 		"marketing.campaign.live",
 		"Campaign is now live",
 		message,

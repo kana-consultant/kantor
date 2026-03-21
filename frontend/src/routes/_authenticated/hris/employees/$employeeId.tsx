@@ -23,7 +23,7 @@ import { useRBAC } from "@/hooks/use-rbac";
 import { ApiError } from "@/lib/api-client";
 import { formatIDR } from "@/lib/currency";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
   approveBonus,
   compensationKeys,
@@ -65,6 +65,7 @@ const bonusSchema = z.object({
 
 export const Route = createFileRoute("/_authenticated/hris/employees/$employeeId")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisEmployeeView);
   },
   component: EmployeeDetailPage,

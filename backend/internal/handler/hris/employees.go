@@ -27,11 +27,11 @@ func NewEmployeesHandler(service *hrisservice.EmployeesService) *EmployeesHandle
 }
 
 func (h *EmployeesHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("hris:employee:create")).Post("/", h.createEmployee)
-	router.With(platformmiddleware.RBACMiddleware("hris:employee:view")).Get("/", h.listEmployees)
-	router.With(platformmiddleware.RBACMiddleware("hris:employee:view")).Get("/{employeeID}", h.getEmployee)
-	router.With(platformmiddleware.RBACMiddleware("hris:employee:edit")).Put("/{employeeID}", h.updateEmployee)
-	router.With(platformmiddleware.RBACMiddleware("hris:employee:delete")).Delete("/{employeeID}", h.deleteEmployee)
+	router.With(platformmiddleware.RequirePermission("hris:employee:create")).Post("/", h.createEmployee)
+	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/", h.listEmployees)
+	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/{employeeID}", h.getEmployee)
+	router.With(platformmiddleware.RequirePermission("hris:employee:edit")).Put("/{employeeID}", h.updateEmployee)
+	router.With(platformmiddleware.RequirePermission("hris:employee:delete")).Delete("/{employeeID}", h.deleteEmployee)
 }
 
 func (h *EmployeesHandler) createEmployee(w http.ResponseWriter, r *http.Request) {

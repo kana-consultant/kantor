@@ -1,242 +1,285 @@
 package rbac
 
+import "sort"
+
 type RoleKey struct {
 	Name   string
 	Module string
 }
 
-type RoleDefinition struct {
-	Name        string
-	Module      string
-	Description string
+type ModuleDefinition struct {
+	ID           string
+	Name         string
+	Description  string
+	DisplayOrder int
 }
 
 type PermissionDefinition struct {
-	Name        string
-	Module      string
+	ID          string
+	ModuleID    string
 	Resource    string
 	Action      string
 	Description string
+	IsSensitive bool
 }
 
-var modules = []string{"operational", "hris", "marketing"}
-
-var defaultPermissions = []PermissionDefinition{
-	{Name: "operational:project:view", Module: "operational", Resource: "project", Action: "view", Description: "View operational projects"},
-	{Name: "operational:project:create", Module: "operational", Resource: "project", Action: "create", Description: "Create operational projects"},
-	{Name: "operational:project:edit", Module: "operational", Resource: "project", Action: "edit", Description: "Edit operational projects"},
-	{Name: "operational:project:delete", Module: "operational", Resource: "project", Action: "delete", Description: "Delete operational projects"},
-	{Name: "operational:kanban:view", Module: "operational", Resource: "kanban", Action: "view", Description: "View operational kanban board"},
-	{Name: "operational:kanban:create", Module: "operational", Resource: "kanban", Action: "create", Description: "Create operational kanban columns and tasks"},
-	{Name: "operational:kanban:edit", Module: "operational", Resource: "kanban", Action: "edit", Description: "Edit operational kanban columns and tasks"},
-	{Name: "operational:kanban:delete", Module: "operational", Resource: "kanban", Action: "delete", Description: "Delete operational kanban columns and tasks"},
-	{Name: "operational:task:view", Module: "operational", Resource: "task", Action: "view", Description: "View operational tasks"},
-	{Name: "operational:task:create", Module: "operational", Resource: "task", Action: "create", Description: "Create operational tasks"},
-	{Name: "operational:task:edit", Module: "operational", Resource: "task", Action: "edit", Description: "Edit operational tasks"},
-	{Name: "operational:task:delete", Module: "operational", Resource: "task", Action: "delete", Description: "Delete operational tasks"},
-	{Name: "operational:tracker:view", Module: "operational", Resource: "tracker", Action: "view", Description: "View personal activity tracker data"},
-	{Name: "operational:tracker:view_team", Module: "operational", Resource: "tracker", Action: "view_team", Description: "View team activity tracker data"},
-	{Name: "operational:tracker_consent:audit", Module: "operational", Resource: "tracker_consent", Action: "audit", Description: "View tracker consent audit report"},
-	{Name: "operational:tracker_domain:manage", Module: "operational", Resource: "tracker_domain", Action: "manage", Description: "Manage activity tracker domain categories"},
-	{Name: "hris:employee:view", Module: "hris", Resource: "employee", Action: "view", Description: "View employee data"},
-	{Name: "hris:employee:create", Module: "hris", Resource: "employee", Action: "create", Description: "Create employee data"},
-	{Name: "hris:employee:edit", Module: "hris", Resource: "employee", Action: "edit", Description: "Edit employee data"},
-	{Name: "hris:employee:delete", Module: "hris", Resource: "employee", Action: "delete", Description: "Delete employee data"},
-	{Name: "hris:department:view", Module: "hris", Resource: "department", Action: "view", Description: "View departments"},
-	{Name: "hris:department:create", Module: "hris", Resource: "department", Action: "create", Description: "Create departments"},
-	{Name: "hris:department:edit", Module: "hris", Resource: "department", Action: "edit", Description: "Edit departments"},
-	{Name: "hris:department:delete", Module: "hris", Resource: "department", Action: "delete", Description: "Delete departments"},
-	{Name: "hris:salary:view", Module: "hris", Resource: "salary", Action: "view", Description: "View salary data"},
-	{Name: "hris:salary:create", Module: "hris", Resource: "salary", Action: "create", Description: "Create salary records"},
-	{Name: "hris:salary:edit", Module: "hris", Resource: "salary", Action: "edit", Description: "Edit salary data"},
-	{Name: "hris:bonus:view", Module: "hris", Resource: "bonus", Action: "view", Description: "View bonus data"},
-	{Name: "hris:bonus:create", Module: "hris", Resource: "bonus", Action: "create", Description: "Create bonus entries"},
-	{Name: "hris:bonus:edit", Module: "hris", Resource: "bonus", Action: "edit", Description: "Edit bonus entries"},
-	{Name: "hris:bonus:approve", Module: "hris", Resource: "bonus", Action: "approve", Description: "Approve bonus entries"},
-	{Name: "hris:subscription:view", Module: "hris", Resource: "subscription", Action: "view", Description: "View subscriptions"},
-	{Name: "hris:subscription:create", Module: "hris", Resource: "subscription", Action: "create", Description: "Create subscriptions"},
-	{Name: "hris:subscription:edit", Module: "hris", Resource: "subscription", Action: "edit", Description: "Edit subscriptions"},
-	{Name: "hris:subscription:delete", Module: "hris", Resource: "subscription", Action: "delete", Description: "Delete subscriptions"},
-	{Name: "hris:finance:view", Module: "hris", Resource: "finance", Action: "view", Description: "View finance entries"},
-	{Name: "hris:finance:create", Module: "hris", Resource: "finance", Action: "create", Description: "Create finance entries"},
-	{Name: "hris:finance:edit", Module: "hris", Resource: "finance", Action: "edit", Description: "Edit finance entries"},
-	{Name: "hris:finance:approve", Module: "hris", Resource: "finance", Action: "approve", Description: "Approve finance entries"},
-	{Name: "hris:reimbursement:view", Module: "hris", Resource: "reimbursement", Action: "view", Description: "View reimbursements"},
-	{Name: "hris:reimbursement:create", Module: "hris", Resource: "reimbursement", Action: "create", Description: "Create reimbursements"},
-	{Name: "hris:reimbursement:edit", Module: "hris", Resource: "reimbursement", Action: "edit", Description: "Edit reimbursements"},
-	{Name: "hris:reimbursement:approve", Module: "hris", Resource: "reimbursement", Action: "approve", Description: "Approve reimbursements"},
-	{Name: "marketing:campaign:view", Module: "marketing", Resource: "campaign", Action: "view", Description: "View campaigns"},
-	{Name: "marketing:campaign:create", Module: "marketing", Resource: "campaign", Action: "create", Description: "Create campaigns"},
-	{Name: "marketing:campaign:edit", Module: "marketing", Resource: "campaign", Action: "edit", Description: "Edit campaigns"},
-	{Name: "marketing:campaign:delete", Module: "marketing", Resource: "campaign", Action: "delete", Description: "Delete campaigns"},
-	{Name: "marketing:column:manage", Module: "marketing", Resource: "column", Action: "manage", Description: "Manage marketing campaign columns"},
-	{Name: "marketing:ads_metrics:view", Module: "marketing", Resource: "ads_metrics", Action: "view", Description: "View ads metrics"},
-	{Name: "marketing:ads_metrics:create", Module: "marketing", Resource: "ads_metrics", Action: "create", Description: "Create ads metrics"},
-	{Name: "marketing:ads_metrics:edit", Module: "marketing", Resource: "ads_metrics", Action: "edit", Description: "Edit ads metrics"},
-	{Name: "marketing:ads_metrics:delete", Module: "marketing", Resource: "ads_metrics", Action: "delete", Description: "Delete ads metrics"},
-	{Name: "marketing:metric:view", Module: "marketing", Resource: "metric", Action: "view", Description: "View ad metrics"},
-	{Name: "marketing:metric:create", Module: "marketing", Resource: "metric", Action: "create", Description: "Create ad metrics"},
-	{Name: "marketing:metric:edit", Module: "marketing", Resource: "metric", Action: "edit", Description: "Edit ad metrics"},
-	{Name: "marketing:metric:delete", Module: "marketing", Resource: "metric", Action: "delete", Description: "Delete ad metrics"},
-	{Name: "marketing:leads:view", Module: "marketing", Resource: "leads", Action: "view", Description: "View leads"},
-	{Name: "marketing:leads:create", Module: "marketing", Resource: "leads", Action: "create", Description: "Create leads"},
-	{Name: "marketing:leads:edit", Module: "marketing", Resource: "leads", Action: "edit", Description: "Edit leads"},
-	{Name: "marketing:leads:delete", Module: "marketing", Resource: "leads", Action: "delete", Description: "Delete leads"},
-	{Name: "operational:wa:view", Module: "operational", Resource: "wa", Action: "view", Description: "View WA broadcast dashboard and logs"},
-	{Name: "operational:wa:manage", Module: "operational", Resource: "wa", Action: "manage", Description: "Manage WA broadcast templates, schedules, and send messages"},
+type RoleDefinition struct {
+	Name           string
+	Slug           string
+	Description    string
+	IsSystem       bool
+	HierarchyLevel int
 }
 
-func DefaultRoles() []RoleDefinition {
-	roles := []RoleDefinition{
+const (
+	ModuleOperational = "operational"
+	ModuleHRIS        = "hris"
+	ModuleMarketing   = "marketing"
+	ModuleAdmin       = "admin"
+
+	RoleSuperAdmin = "super_admin"
+	RoleAdmin      = "admin"
+	RoleManager    = "manager"
+	RoleStaff      = "staff"
+	RoleViewer     = "viewer"
+)
+
+func Modules() []ModuleDefinition {
+	return []ModuleDefinition{
 		{
-			Name:        "super_admin",
-			Description: "Global full access to all modules and settings",
+			ID:           ModuleOperational,
+			Name:         "Operasional",
+			Description:  "Manajemen project, task, kanban, automation, activity tracker, WA broadcast",
+			DisplayOrder: 1,
+		},
+		{
+			ID:           ModuleHRIS,
+			Name:         "HRIS",
+			Description:  "Data karyawan, keuangan, reimbursement, subscription",
+			DisplayOrder: 2,
+		},
+		{
+			ID:           ModuleMarketing,
+			Name:         "Marketing",
+			Description:  "Campaign, ads metrics, leads management",
+			DisplayOrder: 3,
+		},
+		{
+			ID:           ModuleAdmin,
+			Name:         "Admin",
+			Description:  "Audit log, role management, user management, system settings",
+			DisplayOrder: 4,
 		},
 	}
+}
 
-	for _, module := range modules {
-		roles = append(roles,
-			RoleDefinition{Name: "admin", Module: module, Description: "Module administrator with full CRUD access"},
-			RoleDefinition{Name: "manager", Module: module, Description: "Module manager with view and approval access"},
-			RoleDefinition{Name: "staff", Module: module, Description: "Module staff with limited self-service CRUD access"},
-			RoleDefinition{Name: "viewer", Module: module, Description: "Module viewer with read-only access"},
-		)
+func SystemRoles() []RoleDefinition {
+	return []RoleDefinition{
+		{
+			Name:           "Super Admin",
+			Slug:           RoleSuperAdmin,
+			Description:    "Akses penuh ke seluruh sistem tanpa assignment modul",
+			IsSystem:       true,
+			HierarchyLevel: 100,
+		},
+		{
+			Name:           "Admin",
+			Slug:           RoleAdmin,
+			Description:    "Akses penuh di modul yang di-assign",
+			IsSystem:       true,
+			HierarchyLevel: 80,
+		},
+		{
+			Name:           "Manager",
+			Slug:           RoleManager,
+			Description:    "Akses managerial di modul yang di-assign",
+			IsSystem:       true,
+			HierarchyLevel: 60,
+		},
+		{
+			Name:           "Staff",
+			Slug:           RoleStaff,
+			Description:    "Akses operasional harian di modul yang di-assign",
+			IsSystem:       true,
+			HierarchyLevel: 40,
+		},
+		{
+			Name:           "Viewer",
+			Slug:           RoleViewer,
+			Description:    "Akses baca di modul yang di-assign",
+			IsSystem:       true,
+			HierarchyLevel: 20,
+		},
 	}
+}
 
-	return roles
+func ReservedRoleSlugs() []string {
+	return []string{
+		RoleSuperAdmin,
+		RoleAdmin,
+		RoleManager,
+		RoleStaff,
+		RoleViewer,
+	}
 }
 
 func DefaultPermissions() []PermissionDefinition {
-	return defaultPermissions
+	return []PermissionDefinition{
+		// Operational
+		{ID: "operational:project:view", ModuleID: ModuleOperational, Resource: "project", Action: "view", Description: "Melihat daftar dan detail project"},
+		{ID: "operational:project:create", ModuleID: ModuleOperational, Resource: "project", Action: "create", Description: "Membuat project baru"},
+		{ID: "operational:project:edit", ModuleID: ModuleOperational, Resource: "project", Action: "edit", Description: "Mengedit project"},
+		{ID: "operational:project:delete", ModuleID: ModuleOperational, Resource: "project", Action: "delete", Description: "Menghapus project"},
+		{ID: "operational:project:manage_members", ModuleID: ModuleOperational, Resource: "project", Action: "manage_members", Description: "Assign dan remove anggota project"},
+		{ID: "operational:task:view", ModuleID: ModuleOperational, Resource: "task", Action: "view", Description: "Melihat task di kanban board"},
+		{ID: "operational:task:create", ModuleID: ModuleOperational, Resource: "task", Action: "create", Description: "Membuat task baru"},
+		{ID: "operational:task:edit", ModuleID: ModuleOperational, Resource: "task", Action: "edit", Description: "Mengedit task"},
+		{ID: "operational:task:delete", ModuleID: ModuleOperational, Resource: "task", Action: "delete", Description: "Menghapus task"},
+		{ID: "operational:task:assign", ModuleID: ModuleOperational, Resource: "task", Action: "assign", Description: "Assign task ke user lain"},
+		{ID: "operational:column:view", ModuleID: ModuleOperational, Resource: "column", Action: "view", Description: "Melihat kolom kanban"},
+		{ID: "operational:column:manage", ModuleID: ModuleOperational, Resource: "column", Action: "manage", Description: "Tambah edit hapus dan reorder kolom kanban"},
+		{ID: "operational:assignment_rule:view", ModuleID: ModuleOperational, Resource: "assignment_rule", Action: "view", Description: "Melihat assignment rules"},
+		{ID: "operational:assignment_rule:manage", ModuleID: ModuleOperational, Resource: "assignment_rule", Action: "manage", Description: "Mengelola assignment rules"},
+		{ID: "operational:tracker:view", ModuleID: ModuleOperational, Resource: "tracker", Action: "view", Description: "Melihat aktivitas tracker sendiri"},
+		{ID: "operational:tracker:view_team", ModuleID: ModuleOperational, Resource: "tracker", Action: "view_team", Description: "Melihat aktivitas tracker seluruh tim", IsSensitive: true},
+		{ID: "operational:tracker:manage_domains", ModuleID: ModuleOperational, Resource: "tracker", Action: "manage_domains", Description: "Mengelola domain categories tracker"},
+		{ID: "operational:wa:view", ModuleID: ModuleOperational, Resource: "wa_broadcast", Action: "view", Description: "Melihat dashboard dan log WA broadcast"},
+		{ID: "operational:wa:manage", ModuleID: ModuleOperational, Resource: "wa_broadcast", Action: "manage", Description: "Mengelola template schedule dan pengiriman WA"},
+
+		// HRIS
+		{ID: "hris:employee:view", ModuleID: ModuleHRIS, Resource: "employee", Action: "view", Description: "Melihat data karyawan"},
+		{ID: "hris:employee:create", ModuleID: ModuleHRIS, Resource: "employee", Action: "create", Description: "Menambah karyawan baru"},
+		{ID: "hris:employee:edit", ModuleID: ModuleHRIS, Resource: "employee", Action: "edit", Description: "Mengedit data karyawan"},
+		{ID: "hris:employee:delete", ModuleID: ModuleHRIS, Resource: "employee", Action: "delete", Description: "Menghapus karyawan"},
+		{ID: "hris:department:view", ModuleID: ModuleHRIS, Resource: "department", Action: "view", Description: "Melihat departemen"},
+		{ID: "hris:department:create", ModuleID: ModuleHRIS, Resource: "department", Action: "create", Description: "Membuat departemen"},
+		{ID: "hris:department:edit", ModuleID: ModuleHRIS, Resource: "department", Action: "edit", Description: "Mengedit departemen"},
+		{ID: "hris:department:delete", ModuleID: ModuleHRIS, Resource: "department", Action: "delete", Description: "Menghapus departemen"},
+		{ID: "hris:salary:view", ModuleID: ModuleHRIS, Resource: "salary", Action: "view", Description: "Melihat data gaji karyawan", IsSensitive: true},
+		{ID: "hris:salary:create", ModuleID: ModuleHRIS, Resource: "salary", Action: "create", Description: "Menginput data gaji", IsSensitive: true},
+		{ID: "hris:bonus:view", ModuleID: ModuleHRIS, Resource: "bonus", Action: "view", Description: "Melihat data bonus", IsSensitive: true},
+		{ID: "hris:bonus:create", ModuleID: ModuleHRIS, Resource: "bonus", Action: "create", Description: "Menginput bonus", IsSensitive: true},
+		{ID: "hris:bonus:edit", ModuleID: ModuleHRIS, Resource: "bonus", Action: "edit", Description: "Mengedit bonus pending", IsSensitive: true},
+		{ID: "hris:bonus:delete", ModuleID: ModuleHRIS, Resource: "bonus", Action: "delete", Description: "Menghapus bonus pending", IsSensitive: true},
+		{ID: "hris:bonus:approve", ModuleID: ModuleHRIS, Resource: "bonus", Action: "approve", Description: "Approve atau reject bonus", IsSensitive: true},
+		{ID: "hris:subscription:view", ModuleID: ModuleHRIS, Resource: "subscription", Action: "view", Description: "Melihat subscription"},
+		{ID: "hris:subscription:create", ModuleID: ModuleHRIS, Resource: "subscription", Action: "create", Description: "Menambah subscription"},
+		{ID: "hris:subscription:edit", ModuleID: ModuleHRIS, Resource: "subscription", Action: "edit", Description: "Mengedit subscription"},
+		{ID: "hris:subscription:delete", ModuleID: ModuleHRIS, Resource: "subscription", Action: "delete", Description: "Menghapus subscription"},
+		{ID: "hris:finance:view", ModuleID: ModuleHRIS, Resource: "finance", Action: "view", Description: "Melihat data keuangan"},
+		{ID: "hris:finance:create", ModuleID: ModuleHRIS, Resource: "finance", Action: "create", Description: "Menginput record keuangan"},
+		{ID: "hris:finance:edit", ModuleID: ModuleHRIS, Resource: "finance", Action: "edit", Description: "Mengedit record keuangan"},
+		{ID: "hris:finance:delete", ModuleID: ModuleHRIS, Resource: "finance", Action: "delete", Description: "Menghapus record keuangan"},
+		{ID: "hris:finance:approve", ModuleID: ModuleHRIS, Resource: "finance", Action: "approve", Description: "Approve atau reject record keuangan"},
+		{ID: "hris:reimbursement:view", ModuleID: ModuleHRIS, Resource: "reimbursement", Action: "view", Description: "Melihat reimbursement milik sendiri"},
+		{ID: "hris:reimbursement:view_all", ModuleID: ModuleHRIS, Resource: "reimbursement", Action: "view_all", Description: "Melihat semua reimbursement", IsSensitive: true},
+		{ID: "hris:reimbursement:create", ModuleID: ModuleHRIS, Resource: "reimbursement", Action: "create", Description: "Mengajukan reimbursement"},
+		{ID: "hris:reimbursement:edit", ModuleID: ModuleHRIS, Resource: "reimbursement", Action: "edit", Description: "Mengedit reimbursement dan upload attachment"},
+		{ID: "hris:reimbursement:approve", ModuleID: ModuleHRIS, Resource: "reimbursement", Action: "approve", Description: "Approve atau reject reimbursement"},
+		{ID: "hris:reimbursement:mark_paid", ModuleID: ModuleHRIS, Resource: "reimbursement", Action: "mark_paid", Description: "Menandai reimbursement sudah dibayar", IsSensitive: true},
+
+		// Marketing
+		{ID: "marketing:campaign:view", ModuleID: ModuleMarketing, Resource: "campaign", Action: "view", Description: "Melihat campaign"},
+		{ID: "marketing:campaign:create", ModuleID: ModuleMarketing, Resource: "campaign", Action: "create", Description: "Membuat campaign"},
+		{ID: "marketing:campaign:edit", ModuleID: ModuleMarketing, Resource: "campaign", Action: "edit", Description: "Mengedit campaign"},
+		{ID: "marketing:campaign:delete", ModuleID: ModuleMarketing, Resource: "campaign", Action: "delete", Description: "Menghapus campaign"},
+		{ID: "marketing:campaign:manage_columns", ModuleID: ModuleMarketing, Resource: "campaign", Action: "manage_columns", Description: "Mengelola kolom kanban campaign"},
+		{ID: "marketing:ads_metrics:view", ModuleID: ModuleMarketing, Resource: "ads_metrics", Action: "view", Description: "Melihat data ads metrics"},
+		{ID: "marketing:ads_metrics:create", ModuleID: ModuleMarketing, Resource: "ads_metrics", Action: "create", Description: "Menginput ads metrics"},
+		{ID: "marketing:ads_metrics:edit", ModuleID: ModuleMarketing, Resource: "ads_metrics", Action: "edit", Description: "Mengedit ads metrics"},
+		{ID: "marketing:ads_metrics:delete", ModuleID: ModuleMarketing, Resource: "ads_metrics", Action: "delete", Description: "Menghapus ads metrics"},
+		{ID: "marketing:leads:view", ModuleID: ModuleMarketing, Resource: "leads", Action: "view", Description: "Melihat leads"},
+		{ID: "marketing:leads:create", ModuleID: ModuleMarketing, Resource: "leads", Action: "create", Description: "Menambah lead"},
+		{ID: "marketing:leads:edit", ModuleID: ModuleMarketing, Resource: "leads", Action: "edit", Description: "Mengedit lead"},
+		{ID: "marketing:leads:delete", ModuleID: ModuleMarketing, Resource: "leads", Action: "delete", Description: "Menghapus lead"},
+		{ID: "marketing:leads:import", ModuleID: ModuleMarketing, Resource: "leads", Action: "import", Description: "Bulk import leads dari CSV"},
+
+		// Admin
+		{ID: "admin:audit_log:view", ModuleID: ModuleAdmin, Resource: "audit_log", Action: "view", Description: "Melihat audit log", IsSensitive: true},
+		{ID: "admin:audit_log:export", ModuleID: ModuleAdmin, Resource: "audit_log", Action: "export", Description: "Export audit log", IsSensitive: true},
+		{ID: "admin:roles:view", ModuleID: ModuleAdmin, Resource: "roles", Action: "view", Description: "Melihat daftar roles"},
+		{ID: "admin:roles:manage", ModuleID: ModuleAdmin, Resource: "roles", Action: "manage", Description: "Membuat mengedit menghapus roles dan permissions", IsSensitive: true},
+		{ID: "admin:users:view", ModuleID: ModuleAdmin, Resource: "users", Action: "view", Description: "Melihat daftar users"},
+		{ID: "admin:users:manage", ModuleID: ModuleAdmin, Resource: "users", Action: "manage", Description: "Assign role dan manage user access", IsSensitive: true},
+		{ID: "admin:settings:view", ModuleID: ModuleAdmin, Resource: "settings", Action: "view", Description: "Melihat system settings"},
+		{ID: "admin:settings:manage", ModuleID: ModuleAdmin, Resource: "settings", Action: "manage", Description: "Mengubah system settings", IsSensitive: true},
+	}
 }
 
-func DefaultRolesForNewUser(existingUsers int64) []RoleKey {
-	if existingUsers == 0 {
-		return []RoleKey{{Name: "super_admin"}}
-	}
+func SystemRolePermissionIDs(roleSlug string) []string {
+	allPermissions := DefaultPermissions()
+	result := make([]string, 0, len(allPermissions))
 
-	return []RoleKey{
-		{Name: "viewer", Module: "operational"},
-		{Name: "viewer", Module: "hris"},
-		{Name: "viewer", Module: "marketing"},
-	}
-}
-
-func PermissionNamesForRole(role RoleDefinition) []string {
-	if role.Name == "super_admin" {
-		names := make([]string, 0, len(defaultPermissions))
-		for _, permission := range defaultPermissions {
-			names = append(names, permission.Name)
-		}
-
-		return names
-	}
-
-	modulePermissions := make([]PermissionDefinition, 0)
-	for _, permission := range defaultPermissions {
-		if permission.Module == role.Module {
-			modulePermissions = append(modulePermissions, permission)
-		}
-	}
-
-	names := make([]string, 0)
-	for _, permission := range modulePermissions {
-		switch role.Name {
-		case "admin":
-			names = append(names, permission.Name)
-		case "manager":
-			if permission.Action == "view" || permission.Action == "approve" || permission.Action == "view_team" || managerCanManage(permission) || managerCanEdit(permission) || managerCanCreate(permission) {
-				names = append(names, permission.Name)
+	for _, permission := range allPermissions {
+		switch roleSlug {
+		case RoleAdmin:
+			result = append(result, permission.ID)
+		case RoleManager:
+			if managerCanAccess(permission) {
+				result = append(result, permission.ID)
 			}
-		case "staff":
+		case RoleStaff:
 			if staffCanAccess(permission) {
-				names = append(names, permission.Name)
+				result = append(result, permission.ID)
 			}
-		case "viewer":
+		case RoleViewer:
 			if viewerCanAccess(permission) {
-				names = append(names, permission.Name)
+				result = append(result, permission.ID)
 			}
 		}
 	}
 
-	return names
+	sort.Strings(result)
+	return result
 }
 
-func managerCanManage(permission PermissionDefinition) bool {
-	if permission.Action != "manage" {
+func managerCanAccess(permission PermissionDefinition) bool {
+	if permission.ModuleID == ModuleAdmin {
+		switch permission.ID {
+		case "admin:roles:manage", "admin:users:manage", "admin:settings:manage":
+			return false
+		default:
+			return permission.Action == "view"
+		}
+	}
+
+	if permission.Action == "delete" {
 		return false
 	}
 
-	return permission.Module == "operational" && permission.Resource == "wa"
-}
-
-func managerCanEdit(permission PermissionDefinition) bool {
-	if permission.Action != "edit" {
+	if permission.ID == "marketing:campaign:manage_columns" || permission.ID == "operational:column:manage" {
 		return false
 	}
 
-	if permission.Module == "hris" && permission.Resource == "salary" {
-		return true
+	if permission.ID == "hris:reimbursement:mark_paid" {
+		return false
 	}
 
 	return true
 }
 
-func managerCanCreate(permission PermissionDefinition) bool {
-	if permission.Action != "create" {
-		return false
-	}
-
-	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus" || permission.Resource == "reimbursement") {
-		return true
-	}
-
-	return false
-}
-
 func staffCanAccess(permission PermissionDefinition) bool {
-	// Staff cannot access salary or bonus
-	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus") {
-		return false
+	if permission.ModuleID == ModuleAdmin {
+		return permission.Action == "view"
 	}
 
-	// Staff cannot access finance (admin/manager only)
-	if permission.Module == "hris" && permission.Resource == "finance" {
-		return false
-	}
-
-	// Staff cannot manage WA broadcast (admin/manager only)
-	if permission.Resource == "wa" && permission.Action == "manage" {
+	if permission.IsSensitive {
 		return false
 	}
 
 	switch permission.Action {
 	case "view", "create", "edit":
 		return true
+	case "assign":
+		return permission.ID == "operational:task:assign"
 	default:
 		return false
 	}
 }
 
 func viewerCanAccess(permission PermissionDefinition) bool {
-	// Viewers cannot access salary, bonus, or finance at all
-	if permission.Module == "hris" && (permission.Resource == "salary" || permission.Resource == "bonus" || permission.Resource == "finance") {
+	if permission.IsSensitive {
 		return false
-	}
-
-	// Viewers cannot access WA broadcast
-	if permission.Resource == "wa" {
-		return false
-	}
-
-	// Viewers cannot access subscriptions
-	if permission.Module == "hris" && permission.Resource == "subscription" {
-		return false
-	}
-
-	// Viewers can view and create reimbursements (self-service request)
-	if permission.Module == "hris" && permission.Resource == "reimbursement" {
-		return permission.Action == "view" || permission.Action == "create"
 	}
 
 	return permission.Action == "view"

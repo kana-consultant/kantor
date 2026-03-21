@@ -64,9 +64,10 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"user":        result.User,
-		"roles":       result.Roles,
-		"permissions": result.Permissions,
+		"user":           result.User,
+		"module_roles":   result.ModuleRoles,
+		"permissions":    result.Permissions,
+		"is_super_admin": result.IsSuperAdmin,
 	}, nil)
 }
 
@@ -106,10 +107,11 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 
 	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
 	response.WriteJSON(w, http.StatusCreated, dto.AuthResponse{
-		User:        result.User,
-		Roles:       result.Roles,
-		Permissions: result.Permissions,
-		Tokens:      result.Tokens,
+		User:         result.User,
+		ModuleRoles:  result.ModuleRoles,
+		Permissions:  result.Permissions,
+		IsSuperAdmin: result.IsSuperAdmin,
+		Tokens:       result.Tokens,
 	}, nil)
 }
 
@@ -127,10 +129,11 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
-		User:        result.User,
-		Roles:       result.Roles,
-		Permissions: result.Permissions,
-		Tokens:      result.Tokens,
+		User:         result.User,
+		ModuleRoles:  result.ModuleRoles,
+		Permissions:  result.Permissions,
+		IsSuperAdmin: result.IsSuperAdmin,
+		Tokens:       result.Tokens,
 	}, nil)
 }
 
@@ -149,10 +152,11 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 
 	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
-		User:        result.User,
-		Roles:       result.Roles,
-		Permissions: result.Permissions,
-		Tokens:      result.Tokens,
+		User:         result.User,
+		ModuleRoles:  result.ModuleRoles,
+		Permissions:  result.Permissions,
+		IsSuperAdmin: result.IsSuperAdmin,
+		Tokens:       result.Tokens,
 	}, nil)
 }
 

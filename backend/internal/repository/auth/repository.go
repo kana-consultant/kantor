@@ -62,8 +62,8 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 	}()
 
 	query := `
-		INSERT INTO users (email, password_hash, full_name, department, skills, is_active)
-		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]), TRUE)
+		INSERT INTO users (email, password_hash, full_name, department, skills, is_active, is_super_admin)
+		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]), TRUE, FALSE)
 		ON CONFLICT (email)
 		DO UPDATE SET
 			password_hash = EXCLUDED.password_hash,
@@ -72,7 +72,7 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 			skills = EXCLUDED.skills,
 			is_active = TRUE,
 			updated_at = NOW()
-		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
+		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
 	`
 
 	var user model.User
@@ -85,6 +85,7 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.IsSuperAdmin,
 		&user.FailedLoginAttempts,
 		&user.LockedUntil,
 		&user.CreatedAt,
@@ -98,7 +99,7 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 		return model.User{}, err
 	}
 
-	if err = r.ensureEmployeeForUser(ctx, tx, user); err != nil {
+	if err = r.ensureEmployeeForUserForNewAccount(ctx, tx, user); err != nil {
 		return model.User{}, err
 	}
 
@@ -123,9 +124,9 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 	}()
 
 	query := `
-		INSERT INTO users (email, password_hash, full_name, department, skills)
-		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]))
-		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
+		INSERT INTO users (email, password_hash, full_name, department, skills, is_super_admin)
+		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]), FALSE)
+		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
 	`
 
 	var user model.User
@@ -138,6 +139,7 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.IsSuperAdmin,
 		&user.FailedLoginAttempts,
 		&user.LockedUntil,
 		&user.CreatedAt,
@@ -152,7 +154,7 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 	}
 
 	// Auto-create or link employee record
-	if err = r.ensureEmployeeForUser(ctx, tx, user); err != nil {
+	if err = r.ensureEmployeeForUserForNewAccount(ctx, tx, user); err != nil {
 		return model.User{}, err
 	}
 
@@ -167,7 +169,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
+		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -182,6 +184,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.IsSuperAdmin,
 		&user.FailedLoginAttempts,
 		&user.LockedUntil,
 		&user.CreatedAt,
@@ -202,7 +205,7 @@ func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, failed_login_attempts, locked_until, created_at, updated_at
+		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -217,6 +220,7 @@ func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User
 		&user.Department,
 		&user.Skills,
 		&user.IsActive,
+		&user.IsSuperAdmin,
 		&user.FailedLoginAttempts,
 		&user.LockedUntil,
 		&user.CreatedAt,
@@ -236,15 +240,39 @@ func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User
 func (r *Repository) GetUserRolesAndPermissions(ctx context.Context, userID string) ([]string, []string, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
+	var isSuperAdmin bool
+	if err := r.db.QueryRow(ctx, `SELECT is_super_admin FROM users WHERE id = $1::uuid`, userID).Scan(&isSuperAdmin); err != nil {
+		return nil, nil, err
+	}
+
+	if isSuperAdmin {
+		permissionRows, err := r.db.Query(ctx, `SELECT id FROM permissions ORDER BY id`)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer permissionRows.Close()
+
+		permissions := make([]string, 0)
+		for permissionRows.Next() {
+			var permission string
+			if err := permissionRows.Scan(&permission); err != nil {
+				return nil, nil, err
+			}
+			permissions = append(permissions, permission)
+		}
+		if err := permissionRows.Err(); err != nil {
+			return nil, nil, err
+		}
+
+		return []string{"super_admin"}, permissions, nil
+	}
+
 	rolesQuery := `
 		SELECT DISTINCT
-			CASE
-				WHEN roles.module IS NULL OR roles.module = '' THEN roles.name
-				ELSE roles.name || ':' || roles.module
-			END AS role_key
-		FROM user_roles
-		INNER JOIN roles ON roles.id = user_roles.role_id
-		WHERE user_roles.user_id = $1
+			roles.slug || ':' || user_module_roles.module_id AS role_key
+		FROM user_module_roles
+		INNER JOIN roles ON roles.id = user_module_roles.role_id
+		WHERE user_module_roles.user_id = $1
 		ORDER BY role_key
 	`
 
@@ -268,12 +296,15 @@ func (r *Repository) GetUserRolesAndPermissions(ctx context.Context, userID stri
 	}
 
 	permissionsQuery := `
-		SELECT DISTINCT permissions.name
-		FROM user_roles
-		INNER JOIN role_permissions ON role_permissions.role_id = user_roles.role_id
+		SELECT DISTINCT permissions.id
+		FROM user_module_roles
+		INNER JOIN roles ON roles.id = user_module_roles.role_id
+		INNER JOIN role_permissions ON role_permissions.role_id = roles.id
 		INNER JOIN permissions ON permissions.id = role_permissions.permission_id
-		WHERE user_roles.user_id = $1
-		ORDER BY permissions.name
+		WHERE user_module_roles.user_id = $1
+			AND roles.is_active = TRUE
+			AND permissions.module_id = user_module_roles.module_id
+		ORDER BY permissions.id
 	`
 
 	permissionRows, err := r.db.Query(ctx, permissionsQuery, userID)
@@ -496,13 +527,77 @@ func (r *Repository) ListUserIDsByRole(ctx context.Context, roleName string, mod
 	query := `
 		SELECT DISTINCT users.id::text
 		FROM users
-		INNER JOIN user_roles ON user_roles.user_id = users.id
-		INNER JOIN roles ON roles.id = user_roles.role_id
-		WHERE roles.name = $1 AND COALESCE(roles.module, '') = $2
+		INNER JOIN user_module_roles ON user_module_roles.user_id = users.id
+		INNER JOIN roles ON roles.id = user_module_roles.role_id
+		WHERE roles.slug = $1 AND user_module_roles.module_id = $2
 		ORDER BY users.id::text
 	`
 
+	if roleName == "super_admin" {
+		query = `
+			SELECT DISTINCT id::text
+			FROM users
+			WHERE is_super_admin = TRUE
+			ORDER BY id::text
+		`
+		rows, err := r.db.Query(ctx, query)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		items := make([]string, 0)
+		for rows.Next() {
+			var userID string
+			if err := rows.Scan(&userID); err != nil {
+				return nil, err
+			}
+			items = append(items, userID)
+		}
+
+		return items, rows.Err()
+	}
+
 	rows, err := r.db.Query(ctx, query, roleName, module)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]string, 0)
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		items = append(items, userID)
+	}
+
+	return items, rows.Err()
+}
+
+func (r *Repository) ListUserIDsByPermission(ctx context.Context, permissionID string) ([]string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT users.id::text
+		FROM users
+		LEFT JOIN user_module_roles ON user_module_roles.user_id = users.id
+		LEFT JOIN roles ON roles.id = user_module_roles.role_id
+		LEFT JOIN role_permissions ON role_permissions.role_id = roles.id
+		LEFT JOIN permissions ON permissions.id = role_permissions.permission_id
+		WHERE users.is_active = TRUE
+			AND (
+				users.is_super_admin = TRUE
+				OR (
+					roles.is_active = TRUE
+					AND role_permissions.permission_id = $1
+					AND permissions.module_id = user_module_roles.module_id
+				)
+			)
+		ORDER BY users.id::text
+	`, permissionID)
 	if err != nil {
 		return nil, err
 	}
@@ -526,13 +621,39 @@ func (r *Repository) ListUserIDsByRoleAndDepartment(ctx context.Context, roleNam
 	query := `
 		SELECT DISTINCT users.id::text
 		FROM users
-		INNER JOIN user_roles ON user_roles.user_id = users.id
-		INNER JOIN roles ON roles.id = user_roles.role_id
-		WHERE roles.name = $1
-			AND COALESCE(roles.module, '') = $2
+		INNER JOIN user_module_roles ON user_module_roles.user_id = users.id
+		INNER JOIN roles ON roles.id = user_module_roles.role_id
+		WHERE roles.slug = $1
+			AND user_module_roles.module_id = $2
 			AND COALESCE(users.department, '') = $3
 		ORDER BY users.id::text
 	`
+
+	if roleName == "super_admin" {
+		query = `
+			SELECT DISTINCT id::text
+			FROM users
+			WHERE is_super_admin = TRUE
+				AND COALESCE(department, '') = $1
+			ORDER BY id::text
+		`
+		rows, err := r.db.Query(ctx, query, department)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		items := make([]string, 0)
+		for rows.Next() {
+			var userID string
+			if err := rows.Scan(&userID); err != nil {
+				return nil, err
+			}
+			items = append(items, userID)
+		}
+
+		return items, rows.Err()
+	}
 
 	rows, err := r.db.Query(ctx, query, roleName, module, department)
 	if err != nil {
@@ -553,6 +674,10 @@ func (r *Repository) ListUserIDsByRoleAndDepartment(ctx context.Context, roleNam
 }
 
 func (r *Repository) assignRoleKeys(ctx context.Context, tx pgx.Tx, userID string, roles []rbac.RoleKey) error {
+	if _, err := tx.Exec(ctx, `UPDATE users SET is_super_admin = FALSE, updated_at = NOW() WHERE id = $1::uuid`, userID); err != nil {
+		return err
+	}
+
 	if len(roles) == 0 {
 		return nil
 	}
@@ -560,25 +685,37 @@ func (r *Repository) assignRoleKeys(ctx context.Context, tx pgx.Tx, userID strin
 	selectRoleQuery := `
 		SELECT id::text
 		FROM roles
-		WHERE name = $1 AND COALESCE(module, '') = $2
+		WHERE slug = $1
 	`
 	insertAssignmentQuery := `
-		INSERT INTO user_roles (user_id, role_id)
-		VALUES ($1, $2::uuid)
-		ON CONFLICT DO NOTHING
+		INSERT INTO user_module_roles (user_id, module_id, role_id)
+		VALUES ($1::uuid, $2, $3::uuid)
+		ON CONFLICT (user_id, module_id)
+		DO UPDATE SET role_id = EXCLUDED.role_id, assigned_at = NOW()
 	`
 
 	for _, role := range roles {
+		if role.Name == rbac.RoleSuperAdmin {
+			if _, err := tx.Exec(ctx, `UPDATE users SET is_super_admin = TRUE, updated_at = NOW() WHERE id = $1::uuid`, userID); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if strings.TrimSpace(role.Module) == "" {
+			return fmt.Errorf("module assignment is required for role %s", role.Name)
+		}
+
 		var roleID string
-		if err := tx.QueryRow(ctx, selectRoleQuery, role.Name, role.Module).Scan(&roleID); err != nil {
+		if err := tx.QueryRow(ctx, selectRoleQuery, role.Name).Scan(&roleID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("role %s:%s is not seeded", role.Name, role.Module)
+				return fmt.Errorf("role slug %s is not seeded", role.Name)
 			}
 
 			return err
 		}
 
-		if _, err := tx.Exec(ctx, insertAssignmentQuery, userID, roleID); err != nil {
+		if _, err := tx.Exec(ctx, insertAssignmentQuery, userID, role.Module, roleID); err != nil {
 			return err
 		}
 	}
@@ -626,8 +763,9 @@ type ListUsersParams struct {
 }
 
 type UserWithRoles struct {
-	User  model.User `json:"user"`
-	Roles []string   `json:"roles"`
+	User        model.User `json:"user"`
+	Roles       []string   `json:"roles"`
+	Permissions []string   `json:"permissions,omitempty"`
 }
 
 func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]UserWithRoles, int64, error) {
@@ -659,7 +797,7 @@ func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]U
 
 	offset := (page - 1) * perPage
 	listQuery := fmt.Sprintf(`
-		SELECT u.id::text, u.email, u.password_hash, u.full_name, u.avatar_url, u.department, u.skills, u.is_active, u.created_at, u.updated_at
+		SELECT u.id::text, u.email, u.password_hash, u.full_name, u.avatar_url, u.department, u.skills, u.is_active, u.is_super_admin, u.created_at, u.updated_at
 		FROM users u
 		WHERE %s
 		ORDER BY u.created_at DESC
@@ -676,7 +814,7 @@ func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]U
 	result := make([]UserWithRoles, 0)
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.Department, &u.Skills, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.Department, &u.Skills, &u.IsActive, &u.IsSuperAdmin, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		result = append(result, UserWithRoles{User: u})
@@ -719,7 +857,7 @@ func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roles 
 		}
 	}()
 
-	if _, err = tx.Exec(ctx, `DELETE FROM user_roles WHERE user_id = $1::uuid`, userID); err != nil {
+	if _, err = tx.Exec(ctx, `DELETE FROM user_module_roles WHERE user_id = $1::uuid`, userID); err != nil {
 		return err
 	}
 

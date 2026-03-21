@@ -13,7 +13,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
   adsMetricsKeys,
   getAdsMetricsSummary,
@@ -25,6 +25,7 @@ const chartColors = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#ca8a04", "#0f
 
 export const Route = createFileRoute("/_authenticated/marketing/dashboard")({
   beforeLoad: async () => {
+    await ensureModuleAccess("marketing");
     await ensurePermission(permissions.marketingOverview);
   },
   component: MarketingDashboardPage,

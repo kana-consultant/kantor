@@ -23,7 +23,7 @@ import { useThemeStore } from "@/stores/theme-store";
 export function Topbar() {
   const queryClient = useQueryClient();
   const { breadcrumb } = useModuleTheme();
-  const { user, roles } = useAuth();
+  const { user, roleLabels, roleSummary } = useAuth();
   const mode = useThemeStore((state) => state.mode);
   const toggleTheme = useThemeStore((state) => state.toggleMode);
   const { isDesktopCollapsed, toggleDesktopCollapsed, toggleMobileOpen } = useSidebarStore();
@@ -216,7 +216,7 @@ export function Topbar() {
             </div>
             <div className="hidden text-left md:block">
               <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
-              <p className="text-xs text-text-secondary">{roles[0] ?? "viewer"}</p>
+              <p className="text-xs text-text-secondary">{roleSummary}</p>
             </div>
             <ChevronDown className="hidden h-4 w-4 text-text-secondary md:block" />
           </button>
@@ -226,6 +226,18 @@ export function Topbar() {
               <div className="border-b border-border px-4 py-4">
                 <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
                 <p className="mt-1 text-xs text-text-secondary">{user?.email ?? "guest@kantor.local"}</p>
+                {roleLabels.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {roleLabels.map((label) => (
+                      <span
+                        className="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-text-secondary"
+                        key={label}
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <div className="border-b border-border px-4 py-3">
                 <div className="flex items-center gap-2 text-xs text-text-secondary mb-2">

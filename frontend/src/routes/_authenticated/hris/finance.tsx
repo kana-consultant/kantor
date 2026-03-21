@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { formatIDR } from "@/lib/currency";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
   createFinanceCategory,
   createFinanceRecord,
@@ -83,6 +83,7 @@ const pieColors = ["#36B37E", "#FF5630", "#0065FF", "#6554C0", "#FF8B00", "#00B8
 
 export const Route = createFileRoute("/_authenticated/hris/finance")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisFinanceView);
   },
   component: FinancePage,

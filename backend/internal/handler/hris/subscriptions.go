@@ -26,14 +26,14 @@ func NewSubscriptionsHandler(service *hrisservice.SubscriptionsService) *Subscri
 }
 
 func (h *SubscriptionsHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:create")).Post("/", h.createSubscription)
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:view")).Get("/", h.listSubscriptions)
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:view")).Get("/summary", h.summary)
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:view")).Get("/alerts", h.listAlerts)
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:view")).Get("/{subscriptionID}", h.getSubscription)
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:edit")).Put("/{subscriptionID}", h.updateSubscription)
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:delete")).Delete("/{subscriptionID}", h.deleteSubscription)
-	router.With(platformmiddleware.RBACMiddleware("hris:subscription:view")).Patch("/alerts/{alertID}/read", h.markAlertRead)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:create")).Post("/", h.createSubscription)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/", h.listSubscriptions)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/summary", h.summary)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/alerts", h.listAlerts)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/{subscriptionID}", h.getSubscription)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:edit")).Put("/{subscriptionID}", h.updateSubscription)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:delete")).Delete("/{subscriptionID}", h.deleteSubscription)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Patch("/alerts/{alertID}/read", h.markAlertRead)
 }
 
 func (h *SubscriptionsHandler) createSubscription(w http.ResponseWriter, r *http.Request) {

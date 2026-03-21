@@ -32,7 +32,7 @@ import {
 } from "@/lib/marketing";
 import { formatIDR } from "@/lib/currency";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { getProtectedFileName, openProtectedFile } from "@/services/files";
 import {
   adsMetricsKeys,
@@ -82,6 +82,7 @@ const defaultFilters: CampaignFilters = {
 export const Route = createFileRoute("/_authenticated/marketing/campaigns")({
   validateSearch: searchSchema,
   beforeLoad: async () => {
+    await ensureModuleAccess("marketing");
     await ensurePermission(permissions.marketingCampaignView);
   },
   component: MarketingCampaignsPage,

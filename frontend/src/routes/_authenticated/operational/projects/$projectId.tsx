@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
   deleteProject,
   getProject,
@@ -32,6 +32,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authenticated/operational/projects/$projectId")({
   validateSearch: searchSchema,
   beforeLoad: async () => {
+    await ensureModuleAccess("operational");
     await ensurePermission(permissions.operationalProjectView);
   },
   component: ProjectWorkspacePage,
@@ -261,7 +262,7 @@ function ProjectWorkspacePage() {
                 You do not have permission to view this board.
               </Card>
             }
-            permission={permissions.operationalKanbanView}
+            permission={permissions.operationalTaskView}
           >
             <KanbanBoard members={members} projectId={projectId} />
           </PermissionGate>

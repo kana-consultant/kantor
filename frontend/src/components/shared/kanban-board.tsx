@@ -370,7 +370,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
               </p>
             </div>
 
-            <PermissionGate permission={permissions.operationalKanbanCreate}>
+            <PermissionGate permission={permissions.operationalColumnManage}>
               <div className="flex w-full flex-col items-stretch gap-3 xl:w-auto xl:items-end">
                 <Button
                   variant="ops"
@@ -805,12 +805,12 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
             </div>
           </div>
 
-          <PermissionGate permission={permissions.operationalKanbanEdit}>
+          <PermissionGate permission={permissions.operationalColumnManage}>
             <div className="flex gap-2">
               <Button onClick={props.onEditColumn} size="sm" variant="secondary" className="h-7 px-2 text-[11px]">
                 Edit
               </Button>
-              <PermissionGate permission={permissions.operationalKanbanDelete}>
+              <PermissionGate permission={permissions.operationalColumnManage}>
                 <Button onClick={props.onDeleteColumn} size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
                    Delete
                 </Button>
@@ -837,7 +837,7 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
           ) : null}
         </div>
 
-        <PermissionGate permission={permissions.operationalKanbanCreate}>
+        <PermissionGate permission={permissions.operationalTaskCreate}>
           <div className="mt-4 rounded-[12px] border border-border bg-background p-3 space-y-3">
             <Input
               className="focus-visible:border-ops focus-visible:ring-ops/10"
@@ -1066,7 +1066,7 @@ function TaskModal({
               {isSubmitting ? "Saving..." : mode === "create" ? "Create task" : "Save changes"}
             </Button>
             {mode === "edit" ? (
-              <PermissionGate permission={permissions.operationalKanbanDelete}>
+              <PermissionGate permission={permissions.operationalTaskDelete}>
                 <Button disabled={isDeleting} onClick={onDelete} type="button" variant="ghost">
                   {isDeleting ? "Deleting..." : "Delete task"}
                 </Button>

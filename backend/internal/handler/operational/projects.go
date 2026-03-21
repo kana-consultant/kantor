@@ -31,13 +31,13 @@ func NewProjectsHandler(service *operationalservice.ProjectsService, repo *opera
 }
 
 func (h *ProjectsHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("operational:project:create")).Post("/", h.createProject)
-	router.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/", h.listProjects)
-	router.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/available-users", h.listAvailableUsers)
-	router.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/{projectID}", h.getProject)
-	router.With(platformmiddleware.RBACMiddleware("operational:project:edit")).Put("/{projectID}", h.updateProject)
-	router.With(platformmiddleware.RBACMiddleware("operational:project:delete")).Delete("/{projectID}", h.deleteProject)
-	router.With(platformmiddleware.RBACMiddleware("operational:project:edit")).Post("/{projectID}/members", h.mutateMembers)
+	router.With(platformmiddleware.RequirePermission("operational:project:create")).Post("/", h.createProject)
+	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/", h.listProjects)
+	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/available-users", h.listAvailableUsers)
+	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/{projectID}", h.getProject)
+	router.With(platformmiddleware.RequirePermission("operational:project:edit")).Put("/{projectID}", h.updateProject)
+	router.With(platformmiddleware.RequirePermission("operational:project:delete")).Delete("/{projectID}", h.deleteProject)
+	router.With(platformmiddleware.RequirePermission("operational:project:manage_members")).Post("/{projectID}/members", h.mutateMembers)
 }
 
 func (h *ProjectsHandler) createProject(w http.ResponseWriter, r *http.Request) {

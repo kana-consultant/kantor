@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
 
 function ProfilePage() {
   const queryClient = useQueryClient();
-  const { user, roles } = useAuth();
+  const { user, roleLabels, roleSummary } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
 
   const profileQuery = useQuery({
@@ -162,7 +162,7 @@ function ProfilePage() {
       {/* Info grid */}
       <div className="grid gap-4 md:grid-cols-2">
         <InfoCard icon={Mail} label="Email" value={user?.email ?? "-"} />
-        <InfoCard icon={Shield} label="Role" value={roles.join(", ") || "-"} />
+        <InfoCard icon={Shield} label="Role" value={roleLabels.join(", ") || roleSummary || "-"} />
         <InfoCard
           icon={Phone}
           label="Telepon"

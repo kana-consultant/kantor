@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   Outlet,
   createFileRoute,
@@ -9,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { ensureAuthenticated } from "@/services/auth";
+import { fetchSessionProfile } from "@/services/foundation";
+import { useAuthStore } from "@/stores/auth-store";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -25,6 +28,38 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
+  const session = useAuthStore((state) => state.session);
+  const setSession = useAuthStore((state) => state.setSession);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    let active = true;
+    void fetchSessionProfile()
+      .then((profile) => {
+        if (!active) {
+          return;
+        }
+
+        setSession({
+          ...session,
+          user: profile.user,
+          module_roles: profile.module_roles,
+          permissions: profile.permissions,
+          is_super_admin: profile.is_super_admin,
+        });
+      })
+      .catch(() => {
+        // Route guards already handle auth loss; ignore profile sync errors here.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session?.tokens.access_token, setSession]);
+
   return (
     <PageShell>
       <Outlet />

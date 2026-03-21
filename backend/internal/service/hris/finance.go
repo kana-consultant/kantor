@@ -9,6 +9,7 @@ import (
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 )
 
@@ -16,6 +17,7 @@ var (
 	ErrFinanceCategoryNotFound = errors.New("finance category not found")
 	ErrFinanceRecordNotFound   = errors.New("finance record not found")
 	ErrFinanceCategoryExists   = errors.New("finance category already exists")
+	ErrFinanceForbidden        = errors.New("finance record access is forbidden")
 )
 
 type financeRepository interface {
@@ -66,18 +68,19 @@ func (s *FinanceService) DeleteCategory(ctx context.Context, categoryID string) 
 	return mapFinanceServiceError(s.repo.DeleteCategory(ctx, categoryID))
 }
 
-func (s *FinanceService) CreateRecord(ctx context.Context, request hrisdto.CreateFinanceRecordRequest) (model.FinanceRecord, error) {
+func (s *FinanceService) CreateRecord(ctx context.Context, request hrisdto.CreateFinanceRecordRequest, actorID string) (model.FinanceRecord, error) {
 	item, err := s.repo.CreateRecord(ctx, hrisrepo.UpsertFinanceRecordParams{
 		CategoryID:  strings.TrimSpace(request.CategoryID),
 		Type:        strings.TrimSpace(request.Type),
 		Amount:      request.Amount,
 		Description: strings.TrimSpace(request.Description),
 		RecordDate:  request.RecordDate,
+		SubmittedBy: actorID,
 	})
 	return item, mapFinanceServiceError(err)
 }
 
-func (s *FinanceService) ListRecords(ctx context.Context, query hrisdto.ListFinanceRecordsQuery) ([]model.FinanceRecord, int64, int, int, error) {
+func (s *FinanceService) ListRecords(ctx context.Context, query hrisdto.ListFinanceRecordsQuery, actorID string, perms *rbac.CachedPermissions) ([]model.FinanceRecord, int64, int, int, error) {
 	page := query.Page
 	if page < 1 {
 		page = 1
@@ -87,38 +90,67 @@ func (s *FinanceService) ListRecords(ctx context.Context, query hrisdto.ListFina
 		perPage = 20
 	}
 	items, total, err := s.repo.ListRecords(ctx, hrisrepo.ListFinanceRecordsParams{
-		Page:       page,
-		PerPage:    perPage,
-		Type:       strings.TrimSpace(query.Type),
-		CategoryID: strings.TrimSpace(query.CategoryID),
-		Month:      query.Month,
-		Year:       query.Year,
-		Status:     strings.TrimSpace(query.Status),
+		Page:        page,
+		PerPage:     perPage,
+		Type:        strings.TrimSpace(query.Type),
+		CategoryID:  strings.TrimSpace(query.CategoryID),
+		Month:       query.Month,
+		Year:        query.Year,
+		Status:      strings.TrimSpace(query.Status),
+		SubmittedBy: restrictFinanceSubmittedBy(actorID, perms),
 	})
 	return items, total, page, perPage, err
 }
 
-func (s *FinanceService) GetRecord(ctx context.Context, recordID string) (model.FinanceRecord, error) {
+func (s *FinanceService) GetRecord(ctx context.Context, recordID string, actorID string, perms *rbac.CachedPermissions) (model.FinanceRecord, error) {
 	item, err := s.repo.GetRecordByID(ctx, recordID)
-	return item, mapFinanceServiceError(err)
+	if err != nil {
+		return item, mapFinanceServiceError(err)
+	}
+	if !canViewAllFinance(perms) && strings.TrimSpace(optionalString(item.SubmittedBy)) != strings.TrimSpace(actorID) {
+		return model.FinanceRecord{}, ErrFinanceForbidden
+	}
+	return item, nil
 }
 
-func (s *FinanceService) UpdateRecord(ctx context.Context, recordID string, request hrisdto.UpdateFinanceRecordRequest) (model.FinanceRecord, error) {
+func (s *FinanceService) UpdateRecord(ctx context.Context, recordID string, request hrisdto.UpdateFinanceRecordRequest, actorID string, perms *rbac.CachedPermissions) (model.FinanceRecord, error) {
+	current, err := s.repo.GetRecordByID(ctx, recordID)
+	if err != nil {
+		return model.FinanceRecord{}, mapFinanceServiceError(err)
+	}
+	if !canViewAllFinance(perms) && strings.TrimSpace(optionalString(current.SubmittedBy)) != strings.TrimSpace(actorID) {
+		return model.FinanceRecord{}, ErrFinanceForbidden
+	}
 	item, err := s.repo.UpdateRecord(ctx, recordID, hrisrepo.UpsertFinanceRecordParams{
 		CategoryID:  strings.TrimSpace(request.CategoryID),
 		Type:        strings.TrimSpace(request.Type),
 		Amount:      request.Amount,
 		Description: strings.TrimSpace(request.Description),
 		RecordDate:  request.RecordDate,
+		SubmittedBy: optionalString(current.SubmittedBy),
 	})
 	return item, mapFinanceServiceError(err)
 }
 
-func (s *FinanceService) DeleteRecord(ctx context.Context, recordID string) error {
+func (s *FinanceService) DeleteRecord(ctx context.Context, recordID string, actorID string, perms *rbac.CachedPermissions) error {
+	current, err := s.repo.GetRecordByID(ctx, recordID)
+	if err != nil {
+		return mapFinanceServiceError(err)
+	}
+	if !canViewAllFinance(perms) && strings.TrimSpace(optionalString(current.SubmittedBy)) != strings.TrimSpace(actorID) {
+		return ErrFinanceForbidden
+	}
 	return mapFinanceServiceError(s.repo.DeleteRecord(ctx, recordID))
 }
 
-func (s *FinanceService) SubmitRecord(ctx context.Context, recordID string, actorID string) (model.FinanceRecord, error) {
+func (s *FinanceService) SubmitRecord(ctx context.Context, recordID string, actorID string, perms *rbac.CachedPermissions) (model.FinanceRecord, error) {
+	current, err := s.repo.GetRecordByID(ctx, recordID)
+	if err != nil {
+		return model.FinanceRecord{}, mapFinanceServiceError(err)
+	}
+	if !canViewAllFinance(perms) && strings.TrimSpace(optionalString(current.SubmittedBy)) != strings.TrimSpace(actorID) {
+		return model.FinanceRecord{}, ErrFinanceForbidden
+	}
 	item, err := s.repo.SubmitRecord(ctx, recordID, actorID)
 	return item, mapFinanceServiceError(err)
 }
@@ -174,4 +206,22 @@ func mapFinanceServiceError(err error) error {
 	default:
 		return err
 	}
+}
+
+func canViewAllFinance(perms *rbac.CachedPermissions) bool {
+	return rbac.CanViewAll(perms, "hris:finance:approve")
+}
+
+func restrictFinanceSubmittedBy(actorID string, perms *rbac.CachedPermissions) string {
+	if canViewAllFinance(perms) {
+		return ""
+	}
+	return strings.TrimSpace(actorID)
+}
+
+func optionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }

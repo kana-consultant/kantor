@@ -36,16 +36,18 @@ type UpsertFinanceRecordParams struct {
 	Amount      int64
 	Description string
 	RecordDate  time.Time
+	SubmittedBy string
 }
 
 type ListFinanceRecordsParams struct {
-	Page       int
-	PerPage    int
-	Type       string
-	CategoryID string
-	Month      int
-	Year       int
-	Status     string
+	Page        int
+	PerPage     int
+	Type        string
+	CategoryID  string
+	Month       int
+	Year        int
+	Status      string
+	SubmittedBy string
 }
 
 type ListFinanceExportParams struct {
@@ -153,11 +155,11 @@ func (r *FinanceRepository) CreateRecord(ctx context.Context, params UpsertFinan
 	defer cancel()
 
 	query := `
-		INSERT INTO finance_records (category_id, type, amount, description, record_date, record_month, record_year)
-		VALUES ($1::uuid, $2, $3, $4, $5::date, EXTRACT(MONTH FROM $5::date)::int, EXTRACT(YEAR FROM $5::date)::int)
+		INSERT INTO finance_records (category_id, type, amount, description, record_date, record_month, record_year, submitted_by)
+		VALUES ($1::uuid, $2, $3, $4, $5::date, EXTRACT(MONTH FROM $5::date)::int, EXTRACT(YEAR FROM $5::date)::int, NULLIF($6, '')::uuid)
 		RETURNING id::text, category_id::text, type, amount, description, record_date, record_month, record_year, approval_status, submitted_by::text, reviewed_by::text, reviewed_at, approved_by::text, approved_at, created_at, updated_at
 	`
-	record, err := r.scanRecordRow(ctx, r.db.QueryRow(ctx, query, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate))
+	record, err := r.scanRecordRow(ctx, r.db.QueryRow(ctx, query, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate, params.SubmittedBy))
 	if err != nil {
 		return model.FinanceRecord{}, err
 	}
@@ -195,6 +197,11 @@ func (r *FinanceRepository) ListRecords(ctx context.Context, params ListFinanceR
 	if params.Status != "" {
 		filters = append(filters, fmt.Sprintf("finance_records.approval_status = $%d", index))
 		args = append(args, params.Status)
+		index++
+	}
+	if params.SubmittedBy != "" {
+		filters = append(filters, fmt.Sprintf("finance_records.submitted_by = $%d::uuid", index))
+		args = append(args, params.SubmittedBy)
 		index++
 	}
 

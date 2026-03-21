@@ -25,11 +25,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { overviewKeys, getOperationalOverview } from "@/services/overview";
 
 export const Route = createFileRoute("/_authenticated/operational/overview")({
   beforeLoad: async () => {
+    await ensureModuleAccess("operational");
     await ensurePermission(permissions.operationalOverview);
   },
   component: OperationalOverviewPage,

@@ -37,13 +37,13 @@ func NewReimbursementsHandler(service *hrisservice.ReimbursementsService, upload
 }
 
 func (h *ReimbursementsHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("hris:reimbursement:create")).Post("/", h.create)
-	router.With(platformmiddleware.RBACMiddleware("hris:reimbursement:view")).Get("/", h.list)
-	router.With(platformmiddleware.RBACMiddleware("hris:reimbursement:view")).Get("/summary", h.summary)
-	router.With(platformmiddleware.RBACMiddleware("hris:reimbursement:view")).Get("/{reimbursementID}", h.get)
-	router.With(platformmiddleware.RBACMiddleware("hris:reimbursement:edit")).Post("/{reimbursementID}/attachments", h.uploadAttachments)
-	router.With(platformmiddleware.RBACMiddleware("hris:reimbursement:approve")).Patch("/{reimbursementID}/review", h.review)
-	router.With(platformmiddleware.RBACMiddleware("hris:reimbursement:approve")).Patch("/{reimbursementID}/mark-paid", h.markPaid)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:create")).Post("/", h.create)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/", h.list)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/summary", h.summary)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/{reimbursementID}", h.get)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:edit")).Post("/{reimbursementID}/attachments", h.uploadAttachments)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:approve")).Patch("/{reimbursementID}/review", h.review)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:mark_paid")).Patch("/{reimbursementID}/mark-paid", h.markPaid)
 }
 
 func (h *ReimbursementsHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +58,7 @@ func (h *ReimbursementsHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.Create(r.Context(), input, principal.UserID, principal.Roles)
+	result, err := h.service.Create(r.Context(), input, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -79,7 +79,7 @@ func (h *ReimbursementsHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, total, page, perPage, err := h.service.List(r.Context(), query, principal.UserID, principal.Roles)
+	items, total, page, perPage, err := h.service.List(r.Context(), query, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -97,7 +97,7 @@ func (h *ReimbursementsHandler) get(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
 		return
 	}
-	item, err := h.service.Get(r.Context(), chi.URLParam(r, "reimbursementID"), principal.UserID, principal.Roles)
+	item, err := h.service.Get(r.Context(), chi.URLParam(r, "reimbursementID"), principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -135,7 +135,7 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 	}
 
 	reimbursementID := chi.URLParam(r, "reimbursementID")
-	item, err := h.service.AddAttachments(r.Context(), reimbursementID, paths, principal.UserID, principal.Roles)
+	item, err := h.service.AddAttachments(r.Context(), reimbursementID, paths, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -157,7 +157,7 @@ func (h *ReimbursementsHandler) markPaid(w http.ResponseWriter, r *http.Request)
 	}
 
 	reimbursementID := chi.URLParam(r, "reimbursementID")
-	item, err := h.service.MarkPaid(r.Context(), reimbursementID, input.Notes, principal.UserID, principal.Roles)
+	item, err := h.service.MarkPaid(r.Context(), reimbursementID, input.Notes, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -175,7 +175,7 @@ func (h *ReimbursementsHandler) summary(w http.ResponseWriter, r *http.Request) 
 
 	month, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("month")))
 	year, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("year")))
-	item, err := h.service.Summary(r.Context(), month, year, principal.UserID, principal.Roles)
+	item, err := h.service.Summary(r.Context(), month, year, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -196,7 +196,7 @@ func (h *ReimbursementsHandler) review(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reimbursementID := chi.URLParam(r, "reimbursementID")
-	item, err := h.service.ManagerReview(r.Context(), reimbursementID, input, principal.UserID, principal.Roles)
+	item, err := h.service.ManagerReview(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return

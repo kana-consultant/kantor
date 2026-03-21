@@ -14,16 +14,18 @@ export interface AuthTokens {
   expires_in: number;
 }
 
+export interface AuthModuleRole {
+  role_id: string;
+  role_name: string;
+  role_slug: string;
+}
+
 export interface AuthSession {
   user: AuthUser;
-  roles: string[];
+  module_roles: Record<string, AuthModuleRole>;
   permissions: string[];
+  is_super_admin: boolean;
   tokens: AuthTokens;
 }
 
-export interface AuthPayload {
-  user: AuthUser;
-  roles: string[];
-  permissions: string[];
-  tokens: AuthTokens;
-}
+export type AuthPayload = AuthSession;

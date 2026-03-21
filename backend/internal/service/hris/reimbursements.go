@@ -8,6 +8,7 @@ import (
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 )
@@ -39,7 +40,7 @@ type reimbursementsEmployeesRepository interface {
 }
 
 type reimbursementsAuthRepository interface {
-	ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error)
+	ListUserIDsByPermission(ctx context.Context, permissionID string) ([]string, error)
 }
 
 type reimbursementsNotificationsService interface {
@@ -72,13 +73,13 @@ func (s *ReimbursementsService) SetWANotifier(n ReimbursementStatusNotifier) {
 	s.waNotifier = n
 }
 
-func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.CreateReimbursementRequest, actorID string, roles []string) (model.Reimbursement, error) {
+func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.CreateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
 	employee, err := s.employeesRepo.GetEmployeeByID(ctx, request.EmployeeID)
 	if err != nil {
 		return model.Reimbursement{}, mapReimbursementError(err)
 	}
 
-	if isStaffHRIS(roles) {
+	if !canViewAllReimbursements(perms) {
 		if employee.UserID == nil || strings.TrimSpace(*employee.UserID) != actorID {
 			return model.Reimbursement{}, ErrReimbursementForbidden
 		}
@@ -104,7 +105,7 @@ func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.Crea
 	return item, nil
 }
 
-func (s *ReimbursementsService) List(ctx context.Context, query hrisdto.ListReimbursementsQuery, actorID string, roles []string) ([]model.Reimbursement, int64, int, int, error) {
+func (s *ReimbursementsService) List(ctx context.Context, query hrisdto.ListReimbursementsQuery, actorID string, perms *rbac.CachedPermissions) ([]model.Reimbursement, int64, int, int, error) {
 	page := query.Page
 	if page < 1 {
 		page = 1
@@ -115,22 +116,12 @@ func (s *ReimbursementsService) List(ctx context.Context, query hrisdto.ListReim
 	}
 
 	employeeID := strings.TrimSpace(query.EmployeeID)
-	department := ""
-	if isStaffHRIS(roles) {
+	if !canViewAllReimbursements(perms) {
 		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
 		if err != nil {
 			return nil, 0, page, perPage, mapReimbursementError(err)
 		}
 		employeeID = employee.ID
-	}
-	if isManagerHRIS(roles) && !isAdminHRIS(roles) && !isSuperAdmin(roles) {
-		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
-		if err != nil {
-			return nil, 0, page, perPage, mapReimbursementError(err)
-		}
-		if employee.Department != nil {
-			department = strings.TrimSpace(*employee.Department)
-		}
 	}
 
 	items, total, err := s.repo.List(ctx, hrisrepo.ListReimbursementsParams{
@@ -138,38 +129,38 @@ func (s *ReimbursementsService) List(ctx context.Context, query hrisdto.ListReim
 		PerPage:    perPage,
 		Status:     strings.TrimSpace(query.Status),
 		EmployeeID: employeeID,
-		Department: department,
+		Department: "",
 		Month:      query.Month,
 		Year:       query.Year,
 	})
 	return items, total, page, perPage, err
 }
 
-func (s *ReimbursementsService) Get(ctx context.Context, reimbursementID string, actorID string, roles []string) (model.Reimbursement, error) {
+func (s *ReimbursementsService) Get(ctx context.Context, reimbursementID string, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
 	item, err := s.repo.GetByID(ctx, reimbursementID)
 	if err != nil {
 		return model.Reimbursement{}, mapReimbursementError(err)
 	}
-	if err := s.ensureAccessible(ctx, item, actorID, roles); err != nil {
+	if err := s.ensureAccessible(ctx, item, actorID, perms); err != nil {
 		return model.Reimbursement{}, err
 	}
 	return item, nil
 }
 
-func (s *ReimbursementsService) AddAttachments(ctx context.Context, reimbursementID string, attachments []string, actorID string, roles []string) (model.Reimbursement, error) {
+func (s *ReimbursementsService) AddAttachments(ctx context.Context, reimbursementID string, attachments []string, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
 	item, err := s.repo.GetByID(ctx, reimbursementID)
 	if err != nil {
 		return model.Reimbursement{}, mapReimbursementError(err)
 	}
-	if err := s.ensureEditable(ctx, item, actorID, roles); err != nil {
+	if err := s.ensureEditable(ctx, item, actorID, perms); err != nil {
 		return model.Reimbursement{}, err
 	}
 	updated, err := s.repo.AddAttachments(ctx, reimbursementID, attachments)
 	return updated, mapReimbursementError(err)
 }
 
-func (s *ReimbursementsService) ManagerReview(ctx context.Context, reimbursementID string, request hrisdto.ReviewReimbursementRequest, actorID string, roles []string) (model.Reimbursement, error) {
-	if !isManagerHRIS(roles) && !isAdminHRIS(roles) && !isSuperAdmin(roles) {
+func (s *ReimbursementsService) ManagerReview(ctx context.Context, reimbursementID string, request hrisdto.ReviewReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
+	if !canApproveReimbursements(perms) {
 		return model.Reimbursement{}, ErrReimbursementForbidden
 	}
 	updated, err := s.repo.ApplyManagerReview(ctx, reimbursementID, hrisrepo.ReviewReimbursementParams{
@@ -196,12 +187,12 @@ func (s *ReimbursementsService) ManagerReview(ctx context.Context, reimbursement
 	return updated, nil
 }
 
-func (s *ReimbursementsService) FinanceReview(ctx context.Context, reimbursementID string, request hrisdto.ReviewReimbursementRequest, actorID string, roles []string) (model.Reimbursement, error) {
-	return s.ManagerReview(ctx, reimbursementID, request, actorID, roles)
+func (s *ReimbursementsService) FinanceReview(ctx context.Context, reimbursementID string, request hrisdto.ReviewReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
+	return s.ManagerReview(ctx, reimbursementID, request, actorID, perms)
 }
 
-func (s *ReimbursementsService) MarkPaid(ctx context.Context, reimbursementID string, notes *string, actorID string, roles []string) (model.Reimbursement, error) {
-	if !isManagerHRIS(roles) && !isAdminHRIS(roles) && !isSuperAdmin(roles) {
+func (s *ReimbursementsService) MarkPaid(ctx context.Context, reimbursementID string, notes *string, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
+	if !canMarkPaidReimbursements(perms) {
 		return model.Reimbursement{}, ErrReimbursementForbidden
 	}
 	updated, err := s.repo.MarkPaid(ctx, reimbursementID, actorID, notes)
@@ -224,9 +215,8 @@ func (s *ReimbursementsService) MarkPaid(ctx context.Context, reimbursementID st
 	return updated, nil
 }
 
-func (s *ReimbursementsService) Summary(ctx context.Context, month int, year int, actorID string, roles []string) (model.ReimbursementSummary, error) {
+func (s *ReimbursementsService) Summary(ctx context.Context, month int, year int, actorID string, perms *rbac.CachedPermissions) (model.ReimbursementSummary, error) {
 	employeeID := ""
-	department := ""
 	if month < 1 {
 		month = int(time.Now().Month())
 	}
@@ -234,48 +224,33 @@ func (s *ReimbursementsService) Summary(ctx context.Context, month int, year int
 		year = time.Now().Year()
 	}
 
-	if isStaffHRIS(roles) {
+	if !canViewAllReimbursements(perms) {
 		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
 		if err != nil {
 			return model.ReimbursementSummary{}, mapReimbursementError(err)
 		}
 		employeeID = employee.ID
 	}
-	if isManagerHRIS(roles) && !isAdminHRIS(roles) && !isSuperAdmin(roles) {
-		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
-		if err != nil {
-			return model.ReimbursementSummary{}, mapReimbursementError(err)
-		}
-		if employee.Department != nil {
-			department = strings.TrimSpace(*employee.Department)
-		}
-	}
 
-	return s.repo.Summary(ctx, month, year, employeeID, department)
+	return s.repo.Summary(ctx, month, year, employeeID, "")
 }
 
-func (s *ReimbursementsService) ensureAccessible(ctx context.Context, item model.Reimbursement, actorID string, roles []string) error {
-	if isSuperAdmin(roles) || isAdminHRIS(roles) {
+func (s *ReimbursementsService) ensureAccessible(ctx context.Context, item model.Reimbursement, actorID string, perms *rbac.CachedPermissions) error {
+	if canViewAllReimbursements(perms) {
 		return nil
 	}
-	if isStaffHRIS(roles) {
-		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
-		if err != nil {
-			return mapReimbursementError(err)
-		}
-		if employee.ID != item.EmployeeID {
-			return ErrReimbursementForbidden
-		}
-		return nil
+	employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
+	if err != nil {
+		return mapReimbursementError(err)
 	}
-	if isManagerHRIS(roles) {
-		return nil
+	if employee.ID != item.EmployeeID {
+		return ErrReimbursementForbidden
 	}
 	return nil
 }
 
-func (s *ReimbursementsService) ensureEditable(ctx context.Context, item model.Reimbursement, actorID string, roles []string) error {
-	if isSuperAdmin(roles) || isAdminHRIS(roles) {
+func (s *ReimbursementsService) ensureEditable(ctx context.Context, item model.Reimbursement, actorID string, perms *rbac.CachedPermissions) error {
+	if canViewAllReimbursements(perms) {
 		return nil
 	}
 	employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
@@ -292,19 +267,11 @@ func (s *ReimbursementsService) ensureEditable(ctx context.Context, item model.R
 }
 
 func (s *ReimbursementsService) notifyApproversForSubmission(ctx context.Context, item model.Reimbursement) error {
-	managers, err := s.authRepo.ListUserIDsByRole(ctx, "manager", "hris")
+	recipients, err := s.authRepo.ListUserIDsByPermission(ctx, "hris:reimbursement:approve")
 	if err != nil {
 		return err
 	}
-	admins, err := s.authRepo.ListUserIDsByRole(ctx, "admin", "hris")
-	if err != nil {
-		return err
-	}
-	superAdmins, err := s.authRepo.ListUserIDsByRole(ctx, "super_admin", "")
-	if err != nil {
-		return err
-	}
-	return s.sendNotifications(ctx, uniqueIDs(append(append(managers, admins...), superAdmins...)), "reimbursement.submitted", "New reimbursement submitted", item.Title, "reimbursement", &item.ID)
+	return s.sendNotifications(ctx, recipients, "reimbursement.submitted", "New reimbursement submitted", item.Title, "reimbursement", &item.ID)
 }
 
 func (s *ReimbursementsService) notifyRequester(ctx context.Context, item model.Reimbursement, notificationType string, title string) error {
@@ -348,31 +315,6 @@ func uniqueIDs(userIDs []string) []string {
 	return items
 }
 
-func isSuperAdmin(roles []string) bool {
-	return containsRole(roles, "super_admin")
-}
-
-func isAdminHRIS(roles []string) bool {
-	return containsRole(roles, "admin:hris")
-}
-
-func isManagerHRIS(roles []string) bool {
-	return containsRole(roles, "manager:hris")
-}
-
-func isStaffHRIS(roles []string) bool {
-	return containsRole(roles, "staff:hris")
-}
-
-func containsRole(roles []string, target string) bool {
-	for _, role := range roles {
-		if strings.EqualFold(strings.TrimSpace(role), target) {
-			return true
-		}
-	}
-	return false
-}
-
 func mapReimbursementError(err error) error {
 	switch {
 	case errors.Is(err, hrisrepo.ErrReimbursementNotFound):
@@ -382,4 +324,16 @@ func mapReimbursementError(err error) error {
 	default:
 		return err
 	}
+}
+
+func canViewAllReimbursements(perms *rbac.CachedPermissions) bool {
+	return rbac.CanViewAll(perms, "hris:reimbursement:view_all")
+}
+
+func canApproveReimbursements(perms *rbac.CachedPermissions) bool {
+	return perms != nil && (perms.IsSuperAdmin || perms.Permissions["hris:reimbursement:approve"])
+}
+
+func canMarkPaidReimbursements(perms *rbac.CachedPermissions) bool {
+	return perms != nil && (perms.IsSuperAdmin || perms.Permissions["hris:reimbursement:mark_paid"])
 }

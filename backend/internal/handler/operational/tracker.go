@@ -29,26 +29,26 @@ func NewTrackerHandler(service *operationalservice.TrackerService) *TrackerHandl
 }
 
 func (h *TrackerHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Get("/consent", h.getConsent)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Post("/consent", h.giveConsent)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Delete("/consent", h.revokeConsent)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Get("/consent", h.getConsent)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Post("/consent", h.giveConsent)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Delete("/consent", h.revokeConsent)
 
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Post("/sessions/start", h.startSession)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Patch("/sessions/{sessionID}/end", h.endSession)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Post("/heartbeat", h.heartbeat)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Post("/entries/batch", h.batchEntries)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Post("/sessions/start", h.startSession)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Patch("/sessions/{sessionID}/end", h.endSession)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Post("/heartbeat", h.heartbeat)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Post("/entries/batch", h.batchEntries)
 
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Get("/my-activity", h.getMyActivity)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view")).Get("/extension/download", h.downloadExtension)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view_team")).Get("/team-activity", h.getTeamActivity)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view_team")).Get("/activity/{userID}", h.getUserActivity)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker:view_team")).Get("/summary", h.getSummary)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker_consent:audit")).Get("/consents", h.listConsentAudit)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Get("/my-activity", h.getMyActivity)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view")).Get("/extension/download", h.downloadExtension)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view_team")).Get("/team-activity", h.getTeamActivity)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view_team")).Get("/activity/{userID}", h.getUserActivity)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view_team")).Get("/summary", h.getSummary)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:view_team")).Get("/consents", h.listConsentAudit)
 
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker_domain:manage")).Get("/domains", h.listDomains)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker_domain:manage")).Post("/domains", h.createDomain)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker_domain:manage")).Put("/domains/{domainID}", h.updateDomain)
-	router.With(platformmiddleware.RBACMiddleware("operational:tracker_domain:manage")).Delete("/domains/{domainID}", h.deleteDomain)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Get("/domains", h.listDomains)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Post("/domains", h.createDomain)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Put("/domains/{domainID}", h.updateDomain)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Delete("/domains/{domainID}", h.deleteDomain)
 }
 
 func (h *TrackerHandler) getConsent(w http.ResponseWriter, r *http.Request) {
