@@ -88,6 +88,10 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLogWithUser(r.Context(), principal.UserID, "update", "admin", "password", principal.UserID, nil, map[string]any{
+		"changed": true,
+	})
+
 	response.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "Password changed successfully. All sessions have been revoked.",
 	}, nil)
@@ -241,6 +245,8 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusTooManyRequests, "ACCOUNT_LOCKED", err.Error(), nil)
 	case errors.Is(err, authservice.ErrInvalidRefreshToken), errors.Is(err, authservice.ErrExpiredRefreshToken):
 		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", err.Error(), nil)
+	case errors.Is(err, authservice.ErrPasswordUnchanged):
+		response.WriteError(w, http.StatusBadRequest, "PASSWORD_UNCHANGED", err.Error(), nil)
 	default:
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}

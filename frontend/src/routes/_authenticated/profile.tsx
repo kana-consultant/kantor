@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useForm } from "react-hook-form";
 import {
   Building2,
   Calendar,
+  KeyRound,
   Mail,
   MapPin,
   Pencil,
@@ -13,13 +16,30 @@ import {
   User,
   X,
 } from "lucide-react";
+import { z } from "zod";
 
+import { FormModal } from "@/components/shared/form-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
+import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { ensureAuthenticated } from "@/services/auth";
+import { changePassword, ensureAuthenticated, logout } from "@/services/auth";
 import { getProfile, profileKeys, updateProfile } from "@/services/profile";
+import { toast } from "@/stores/toast-store";
+
+const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "Password saat ini wajib diisi"),
+    new_password: z.string().min(8, "Password baru minimal 8 karakter"),
+    confirm_password: z.string().min(1, "Konfirmasi password wajib diisi"),
+  })
+  .refine((values) => values.new_password === values.confirm_password, {
+    message: "Konfirmasi password harus sama dengan password baru",
+    path: ["confirm_password"],
+  });
+
+type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 export const Route = createFileRoute("/_authenticated/profile")({
   beforeLoad: async () => {
@@ -33,8 +53,10 @@ export const Route = createFileRoute("/_authenticated/profile")({
 
 function ProfilePage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { user, roleLabels, roleSummary } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: profileKeys.me,
@@ -64,6 +86,38 @@ function ProfilePage() {
     },
   });
 
+  const {
+    register: registerPasswordField,
+    handleSubmit: submitPasswordForm,
+    reset: resetPasswordForm,
+    formState: { errors: passwordErrors },
+  } = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      current_password: "",
+      new_password: "",
+      confirm_password: "",
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: (values: ChangePasswordFormValues) =>
+      changePassword({
+        current_password: values.current_password,
+        new_password: values.new_password,
+      }),
+    onSuccess: async () => {
+      setIsPasswordModalOpen(false);
+      resetPasswordForm();
+      toast.success(
+        "Password berhasil diubah",
+        "Silakan login ulang. Semua sesi aktif sudah dicabut.",
+      );
+      await logout();
+      await navigate({ to: "/login" });
+    },
+  });
+
   const employee = profileQuery.data;
 
   function startEditing() {
@@ -76,6 +130,16 @@ function ProfilePage() {
       avatar_url: employee.avatar_url ?? "",
     });
     setIsEditing(true);
+  }
+
+  function closePasswordModal() {
+    if (changePasswordMutation.isPending) {
+      return;
+    }
+
+    setIsPasswordModalOpen(false);
+    changePasswordMutation.reset();
+    resetPasswordForm();
   }
 
   const statusLabel: Record<string, string> = {
@@ -108,10 +172,16 @@ function ProfilePage() {
           <p className="text-sm text-text-tertiary">Kelola informasi pribadi Anda</p>
         </div>
         {!isEditing ? (
-          <Button variant="outline" size="sm" onClick={startEditing}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit Profil
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsPasswordModalOpen(true)}>
+              <KeyRound className="mr-2 h-4 w-4" />
+              Ganti Password
+            </Button>
+            <Button variant="outline" size="sm" onClick={startEditing}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Profil
+            </Button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
@@ -207,6 +277,81 @@ function ProfilePage() {
           <p className="mt-1 text-sm text-text-primary">{employee?.address || "-"}</p>
         )}
       </div>
+
+      <div className="rounded-xl border bg-card p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-text-secondary">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">Keamanan Akun</span>
+            </div>
+            <p className="mt-1 text-sm text-text-primary">
+              Ganti password akun Anda. Setelah berhasil, Anda akan diminta login ulang.
+            </p>
+          </div>
+          <Button onClick={() => setIsPasswordModalOpen(true)} type="button">
+            <KeyRound className="mr-2 h-4 w-4" />
+            Ganti Password
+          </Button>
+        </div>
+      </div>
+
+      <FormModal
+        error={changePasswordMutation.error instanceof ApiError ? changePasswordMutation.error.message : null}
+        isLoading={changePasswordMutation.isPending}
+        isOpen={isPasswordModalOpen}
+        onClose={closePasswordModal}
+        onSubmit={submitPasswordForm((values) => changePasswordMutation.mutate(values))}
+        size="md"
+        submitLabel="Simpan Password Baru"
+        subtitle="Gunakan password baru yang kuat. Sistem akan mencabut semua sesi aktif setelah perubahan berhasil."
+        title="Ganti Password"
+      >
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-[600] text-text-primary" htmlFor="current_password">
+            Password Saat Ini
+          </label>
+          <Input
+            id="current_password"
+            placeholder="Masukkan password saat ini"
+            type="password"
+            {...registerPasswordField("current_password")}
+          />
+          {passwordErrors.current_password ? (
+            <p className="text-[12px] text-error">{passwordErrors.current_password.message}</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-[600] text-text-primary" htmlFor="new_password">
+            Password Baru
+          </label>
+          <Input
+            id="new_password"
+            placeholder="Minimal 8 karakter"
+            type="password"
+            {...registerPasswordField("new_password")}
+          />
+          {passwordErrors.new_password ? (
+            <p className="text-[12px] text-error">{passwordErrors.new_password.message}</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-[600] text-text-primary" htmlFor="confirm_password">
+            Konfirmasi Password Baru
+          </label>
+          <Input
+            id="confirm_password"
+            placeholder="Ulangi password baru"
+            type="password"
+            {...registerPasswordField("confirm_password")}
+          />
+          {passwordErrors.confirm_password ? (
+            <p className="text-[12px] text-error">{passwordErrors.confirm_password.message}</p>
+          ) : null}
+        </div>
+      </FormModal>
     </div>
   );
 }

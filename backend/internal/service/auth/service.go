@@ -27,6 +27,7 @@ var (
 	ErrAccountLocked       = errors.New("account is temporarily locked due to too many failed login attempts")
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 	ErrExpiredRefreshToken = errors.New("refresh token has expired")
+	ErrPasswordUnchanged   = errors.New("new password must differ from current password")
 )
 
 type authRepository interface {
@@ -236,7 +237,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, currentPass
 	}
 
 	if currentPassword == newPassword {
-		return errors.New("new password must differ from current password")
+		return ErrPasswordUnchanged
 	}
 
 	newHash, err := backendauth.HashPassword(newPassword)

@@ -1,4 +1,4 @@
-import { postJSON } from "@/lib/api-client";
+import { authPostJSON, postJSON } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { AuthPayload, AuthSession } from "@/types/auth";
 
@@ -13,6 +13,15 @@ interface RegisterRequest {
   full_name: string;
 }
 
+interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+interface ChangePasswordResponse {
+  message: string;
+}
+
 export function login(payload: LoginRequest) {
   return postJSON<AuthPayload, LoginRequest>("/auth/login", payload);
 }
@@ -23,6 +32,13 @@ export function register(payload: RegisterRequest) {
 
 export function refresh() {
   return postJSON<AuthPayload, Record<string, never>>("/auth/refresh", {});
+}
+
+export function changePassword(payload: ChangePasswordRequest) {
+  return authPostJSON<ChangePasswordResponse, ChangePasswordRequest>(
+    "/auth/change-password",
+    payload,
+  );
 }
 
 export function revokeRefreshToken() {
