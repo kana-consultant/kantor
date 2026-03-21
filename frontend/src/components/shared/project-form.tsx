@@ -241,10 +241,22 @@ export function ProjectForm({
                     setDropdownOpen(false);
                   }
                 }}
-                placeholder={selectedEmails.length > 0 ? "Tambah lagi..." : "Cari nama atau email..."}
+                placeholder={selectedEmails.length > 0 ? "Tambah member lagi..." : "Cari employee atau user..."}
                 value={memberSearch}
               />
             </div>
+
+            {dropdownOpen && usersQuery.isLoading && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
+                Memuat daftar user...
+              </div>
+            )}
+
+            {dropdownOpen && usersQuery.isError && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-error/30 bg-error-light px-3 py-3 text-center text-sm text-error shadow-lg">
+                Gagal memuat daftar user. Coba tutup lalu buka lagi form project.
+              </div>
+            )}
 
             {dropdownOpen && filteredUsers.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
@@ -270,11 +282,17 @@ export function ProjectForm({
               </div>
             )}
 
-            {dropdownOpen && filteredUsers.length === 0 && availableUsers.length > 0 && (
+            {dropdownOpen && !usersQuery.isLoading && !usersQuery.isError && filteredUsers.length === 0 && availableUsers.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
                 {selectedEmails.length === availableUsers.length
                   ? "Semua user sudah dipilih"
                   : "Tidak ada hasil"}
+              </div>
+            )}
+
+            {dropdownOpen && !usersQuery.isLoading && !usersQuery.isError && filteredUsers.length === 0 && availableUsers.length === 0 && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
+                Belum ada user aktif yang bisa dipilih.
               </div>
             )}
           </div>

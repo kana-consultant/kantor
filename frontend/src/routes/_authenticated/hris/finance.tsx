@@ -584,7 +584,7 @@ function FinancePage() {
                 />
               </div>
               <div className="mt-6 h-[320px]">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
                   <BarChart data={summaryQuery.data?.monthly ?? []}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" />
@@ -605,7 +605,7 @@ function FinancePage() {
                 <h4 className="text-[20px] font-[700] text-text-primary">Breakdown</h4>
               </div>
               <div className="mt-6 h-[260px]">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
                   <PieChart>
                     <Pie
                       cx="50%"

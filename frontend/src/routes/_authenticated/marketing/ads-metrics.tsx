@@ -673,7 +673,7 @@ function AdsMetricsPage() {
               </p>
               <h4 className="text-[20px] font-[700] text-text-primary">Spent vs revenue per campaign</h4>
               <div className="mt-6 h-[320px]">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
                   <BarChart data={campaignRows.slice(0, 8)}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="group_label" tick={{ fontSize: 12 }} />
@@ -692,7 +692,7 @@ function AdsMetricsPage() {
               </p>
               <h4 className="text-[20px] font-[700] text-text-primary">Spent breakdown</h4>
               <div className="mt-6 h-[260px]">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
                   <PieChart>
                     <Pie cx="50%" cy="50%" data={platformRows} dataKey="total_spent" innerRadius={55} outerRadius={90} paddingAngle={3}>
                       {platformRows.map((row, index) => (
@@ -724,7 +724,7 @@ function AdsMetricsPage() {
               </p>
               <h4 className="text-[20px] font-[700] text-text-primary">Monthly CTR and ROAS</h4>
               <div className="mt-6 h-[320px]">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
                   <LineChart data={monthlyRows}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="group_label" />

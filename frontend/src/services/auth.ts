@@ -94,6 +94,15 @@ export async function ensureAuthenticated(): Promise<AuthSession | null> {
   }
 }
 
+export function getValidStoredSession(): AuthSession | null {
+  const session = useAuthStore.getState().session;
+  if (!session) {
+    return null;
+  }
+
+  return isJwtExpired(session.tokens.access_token) ? null : session;
+}
+
 function isJwtExpired(token: string) {
   const payload = parseJwtPayload(token);
 

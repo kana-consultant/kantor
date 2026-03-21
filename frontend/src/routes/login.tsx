@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
-import { ensureAuthenticated, login } from "@/services/auth";
+import { getValidStoredSession, login } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth-store";
 
 const loginSchema = z.object({
@@ -20,7 +20,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
-    const session = await ensureAuthenticated();
+    const session = getValidStoredSession();
     if (session?.tokens.access_token) {
       throw redirect({
         to: "/operational",

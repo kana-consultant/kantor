@@ -196,7 +196,7 @@ function MarketingOverviewPage() {
             </h2>
           </div>
           <div className="mt-6 h-[320px]">
-            <ResponsiveContainer height="100%" width="100%">
+            <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
               <LineChart data={overview.roas_trend}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
                 <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
@@ -233,7 +233,7 @@ function MarketingOverviewPage() {
           </div>
           <div className="mt-6 h-[320px]">
             {overview.leads_by_stage.some((item) => item.lead_count > 0) ? (
-              <ResponsiveContainer height="100%" width="100%">
+              <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
                 <BarChart data={overview.leads_by_stage} layout="vertical" margin={{ left: 24 }}>
                   <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" horizontal={false} />
                   <XAxis allowDecimals={false} stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} type="number" />

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
-import { ensureAuthenticated, register } from "@/services/auth";
+import { getValidStoredSession, register } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth-store";
 
 const registerSchema = z
@@ -28,7 +28,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export const Route = createFileRoute("/register")({
   beforeLoad: async () => {
-    const session = await ensureAuthenticated();
+    const session = getValidStoredSession();
     if (session?.tokens.access_token) {
       throw redirect({
         to: "/operational",

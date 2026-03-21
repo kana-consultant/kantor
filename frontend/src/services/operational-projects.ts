@@ -23,8 +23,10 @@ export const projectsKeys = {
 };
 
 export async function listAvailableUsers(): Promise<AvailableUser[]> {
-  const token = await requireAccessToken();
-  return requestJSON<AvailableUser[]>("/operational/projects/available-users", { method: "GET" }, token);
+  return authRequestJSON<AvailableUser[]>(
+    "/operational/projects/available-users",
+    { method: "GET" },
+  );
 }
 
 export async function listProjects(filters: ProjectFilters): Promise<ListProjectsResponse> {

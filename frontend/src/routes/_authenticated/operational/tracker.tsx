@@ -1082,7 +1082,7 @@ function MyActivityContent({ data, topDomainColumns }: { data: TrackerActivityOv
             <h2 className="mt-2 text-[22px] font-bold text-text-primary">Breakdown per jam</h2>
           </div>
           <div className="mt-6 h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={240} minWidth={1}>
               <BarChart data={data.hourly_breakdown}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
                 <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} interval={1} angle={-45} textAnchor="end" height={70} />
@@ -1101,7 +1101,7 @@ function MyActivityContent({ data, topDomainColumns }: { data: TrackerActivityOv
           </div>
           <div className="mt-6 h-[320px]">
             {data.category_breakdown.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={240} minWidth={1}>
                 <PieChart>
                   <Pie data={data.category_breakdown} dataKey="duration_seconds" nameKey="category" innerRadius={72} outerRadius={104}>
                     {data.category_breakdown.map((entry, index) => (
@@ -1187,7 +1187,7 @@ function TeamActivityTab({
             <h2 className="mt-2 text-[22px] font-bold text-text-primary">Stacked category time per user</h2>
           </div>
           <div className="mt-6 h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={240} minWidth={1}>
               <BarChart data={stackedTeamData}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
                 <XAxis dataKey="user_name" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />

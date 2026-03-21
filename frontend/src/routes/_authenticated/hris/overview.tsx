@@ -146,7 +146,7 @@ function HrisOverviewPage() {
                 </h2>
               </div>
               <div className="mt-6 h-[320px]">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
                   <BarChart data={overview.income_vs_outcome}>
                     <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
                     <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />

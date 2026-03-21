@@ -96,7 +96,7 @@ function MarketingDashboardPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-mkt">Campaign status</p>
           <h4 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Status distribution</h4>
           <div className="mt-6 h-[300px]">
-            <ResponsiveContainer height="100%" width="100%">
+            <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
               <PieChart>
                 <Pie data={campaignStatusRows} dataKey="value" innerRadius={70} outerRadius={110} paddingAngle={4}>
                   {campaignStatusRows.map((row, index) => (
