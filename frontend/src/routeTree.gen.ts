@@ -33,6 +33,7 @@ import { Route as AuthenticatedHrisDepartmentsRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin/settings'
 import { Route as AuthenticatedAdminRolesRouteImport } from './routes/_authenticated/admin/roles'
+import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin/audit-logs'
 import { Route as AuthenticatedOperationalProjectsIndexRouteImport } from './routes/_authenticated/operational/projects/index'
 import { Route as AuthenticatedHrisReimbursementsIndexRouteImport } from './routes/_authenticated/hris/reimbursements/index'
 import { Route as AuthenticatedHrisEmployeesIndexRouteImport } from './routes/_authenticated/hris/employees/index'
@@ -174,6 +175,12 @@ const AuthenticatedAdminRolesRoute = AuthenticatedAdminRolesRouteImport.update({
   path: '/admin/roles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminAuditLogsRoute =
+  AuthenticatedAdminAuditLogsRouteImport.update({
+    id: '/admin/audit-logs',
+    path: '/admin/audit-logs',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedOperationalProjectsIndexRoute =
   AuthenticatedOperationalProjectsIndexRouteImport.update({
     id: '/operational/projects/',
@@ -217,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/admin/roles': typeof AuthenticatedAdminRolesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -248,6 +256,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/forbidden': typeof AuthenticatedForbiddenRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/admin/roles': typeof AuthenticatedAdminRolesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -281,6 +290,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/_authenticated/forbidden': typeof AuthenticatedForbiddenRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
   '/_authenticated/admin/roles': typeof AuthenticatedAdminRolesRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/forbidden'
     | '/profile'
+    | '/admin/audit-logs'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/forbidden'
     | '/profile'
+    | '/admin/audit-logs'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
@@ -377,6 +389,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/_authenticated/forbidden'
     | '/_authenticated/profile'
+    | '/_authenticated/admin/audit-logs'
     | '/_authenticated/admin/roles'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
@@ -580,6 +593,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRolesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/audit-logs': {
+      id: '/_authenticated/admin/audit-logs'
+      path: '/admin/audit-logs'
+      fullPath: '/admin/audit-logs'
+      preLoaderRoute: typeof AuthenticatedAdminAuditLogsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/operational/projects/': {
       id: '/_authenticated/operational/projects/'
       path: '/operational/projects'
@@ -628,6 +648,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedForbiddenRoute: typeof AuthenticatedForbiddenRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute
   AuthenticatedAdminRolesRoute: typeof AuthenticatedAdminRolesRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
@@ -657,6 +678,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedForbiddenRoute: AuthenticatedForbiddenRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedAdminAuditLogsRoute: AuthenticatedAdminAuditLogsRoute,
   AuthenticatedAdminRolesRoute: AuthenticatedAdminRolesRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,

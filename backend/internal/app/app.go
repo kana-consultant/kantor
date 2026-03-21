@@ -24,6 +24,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
+	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
 	hrishandler "github.com/kana-consultant/kantor/backend/internal/handler/hris"
@@ -205,6 +206,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	application.router = application.buildRouter(
 		auditService,
 		authService,
+		adminhandler.NewAuditLogsHandler(auditService),
 		operationalhandler.NewOverviewHandler(operationalOverviewService),
 		operationalhandler.NewProjectsHandler(projectsService, projectsRepository),
 		operationalhandler.NewKanbanHandler(kanbanService),
@@ -249,6 +251,7 @@ func (a *App) Close() {
 func (a *App) buildRouter(
 	auditService *auditservice.Service,
 	authService *authservice.Service,
+	auditLogsHandler *adminhandler.AuditLogsHandler,
 	operationalOverviewHandler *operationalhandler.OverviewHandler,
 	projectsHandler *operationalhandler.ProjectsHandler,
 	kanbanHandler *operationalhandler.KanbanHandler,
@@ -326,6 +329,7 @@ func (a *App) buildRouter(
 
 			protected.Route("/admin", func(admin chi.Router) {
 				admin.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleAdmin))
+				admin.Route("/audit-logs", auditLogsHandler.RegisterRoutes)
 				admin.With(platformmiddleware.RequireAnyPermission(
 					"admin:roles:view",
 					"admin:users:view",

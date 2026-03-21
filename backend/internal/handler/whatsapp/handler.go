@@ -87,18 +87,32 @@ func (h *Handler) getQR(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) startSession(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
 	if err := h.service.StartSession(); err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_session", principal.UserID, nil, map[string]any{"status": "started"})
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Session started"}, nil)
 }
 
 func (h *Handler) stopSession(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
 	if err := h.service.StopSession(); err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_session", principal.UserID, nil, map[string]any{"status": "stopped"})
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Session stopped"}, nil)
 }
 
@@ -153,11 +167,22 @@ func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
 		h.writeInternalError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "operational", "wa_template", result.ID, nil, result)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
 func (h *Handler) updateTemplate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "templateID")
+	previous, previousErr := h.service.GetTemplate(r.Context(), id)
+	if previousErr != nil {
+		if errors.Is(previousErr, waservice.ErrTemplateNotFound) {
+			response.WriteError(w, http.StatusNotFound, "TEMPLATE_NOT_FOUND", "Template not found", nil)
+			return
+		}
+		h.writeInternalError(w, previousErr)
+		return
+	}
+
 	var input wadto.UpdateTemplateRequest
 	if !h.decodeAndValidate(w, r, &input) {
 		return
@@ -180,11 +205,17 @@ func (h *Handler) updateTemplate(w http.ResponseWriter, r *http.Request) {
 		h.writeInternalError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_template", id, previous, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *Handler) deleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "templateID")
+	previous, previousErr := h.service.GetTemplate(r.Context(), id)
+	if previousErr != nil && !errors.Is(previousErr, waservice.ErrTemplateNotFound) {
+		h.writeInternalError(w, previousErr)
+		return
+	}
 	err := h.service.DeleteTemplate(r.Context(), id)
 	switch {
 	case errors.Is(err, waservice.ErrTemplateNotFound):
@@ -194,6 +225,7 @@ func (h *Handler) deleteTemplate(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.writeInternalError(w, err)
 	default:
+		platformmiddleware.AuditLog(r.Context(), "delete", "operational", "wa_template", id, previous, nil)
 		response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Template deleted"}, nil)
 	}
 }
@@ -249,11 +281,22 @@ func (h *Handler) createSchedule(w http.ResponseWriter, r *http.Request) {
 		h.writeInternalError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "create", "operational", "wa_schedule", result.ID, nil, result)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
 }
 
 func (h *Handler) updateSchedule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "scheduleID")
+	previous, previousErr := h.service.GetSchedule(r.Context(), id)
+	if previousErr != nil {
+		if errors.Is(previousErr, waservice.ErrScheduleNotFound) {
+			response.WriteError(w, http.StatusNotFound, "SCHEDULE_NOT_FOUND", "Schedule not found", nil)
+			return
+		}
+		h.writeInternalError(w, previousErr)
+		return
+	}
+
 	var input wadto.UpdateScheduleRequest
 	if !h.decodeAndValidate(w, r, &input) {
 		return
@@ -276,11 +319,17 @@ func (h *Handler) updateSchedule(w http.ResponseWriter, r *http.Request) {
 		h.writeInternalError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_schedule", id, previous, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *Handler) deleteSchedule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "scheduleID")
+	previous, previousErr := h.service.GetSchedule(r.Context(), id)
+	if previousErr != nil && !errors.Is(previousErr, waservice.ErrScheduleNotFound) {
+		h.writeInternalError(w, previousErr)
+		return
+	}
 	err := h.service.DeleteSchedule(r.Context(), id)
 	if errors.Is(err, waservice.ErrScheduleNotFound) {
 		response.WriteError(w, http.StatusNotFound, "SCHEDULE_NOT_FOUND", "Schedule not found", nil)
@@ -290,12 +339,14 @@ func (h *Handler) deleteSchedule(w http.ResponseWriter, r *http.Request) {
 		h.writeInternalError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "operational", "wa_schedule", id, previous, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Schedule deleted"}, nil)
 }
 
 func (h *Handler) triggerSchedule(w http.ResponseWriter, r *http.Request) {
 	// For now, manual trigger runs the daily reminders
 	go h.service.RunDailyReminders(r.Context())
+	platformmiddleware.AuditLog(r.Context(), "trigger", "operational", "wa_schedule", chi.URLParam(r, "scheduleID"), nil, map[string]any{"trigger": "manual"})
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Schedule triggered"}, nil)
 }
 
@@ -315,6 +366,7 @@ func (h *Handler) toggleSchedule(w http.ResponseWriter, r *http.Request) {
 		h.writeInternalError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_schedule", id, nil, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -368,6 +420,12 @@ func (h *Handler) getLogSummary(w http.ResponseWriter, r *http.Request) {
 // --------------- Quick Send ---------------
 
 func (h *Handler) quickSend(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
 	var input wadto.QuickSendRequest
 	if !h.decodeAndValidate(w, r, &input) {
 		return
@@ -377,6 +435,10 @@ func (h *Handler) quickSend(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadGateway, "SEND_FAILED", err.Error(), nil)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "send", "operational", "wa_broadcast", principal.UserID, nil, map[string]any{
+		"phone":          input.Phone,
+		"message_length": len([]rune(input.Message)),
+	})
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Message sent"}, nil)
 }
 

@@ -11,8 +11,8 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
-	"github.com/kana-consultant/kantor/backend/internal/response"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	"github.com/kana-consultant/kantor/backend/internal/response"
 )
 
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +67,11 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateUserRoles(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userID")
+	previous, previousErr := h.service.GetAdminUserDetail(r.Context(), userID)
+	if previousErr != nil {
+		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
+		return
+	}
 
 	var input dto.UpdateUserModuleRolesRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -95,11 +100,17 @@ func (h *Handler) UpdateUserRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "user_module_roles", userID, previous, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *Handler) ToggleUserActive(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userID")
+	previous, previousErr := h.service.GetAdminUserDetail(r.Context(), userID)
+	if previousErr != nil {
+		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
+		return
+	}
 
 	var input dto.ToggleActiveRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -112,6 +123,11 @@ func (h *Handler) ToggleUserActive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "user", userID, map[string]any{
+		"is_active": previous.User.IsActive,
+	}, map[string]any{
+		"is_active": input.Active,
+	})
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"success": true}, nil)
 }
 
@@ -127,6 +143,11 @@ func (h *Handler) ToggleUserSuperAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := chi.URLParam(r, "userID")
+	previous, previousErr := h.service.GetAdminUserDetail(r.Context(), userID)
+	if previousErr != nil {
+		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
+		return
+	}
 
 	var input dto.ToggleSuperAdminRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -150,6 +171,11 @@ func (h *Handler) ToggleUserSuperAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "user", userID, map[string]any{
+		"is_super_admin": previous.IsSuperAdmin,
+	}, map[string]any{
+		"is_super_admin": result.IsSuperAdmin,
+	})
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 

@@ -20,11 +20,11 @@ import (
 const refreshTokenCookie = "refresh_token"
 
 type Handler struct {
-	service        *authservice.Service
-	validator      *validator.Validate
-	cookieSecure   bool
-	cookiePath     string
-	refreshExpiry  time.Duration
+	service       *authservice.Service
+	validator     *validator.Validate
+	cookieSecure  bool
+	cookiePath    string
+	refreshExpiry time.Duration
 }
 
 func New(service *authservice.Service, cfg config.Config) *Handler {
@@ -106,6 +106,11 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
+	platformmiddleware.AuditLogWithUser(r.Context(), result.User.ID, "register", "admin", "auth", result.User.ID, nil, map[string]any{
+		"email":          result.User.Email,
+		"is_super_admin": result.IsSuperAdmin,
+		"module_roles":   result.ModuleRoles,
+	})
 	response.WriteJSON(w, http.StatusCreated, dto.AuthResponse{
 		User:         result.User,
 		ModuleRoles:  result.ModuleRoles,
@@ -128,6 +133,10 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
+	platformmiddleware.AuditLogWithUser(r.Context(), result.User.ID, "login", "admin", "auth", result.User.ID, nil, map[string]any{
+		"email":          result.User.Email,
+		"is_super_admin": result.IsSuperAdmin,
+	})
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
 		User:         result.User,
 		ModuleRoles:  result.ModuleRoles,
@@ -163,7 +172,11 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := h.readRefreshTokenCookie(r)
 	if err == nil {
-		_ = h.service.Logout(r.Context(), refreshToken)
+		if userID, logoutErr := h.service.Logout(r.Context(), refreshToken); logoutErr == nil {
+			platformmiddleware.AuditLogWithUser(r.Context(), userID, "logout", "admin", "auth", userID, nil, map[string]any{
+				"revoked": true,
+			})
+		}
 	}
 
 	h.clearRefreshTokenCookie(w)

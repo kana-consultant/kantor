@@ -247,20 +247,28 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, currentPass
 	return s.repo.ChangePasswordAndRevokeTokens(ctx, userID, newHash)
 }
 
-func (s *Service) Logout(ctx context.Context, refreshToken string) error {
+func (s *Service) Logout(ctx context.Context, refreshToken string) (string, error) {
 	tokenHash := backendauth.HashRefreshToken(strings.TrimSpace(refreshToken))
 	if tokenHash == "" {
-		return ErrInvalidRefreshToken
+		return "", ErrInvalidRefreshToken
+	}
+
+	storedToken, err := s.repo.GetRefreshTokenByHash(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, authrepo.ErrNotFound) {
+			return "", ErrInvalidRefreshToken
+		}
+		return "", err
 	}
 
 	if err := s.repo.RevokeRefreshToken(ctx, tokenHash); err != nil {
 		if errors.Is(err, authrepo.ErrNotFound) {
-			return ErrInvalidRefreshToken
+			return "", ErrInvalidRefreshToken
 		}
-		return err
+		return "", err
 	}
 
-	return nil
+	return storedToken.UserID, nil
 }
 
 func (s *Service) ParseAccessToken(token string) (*backendauth.AccessClaims, error) {

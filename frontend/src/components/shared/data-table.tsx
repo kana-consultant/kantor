@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Inbox } from "lucide-react";
@@ -27,6 +28,7 @@ interface DataTableProps<TData> {
   getRowClassName?: (row: TData) => string | undefined;
   selectedRowId?: string | null;
   onRowClick?: (row: TData) => void;
+  renderExpandedRow?: (row: TData) => ReactNode;
   emptyTitle: string;
   emptyDescription: string;
   emptyActionLabel?: string;
@@ -53,6 +55,7 @@ export function DataTable<TData>({
   getRowClassName,
   selectedRowId,
   onRowClick,
+  renderExpandedRow,
   emptyTitle,
   emptyDescription,
   emptyActionLabel,
@@ -153,30 +156,38 @@ export function DataTable<TData>({
               const selected = rowId === selectedRowId;
 
               return (
-                <tr
-                  className={cn(
-                    "border-b border-border transition last:border-b-0 hover:bg-surface-muted",
-                    selected && "bg-module-light shadow-[inset_3px_0_0_0_var(--module-primary)]",
-                    getRowClassName?.(row),
-                    onRowClick && "cursor-pointer",
-                  )}
-                  key={rowId}
-                  onClick={() => onRowClick?.(row)}
-                >
-                  {columns.map((column) => (
-                    <td
-                      className={cn(
-                        "px-4 py-4 align-top text-sm text-text-primary",
-                        column.numeric && "font-mono tabular-nums",
-                        column.align === "right" && "text-right",
-                        column.align === "center" && "text-center",
-                      )}
-                      key={column.id}
-                    >
-                      {column.cell ? column.cell(row) : formatValue(readValue(row, column))}
-                    </td>
-                  ))}
-                </tr>
+                <Fragment key={rowId}>
+                  <tr
+                    className={cn(
+                      "border-b border-border transition last:border-b-0 hover:bg-surface-muted",
+                      selected && "bg-module-light shadow-[inset_3px_0_0_0_var(--module-primary)]",
+                      getRowClassName?.(row),
+                      onRowClick && "cursor-pointer",
+                    )}
+                    onClick={() => onRowClick?.(row)}
+                  >
+                    {columns.map((column) => (
+                      <td
+                        className={cn(
+                          "px-4 py-4 align-top text-sm text-text-primary",
+                          column.numeric && "font-mono tabular-nums",
+                          column.align === "right" && "text-right",
+                          column.align === "center" && "text-center",
+                        )}
+                        key={column.id}
+                      >
+                        {column.cell ? column.cell(row) : formatValue(readValue(row, column))}
+                      </td>
+                    ))}
+                  </tr>
+                  {selected && renderExpandedRow ? (
+                    <tr className="border-b border-border bg-surface-muted/40 last:border-b-0">
+                      <td className="px-4 py-4" colSpan={columns.length}>
+                        {renderExpandedRow(row)}
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               );
             })}
           </tbody>
