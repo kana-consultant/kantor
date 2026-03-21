@@ -3,7 +3,6 @@ package marketing
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 
@@ -48,11 +47,11 @@ func requireMarketingAdmin(w http.ResponseWriter, r *http.Request) (platformmidd
 		return platformmiddleware.Principal{}, false
 	}
 
-	for _, role := range principal.Roles {
-		normalized := strings.ToLower(strings.TrimSpace(role))
-		if normalized == "super_admin" || normalized == "admin:marketing" {
-			return principal, true
-		}
+	if principal.IsSuperAdmin {
+		return principal, true
+	}
+	if principal.Cached != nil && principal.Cached.Permissions["marketing:campaign:manage_columns"] {
+		return principal, true
 	}
 
 	response.WriteError(w, http.StatusForbidden, "FORBIDDEN", "This action requires marketing admin access", nil)

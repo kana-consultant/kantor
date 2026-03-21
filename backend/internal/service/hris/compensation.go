@@ -9,6 +9,7 @@ import (
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 	"github.com/kana-consultant/kantor/backend/internal/security"
 )
@@ -17,6 +18,7 @@ var (
 	ErrSalaryNotFound  = errors.New("salary record not found")
 	ErrBonusNotFound   = errors.New("bonus record not found")
 	ErrBonusNotPending = errors.New("only pending bonus records can be changed")
+	ErrBonusForbidden  = errors.New("bonus access is forbidden")
 )
 
 type compensationRepository interface {
@@ -34,6 +36,7 @@ type compensationRepository interface {
 
 type compensationEmployeesRepository interface {
 	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
+	GetEmployeeByUserID(ctx context.Context, userID string) (model.Employee, error)
 }
 
 type CompensationService struct {
@@ -147,7 +150,16 @@ func (s *CompensationService) CreateBonus(ctx context.Context, employeeID string
 	return s.mapBonusRow(row)
 }
 
-func (s *CompensationService) ListBonuses(ctx context.Context, employeeID string) ([]model.BonusRecord, error) {
+func (s *CompensationService) ListBonuses(ctx context.Context, employeeID string, actorID string, perms *rbac.CachedPermissions) ([]model.BonusRecord, error) {
+	if !canManageAllBonuses(perms) {
+		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if employee.ID != employeeID {
+			return nil, ErrBonusForbidden
+		}
+	}
 	rows, err := s.repo.ListBonuses(ctx, employeeID)
 	if err != nil {
 		return nil, err
@@ -163,12 +175,15 @@ func (s *CompensationService) ListBonuses(ctx context.Context, employeeID string
 	return result, nil
 }
 
-func (s *CompensationService) UpdateBonus(ctx context.Context, bonusID string, request hrisdto.UpdateBonusRequest) (model.BonusRecord, error) {
+func (s *CompensationService) UpdateBonus(ctx context.Context, bonusID string, request hrisdto.UpdateBonusRequest, actorID string, perms *rbac.CachedPermissions) (model.BonusRecord, error) {
 	row, err := s.repo.GetBonusByID(ctx, bonusID)
 	if err != nil {
 		if errors.Is(err, hrisrepo.ErrBonusNotFound) {
 			return model.BonusRecord{}, ErrBonusNotFound
 		}
+		return model.BonusRecord{}, err
+	}
+	if err := s.ensureBonusAccessible(ctx, row.EmployeeID, actorID, perms); err != nil {
 		return model.BonusRecord{}, err
 	}
 	if row.ApprovalStatus != "pending" {
@@ -218,12 +233,15 @@ func (s *CompensationService) RejectBonus(ctx context.Context, bonusID string, a
 	return s.mapBonusRow(row)
 }
 
-func (s *CompensationService) DeleteBonus(ctx context.Context, bonusID string) error {
+func (s *CompensationService) DeleteBonus(ctx context.Context, bonusID string, actorID string, perms *rbac.CachedPermissions) error {
 	row, err := s.repo.GetBonusByID(ctx, bonusID)
 	if err != nil {
 		if errors.Is(err, hrisrepo.ErrBonusNotFound) {
 			return ErrBonusNotFound
 		}
+		return err
+	}
+	if err := s.ensureBonusAccessible(ctx, row.EmployeeID, actorID, perms); err != nil {
 		return err
 	}
 	if row.ApprovalStatus != "pending" {
@@ -237,6 +255,24 @@ func (s *CompensationService) DeleteBonus(ctx context.Context, bonusID string) e
 		return err
 	}
 	return nil
+}
+
+func (s *CompensationService) ensureBonusAccessible(ctx context.Context, employeeID string, actorID string, perms *rbac.CachedPermissions) error {
+	if canManageAllBonuses(perms) {
+		return nil
+	}
+	employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
+	if err != nil {
+		return err
+	}
+	if employee.ID != employeeID {
+		return ErrBonusForbidden
+	}
+	return nil
+}
+
+func canManageAllBonuses(perms *rbac.CachedPermissions) bool {
+	return rbac.CanViewAll(perms, "hris:bonus:approve")
 }
 
 func (s *CompensationService) mapSalaryRow(row hrisrepo.SalaryRow) (model.SalaryRecord, error) {

@@ -14,7 +14,7 @@ import { Card } from "@/components/ui/card";
 import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { employeesKeys, listEmployees } from "@/services/hris-employees";
 import {
   createSubscription,
@@ -30,6 +30,7 @@ import type { Subscription, SubscriptionFormValues } from "@/types/hris";
 
 export const Route = createFileRoute("/_authenticated/hris/subscriptions")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisSubscriptionView);
   },
   component: SubscriptionsPage,

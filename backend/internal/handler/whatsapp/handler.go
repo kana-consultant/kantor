@@ -30,33 +30,33 @@ func New(service *waservice.Service) *Handler {
 
 func (h *Handler) RegisterRoutes(router chi.Router) {
 	// Connection
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Get("/status", h.getStatus)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Get("/qr", h.getQR)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Post("/session/start", h.startSession)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Post("/session/stop", h.stopSession)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:view")).Get("/stats", h.getStats)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/status", h.getStatus)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/qr", h.getQR)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/session/start", h.startSession)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/session/stop", h.stopSession)
+	router.With(platformmiddleware.RequirePermission("operational:wa:view")).Get("/stats", h.getStats)
 
 	// Templates
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:view")).Get("/templates", h.listTemplates)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Post("/templates", h.createTemplate)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Put("/templates/{templateID}", h.updateTemplate)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Delete("/templates/{templateID}", h.deleteTemplate)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:view")).Post("/templates/{templateID}/preview", h.previewTemplate)
+	router.With(platformmiddleware.RequirePermission("operational:wa:view")).Get("/templates", h.listTemplates)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/templates", h.createTemplate)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Put("/templates/{templateID}", h.updateTemplate)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Delete("/templates/{templateID}", h.deleteTemplate)
+	router.With(platformmiddleware.RequirePermission("operational:wa:view")).Post("/templates/{templateID}/preview", h.previewTemplate)
 
 	// Schedules
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Get("/schedules", h.listSchedules)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Post("/schedules", h.createSchedule)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Put("/schedules/{scheduleID}", h.updateSchedule)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Delete("/schedules/{scheduleID}", h.deleteSchedule)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Post("/schedules/{scheduleID}/trigger", h.triggerSchedule)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Patch("/schedules/{scheduleID}/toggle", h.toggleSchedule)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/schedules", h.listSchedules)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/schedules", h.createSchedule)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Put("/schedules/{scheduleID}", h.updateSchedule)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Delete("/schedules/{scheduleID}", h.deleteSchedule)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/schedules/{scheduleID}/trigger", h.triggerSchedule)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Patch("/schedules/{scheduleID}/toggle", h.toggleSchedule)
 
 	// Logs
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:view")).Get("/logs", h.listLogs)
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:view")).Get("/logs/summary", h.getLogSummary)
+	router.With(platformmiddleware.RequirePermission("operational:wa:view")).Get("/logs", h.listLogs)
+	router.With(platformmiddleware.RequirePermission("operational:wa:view")).Get("/logs/summary", h.getLogSummary)
 
 	// Quick Send
-	router.With(platformmiddleware.RBACMiddleware("operational:wa:manage")).Post("/send", h.quickSend)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/send", h.quickSend)
 
 	// User phone
 	router.Get("/phone", h.getUserPhone)

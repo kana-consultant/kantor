@@ -28,17 +28,17 @@ func NewLeadsHandler(service *marketingservice.LeadsService) *LeadsHandler {
 }
 
 func (h *LeadsHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:create")).Post("/", h.createLead)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:view")).Get("/", h.listLeads)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:view")).Get("/summary", h.summary)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:view")).Get("/pipeline", h.pipeline)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:create")).Post("/import", h.importCSV)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:view")).Get("/{leadID}", h.getLead)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:edit")).Put("/{leadID}", h.updateLead)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:delete")).Delete("/{leadID}", h.deleteLead)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:edit")).Patch("/{leadID}/status", h.moveStatus)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:view")).Get("/{leadID}/activities", h.listActivities)
-	router.With(platformmiddleware.RBACMiddleware("marketing:leads:edit")).Post("/{leadID}/activities", h.createActivity)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:create")).Post("/", h.createLead)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/", h.listLeads)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/summary", h.summary)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/pipeline", h.pipeline)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:import")).Post("/import", h.importCSV)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/{leadID}", h.getLead)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:edit")).Put("/{leadID}", h.updateLead)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:delete")).Delete("/{leadID}", h.deleteLead)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:edit")).Patch("/{leadID}/status", h.moveStatus)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/{leadID}/activities", h.listActivities)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:edit")).Post("/{leadID}/activities", h.createActivity)
 }
 
 func (h *LeadsHandler) createLead(w http.ResponseWriter, r *http.Request) {

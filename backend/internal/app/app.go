@@ -57,6 +57,7 @@ type App struct {
 	db               *pgxpool.Pool
 	router           http.Handler
 	backgroundCancel context.CancelFunc
+	permissionCache  *rbac.PermissionCache
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -89,8 +90,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	auditService := auditservice.NewService(auditRepository)
 
 	authRepository := authrepo.New(pool)
+	permissionCache := rbac.NewPermissionCache(pool, 5*time.Minute)
 	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
-	authService := authservice.New(authRepository, employeesRepository, cfg)
+	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache)
 
 	if cfg.SeedSuperAdmin.Enabled {
 		if err := authService.EnsureSeedSuperAdmin(
@@ -199,7 +201,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	kanbanService.SetTaskAssignNotifier(whatsappService)
 	reimbursementsService.SetWANotifier(whatsappService)
 
-	application := &App{cfg: cfg, db: pool}
+	application := &App{cfg: cfg, db: pool, permissionCache: permissionCache}
 	application.router = application.buildRouter(
 		auditService,
 		authService,
@@ -309,51 +311,83 @@ func (a *App) buildRouter(
 		})
 
 		r.Group(func(protected chi.Router) {
-			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken))
+			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load))
 			protected.Get("/auth/me", authHandler.Me)
 			protected.Get("/auth/profile", authHandler.GetProfile)
 			protected.Put("/auth/profile", authHandler.UpdateProfile)
 			protected.Post("/auth/change-password", authHandler.ChangePassword)
-			protected.Post("/auth/change-password", authHandler.ChangePassword)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
+			protected.With(platformmiddleware.RequireAnyPermission(
+				"admin:roles:view",
+				"admin:users:view",
+				"admin:settings:view",
+			)).Get("/modules", authHandler.ListModules)
 			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
 
 			protected.Route("/admin", func(admin chi.Router) {
-				admin.Use(platformmiddleware.SuperAdminMiddleware())
-				admin.Get("/users", authHandler.ListUsers)
-				admin.Get("/users/{userID}", authHandler.GetUser)
-				admin.Put("/users/{userID}/roles", authHandler.UpdateUserRoles)
-				admin.Patch("/users/{userID}/active", authHandler.ToggleUserActive)
+				admin.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleAdmin))
+				admin.With(platformmiddleware.RequireAnyPermission(
+					"admin:roles:view",
+					"admin:users:view",
+					"admin:settings:view",
+				)).Get("/roles", authHandler.ListRoles)
+				admin.With(platformmiddleware.RequireAnyPermission(
+					"admin:roles:view",
+					"admin:users:view",
+				)).Get("/roles/{roleID}", authHandler.GetRole)
+				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Post("/roles", authHandler.CreateRole)
+				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Put("/roles/{roleID}", authHandler.UpdateRole)
+				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Delete("/roles/{roleID}", authHandler.DeleteRole)
+				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Patch("/roles/{roleID}/toggle", authHandler.ToggleRole)
+				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Post("/roles/{roleID}/duplicate", authHandler.DuplicateRole)
+				admin.With(platformmiddleware.RequirePermission("admin:roles:view")).Get("/permissions", authHandler.ListPermissions)
+
+				admin.With(platformmiddleware.RequirePermission("admin:users:view")).Get("/users", authHandler.ListUsers)
+				admin.With(platformmiddleware.RequirePermission("admin:users:view")).Get("/users/{userID}", authHandler.GetUser)
+				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Put("/users/{userID}/roles", authHandler.UpdateUserRoles)
+				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Patch("/users/{userID}/active", authHandler.ToggleUserActive)
+				admin.With(platformmiddleware.SuperAdminMiddleware()).Post("/users/{userID}/toggle-super-admin", authHandler.ToggleUserSuperAdmin)
+
+				admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings", authHandler.GetSettings)
+				admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings/departments", authHandler.ListSettingsDepartments)
+				admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/default-roles", authHandler.UpdateDefaultRoles)
+				admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/auto-create-employee", authHandler.UpdateAutoCreateEmployee)
 			})
 
 			protected.Route("/operational", func(module chi.Router) {
-				module.With(platformmiddleware.RBACMiddleware("operational:project:view")).Get("/overview", operationalOverviewHandler.Get)
+				module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
+				module.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/overview", operationalOverviewHandler.Get)
 
 				module.Route("/projects", projectsHandler.RegisterRoutes)
 				module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
 				module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
 			})
 
-			protected.Route("/tracker", trackerHandler.RegisterRoutes)
+			protected.Route("/tracker", func(tracker chi.Router) {
+				tracker.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
+				trackerHandler.RegisterRoutes(tracker)
+			})
 
 			protected.Route("/hris", func(module chi.Router) {
-				module.With(platformmiddleware.RBACMiddleware("hris:employee:view")).Get("/overview", hrisOverviewHandler.Get)
+				module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleHRIS))
+				module.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/overview", hrisOverviewHandler.Get)
 
 				module.Route("/employees", employeesHandler.RegisterRoutes)
 				module.Route("/departments", departmentsHandler.RegisterRoutes)
 				module.Route("/employees/{employeeID}/salaries", compensationHandler.RegisterSalaryRoutes)
 				module.Route("/employees/{employeeID}/bonuses", compensationHandler.RegisterBonusRoutes)
-				module.With(platformmiddleware.RBACMiddleware("hris:bonus:edit")).Put("/bonuses/{bonusID}", compensationHandler.UpdateBonus)
-				module.With(platformmiddleware.RBACMiddleware("hris:bonus:edit")).Delete("/bonuses/{bonusID}", compensationHandler.DeleteBonus)
-				module.With(platformmiddleware.RBACMiddleware("hris:bonus:approve")).Patch("/bonuses/{bonusID}/approve", compensationHandler.ApproveBonus)
-				module.With(platformmiddleware.RBACMiddleware("hris:bonus:approve")).Patch("/bonuses/{bonusID}/reject", compensationHandler.RejectBonus)
+				module.With(platformmiddleware.RequirePermission("hris:bonus:edit")).Put("/bonuses/{bonusID}", compensationHandler.UpdateBonus)
+				module.With(platformmiddleware.RequirePermission("hris:bonus:delete")).Delete("/bonuses/{bonusID}", compensationHandler.DeleteBonus)
+				module.With(platformmiddleware.RequirePermission("hris:bonus:approve")).Patch("/bonuses/{bonusID}/approve", compensationHandler.ApproveBonus)
+				module.With(platformmiddleware.RequirePermission("hris:bonus:approve")).Patch("/bonuses/{bonusID}/reject", compensationHandler.RejectBonus)
 				module.Route("/finance", financeHandler.RegisterRoutes)
 				module.Route("/reimbursements", reimbursementsHandler.RegisterRoutes)
 				module.Route("/subscriptions", subscriptionsHandler.RegisterRoutes)
 			})
 
 			protected.Route("/marketing", func(module chi.Router) {
-				module.With(platformmiddleware.RBACMiddleware("marketing:campaign:view")).Get("/overview", marketingOverviewHandler.Get)
+				module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleMarketing))
+				module.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/overview", marketingOverviewHandler.Get)
 
 				module.Route("/campaigns", campaignsHandler.RegisterRoutes)
 				module.Route("/ads-metrics", adsMetricsHandler.RegisterRoutes)
@@ -361,7 +395,10 @@ func (a *App) buildRouter(
 				module.Route("/columns", campaignsHandler.RegisterColumnRoutes)
 			})
 
-			protected.Route("/wa", waHandler.RegisterRoutes)
+			protected.Route("/wa", func(wa chi.Router) {
+				wa.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
+				waHandler.RegisterRoutes(wa)
+			})
 		})
 	})
 

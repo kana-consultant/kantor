@@ -35,7 +35,7 @@ import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
 import { adsMetricPlatformOptions, adsPlatformMeta } from "@/lib/marketing";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
   adsMetricsKeys,
   batchCreateAdsMetrics,
@@ -93,6 +93,7 @@ const summaryColors = ["#FF5630", "#36B37E", "#0065FF", "#6554C0", "#FF8B00", "#
 
 export const Route = createFileRoute("/_authenticated/marketing/ads-metrics")({
   beforeLoad: async () => {
+    await ensureModuleAccess("marketing");
     await ensurePermission(permissions.marketingAdsMetricsView);
   },
   component: AdsMetricsPage,

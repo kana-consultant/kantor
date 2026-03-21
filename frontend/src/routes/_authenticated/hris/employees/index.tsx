@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { departmentsKeys, listDepartments } from "@/services/hris-departments";
 import {
   deleteEmployee,
@@ -29,6 +29,7 @@ const defaultFilters: EmployeeFilters = {
 
 export const Route = createFileRoute("/_authenticated/hris/employees/")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisEmployeeView);
   },
   component: EmployeesPage,

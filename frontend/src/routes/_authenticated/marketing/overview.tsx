@@ -32,7 +32,7 @@ import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { getMarketingOverview, overviewKeys } from "@/services/overview";
 import type { MarketingTopCampaign } from "@/types/overview";
 
@@ -48,6 +48,7 @@ const pipelineColors: Record<string, string> = {
 
 export const Route = createFileRoute("/_authenticated/marketing/overview")({
   beforeLoad: async () => {
+    await ensureModuleAccess("marketing");
     await ensurePermission(permissions.marketingOverview);
   },
   component: MarketingOverviewPage,

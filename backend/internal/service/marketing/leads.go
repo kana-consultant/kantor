@@ -36,7 +36,7 @@ type leadsRepository interface {
 }
 
 type leadsAuthRepository interface {
-	ListUserIDsByRole(ctx context.Context, roleName string, module string) ([]string, error)
+	ListUserIDsByPermission(ctx context.Context, permissionID string) ([]string, error)
 }
 
 type leadsNotificationsService interface {
@@ -278,15 +278,7 @@ func (s *LeadsService) notifyLeadOutcome(ctx context.Context, lead model.Lead) e
 		return nil
 	}
 
-	managers, err := s.authRepo.ListUserIDsByRole(ctx, "manager", "marketing")
-	if err != nil {
-		return err
-	}
-	admins, err := s.authRepo.ListUserIDsByRole(ctx, "admin", "marketing")
-	if err != nil {
-		return err
-	}
-	superAdmins, err := s.authRepo.ListUserIDsByRole(ctx, "super_admin", "")
+	recipients, err := s.authRepo.ListUserIDsByPermission(ctx, "marketing:leads:edit")
 	if err != nil {
 		return err
 	}
@@ -295,7 +287,7 @@ func (s *LeadsService) notifyLeadOutcome(ctx context.Context, lead model.Lead) e
 	return sendNotifications(
 		ctx,
 		s.notificationsService,
-		append(append(append(managers, admins...), superAdmins...), lead.CreatedBy),
+		append(recipients, lead.CreatedBy),
 		"marketing.lead."+lead.PipelineStatus,
 		"Lead outcome updated",
 		message,

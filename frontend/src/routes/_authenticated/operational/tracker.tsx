@@ -48,7 +48,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRBAC } from "@/hooks/use-rbac";
 import { env } from "@/lib/env";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import {
   trackerKeys,
@@ -74,6 +74,7 @@ const TRACKER_EXTENSION_SOURCE = "KANTOR_TRACKER_EXTENSION";
 
 export const Route = createFileRoute("/_authenticated/operational/tracker")({
   beforeLoad: async () => {
+    await ensureModuleAccess("operational");
     await ensurePermission(permissions.operationalTrackerView);
   },
   component: OperationalTrackerPage,
@@ -84,7 +85,7 @@ function OperationalTrackerPage() {
   const { session } = useAuth();
   const { hasPermission } = useRBAC();
   const canViewTeam = hasPermission(permissions.operationalTrackerViewTeam);
-  const canAuditConsent = hasPermission(permissions.operationalTrackerConsentAudit);
+  const canAuditConsent = hasPermission(permissions.operationalTrackerViewTeam);
   const canManageDomains = hasPermission(permissions.operationalTrackerDomainManage);
 
   const today = formatDateInput(new Date());

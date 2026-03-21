@@ -28,14 +28,14 @@ func NewAdsMetricsHandler(service *marketingservice.AdsMetricsService) *AdsMetri
 }
 
 func (h *AdsMetricsHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:create")).Post("/", h.createMetric)
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:create")).Post("/batch", h.batchCreateMetrics)
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:view")).Get("/", h.listMetrics)
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:view")).Get("/summary", h.summary)
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:view")).Get("/export", h.exportCSV)
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:view")).Get("/{metricID}", h.getMetric)
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:edit")).Put("/{metricID}", h.updateMetric)
-	router.With(platformmiddleware.RBACMiddleware("marketing:ads_metrics:delete")).Delete("/{metricID}", h.deleteMetric)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:create")).Post("/", h.createMetric)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:create")).Post("/batch", h.batchCreateMetrics)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/", h.listMetrics)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/summary", h.summary)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/export", h.exportCSV)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/{metricID}", h.getMetric)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:edit")).Put("/{metricID}", h.updateMetric)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:delete")).Delete("/{metricID}", h.deleteMetric)
 }
 
 func (h *AdsMetricsHandler) createMetric(w http.ResponseWriter, r *http.Request) {

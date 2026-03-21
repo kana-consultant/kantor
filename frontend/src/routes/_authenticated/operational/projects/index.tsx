@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
   createProject,
   deleteProject,
@@ -32,6 +32,7 @@ const defaultFilters: ProjectFilters = {
 
 export const Route = createFileRoute("/_authenticated/operational/projects/")({
   beforeLoad: async () => {
+    await ensureModuleAccess("operational");
     await ensurePermission(permissions.operationalProjectView);
   },
   component: ProjectsListPage,

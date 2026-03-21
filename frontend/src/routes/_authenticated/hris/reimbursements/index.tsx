@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { formatIDR } from "@/lib/currency";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { employeesKeys, listEmployees } from "@/services/hris-employees";
 import {
   createReimbursement,
@@ -50,6 +50,7 @@ const defaultFilters: ReimbursementFilters = {
 
 export const Route = createFileRoute("/_authenticated/hris/reimbursements/")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisReimbursementView);
   },
   component: ReimbursementsPage,

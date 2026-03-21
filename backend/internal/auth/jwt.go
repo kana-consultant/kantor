@@ -12,8 +12,7 @@ import (
 )
 
 type AccessClaims struct {
-	Roles       []string `json:"roles"`
-	Permissions []string `json:"permissions"`
+	Type string `json:"type"`
 	jwt.RegisteredClaims
 }
 
@@ -31,11 +30,10 @@ func NewTokenManager(secret string, accessExpiry time.Duration, refreshExpiry ti
 	}
 }
 
-func (m *TokenManager) GenerateAccessToken(userID string, roles []string, permissions []string, now time.Time) (string, time.Time, error) {
+func (m *TokenManager) GenerateAccessToken(userID string, now time.Time) (string, time.Time, error) {
 	expiresAt := now.Add(m.accessExpiry)
 	claims := AccessClaims{
-		Roles:       roles,
-		Permissions: permissions,
+		Type: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -66,6 +64,9 @@ func (m *TokenManager) ParseAccessToken(token string) (*AccessClaims, error) {
 
 	if !parsed.Valid {
 		return nil, fmt.Errorf("invalid access token")
+	}
+	if claims.Type != "access" {
+		return nil, fmt.Errorf("invalid access token type")
 	}
 
 	return claims, nil

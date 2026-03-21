@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { formatIDR } from "@/lib/currency";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { fetchProtectedFileBlob, getProtectedFileName, openProtectedFile } from "@/services/files";
 import {
   getReimbursement,
@@ -22,6 +22,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/hris/reimbursements/$reimbursementId")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisReimbursementView);
   },
   component: ReimbursementDetailPage,

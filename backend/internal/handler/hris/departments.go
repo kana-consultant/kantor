@@ -26,11 +26,11 @@ func NewDepartmentsHandler(service *hrisservice.DepartmentsService) *Departments
 }
 
 func (h *DepartmentsHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("hris:department:create")).Post("/", h.createDepartment)
-	router.With(platformmiddleware.RBACMiddleware("hris:department:view")).Get("/", h.listDepartments)
-	router.With(platformmiddleware.RBACMiddleware("hris:department:view")).Get("/{departmentID}", h.getDepartment)
-	router.With(platformmiddleware.RBACMiddleware("hris:department:edit")).Put("/{departmentID}", h.updateDepartment)
-	router.With(platformmiddleware.RBACMiddleware("hris:department:delete")).Delete("/{departmentID}", h.deleteDepartment)
+	router.With(platformmiddleware.RequirePermission("hris:department:create")).Post("/", h.createDepartment)
+	router.With(platformmiddleware.RequirePermission("hris:department:view")).Get("/", h.listDepartments)
+	router.With(platformmiddleware.RequirePermission("hris:department:view")).Get("/{departmentID}", h.getDepartment)
+	router.With(platformmiddleware.RequirePermission("hris:department:edit")).Put("/{departmentID}", h.updateDepartment)
+	router.With(platformmiddleware.RequirePermission("hris:department:delete")).Delete("/{departmentID}", h.deleteDepartment)
 }
 
 func (h *DepartmentsHandler) createDepartment(w http.ResponseWriter, r *http.Request) {

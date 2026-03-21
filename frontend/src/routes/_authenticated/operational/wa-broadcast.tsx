@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { useRBAC } from "@/hooks/use-rbac";
 import { cn } from "@/lib/utils";
 import {
@@ -57,6 +57,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/operational/wa-broadcast")({
   beforeLoad: async () => {
+    await ensureModuleAccess("operational");
     await ensurePermission(permissions.operationalWAView);
   },
   component: WABroadcastPage,

@@ -27,19 +27,19 @@ func NewKanbanHandler(service *operationalservice.KanbanService) *KanbanHandler 
 }
 
 func (h *KanbanHandler) RegisterColumnRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:create")).Post("/", h.createColumn)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:view")).Get("/", h.listColumns)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:edit")).Put("/{columnID}", h.updateColumn)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:delete")).Delete("/{columnID}", h.deleteColumn)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:edit")).Patch("/reorder", h.reorderColumns)
+	router.With(platformmiddleware.RequirePermission("operational:column:manage")).Post("/", h.createColumn)
+	router.With(platformmiddleware.RequirePermission("operational:column:view")).Get("/", h.listColumns)
+	router.With(platformmiddleware.RequirePermission("operational:column:manage")).Put("/{columnID}", h.updateColumn)
+	router.With(platformmiddleware.RequirePermission("operational:column:manage")).Delete("/{columnID}", h.deleteColumn)
+	router.With(platformmiddleware.RequirePermission("operational:column:manage")).Patch("/reorder", h.reorderColumns)
 }
 
 func (h *KanbanHandler) RegisterTaskRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:create")).Post("/", h.createTask)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:view")).Get("/", h.listTasks)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:edit")).Put("/{taskID}", h.updateTask)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:delete")).Delete("/{taskID}", h.deleteTask)
-	router.With(platformmiddleware.RBACMiddleware("operational:kanban:edit")).Patch("/{taskID}/move", h.moveTask)
+	router.With(platformmiddleware.RequirePermission("operational:task:create")).Post("/", h.createTask)
+	router.With(platformmiddleware.RequirePermission("operational:task:view")).Get("/", h.listTasks)
+	router.With(platformmiddleware.RequirePermission("operational:task:edit")).Put("/{taskID}", h.updateTask)
+	router.With(platformmiddleware.RequirePermission("operational:task:delete")).Delete("/{taskID}", h.deleteTask)
+	router.With(platformmiddleware.RequirePermission("operational:task:edit")).Patch("/{taskID}/move", h.moveTask)
 }
 
 func (h *KanbanHandler) createColumn(w http.ResponseWriter, r *http.Request) {

@@ -26,11 +26,12 @@ import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { getHrisOverview, overviewKeys } from "@/services/overview";
 
 export const Route = createFileRoute("/_authenticated/hris/overview")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisOverview);
   },
   component: HrisOverviewPage,

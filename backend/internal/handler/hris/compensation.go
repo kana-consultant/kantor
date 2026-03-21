@@ -26,14 +26,14 @@ func NewCompensationHandler(service *hrisservice.CompensationService) *Compensat
 }
 
 func (h *CompensationHandler) RegisterSalaryRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("hris:salary:create")).Post("/", h.createSalary)
-	router.With(platformmiddleware.RBACMiddleware("hris:salary:view")).Get("/", h.listSalaries)
-	router.With(platformmiddleware.RBACMiddleware("hris:salary:view")).Get("/current", h.getCurrentSalary)
+	router.With(platformmiddleware.RequirePermission("hris:salary:create")).Post("/", h.createSalary)
+	router.With(platformmiddleware.RequirePermission("hris:salary:view")).Get("/", h.listSalaries)
+	router.With(platformmiddleware.RequirePermission("hris:salary:view")).Get("/current", h.getCurrentSalary)
 }
 
 func (h *CompensationHandler) RegisterBonusRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("hris:bonus:create")).Post("/", h.createBonus)
-	router.With(platformmiddleware.RBACMiddleware("hris:bonus:view")).Get("/", h.listBonuses)
+	router.With(platformmiddleware.RequirePermission("hris:bonus:create")).Post("/", h.createBonus)
+	router.With(platformmiddleware.RequirePermission("hris:bonus:view")).Get("/", h.listBonuses)
 }
 
 func (h *CompensationHandler) createSalary(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +109,12 @@ func (h *CompensationHandler) createBonus(w http.ResponseWriter, r *http.Request
 }
 
 func (h *CompensationHandler) listBonuses(w http.ResponseWriter, r *http.Request) {
-	result, err := h.service.ListBonuses(r.Context(), chi.URLParam(r, "employeeID"))
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+	result, err := h.service.ListBonuses(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -138,9 +143,14 @@ func (h *CompensationHandler) UpdateBonus(w http.ResponseWriter, r *http.Request
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
 
 	bonusID := chi.URLParam(r, "bonusID")
-	result, err := h.service.UpdateBonus(r.Context(), bonusID, input)
+	result, err := h.service.UpdateBonus(r.Context(), bonusID, input, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -166,8 +176,13 @@ func (h *CompensationHandler) RejectBonus(w http.ResponseWriter, r *http.Request
 }
 
 func (h *CompensationHandler) DeleteBonus(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
 	bonusID := chi.URLParam(r, "bonusID")
-	if err := h.service.DeleteBonus(r.Context(), bonusID); err != nil {
+	if err := h.service.DeleteBonus(r.Context(), bonusID, principal.UserID, principal.Cached); err != nil {
 		h.writeError(w, err)
 		return
 	}
@@ -185,6 +200,8 @@ func (h *CompensationHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusNotFound, "BONUS_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrBonusNotPending):
 		response.WriteError(w, http.StatusConflict, "BONUS_NOT_PENDING", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrBonusForbidden):
+		response.WriteError(w, http.StatusForbidden, "BONUS_FORBIDDEN", err.Error(), nil)
 	default:
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}

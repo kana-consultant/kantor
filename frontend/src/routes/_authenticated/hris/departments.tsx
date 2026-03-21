@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
-import { ensurePermission } from "@/lib/rbac";
+import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
   createDepartment,
   deleteDepartment,
@@ -24,6 +24,7 @@ import type { Department, DepartmentFormValues } from "@/types/hris";
 
 export const Route = createFileRoute("/_authenticated/hris/departments")({
   beforeLoad: async () => {
+    await ensureModuleAccess("hris");
     await ensurePermission(permissions.hrisDepartmentView);
   },
   component: DepartmentsPage,

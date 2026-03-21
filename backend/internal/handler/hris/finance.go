@@ -29,20 +29,20 @@ func NewFinanceHandler(service *hrisservice.FinanceService) *FinanceHandler {
 }
 
 func (h *FinanceHandler) RegisterRoutes(router chi.Router) {
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:view")).Get("/categories", h.listCategories)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:approve")).Post("/categories", h.createCategory)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:approve")).Put("/categories/{categoryID}", h.updateCategory)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:approve")).Delete("/categories/{categoryID}", h.deleteCategory)
+	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/categories", h.listCategories)
+	router.With(platformmiddleware.RequirePermission("hris:finance:approve")).Post("/categories", h.createCategory)
+	router.With(platformmiddleware.RequirePermission("hris:finance:approve")).Put("/categories/{categoryID}", h.updateCategory)
+	router.With(platformmiddleware.RequirePermission("hris:finance:approve")).Delete("/categories/{categoryID}", h.deleteCategory)
 
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:create")).Post("/records", h.createRecord)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:view")).Get("/records", h.listRecords)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:view")).Get("/records/{recordID}", h.getRecord)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:edit")).Put("/records/{recordID}", h.updateRecord)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:edit")).Delete("/records/{recordID}", h.deleteRecord)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:create")).Patch("/records/{recordID}/submit", h.submitRecord)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:approve")).Patch("/records/{recordID}/review", h.reviewRecord)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:view")).Get("/summary", h.summary)
-	router.With(platformmiddleware.RBACMiddleware("hris:finance:view")).Get("/export", h.exportCSV)
+	router.With(platformmiddleware.RequirePermission("hris:finance:create")).Post("/records", h.createRecord)
+	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/records", h.listRecords)
+	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/records/{recordID}", h.getRecord)
+	router.With(platformmiddleware.RequirePermission("hris:finance:edit")).Put("/records/{recordID}", h.updateRecord)
+	router.With(platformmiddleware.RequirePermission("hris:finance:delete")).Delete("/records/{recordID}", h.deleteRecord)
+	router.With(platformmiddleware.RequirePermission("hris:finance:create")).Patch("/records/{recordID}/submit", h.submitRecord)
+	router.With(platformmiddleware.RequirePermission("hris:finance:approve")).Patch("/records/{recordID}/review", h.reviewRecord)
+	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/summary", h.summary)
+	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/export", h.exportCSV)
 }
 
 func (h *FinanceHandler) createCategory(w http.ResponseWriter, r *http.Request) {
@@ -108,8 +108,11 @@ func requireFinanceAdmin(w http.ResponseWriter, r *http.Request) bool {
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
 		return false
 	}
-	for _, role := range principal.Roles {
-		if role == "super_admin" || role == "admin:hris" {
+	if principal.IsSuperAdmin {
+		return true
+	}
+	if principal.ModuleRoles != nil {
+		if role, exists := principal.ModuleRoles["hris"]; exists && role.RoleSlug == "admin" {
 			return true
 		}
 	}
@@ -122,7 +125,12 @@ func (h *FinanceHandler) createRecord(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, err := h.service.CreateRecord(r.Context(), input)
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+	result, err := h.service.CreateRecord(r.Context(), input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -136,7 +144,12 @@ func (h *FinanceHandler) listRecords(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, total, page, perPage, err := h.service.ListRecords(r.Context(), query)
+	principal, principalOK := platformmiddleware.PrincipalFromContext(r.Context())
+	if !principalOK {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+	items, total, page, perPage, err := h.service.ListRecords(r.Context(), query, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -149,7 +162,12 @@ func (h *FinanceHandler) listRecords(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FinanceHandler) getRecord(w http.ResponseWriter, r *http.Request) {
-	result, err := h.service.GetRecord(r.Context(), chi.URLParam(r, "recordID"))
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+	result, err := h.service.GetRecord(r.Context(), chi.URLParam(r, "recordID"), principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -162,8 +180,13 @@ func (h *FinanceHandler) updateRecord(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
 	recordID := chi.URLParam(r, "recordID")
-	result, err := h.service.UpdateRecord(r.Context(), recordID, input)
+	result, err := h.service.UpdateRecord(r.Context(), recordID, input, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -173,8 +196,13 @@ func (h *FinanceHandler) updateRecord(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FinanceHandler) deleteRecord(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
 	recordID := chi.URLParam(r, "recordID")
-	if err := h.service.DeleteRecord(r.Context(), recordID); err != nil {
+	if err := h.service.DeleteRecord(r.Context(), recordID, principal.UserID, principal.Cached); err != nil {
 		h.writeError(w, err)
 		return
 	}
@@ -189,7 +217,7 @@ func (h *FinanceHandler) submitRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	recordID := chi.URLParam(r, "recordID")
-	result, err := h.service.SubmitRecord(r.Context(), recordID, principal.UserID)
+	result, err := h.service.SubmitRecord(r.Context(), recordID, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -307,6 +335,8 @@ func (h *FinanceHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusNotFound, "FINANCE_RECORD_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrFinanceCategoryExists):
 		response.WriteError(w, http.StatusConflict, "FINANCE_CATEGORY_EXISTS", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrFinanceForbidden):
+		response.WriteError(w, http.StatusForbidden, "FINANCE_FORBIDDEN", err.Error(), nil)
 	default:
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}

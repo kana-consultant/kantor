@@ -11,6 +11,7 @@ type User struct {
 	Department          *string    `json:"department,omitempty"`
 	Skills              []string   `json:"skills,omitempty"`
 	IsActive            bool       `json:"is_active"`
+	IsSuperAdmin        bool       `json:"is_super_admin"`
 	FailedLoginAttempts int        `json:"-"`
 	LockedUntil         *time.Time `json:"-"`
 	CreatedAt           time.Time  `json:"created_at"`

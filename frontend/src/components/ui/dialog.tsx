@@ -124,6 +124,19 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
         }
       }, 0);
 
+      return undefined;
+    }, [context.open, context.rendered]);
+
+    useEffect(() => {
+      if (!context.rendered) {
+        return undefined;
+      }
+
+      const node = contentRef.current;
+      if (!node) {
+        return undefined;
+      }
+
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === "Escape" && context.dismissible) {
           event.preventDefault();
@@ -164,7 +177,7 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
       return () => {
         document.removeEventListener("keydown", handleKeyDown);
       };
-    }, [context]);
+    }, [context.dismissible, context.onOpenChange, context.open, context.rendered]);
 
     if (!context.rendered || typeof document === "undefined") {
       return null;
