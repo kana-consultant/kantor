@@ -10,6 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
@@ -17,12 +18,14 @@ import (
 
 type AdsMetricsHandler struct {
 	service   *marketingservice.AdsMetricsService
+	users     exportutil.UserLookup
 	validator *validator.Validate
 }
 
-func NewAdsMetricsHandler(service *marketingservice.AdsMetricsService) *AdsMetricsHandler {
+func NewAdsMetricsHandler(service *marketingservice.AdsMetricsService, users exportutil.UserLookup) *AdsMetricsHandler {
 	return &AdsMetricsHandler{
 		service:   service,
+		users:     users,
 		validator: newValidator(),
 	}
 }
@@ -32,7 +35,7 @@ func (h *AdsMetricsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:create")).Post("/batch", h.batchCreateMetrics)
 	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/", h.listMetrics)
 	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/summary", h.summary)
-	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/export", h.exportCSV)
+	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/export", h.export)
 	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:view")).Get("/{metricID}", h.getMetric)
 	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:edit")).Put("/{metricID}", h.updateMetric)
 	router.With(platformmiddleware.RequirePermission("marketing:ads_metrics:delete")).Delete("/{metricID}", h.deleteMetric)

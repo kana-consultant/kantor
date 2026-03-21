@@ -1,7 +1,5 @@
-import { env } from "@/lib/env";
 import { ensureAuthenticated } from "@/services/auth";
-import { ApiError, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { getStoredSession } from "@/stores/auth-store";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type {
   AdsMetric,
   AdsMetricFilters,
@@ -108,30 +106,6 @@ export async function getAdsMetricsSummary(groupBy: "campaign" | "platform" | "m
     `/marketing/ads-metrics/summary?${params.toString()}`,
     { method: "GET" },
   );
-}
-
-export async function exportAdsMetricsCSV(dateFrom: string, dateTo: string) {
-  const session = getStoredSession();
-  const params = new URLSearchParams({ format: "csv" });
-  if (dateFrom) {
-    params.set("date_from", dateFrom);
-  }
-  if (dateTo) {
-    params.set("date_to", dateTo);
-  }
-
-  const response = await fetch(`${env.VITE_API_BASE_URL}/marketing/ads-metrics/export?${params.toString()}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${session?.tokens.access_token ?? ""}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, "Failed to export ads metrics");
-  }
-
-  return response.blob();
 }
 
 function serializeAdsMetric(input: AdsMetricFormValues) {

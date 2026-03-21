@@ -8,6 +8,7 @@ import { CircleDollarSign, Plus, Receipt, TimerReset } from "lucide-react";
 import { z } from "zod";
 
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
@@ -212,12 +213,27 @@ function ReimbursementsPage() {
               Submit claims, attach supporting files, and track approval through payout.
             </p>
           </div>
-          <PermissionGate permission={permissions.hrisReimbursementCreate}>
-            <Button onClick={() => setShowForm(true)} type="button">
-              <Plus className="h-4 w-4" />
-              Submit reimbursement
-            </Button>
-          </PermissionGate>
+          <div className="flex flex-wrap gap-3">
+            <PermissionGate permission={permissions.hrisReimbursementView}>
+              <ExportButton
+                endpoint="/hris/reimbursements/export"
+                filename="reimbursements-report"
+                filters={{
+                  employee: filters.employee,
+                  month: filters.month,
+                  status: filters.status,
+                  year: filters.year,
+                }}
+                formats={["pdf", "xlsx"]}
+              />
+            </PermissionGate>
+            <PermissionGate permission={permissions.hrisReimbursementCreate}>
+              <Button onClick={() => setShowForm(true)} type="button">
+                <Plus className="h-4 w-4" />
+                Submit reimbursement
+              </Button>
+            </PermissionGate>
+          </div>
         </div>
       </Card>
 

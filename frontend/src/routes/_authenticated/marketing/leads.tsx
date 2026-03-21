@@ -21,6 +21,7 @@ import {
   DrawerTitle,
 } from "@/components/shared/drawer";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { MarketingLeadsPipeline } from "@/components/shared/marketing-leads-pipeline";
 import { PermissionGate } from "@/components/shared/permission-gate";
@@ -486,6 +487,22 @@ function MarketingLeadsPage() {
               <LayoutList className="mr-2 h-4 w-4" />
               Table view
             </Button>
+            <PermissionGate permission={permissions.marketingLeadsView}>
+              <ExportButton
+                endpoint="/marketing/leads/export"
+                filename="leads-report"
+                filters={{
+                  assigned_to: filters.assignedTo,
+                  campaign_id: filters.campaignId,
+                  date_from: filters.dateFrom,
+                  date_to: filters.dateTo,
+                  pipeline_status: filters.pipelineStatus,
+                  search: filters.search,
+                  source_channel: filters.sourceChannel,
+                }}
+                formats={["pdf", "xlsx"]}
+              />
+            </PermissionGate>
             <PermissionGate permission={permissions.marketingLeadsCreate}>
               <Button
                 onClick={() => {

@@ -5,6 +5,7 @@ import { Banknote, CalendarClock, CreditCard, Plus } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ExportButton } from "@/components/shared/export-button";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -198,12 +199,21 @@ function SubscriptionsPage() {
             </p>
           </div>
 
-          <PermissionGate permission={permissions.hrisSubscriptionCreate}>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Add subscription
-            </Button>
-          </PermissionGate>
+          <div className="flex flex-wrap gap-3">
+            <PermissionGate permission={permissions.hrisSubscriptionView}>
+              <ExportButton
+                endpoint="/hris/subscriptions/export"
+                filename="subscriptions-report"
+                formats={["pdf", "xlsx"]}
+              />
+            </PermissionGate>
+            <PermissionGate permission={permissions.hrisSubscriptionCreate}>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add subscription
+              </Button>
+            </PermissionGate>
+          </div>
         </div>
       </Card>
 

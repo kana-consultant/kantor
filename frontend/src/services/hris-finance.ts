@@ -1,6 +1,4 @@
-import { env } from "@/lib/env";
 import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { getStoredSession } from "@/stores/auth-store";
 import type {
   FinanceCategory,
   FinanceCategoryFormValues,
@@ -120,28 +118,4 @@ export async function reviewFinanceRecord(recordId: string, decision: "approved"
 
 export async function getFinanceSummary(year: number) {
   return authGetJSON<FinanceSummary>(`/hris/finance/summary?year=${year}`);
-}
-
-export async function exportFinanceCSV(year: number, month?: string) {
-  const session = getStoredSession();
-  const query = new URLSearchParams({ year: String(year) });
-  if (month) {
-    query.set("month", month);
-  }
-
-  const response = await fetch(
-    `${env.VITE_API_BASE_URL}/hris/finance/export?${query.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${session?.tokens.access_token ?? ""}`,
-      },
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error("Export failed");
-  }
-
-  return response.blob();
 }

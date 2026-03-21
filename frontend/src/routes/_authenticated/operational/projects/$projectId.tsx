@@ -6,6 +6,7 @@ import { Plus, UserMinus, X } from "lucide-react";
 
 import { KanbanBoard } from "@/components/shared/kanban-board";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProjectForm } from "@/components/shared/project-form";
@@ -216,6 +217,13 @@ function ProjectWorkspacePage() {
                   {view}
                 </Button>
               ))}
+              <PermissionGate permission={permissions.operationalProjectView}>
+                <ExportButton
+                  endpoint={`/operational/projects/${projectId}/export`}
+                  filename={`project-${projectId}`}
+                  formats={["pdf"]}
+                />
+              </PermissionGate>
             </div>
           </div>
 

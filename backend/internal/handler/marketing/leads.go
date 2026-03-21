@@ -10,6 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
@@ -17,12 +18,14 @@ import (
 
 type LeadsHandler struct {
 	service   *marketingservice.LeadsService
+	users     exportutil.UserLookup
 	validator *validator.Validate
 }
 
-func NewLeadsHandler(service *marketingservice.LeadsService) *LeadsHandler {
+func NewLeadsHandler(service *marketingservice.LeadsService, users exportutil.UserLookup) *LeadsHandler {
 	return &LeadsHandler{
 		service:   service,
+		users:     users,
 		validator: newValidator(),
 	}
 }
@@ -30,6 +33,7 @@ func NewLeadsHandler(service *marketingservice.LeadsService) *LeadsHandler {
 func (h *LeadsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("marketing:leads:create")).Post("/", h.createLead)
 	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/", h.listLeads)
+	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/export", h.export)
 	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/summary", h.summary)
 	router.With(platformmiddleware.RequirePermission("marketing:leads:view")).Get("/pipeline", h.pipeline)
 	router.With(platformmiddleware.RequirePermission("marketing:leads:import")).Post("/import", h.importCSV)

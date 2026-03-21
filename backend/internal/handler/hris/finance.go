@@ -1,6 +1,8 @@
 package hris
 
 import (
+	"bytes"
+	"encoding/csv"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,19 +13,24 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
+	exportreport "github.com/kana-consultant/kantor/backend/internal/export"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
 )
 
 type FinanceHandler struct {
 	service   *hrisservice.FinanceService
+	users     exportutil.UserLookup
 	validator *validator.Validate
 }
 
-func NewFinanceHandler(service *hrisservice.FinanceService) *FinanceHandler {
+func NewFinanceHandler(service *hrisservice.FinanceService, users exportutil.UserLookup) *FinanceHandler {
 	return &FinanceHandler{
 		service:   service,
+		users:     users,
 		validator: newValidator(),
 	}
 }
@@ -42,7 +49,7 @@ func (h *FinanceHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:finance:create")).Patch("/records/{recordID}/submit", h.submitRecord)
 	router.With(platformmiddleware.RequirePermission("hris:finance:approve")).Patch("/records/{recordID}/review", h.reviewRecord)
 	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/summary", h.summary)
-	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/export", h.exportCSV)
+	router.With(platformmiddleware.RequirePermission("hris:finance:view")).Get("/export", h.exportRecords)
 }
 
 func (h *FinanceHandler) createCategory(w http.ResponseWriter, r *http.Request) {
@@ -259,25 +266,80 @@ func (h *FinanceHandler) summary(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
-func (h *FinanceHandler) exportCSV(w http.ResponseWriter, r *http.Request) {
-	year, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("year")))
-	if err != nil || year == 0 {
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Query validation failed", map[string]string{"year": "must be a number"})
+func (h *FinanceHandler) exportRecords(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
 		return
 	}
-	month, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("month")))
-	payload, err := h.service.ExportCSV(r.Context(), year, month)
+
+	query, ok := h.parseListQuery(w, r)
+	if !ok {
+		return
+	}
+	query.Page = 1
+	query.PerPage = 10000
+
+	items, _, _, _, err := h.service.ListRecords(r.Context(), query, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
-	filename := "finance-" + strconv.Itoa(year)
-	if month > 0 {
-		filename += "-" + strconv.Itoa(month)
+
+	selectedYear := query.Year
+	if selectedYear == 0 {
+		selectedYear = time.Now().Year()
 	}
-	filename += ".csv"
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
+	summary, err := h.service.Summary(r.Context(), selectedYear)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "csv"
+	}
+
+	var (
+		contentType string
+		filename    string
+		payload     []byte
+	)
+
+	switch format {
+	case "csv":
+		payload, err = renderFinanceCSV(items)
+		contentType = "text/csv"
+		filename = exportutil.Filename("finance-records", "csv")
+	case "pdf":
+		payload, err = renderFinancePDF(items, summary, exportutil.ResolveGeneratedBy(r.Context(), h.users))
+		contentType = "application/pdf"
+		filename = exportutil.Filename("finance-records", "pdf")
+	case "xlsx":
+		payload, err = renderFinanceXLSX(items, summary)
+		contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+		filename = exportutil.Filename("finance-records", "xlsx")
+	default:
+		response.WriteError(w, http.StatusBadRequest, "UNSUPPORTED_EXPORT_FORMAT", "Export format is not supported", map[string]string{"format": "must be csv, pdf, or xlsx"})
+		return
+	}
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	platformmiddleware.AuditLog(r.Context(), "export", "hris", "finance_record", "filtered", nil, map[string]any{
+		"format": format,
+		"count":  len(items),
+		"year":   query.Year,
+		"month":  query.Month,
+		"type":   query.Type,
+		"status": query.Status,
+	})
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(payload)
 }
@@ -340,4 +402,141 @@ func (h *FinanceHandler) writeError(w http.ResponseWriter, err error) {
 	default:
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}
+}
+
+func renderFinanceCSV(items []model.FinanceRecord) ([]byte, error) {
+	builder := &strings.Builder{}
+	writer := csv.NewWriter(builder)
+	if err := writer.Write([]string{"id", "category", "type", "amount", "description", "record_date", "status"}); err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		if err := writer.Write([]string{
+			item.ID,
+			item.CategoryName,
+			item.Type,
+			strconv.FormatInt(item.Amount, 10),
+			item.Description,
+			item.RecordDate.Format("2006-01-02"),
+			item.ApprovalStatus,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return []byte(builder.String()), nil
+}
+
+func renderFinancePDF(items []model.FinanceRecord, summary model.FinanceSummary, generatedBy string) ([]byte, error) {
+	report := exportreport.NewPDFReport("Finance Records Report", "hris", generatedBy)
+	report.AddParagraph("Approved and in-flight finance records exported from the HRIS finance workspace.")
+	report.AddSummary(map[string]string{
+		"Filtered records": strconv.Itoa(len(items)),
+		"Total income":     exportutil.FormatIDR(totalFinanceByType(items, "income")),
+		"Total outcome":    exportutil.FormatIDR(totalFinanceByType(items, "outcome")),
+		"Net":              exportutil.FormatIDR(totalFinanceByType(items, "income") - totalFinanceByType(items, "outcome")),
+		"Yearly total":     exportutil.FormatIDR(summary.TotalIncome - summary.TotalOutcome),
+	})
+
+	rows := make([][]string, 0, len(items))
+	for _, item := range items {
+		rows = append(rows, []string{
+			item.CategoryName,
+			strings.ToUpper(item.Type),
+			exportutil.FormatIDR(item.Amount),
+			item.ApprovalStatus,
+			exportutil.FormatDate(item.RecordDate),
+			item.Description,
+		})
+	}
+	report.AddTable([]string{"Category", "Type", "Amount", "Status", "Record Date", "Description"}, rows)
+
+	report.AddSection("Monthly Summary")
+	monthlyRows := make([][]string, 0, len(summary.Monthly))
+	for _, month := range summary.Monthly {
+		if month.Income == 0 && month.Outcome == 0 {
+			continue
+		}
+		monthlyRows = append(monthlyRows, []string{
+			time.Month(month.Month).String(),
+			exportutil.FormatIDR(month.Income),
+			exportutil.FormatIDR(month.Outcome),
+			exportutil.FormatIDR(month.Income - month.Outcome),
+		})
+	}
+	report.AddTable([]string{"Month", "Income", "Outcome", "Net"}, monthlyRows)
+
+	var buffer bytes.Buffer
+	if err := report.Save(&buffer); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+func renderFinanceXLSX(items []model.FinanceRecord, summary model.FinanceSummary) ([]byte, error) {
+	report := exportreport.NewExcelReport("Finance Records Report", "hris")
+	recordsSheet := report.AddSheet("Records")
+	if err := report.WriteHeader(recordsSheet, 1, []string{"Category", "Type", "Amount", "Status", "Record Date", "Description"}); err != nil {
+		return nil, err
+	}
+
+	rows := make([][]exportreport.CellValue, 0, len(items))
+	for _, item := range items {
+		rows = append(rows, []exportreport.CellValue{
+			exportreport.TextCell(item.CategoryName),
+			exportreport.TextCell(strings.ToUpper(item.Type)),
+			exportreport.CurrencyCell(item.Amount),
+			exportreport.TextCell(item.ApprovalStatus),
+			exportreport.DateCell(item.RecordDate),
+			exportreport.TextCell(item.Description),
+		})
+	}
+	if err := report.WriteRows(recordsSheet, 2, rows); err != nil {
+		return nil, err
+	}
+
+	summarySheet := report.AddSheet("Summary")
+	if err := report.WriteHeader(summarySheet, 1, []string{"Month", "Income", "Outcome", "Net"}); err != nil {
+		return nil, err
+	}
+	summaryRows := make([][]exportreport.CellValue, 0, len(summary.Monthly))
+	for _, month := range summary.Monthly {
+		summaryRows = append(summaryRows, []exportreport.CellValue{
+			exportreport.TextCell(time.Month(month.Month).String()),
+			exportreport.CurrencyCell(month.Income),
+			exportreport.CurrencyCell(month.Outcome),
+			exportreport.CurrencyCell(month.Income - month.Outcome),
+		})
+	}
+	if err := report.WriteRows(summarySheet, 2, summaryRows); err != nil {
+		return nil, err
+	}
+
+	if err := report.AddSummarySheet(map[string]string{
+		"Filtered records": strconv.Itoa(len(items)),
+		"Total income":     exportutil.FormatIDR(totalFinanceByType(items, "income")),
+		"Total outcome":    exportutil.FormatIDR(totalFinanceByType(items, "outcome")),
+		"Yearly total":     exportutil.FormatIDR(summary.TotalIncome - summary.TotalOutcome),
+	}); err != nil {
+		return nil, err
+	}
+
+	var buffer bytes.Buffer
+	if err := report.Save(&buffer); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+func totalFinanceByType(items []model.FinanceRecord, recordType string) int64 {
+	var total int64
+	for _, item := range items {
+		if strings.EqualFold(item.Type, recordType) {
+			total += item.Amount
+		}
+	}
+	return total
 }

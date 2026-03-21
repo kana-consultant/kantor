@@ -9,27 +9,34 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
 )
 
 type EmployeesHandler struct {
-	service   *hrisservice.EmployeesService
-	validator *validator.Validate
+	service      *hrisservice.EmployeesService
+	compensation *hrisservice.CompensationService
+	users        exportutil.UserLookup
+	validator    *validator.Validate
 }
 
-func NewEmployeesHandler(service *hrisservice.EmployeesService) *EmployeesHandler {
+func NewEmployeesHandler(service *hrisservice.EmployeesService, compensation *hrisservice.CompensationService, users exportutil.UserLookup) *EmployeesHandler {
 	return &EmployeesHandler{
-		service:   service,
-		validator: newValidator(),
+		service:      service,
+		compensation: compensation,
+		users:        users,
+		validator:    newValidator(),
 	}
 }
 
 func (h *EmployeesHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:employee:create")).Post("/", h.createEmployee)
 	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/", h.listEmployees)
+	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/export", h.exportList)
 	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/{employeeID}", h.getEmployee)
+	router.With(platformmiddleware.RequireAllPermissions("hris:employee:view", "hris:salary:view")).Get("/{employeeID}/export", h.exportDetail)
 	router.With(platformmiddleware.RequirePermission("hris:employee:edit")).Put("/{employeeID}", h.updateEmployee)
 	router.With(platformmiddleware.RequirePermission("hris:employee:delete")).Delete("/{employeeID}", h.deleteEmployee)
 }

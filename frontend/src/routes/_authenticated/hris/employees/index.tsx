@@ -4,6 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ExportButton } from "@/components/shared/export-button";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -153,6 +154,18 @@ function EmployeesPage() {
               Employee otomatis terdaftar saat mendaftar akun. Kelola profil, departemen, dan status dari sini.
             </p>
           </div>
+          <PermissionGate permission={permissions.hrisEmployeeView}>
+            <ExportButton
+              endpoint="/hris/employees/export"
+              filename="employees-report"
+              filters={{
+                department: filters.department,
+                search: filters.search,
+                status: filters.status,
+              }}
+              formats={["pdf", "xlsx"]}
+            />
+          </PermissionGate>
         </div>
       </Card>
 

@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmployeeForm } from "@/components/shared/employee-form";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -251,9 +252,18 @@ function EmployeeDetailPage() {
             </div>
           </div>
 
-          <PermissionGate permission={permissions.hrisEmployeeEdit}>
-            <Button onClick={() => setIsEditing(true)}>Edit profile</Button>
-          </PermissionGate>
+          <div className="flex flex-wrap gap-3">
+            <PermissionGate permission={permissions.hrisSalaryView}>
+              <ExportButton
+                endpoint={`/hris/employees/${employeeId}/export`}
+                filename={`employee-${employeeId}`}
+                formats={["pdf"]}
+              />
+            </PermissionGate>
+            <PermissionGate permission={permissions.hrisEmployeeEdit}>
+              <Button onClick={() => setIsEditing(true)}>Edit profile</Button>
+            </PermissionGate>
+          </div>
         </div>
       </Card>
 

@@ -5,6 +5,7 @@ import { Plus, Users } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ExportButton } from "@/components/shared/export-button";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProjectForm } from "@/components/shared/project-form";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -174,12 +175,26 @@ function ProjectsListPage() {
             </p>
           </div>
 
-          <PermissionGate permission={permissions.operationalProjectCreate}>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Create project
-            </Button>
-          </PermissionGate>
+          <div className="flex flex-wrap gap-3">
+            <PermissionGate permission={permissions.operationalProjectView}>
+              <ExportButton
+                endpoint="/operational/projects/export"
+                filename="projects-report"
+                filters={{
+                  priority: filters.priority,
+                  search: filters.search,
+                  status: filters.status,
+                }}
+                formats={["pdf", "xlsx"]}
+              />
+            </PermissionGate>
+            <PermissionGate permission={permissions.operationalProjectCreate}>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Create project
+              </Button>
+            </PermissionGate>
+          </div>
         </div>
       </Card>
 

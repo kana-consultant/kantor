@@ -17,6 +17,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
@@ -24,13 +25,15 @@ import (
 
 type ReimbursementsHandler struct {
 	service    *hrisservice.ReimbursementsService
+	users      exportutil.UserLookup
 	validator  *validator.Validate
 	uploadsDir string
 }
 
-func NewReimbursementsHandler(service *hrisservice.ReimbursementsService, uploadsDir string) *ReimbursementsHandler {
+func NewReimbursementsHandler(service *hrisservice.ReimbursementsService, uploadsDir string, users exportutil.UserLookup) *ReimbursementsHandler {
 	return &ReimbursementsHandler{
 		service:    service,
+		users:      users,
 		validator:  newValidator(),
 		uploadsDir: uploadsDir,
 	}
@@ -39,6 +42,7 @@ func NewReimbursementsHandler(service *hrisservice.ReimbursementsService, upload
 func (h *ReimbursementsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:create")).Post("/", h.create)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/", h.list)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/export", h.export)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/summary", h.summary)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/{reimbursementID}", h.get)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:edit")).Post("/{reimbursementID}/attachments", h.uploadAttachments)

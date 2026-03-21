@@ -10,6 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 	"github.com/kana-consultant/kantor/backend/internal/response"
@@ -18,14 +19,23 @@ import (
 
 type ProjectsHandler struct {
 	service   *operationalservice.ProjectsService
+	kanban    *operationalservice.KanbanService
 	repo      *operationalrepo.ProjectsRepository
+	users     exportutil.UserLookup
 	validator *validator.Validate
 }
 
-func NewProjectsHandler(service *operationalservice.ProjectsService, repo *operationalrepo.ProjectsRepository) *ProjectsHandler {
+func NewProjectsHandler(
+	service *operationalservice.ProjectsService,
+	kanban *operationalservice.KanbanService,
+	repo *operationalrepo.ProjectsRepository,
+	users exportutil.UserLookup,
+) *ProjectsHandler {
 	return &ProjectsHandler{
 		service:   service,
+		kanban:    kanban,
 		repo:      repo,
+		users:     users,
 		validator: validator.New(validator.WithRequiredStructEnabled()),
 	}
 }
@@ -33,8 +43,10 @@ func NewProjectsHandler(service *operationalservice.ProjectsService, repo *opera
 func (h *ProjectsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("operational:project:create")).Post("/", h.createProject)
 	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/", h.listProjects)
+	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/export", h.exportList)
 	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/available-users", h.listAvailableUsers)
 	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/{projectID}", h.getProject)
+	router.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/{projectID}/export", h.exportDetail)
 	router.With(platformmiddleware.RequirePermission("operational:project:edit")).Put("/{projectID}", h.updateProject)
 	router.With(platformmiddleware.RequirePermission("operational:project:delete")).Delete("/{projectID}", h.deleteProject)
 	router.With(platformmiddleware.RequirePermission("operational:project:manage_members")).Post("/{projectID}/members", h.mutateMembers)

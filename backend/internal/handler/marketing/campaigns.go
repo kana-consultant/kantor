@@ -16,6 +16,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/response"
@@ -24,13 +25,15 @@ import (
 
 type CampaignsHandler struct {
 	service    *marketingservice.CampaignsService
+	users      exportutil.UserLookup
 	validator  *validator.Validate
 	uploadsDir string
 }
 
-func NewCampaignsHandler(service *marketingservice.CampaignsService, uploadsDir string) *CampaignsHandler {
+func NewCampaignsHandler(service *marketingservice.CampaignsService, uploadsDir string, users exportutil.UserLookup) *CampaignsHandler {
 	return &CampaignsHandler{
 		service:    service,
+		users:      users,
 		validator:  newValidator(),
 		uploadsDir: uploadsDir,
 	}
@@ -39,6 +42,7 @@ func NewCampaignsHandler(service *marketingservice.CampaignsService, uploadsDir 
 func (h *CampaignsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:create")).Post("/", h.createCampaign)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/", h.listCampaigns)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/export", h.export)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/kanban", h.kanban)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/{campaignID}", h.getCampaign)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/{campaignID}/activities", h.listActivities)

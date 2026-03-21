@@ -8,6 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
+	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
@@ -15,12 +16,14 @@ import (
 
 type SubscriptionsHandler struct {
 	service   *hrisservice.SubscriptionsService
+	users     exportutil.UserLookup
 	validator *validator.Validate
 }
 
-func NewSubscriptionsHandler(service *hrisservice.SubscriptionsService) *SubscriptionsHandler {
+func NewSubscriptionsHandler(service *hrisservice.SubscriptionsService, users exportutil.UserLookup) *SubscriptionsHandler {
 	return &SubscriptionsHandler{
 		service:   service,
+		users:     users,
 		validator: newValidator(),
 	}
 }
@@ -28,6 +31,7 @@ func NewSubscriptionsHandler(service *hrisservice.SubscriptionsService) *Subscri
 func (h *SubscriptionsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:subscription:create")).Post("/", h.createSubscription)
 	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/", h.listSubscriptions)
+	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/export", h.export)
 	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/summary", h.summary)
 	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/alerts", h.listAlerts)
 	router.With(platformmiddleware.RequirePermission("hris:subscription:view")).Get("/{subscriptionID}", h.getSubscription)

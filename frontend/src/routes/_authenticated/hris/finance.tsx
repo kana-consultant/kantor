@@ -21,6 +21,7 @@ import { ArrowDownCircle, ArrowUpCircle, Plus, Scale } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
@@ -38,7 +39,6 @@ import {
   createFinanceRecord,
   deleteFinanceCategory,
   deleteFinanceRecord,
-  exportFinanceCSV,
   financeKeys,
   getFinanceSummary,
   listFinanceCategories,
@@ -361,16 +361,6 @@ function FinancePage() {
     createCategoryMutation.mutate(values);
   });
 
-  const downloadExport = async () => {
-    const blob = await exportFinanceCSV(summaryYear, filters.month || undefined);
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `finance-${summaryYear}${filters.month ? `-${filters.month}` : ""}.csv`;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="space-y-6">
       <Card className="p-8">
@@ -391,6 +381,20 @@ function FinancePage() {
             <Button onClick={() => setActiveTab("dashboard")} variant={activeTab === "dashboard" ? undefined : "outline"}>
               Dashboard
             </Button>
+            <PermissionGate permission={permissions.hrisFinanceView}>
+              <ExportButton
+                endpoint="/hris/finance/export"
+                filename="finance-report"
+                filters={{
+                  category: filters.category,
+                  month: filters.month,
+                  status: filters.status,
+                  type: filters.type,
+                  year: filters.year,
+                }}
+                formats={["csv", "pdf", "xlsx"]}
+              />
+            </PermissionGate>
           </div>
         </div>
       </Card>
@@ -433,9 +437,6 @@ function FinancePage() {
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
               </select>
-              <Button className="w-full lg:w-auto" onClick={() => void downloadExport()} type="button" variant="outline">
-                Export CSV
-              </Button>
             </div>
             <div className="mt-4">
               <PermissionGate permission={permissions.hrisFinanceCreate}>

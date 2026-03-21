@@ -24,6 +24,7 @@ import { BarChart3, CircleDollarSign, Plus, Ratio, TrendingUp } from "lucide-rea
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
@@ -41,7 +42,6 @@ import {
   batchCreateAdsMetrics,
   createAdsMetric,
   deleteAdsMetric,
-  exportAdsMetricsCSV,
   getAdsMetricsSummary,
   listAdsMetrics,
   updateAdsMetric,
@@ -230,16 +230,6 @@ function AdsMetricsPage() {
     createMutation.mutate(values);
   });
 
-  const handleExport = async () => {
-    const blob = await exportAdsMetricsCSV(dashboardRange.dateFrom, dashboardRange.dateTo);
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `ads-metrics-${dashboardRange.dateFrom || "all"}-${dashboardRange.dateTo || "all"}.csv`;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
-  };
-
   const metricColumns: Array<DataTableColumn<AdsMetric>> = [
     {
       id: "campaign",
@@ -399,6 +389,26 @@ function AdsMetricsPage() {
             <Button onClick={() => setActiveTab("dashboard")} variant={activeTab === "dashboard" ? undefined : "outline"}>
               Dashboard
             </Button>
+            <PermissionGate permission={permissions.marketingAdsMetricsView}>
+              <ExportButton
+                endpoint="/marketing/ads-metrics/export"
+                filename="ads-metrics-report"
+                filters={
+                  activeTab === "input"
+                    ? {
+                        campaign_id: filters.campaignId,
+                        date_from: filters.dateFrom,
+                        date_to: filters.dateTo,
+                        platform: filters.platform,
+                      }
+                    : {
+                        date_from: dashboardRange.dateFrom,
+                        date_to: dashboardRange.dateTo,
+                      }
+                }
+                formats={["csv", "pdf", "xlsx"]}
+              />
+            </PermissionGate>
           </div>
         </div>
       </Card>
@@ -619,9 +629,6 @@ function AdsMetricsPage() {
               <Input onChange={(event) => setDashboardRange((previous) => ({ ...previous, dateFrom: event.target.value }))} type="date" value={dashboardRange.dateFrom} />
               <Input onChange={(event) => setDashboardRange((previous) => ({ ...previous, dateTo: event.target.value }))} type="date" value={dashboardRange.dateTo} />
               <div className="flex flex-wrap gap-3 lg:col-span-2">
-                <Button onClick={() => void handleExport()} type="button" variant="outline">
-                  Export CSV
-                </Button>
               </div>
             </div>
           </Card>

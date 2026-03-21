@@ -18,6 +18,7 @@ import {
   DrawerTitle,
 } from "@/components/shared/drawer";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ExportButton } from "@/components/shared/export-button";
 import { MarketingCampaignBoard } from "@/components/shared/marketing-campaign-board";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -376,6 +377,21 @@ function MarketingCampaignsPage() {
               <LayoutList className="mr-2 h-4 w-4" />
               Table view
             </Button>
+            <PermissionGate permission={permissions.marketingCampaignView}>
+              <ExportButton
+                endpoint="/marketing/campaigns/export"
+                filename="campaigns-report"
+                filters={{
+                  channel: filters.channel,
+                  date_from: filters.dateFrom,
+                  date_to: filters.dateTo,
+                  pic: filters.pic,
+                  search: filters.search,
+                  status: filters.status,
+                }}
+                formats={["pdf", "xlsx"]}
+              />
+            </PermissionGate>
             <PermissionGate permission={permissions.marketingCampaignCreate}>
               <Button onClick={() => setIsComposerOpen(true)} variant="mkt">
                 <Plus className="mr-2 h-4 w-4" />
