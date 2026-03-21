@@ -13,6 +13,7 @@ import {
   BarChart3,
   UserPlus,
   Shield,
+  ScrollText,
   Settings2,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -169,6 +170,12 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
 
   if (isSuperAdmin || hasModuleAccess("admin")) {
     const adminItems = [
+      {
+        to: "/admin/audit-logs",
+        label: "Audit Logs",
+        icon: ScrollText,
+        permission: permissions.adminAuditLogView,
+      },
       {
         to: "/admin/roles",
         label: "Roles",

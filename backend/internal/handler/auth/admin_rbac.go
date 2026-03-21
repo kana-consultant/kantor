@@ -76,10 +76,18 @@ func (h *Handler) CreateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "admin", "role", item.ID, nil, item)
 	response.WriteJSON(w, http.StatusCreated, item, nil)
 }
 
 func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
+	roleID := chi.URLParam(r, "roleID")
+	previous, previousErr := h.service.GetRoleDetail(r.Context(), roleID)
+	if previousErr != nil {
+		h.writeRoleError(w, previousErr)
+		return
+	}
+
 	var input dto.UpsertRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
@@ -90,7 +98,7 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.service.UpdateRole(r.Context(), chi.URLParam(r, "roleID"), authrepo.UpsertRoleParams{
+	item, err := h.service.UpdateRole(r.Context(), roleID, authrepo.UpsertRoleParams{
 		Name:           strings.TrimSpace(input.Name),
 		Slug:           strings.ToLower(strings.TrimSpace(input.Slug)),
 		Description:    strings.TrimSpace(input.Description),
@@ -102,25 +110,42 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "role", roleID, previous, item)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
 func (h *Handler) DeleteRole(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteRole(r.Context(), chi.URLParam(r, "roleID")); err != nil {
+	roleID := chi.URLParam(r, "roleID")
+	previous, previousErr := h.service.GetRoleDetail(r.Context(), roleID)
+	if previousErr != nil {
+		h.writeRoleError(w, previousErr)
+		return
+	}
+
+	if err := h.service.DeleteRole(r.Context(), roleID); err != nil {
 		h.writeRoleError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "delete", "admin", "role", roleID, previous, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"success": true}, nil)
 }
 
 func (h *Handler) ToggleRole(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.ToggleRole(r.Context(), chi.URLParam(r, "roleID"))
+	roleID := chi.URLParam(r, "roleID")
+	previous, previousErr := h.service.GetRoleDetail(r.Context(), roleID)
+	if previousErr != nil {
+		h.writeRoleError(w, previousErr)
+		return
+	}
+
+	item, err := h.service.ToggleRole(r.Context(), roleID)
 	if err != nil {
 		h.writeRoleError(w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "role", roleID, previous, item)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
@@ -137,6 +162,10 @@ func (h *Handler) DuplicateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "create", "admin", "role", item.ID, nil, map[string]any{
+		"duplicated_from": chi.URLParam(r, "roleID"),
+		"role":            item,
+	})
 	response.WriteJSON(w, http.StatusCreated, item, nil)
 }
 
@@ -177,6 +206,12 @@ func (h *Handler) UpdateDefaultRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	previous, err := h.service.GetSettings(r.Context())
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load current settings", nil)
+		return
+	}
+
 	var input dto.UpdateDefaultRolesRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
@@ -201,6 +236,8 @@ func (h *Handler) UpdateDefaultRoles(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Default roles updated but failed to fetch settings", nil)
 		return
 	}
+
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "system_setting", "default_roles", previous.DefaultRoles, settings.DefaultRoles)
 	response.WriteJSON(w, http.StatusOK, settings, nil)
 }
 
@@ -208,6 +245,12 @@ func (h *Handler) UpdateAutoCreateEmployee(w http.ResponseWriter, r *http.Reques
 	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	previous, err := h.service.GetSettings(r.Context())
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load current settings", nil)
 		return
 	}
 
@@ -230,6 +273,8 @@ func (h *Handler) UpdateAutoCreateEmployee(w http.ResponseWriter, r *http.Reques
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Setting updated but failed to fetch settings", nil)
 		return
 	}
+
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "system_setting", "auto_create_employee", previous.AutoCreateEmployee, settings.AutoCreateEmployee)
 	response.WriteJSON(w, http.StatusOK, settings, nil)
 }
 

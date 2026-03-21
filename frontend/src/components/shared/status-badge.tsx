@@ -11,7 +11,9 @@ type StatusVariant =
   | "renewal-alert"
   | "campaign-status"
   | "lead-status"
-  | "assignment";
+  | "assignment"
+  | "audit-action"
+  | "module";
 
 interface StatusBadgeProps {
   status: string | null | undefined;
@@ -212,6 +214,49 @@ function resolveTone(status: string, variant: StatusVariant): Tone {
         return tones.info;
       case "manual":
         return tones.neutral;
+      default:
+        return tones.neutral;
+    }
+  }
+
+  if (variant === "audit-action") {
+    switch (normalized) {
+      case "create":
+      case "register":
+      case "login":
+      case "submit":
+      case "send":
+        return tones.success;
+      case "update":
+      case "edit":
+      case "review":
+      case "move":
+      case "toggle":
+      case "trigger":
+        return tones.info;
+      case "view":
+        return tones.neutral;
+      case "approve":
+        return tones.success;
+      case "reject":
+      case "delete":
+      case "logout":
+        return tones.error;
+      default:
+        return tones.neutral;
+    }
+  }
+
+  if (variant === "module") {
+    switch (normalized) {
+      case "operational":
+        return tones.ops;
+      case "hris":
+        return tones.qualified;
+      case "marketing":
+        return tones.proposal;
+      case "admin":
+        return tones.error;
       default:
         return tones.neutral;
     }

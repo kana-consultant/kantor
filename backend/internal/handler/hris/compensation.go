@@ -69,6 +69,11 @@ func (h *CompensationHandler) listSalaries(w http.ResponseWriter, r *http.Reques
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "view", "hris", "salary", chi.URLParam(r, "employeeID"), nil, map[string]any{
+		"scope":         "history",
+		"employee_id":   chi.URLParam(r, "employeeID"),
+		"records_count": len(result),
+	})
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
@@ -84,6 +89,11 @@ func (h *CompensationHandler) getCurrentSalary(w http.ResponseWriter, r *http.Re
 		h.writeError(w, err)
 		return
 	}
+	platformmiddleware.AuditLog(r.Context(), "view", "hris", "salary", chi.URLParam(r, "employeeID"), nil, map[string]any{
+		"scope":       "current",
+		"employee_id": chi.URLParam(r, "employeeID"),
+		"salary_id":   result.ID,
+	})
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 

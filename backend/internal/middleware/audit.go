@@ -56,6 +56,24 @@ func AuditLog(ctx context.Context, action, module, resource, resourceID string, 
 	})
 }
 
+func AuditLogWithUser(ctx context.Context, userID, action, module, resource, resourceID string, oldValue, newValue interface{}) {
+	svc := AuditServiceFromContext(ctx)
+	if svc == nil {
+		return
+	}
+
+	svc.Log(ctx, auditservice.Entry{
+		UserID:     userID,
+		Action:     action,
+		Module:     module,
+		Resource:   resource,
+		ResourceID: resourceID,
+		OldValue:   oldValue,
+		NewValue:   newValue,
+		IPAddress:  ClientIPFromContext(ctx),
+	})
+}
+
 func extractIP(r *http.Request) string {
 	// chi's RealIP middleware sets RemoteAddr from X-Forwarded-For / X-Real-IP,
 	// so r.RemoteAddr already reflects the real client IP in most setups.
