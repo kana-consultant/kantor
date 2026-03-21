@@ -53,6 +53,14 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 }
 
 func hasPermission(principal platformmiddleware.Principal, permission string) bool {
+	if permission == "" {
+		return true
+	}
+
+	if principal.IsSuperAdmin {
+		return true
+	}
+
 	for _, item := range principal.Permissions {
 		if item == permission {
 			return true

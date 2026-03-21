@@ -6,19 +6,23 @@ import { useForm } from "react-hook-form";
 import {
   Building2,
   Calendar,
+  CreditCard,
   KeyRound,
+  Link2,
   Mail,
   MapPin,
   Pencil,
   Phone,
   Save,
   Shield,
+  TerminalSquare,
   User,
   X,
 } from "lucide-react";
 import { z } from "zod";
 
 import { FormModal } from "@/components/shared/form-modal";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
@@ -69,6 +73,10 @@ function ProfilePage() {
     address: "",
     emergency_contact: "",
     avatar_url: "",
+    bank_account_number: "",
+    bank_name: "",
+    linkedin_profile: "",
+    ssh_keys: "",
   });
 
   const mutation = useMutation({
@@ -79,6 +87,10 @@ function ProfilePage() {
         address: values.address || null,
         emergency_contact: values.emergency_contact || null,
         avatar_url: values.avatar_url || null,
+        bank_account_number: values.bank_account_number || null,
+        bank_name: values.bank_name || null,
+        linkedin_profile: values.linkedin_profile || null,
+        ssh_keys: values.ssh_keys || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: profileKeys.me });
@@ -128,6 +140,10 @@ function ProfilePage() {
       address: employee.address ?? "",
       emergency_contact: employee.emergency_contact ?? "",
       avatar_url: employee.avatar_url ?? "",
+      bank_account_number: employee.bank_account_number ?? "",
+      bank_name: employee.bank_name ?? "",
+      linkedin_profile: employee.linkedin_profile ?? "",
+      ssh_keys: employee.ssh_keys ?? "",
     });
     setIsEditing(true);
   }
@@ -205,9 +221,11 @@ function ProfilePage() {
       {/* Header card */}
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
-            {(employee?.full_name ?? user?.full_name ?? "?")[0]?.toUpperCase()}
-          </div>
+          <ProtectedAvatar
+            alt={employee?.full_name ?? user?.full_name ?? "Profil"}
+            avatarUrl={employee?.avatar_url ?? user?.avatar_url}
+            className="h-16 w-16 border border-border/70"
+          />
           <div className="flex-1">
             {isEditing ? (
               <Input
@@ -244,6 +262,24 @@ function ProfilePage() {
         />
         <InfoCard icon={Building2} label="Department" value={employee?.department ?? "-"} />
         <InfoCard
+          icon={CreditCard}
+          label="Nomor Rekening"
+          value={employee?.bank_account_number ?? "-"}
+          editable={isEditing}
+          editValue={form.bank_account_number}
+          onEdit={(v) => setForm((f) => ({ ...f, bank_account_number: v }))}
+          placeholder="Nomor rekening atau akun e-wallet"
+        />
+        <InfoCard
+          icon={Building2}
+          label="Bank / E-Wallet"
+          value={employee?.bank_name ?? "-"}
+          editable={isEditing}
+          editValue={form.bank_name}
+          onEdit={(v) => setForm((f) => ({ ...f, bank_name: v }))}
+          placeholder="BCA, BRI, OVO, GoPay, DANA"
+        />
+        <InfoCard
           icon={Calendar}
           label="Tanggal Bergabung"
           value={employee?.date_joined ? new Date(employee.date_joined).toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" }) : "-"}
@@ -256,6 +292,15 @@ function ProfilePage() {
           editValue={form.emergency_contact}
           onEdit={(v) => setForm((f) => ({ ...f, emergency_contact: v }))}
           placeholder="Nama - Nomor telepon"
+        />
+        <InfoCard
+          icon={Link2}
+          label="LinkedIn Profile"
+          value={employee?.linkedin_profile ?? "-"}
+          editable={isEditing}
+          editValue={form.linkedin_profile}
+          onEdit={(v) => setForm((f) => ({ ...f, linkedin_profile: v }))}
+          placeholder="https://linkedin.com/in/username"
         />
       </div>
 
@@ -275,6 +320,26 @@ function ProfilePage() {
           />
         ) : (
           <p className="mt-1 text-sm text-text-primary">{employee?.address || "-"}</p>
+        )}
+      </div>
+
+      <div className="rounded-xl border bg-card p-5">
+        <div className="flex items-center gap-2 text-text-secondary">
+          <TerminalSquare className="h-4 w-4" />
+          <span className="text-sm font-medium">SSH Keys</span>
+        </div>
+        {isEditing ? (
+          <textarea
+            className="mt-2 w-full rounded-lg border bg-surface-muted px-3 py-2 font-mono text-sm text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            rows={6}
+            value={form.ssh_keys}
+            onChange={(e) => setForm((f) => ({ ...f, ssh_keys: e.target.value }))}
+            placeholder="Tempel public key SSH. Jika lebih dari satu, pisahkan per baris."
+          />
+        ) : (
+          <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-surface-muted px-3 py-2 font-mono text-xs text-text-primary">
+            {employee?.ssh_keys || "-"}
+          </pre>
         )}
       </div>
 

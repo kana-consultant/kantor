@@ -52,6 +52,7 @@ type authRepository interface {
 	SetUserActive(ctx context.Context, userID string, active bool) error
 	UpdateUserFullNameAndPhone(ctx context.Context, userID string, fullName string, phone *string) error
 	UpdateUserFields(ctx context.Context, userID string, fullName string, email string) error
+	UpdateUserAvatar(ctx context.Context, userID string, avatarURL *string) error
 	ListRoles(ctx context.Context, params authrepo.RoleListParams) ([]authrepo.RoleListItem, error)
 	GetRoleDetail(ctx context.Context, roleID string) (authrepo.RoleDetail, error)
 	CreateRole(ctx context.Context, params authrepo.UpsertRoleParams, createdBy string) (authrepo.RoleDetail, error)
@@ -73,7 +74,19 @@ type authRepository interface {
 
 type authEmployeesRepository interface {
 	GetEmployeeByUserID(ctx context.Context, userID string) (model.Employee, error)
-	UpdateEmployeeProfile(ctx context.Context, userID string, fullName string, phone *string, address *string, emergencyContact *string, avatarURL *string) (model.Employee, error)
+	UpdateEmployeeProfile(
+		ctx context.Context,
+		userID string,
+		fullName string,
+		phone *string,
+		address *string,
+		emergencyContact *string,
+		avatarURL *string,
+		bankAccountNumber *string,
+		bankName *string,
+		linkedInProfile *string,
+		sshKeys *string,
+	) (model.Employee, error)
 }
 
 type Service struct {
@@ -306,13 +319,28 @@ func (s *Service) GetProfile(ctx context.Context, userID string) (model.Employee
 func (s *Service) UpdateProfile(ctx context.Context, userID string, input dto.UpdateProfileRequest) (model.Employee, error) {
 	fullName := strings.TrimSpace(input.FullName)
 
-	employee, err := s.employeeRepo.UpdateEmployeeProfile(ctx, userID, fullName, input.Phone, input.Address, input.EmergencyContact, input.AvatarURL)
+	employee, err := s.employeeRepo.UpdateEmployeeProfile(
+		ctx,
+		userID,
+		fullName,
+		input.Phone,
+		input.Address,
+		input.EmergencyContact,
+		input.AvatarURL,
+		input.BankAccountNumber,
+		input.BankName,
+		input.LinkedInProfile,
+		input.SSHKeys,
+	)
 	if err != nil {
 		return model.Employee{}, err
 	}
 
 	// Sync full_name + phone to users table (phone is used by WA broadcast)
 	if err := s.repo.UpdateUserFullNameAndPhone(ctx, userID, fullName, input.Phone); err != nil {
+		return model.Employee{}, err
+	}
+	if err := s.repo.UpdateUserAvatar(ctx, userID, employee.AvatarURL); err != nil {
 		return model.Employee{}, err
 	}
 

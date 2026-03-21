@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ var (
 	ErrEmployeeNotFound        = errors.New("employee not found")
 	ErrEmployeeEmailExists     = errors.New("employee email already exists")
 	ErrEmployeeUserAlreadyUsed = errors.New("user account is already linked to another employee")
+	ErrEmployeeAvatarNotFound  = errors.New("employee avatar not found")
 )
 
 type EmployeesRepository struct {
@@ -34,16 +36,20 @@ type ListEmployeesParams struct {
 }
 
 type UpsertEmployeeParams struct {
-	FullName         string
-	Email            string
-	Phone            *string
-	Position         string
-	Department       *string
-	DateJoined       time.Time
-	EmploymentStatus string
-	Address          *string
-	EmergencyContact *string
-	AvatarURL        *string
+	FullName          string
+	Email             string
+	Phone             *string
+	Position          string
+	Department        *string
+	DateJoined        time.Time
+	EmploymentStatus  string
+	Address           *string
+	EmergencyContact  *string
+	AvatarURL         *string
+	BankAccountNumber *string
+	BankName          *string
+	LinkedInProfile   *string
+	SSHKeys           *string
 }
 
 func NewEmployeesRepository(db *pgxpool.Pool) *EmployeesRepository {
@@ -64,7 +70,11 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 			employment_status,
 			address,
 			emergency_contact,
-			avatar_url
+			avatar_url,
+			bank_account_number,
+			bank_name,
+			linkedin_profile,
+			ssh_keys
 		)
 		VALUES (
 			$1,
@@ -76,9 +86,13 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 			$7,
 			NULLIF($8, ''),
 			NULLIF($9, ''),
-			NULLIF($10, '')
+			NULLIF($10, ''),
+			NULLIF($11, ''),
+			NULLIF($12, ''),
+			NULLIF($13, ''),
+			NULLIF($14, '')
 		)
-		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
+		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 	`
 
 	var employee model.Employee
@@ -95,6 +109,10 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 		nullableString(params.Address),
 		nullableString(params.EmergencyContact),
 		nullableString(params.AvatarURL),
+		nullableString(params.BankAccountNumber),
+		nullableString(params.BankName),
+		nullableString(params.LinkedInProfile),
+		nullableString(params.SSHKeys),
 	).Scan(
 		&employee.ID,
 		&employee.UserID,
@@ -108,6 +126,10 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 		&employee.Address,
 		&employee.EmergencyContact,
 		&employee.AvatarURL,
+		&employee.BankAccountNumber,
+		&employee.BankName,
+		&employee.LinkedInProfile,
+		&employee.SSHKeys,
 		&employee.CreatedAt,
 		&employee.UpdatedAt,
 	)
@@ -153,7 +175,7 @@ func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmpl
 
 	offset := (params.Page - 1) * params.PerPage
 	listQuery := fmt.Sprintf(`
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
+		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 		FROM employees
 		WHERE %s
 		ORDER BY full_name ASC, created_at DESC
@@ -183,6 +205,10 @@ func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmpl
 			&employee.Address,
 			&employee.EmergencyContact,
 			&employee.AvatarURL,
+			&employee.BankAccountNumber,
+			&employee.BankName,
+			&employee.LinkedInProfile,
+			&employee.SSHKeys,
 			&employee.CreatedAt,
 			&employee.UpdatedAt,
 		); err != nil {
@@ -202,7 +228,7 @@ func (r *EmployeesRepository) GetEmployeeByID(ctx context.Context, employeeID st
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
+		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 		FROM employees
 		WHERE id = $1::uuid
 	`
@@ -221,6 +247,10 @@ func (r *EmployeesRepository) GetEmployeeByID(ctx context.Context, employeeID st
 		&employee.Address,
 		&employee.EmergencyContact,
 		&employee.AvatarURL,
+		&employee.BankAccountNumber,
+		&employee.BankName,
+		&employee.LinkedInProfile,
+		&employee.SSHKeys,
 		&employee.CreatedAt,
 		&employee.UpdatedAt,
 	)
@@ -239,7 +269,7 @@ func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID st
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
+		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 		FROM employees
 		WHERE user_id = $1::uuid
 	`
@@ -258,6 +288,10 @@ func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID st
 		&employee.Address,
 		&employee.EmergencyContact,
 		&employee.AvatarURL,
+		&employee.BankAccountNumber,
+		&employee.BankName,
+		&employee.LinkedInProfile,
+		&employee.SSHKeys,
 		&employee.CreatedAt,
 		&employee.UpdatedAt,
 	)
@@ -287,9 +321,13 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 			address = NULLIF($9, ''),
 			emergency_contact = NULLIF($10, ''),
 			avatar_url = NULLIF($11, ''),
+			bank_account_number = NULLIF($12, ''),
+			bank_name = NULLIF($13, ''),
+			linkedin_profile = NULLIF($14, ''),
+			ssh_keys = NULLIF($15, ''),
 			updated_at = NOW()
 		WHERE id = $1::uuid
-		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
+		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 	`
 
 	var employee model.Employee
@@ -307,6 +345,10 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 		nullableString(params.Address),
 		nullableString(params.EmergencyContact),
 		nullableString(params.AvatarURL),
+		nullableString(params.BankAccountNumber),
+		nullableString(params.BankName),
+		nullableString(params.LinkedInProfile),
+		nullableString(params.SSHKeys),
 	).Scan(
 		&employee.ID,
 		&employee.UserID,
@@ -320,6 +362,10 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 		&employee.Address,
 		&employee.EmergencyContact,
 		&employee.AvatarURL,
+		&employee.BankAccountNumber,
+		&employee.BankName,
+		&employee.LinkedInProfile,
+		&employee.SSHKeys,
 		&employee.CreatedAt,
 		&employee.UpdatedAt,
 	)
@@ -329,6 +375,51 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 		}
 
 		return model.Employee{}, mapEmployeeDBError(err)
+	}
+
+	return employee, nil
+}
+
+func (r *EmployeesRepository) UpdateEmployeeAvatar(ctx context.Context, employeeID string, avatarURL *string) (model.Employee, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	query := `
+		UPDATE employees
+		SET
+			avatar_url = NULLIF($2, ''),
+			updated_at = NOW()
+		WHERE id = $1::uuid
+		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
+	`
+
+	var employee model.Employee
+	err := r.db.QueryRow(ctx, query, employeeID, nullableString(avatarURL)).Scan(
+		&employee.ID,
+		&employee.UserID,
+		&employee.FullName,
+		&employee.Email,
+		&employee.Phone,
+		&employee.Position,
+		&employee.Department,
+		&employee.DateJoined,
+		&employee.EmploymentStatus,
+		&employee.Address,
+		&employee.EmergencyContact,
+		&employee.AvatarURL,
+		&employee.BankAccountNumber,
+		&employee.BankName,
+		&employee.LinkedInProfile,
+		&employee.SSHKeys,
+		&employee.CreatedAt,
+		&employee.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Employee{}, ErrEmployeeNotFound
+		}
+
+		return model.Employee{}, err
 	}
 
 	return employee, nil
@@ -363,7 +454,19 @@ func (r *EmployeesRepository) ClearDepartmentReferences(ctx context.Context, dep
 	return err
 }
 
-func (r *EmployeesRepository) UpdateEmployeeProfile(ctx context.Context, userID string, fullName string, phone *string, address *string, emergencyContact *string, avatarURL *string) (model.Employee, error) {
+func (r *EmployeesRepository) UpdateEmployeeProfile(
+	ctx context.Context,
+	userID string,
+	fullName string,
+	phone *string,
+	address *string,
+	emergencyContact *string,
+	avatarURL *string,
+	bankAccountNumber *string,
+	bankName *string,
+	linkedInProfile *string,
+	sshKeys *string,
+) (model.Employee, error) {
 	query := `
 		UPDATE employees
 		SET
@@ -372,9 +475,13 @@ func (r *EmployeesRepository) UpdateEmployeeProfile(ctx context.Context, userID 
 			address = NULLIF($4, ''),
 			emergency_contact = NULLIF($5, ''),
 			avatar_url = NULLIF($6, ''),
+			bank_account_number = NULLIF($7, ''),
+			bank_name = NULLIF($8, ''),
+			linkedin_profile = NULLIF($9, ''),
+			ssh_keys = NULLIF($10, ''),
 			updated_at = NOW()
 		WHERE user_id = $1::uuid
-		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, created_at, updated_at
+		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 	`
 
 	var employee model.Employee
@@ -385,11 +492,16 @@ func (r *EmployeesRepository) UpdateEmployeeProfile(ctx context.Context, userID 
 		nullableString(address),
 		nullableString(emergencyContact),
 		nullableString(avatarURL),
+		nullableString(bankAccountNumber),
+		nullableString(bankName),
+		nullableString(linkedInProfile),
+		nullableString(sshKeys),
 	).Scan(
 		&employee.ID, &employee.UserID, &employee.FullName, &employee.Email,
 		&employee.Phone, &employee.Position, &employee.Department, &employee.DateJoined,
 		&employee.EmploymentStatus, &employee.Address, &employee.EmergencyContact,
-		&employee.AvatarURL, &employee.CreatedAt, &employee.UpdatedAt,
+		&employee.AvatarURL, &employee.BankAccountNumber, &employee.BankName,
+		&employee.LinkedInProfile, &employee.SSHKeys, &employee.CreatedAt, &employee.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -405,6 +517,31 @@ func (r *EmployeesRepository) SyncUserFieldsToEmployee(ctx context.Context, user
 		`UPDATE employees SET full_name = $2, email = $3, updated_at = NOW() WHERE user_id = $1::uuid`,
 		userID, fullName, strings.ToLower(strings.TrimSpace(email)))
 	return err
+}
+
+func (r *EmployeesRepository) FindAvatarPath(ctx context.Context, employeeID string, filename string) (string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	var avatarPath *string
+	err := r.db.QueryRow(ctx, `SELECT avatar_url FROM employees WHERE id = $1::uuid`, employeeID).Scan(&avatarPath)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrEmployeeNotFound
+		}
+		return "", err
+	}
+
+	if avatarPath == nil || strings.TrimSpace(*avatarPath) == "" {
+		return "", ErrEmployeeAvatarNotFound
+	}
+
+	trimmed := filepath.ToSlash(strings.TrimSpace(*avatarPath))
+	if pathBase(trimmed) != filename {
+		return "", ErrEmployeeAvatarNotFound
+	}
+
+	return trimmed, nil
 }
 
 func mapEmployeeDBError(err error) error {
@@ -452,4 +589,9 @@ func normalizePhone(phone *string) string {
 		p = "62" + p[1:]
 	}
 	return p
+}
+
+func pathBase(value string) string {
+	parts := strings.Split(value, "/")
+	return parts[len(parts)-1]
 }

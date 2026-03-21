@@ -18,6 +18,7 @@ var (
 
 type userFieldsSyncer interface {
 	UpdateUserFields(ctx context.Context, userID string, fullName string, email string) error
+	UpdateUserAvatar(ctx context.Context, userID string, avatarURL *string) error
 }
 
 type employeesRepository interface {
@@ -25,6 +26,7 @@ type employeesRepository interface {
 	ListEmployees(ctx context.Context, params hrisrepo.ListEmployeesParams) ([]model.Employee, int64, error)
 	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
 	UpdateEmployee(ctx context.Context, employeeID string, params hrisrepo.UpsertEmployeeParams) (model.Employee, error)
+	UpdateEmployeeAvatar(ctx context.Context, employeeID string, avatarURL *string) (model.Employee, error)
 	DeleteEmployee(ctx context.Context, employeeID string) error
 }
 
@@ -43,16 +45,20 @@ func (s *EmployeesService) SetAuthRepo(syncer userFieldsSyncer) {
 
 func (s *EmployeesService) CreateEmployee(ctx context.Context, request hrisdto.CreateEmployeeRequest) (model.Employee, error) {
 	employee, err := s.repo.CreateEmployee(ctx, hrisrepo.UpsertEmployeeParams{
-		FullName:         strings.TrimSpace(request.FullName),
-		Email:            strings.ToLower(strings.TrimSpace(request.Email)),
-		Phone:            trimOptionalString(request.Phone),
-		Position:         strings.TrimSpace(request.Position),
-		Department:       trimOptionalString(request.Department),
-		DateJoined:       request.DateJoined,
-		EmploymentStatus: strings.TrimSpace(request.EmploymentStatus),
-		Address:          trimOptionalString(request.Address),
-		EmergencyContact: trimOptionalString(request.EmergencyContact),
-		AvatarURL:        trimOptionalString(request.AvatarURL),
+		FullName:          strings.TrimSpace(request.FullName),
+		Email:             strings.ToLower(strings.TrimSpace(request.Email)),
+		Phone:             trimOptionalString(request.Phone),
+		Position:          strings.TrimSpace(request.Position),
+		Department:        trimOptionalString(request.Department),
+		DateJoined:        request.DateJoined,
+		EmploymentStatus:  strings.TrimSpace(request.EmploymentStatus),
+		Address:           trimOptionalString(request.Address),
+		EmergencyContact:  trimOptionalString(request.EmergencyContact),
+		AvatarURL:         trimOptionalString(request.AvatarURL),
+		BankAccountNumber: trimOptionalString(request.BankAccountNumber),
+		BankName:          trimOptionalString(request.BankName),
+		LinkedInProfile:   trimOptionalString(request.LinkedInProfile),
+		SSHKeys:           trimOptionalString(request.SSHKeys),
 	})
 	if err != nil {
 		return model.Employee{}, mapEmployeeError(err)
@@ -97,16 +103,20 @@ func (s *EmployeesService) GetEmployee(ctx context.Context, employeeID string) (
 
 func (s *EmployeesService) UpdateEmployee(ctx context.Context, employeeID string, request hrisdto.UpdateEmployeeRequest) (model.Employee, error) {
 	employee, err := s.repo.UpdateEmployee(ctx, employeeID, hrisrepo.UpsertEmployeeParams{
-		FullName:         strings.TrimSpace(request.FullName),
-		Email:            strings.ToLower(strings.TrimSpace(request.Email)),
-		Phone:            trimOptionalString(request.Phone),
-		Position:         strings.TrimSpace(request.Position),
-		Department:       trimOptionalString(request.Department),
-		DateJoined:       request.DateJoined,
-		EmploymentStatus: strings.TrimSpace(request.EmploymentStatus),
-		Address:          trimOptionalString(request.Address),
-		EmergencyContact: trimOptionalString(request.EmergencyContact),
-		AvatarURL:        trimOptionalString(request.AvatarURL),
+		FullName:          strings.TrimSpace(request.FullName),
+		Email:             strings.ToLower(strings.TrimSpace(request.Email)),
+		Phone:             trimOptionalString(request.Phone),
+		Position:          strings.TrimSpace(request.Position),
+		Department:        trimOptionalString(request.Department),
+		DateJoined:        request.DateJoined,
+		EmploymentStatus:  strings.TrimSpace(request.EmploymentStatus),
+		Address:           trimOptionalString(request.Address),
+		EmergencyContact:  trimOptionalString(request.EmergencyContact),
+		AvatarURL:         trimOptionalString(request.AvatarURL),
+		BankAccountNumber: trimOptionalString(request.BankAccountNumber),
+		BankName:          trimOptionalString(request.BankName),
+		LinkedInProfile:   trimOptionalString(request.LinkedInProfile),
+		SSHKeys:           trimOptionalString(request.SSHKeys),
 	})
 	if err != nil {
 		return model.Employee{}, mapEmployeeError(err)
@@ -115,6 +125,7 @@ func (s *EmployeesService) UpdateEmployee(ctx context.Context, employeeID string
 	// Sync full_name and email back to users table if linked
 	if employee.UserID != nil && s.authRepo != nil {
 		_ = s.authRepo.UpdateUserFields(ctx, *employee.UserID, employee.FullName, employee.Email)
+		_ = s.authRepo.UpdateUserAvatar(ctx, *employee.UserID, employee.AvatarURL)
 	}
 
 	return employee, nil
@@ -122,6 +133,20 @@ func (s *EmployeesService) UpdateEmployee(ctx context.Context, employeeID string
 
 func (s *EmployeesService) DeleteEmployee(ctx context.Context, employeeID string) error {
 	return mapEmployeeError(s.repo.DeleteEmployee(ctx, employeeID))
+}
+
+func (s *EmployeesService) UpdateEmployeeAvatar(ctx context.Context, employeeID string, avatarURL string) (model.Employee, error) {
+	value := strings.TrimSpace(avatarURL)
+	employee, err := s.repo.UpdateEmployeeAvatar(ctx, employeeID, &value)
+	if err != nil {
+		return model.Employee{}, mapEmployeeError(err)
+	}
+
+	if employee.UserID != nil && s.authRepo != nil {
+		_ = s.authRepo.UpdateUserAvatar(ctx, *employee.UserID, employee.AvatarURL)
+	}
+
+	return employee, nil
 }
 
 func mapEmployeeError(err error) error {

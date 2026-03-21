@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { ProjectForm } from "@/components/shared/project-form";
 import { StatusBadge as SharedStatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -234,13 +235,12 @@ function ProjectWorkspacePage() {
               </p>
               <div className="mt-4 flex flex-wrap -space-x-3">
                 {members.slice(0, 5).map((member) => (
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-background bg-primary/15 text-sm font-semibold uppercase text-primary"
+                  <ProtectedAvatar
+                    alt={member.full_name || member.user_email || member.user_id}
+                    avatarUrl={member.avatar_url}
+                    className="h-12 w-12 border-2 border-background shadow-sm"
                     key={member.user_id}
-                    title={member.full_name || member.user_email || member.user_id}
-                  >
-                    {initials(member.full_name || member.user_email || member.user_id)}
-                  </div>
+                  />
                 ))}
                 {members.length === 0 ? (
                   <div className="text-sm text-muted-foreground">No members yet</div>
@@ -324,9 +324,11 @@ function ProjectWorkspacePage() {
                     key={member.user_id}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold uppercase text-primary">
-                        {initials(member.full_name || member.user_email || member.user_id)}
-                      </div>
+                      <ProtectedAvatar
+                        alt={member.full_name || member.user_email || member.user_id}
+                        avatarUrl={member.avatar_url}
+                        className="h-11 w-11 border border-border/70"
+                      />
                       <div className="min-w-0">
                         <p className="truncate font-semibold">
                           {member.full_name || member.user_id}
@@ -446,11 +448,18 @@ function ProjectWorkspacePage() {
                     className="flex items-center justify-between gap-3 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3"
                     key={member.user_id}
                   >
-                    <div>
-                      <p className="font-semibold">{member.full_name || member.user_id}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {member.user_email || member.user_id}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <ProtectedAvatar
+                        alt={member.full_name || member.user_email || member.user_id}
+                        avatarUrl={member.avatar_url}
+                        className="h-11 w-11 border border-border/70"
+                      />
+                      <div>
+                        <p className="font-semibold">{member.full_name || member.user_id}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {member.user_email || member.user_id}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge value={member.role_in_project} />
@@ -642,9 +651,11 @@ function AddMemberModal({
           {selectedUser ? (
             <div className="flex items-center justify-between rounded-[6px] border border-ops/30 bg-ops/5 px-3 py-2.5">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ops/15 text-[11px] font-semibold text-ops">
-                  {initials(selectedUser.full_name)}
-                </div>
+                <ProtectedAvatar
+                  alt={selectedUser.full_name}
+                  avatarUrl={selectedUser.avatar_url}
+                  className="h-8 w-8 shrink-0 border border-border/70"
+                />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-text-primary">{selectedUser.full_name}</p>
                   <p className="truncate text-xs text-text-tertiary">{selectedUser.email}</p>
@@ -687,9 +698,11 @@ function AddMemberModal({
                       }}
                       type="button"
                     >
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ops/15 text-[10px] font-semibold text-ops">
-                        {initials(user.full_name)}
-                      </div>
+                      <ProtectedAvatar
+                        alt={user.full_name}
+                        avatarUrl={user.avatar_url}
+                        className="h-7 w-7 shrink-0 border border-border/70"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-text-primary">{user.full_name}</p>
                         <p className="truncate text-xs text-text-tertiary">{user.email}</p>
@@ -743,12 +756,3 @@ function Badge({ value }: { value: string }) {
   );
 }
 
-function initials(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}

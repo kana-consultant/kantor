@@ -105,8 +105,8 @@ func (h *EmployeesHandler) exportDetail(w http.ResponseWriter, r *http.Request) 
 func renderEmployeesPDF(items []model.Employee, generatedBy string) ([]byte, error) {
 	report := exportreport.NewPDFReport("Employees Report", "hris", generatedBy)
 	report.AddSummary(map[string]string{
-		"Employees":       strconv.Itoa(len(items)),
-		"Active employees": strconv.Itoa(countEmployeesByStatus(items, "active")),
+		"Employees":          strconv.Itoa(len(items)),
+		"Active employees":   strconv.Itoa(countEmployeesByStatus(items, "active")),
 		"Inactive employees": strconv.Itoa(countEmployeesByStatus(items, "inactive")),
 	})
 
@@ -121,7 +121,7 @@ func renderEmployeesPDF(items []model.Employee, generatedBy string) ([]byte, err
 			item.Email,
 		})
 	}
-	report.AddTable([]string{"Name", "Position", "Department", "Status", "Date Joined", "Contact"}, rows)
+	report.AddTable([]string{"Name", "Role", "Department", "Status", "Date Joined", "Contact"}, rows)
 
 	var buffer bytes.Buffer
 	if err := report.Save(&buffer); err != nil {
@@ -133,7 +133,7 @@ func renderEmployeesPDF(items []model.Employee, generatedBy string) ([]byte, err
 func renderEmployeesXLSX(items []model.Employee) ([]byte, error) {
 	report := exportreport.NewExcelReport("Employees Report", "hris")
 	sheet := report.AddSheet("Employees")
-	if err := report.WriteHeader(sheet, 1, []string{"Name", "Position", "Department", "Status", "Date Joined", "Email", "Phone"}); err != nil {
+	if err := report.WriteHeader(sheet, 1, []string{"Name", "Role", "Department", "Status", "Date Joined", "Email", "Phone"}); err != nil {
 		return nil, err
 	}
 
@@ -172,7 +172,7 @@ func renderEmployeeDetailPDF(employee model.Employee, salaries []model.SalaryRec
 	report := exportreport.NewPDFReport("Employee Profile Report", "hris", generatedBy)
 	report.AddSummary(map[string]string{
 		"Name":        employee.FullName,
-		"Position":    employee.Position,
+		"Role":        employee.Position,
 		"Department":  exportutil.OptionalString(employee.Department, "-"),
 		"Status":      employee.EmploymentStatus,
 		"Date joined": exportutil.FormatDate(employee.DateJoined),

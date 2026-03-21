@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,14 +32,13 @@ import {
   createBonus,
   createSalary,
   deleteBonus,
-  getCurrentSalary,
   listBonuses,
   updateBonus,
   listSalaries,
   rejectBonus,
 } from "@/services/hris-compensation";
 import { departmentsKeys, listDepartments } from "@/services/hris-departments";
-import { employeesKeys, getEmployee, updateEmployee } from "@/services/hris-employees";
+import { employeesKeys, getEmployee, updateEmployee, uploadEmployeeAvatar } from "@/services/hris-employees";
 import { listReimbursements, reimbursementsKeys } from "@/services/hris-reimbursements";
 import type {
   BonusFormValues,
@@ -77,6 +77,7 @@ function EmployeeDetailPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"profile" | "salary" | "bonus" | "reimbursements">("profile");
   const [isEditing, setIsEditing] = useState(false);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
   const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
   const [editingBonus, setEditingBonus] = useState<BonusRecord | null>(null);
@@ -113,17 +114,14 @@ function EmployeeDetailPage() {
     queryFn: listDepartments,
   });
 
-  const currentSalaryQuery = useQuery({
-    queryKey: compensationKeys.currentSalary(employeeId),
-    queryFn: () => getCurrentSalary(employeeId),
-  });
-
   const salaryHistoryQuery = useQuery({
+    enabled: tab === "salary",
     queryKey: compensationKeys.salaries(employeeId),
     queryFn: () => listSalaries(employeeId),
   });
 
   const bonusesQuery = useQuery({
+    enabled: tab === "bonus",
     queryKey: compensationKeys.bonuses(employeeId),
     queryFn: () => listBonuses(employeeId),
   });
@@ -150,8 +148,16 @@ function EmployeeDetailPage() {
   });
 
   const updateEmployeeMutation = useMutation({
-    mutationFn: (values: EmployeeFormValues) => updateEmployee(employeeId, values),
+    mutationFn: async ({ values, avatarFile }: { values: EmployeeFormValues; avatarFile: File | null }) => {
+      const updatedEmployee = await updateEmployee(employeeId, values);
+      if (!avatarFile) {
+        return updatedEmployee;
+      }
+
+      return uploadEmployeeAvatar(employeeId, avatarFile);
+    },
     onSuccess: async () => {
+      setPendingAvatarFile(null);
       setIsEditing(false);
       await queryClient.invalidateQueries({ queryKey: employeesKeys.detail(employeeId) });
       await queryClient.invalidateQueries({ queryKey: employeesKeys.all });
@@ -240,9 +246,11 @@ function EmployeeDetailPage() {
       <Card className="p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/15 text-lg font-semibold text-primary">
-              {initials(employee.full_name)}
-            </div>
+            <ProtectedAvatar
+              alt={employee.full_name}
+              avatarUrl={employee.avatar_url}
+              className="h-16 w-16 rounded-3xl border border-border/70 shadow-sm"
+            />
             <div>
               <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Employee profile</p>
               <h3 className="mt-2 text-3xl font-bold">{employee.full_name}</h3>
@@ -268,13 +276,19 @@ function EmployeeDetailPage() {
       </Card>
 
       <EmployeeForm
+        avatarFile={pendingAvatarFile}
         defaultValues={toEmployeeFormValues(employee)}
         departments={departmentsQuery.data ?? []}
         description="Perbarui data profil karyawan tanpa meninggalkan halaman detail."
+        existingAvatarPath={employee.avatar_url}
         isOpen={isEditing}
         isSubmitting={updateEmployeeMutation.isPending}
-        onCancel={() => setIsEditing(false)}
-        onSubmit={(values) => updateEmployeeMutation.mutate(values)}
+        onAvatarFileChange={setPendingAvatarFile}
+        onCancel={() => {
+          setPendingAvatarFile(null);
+          setIsEditing(false);
+        }}
+        onSubmit={(values) => updateEmployeeMutation.mutate({ values, avatarFile: pendingAvatarFile })}
         submitLabel="Save changes"
         title="Edit employee"
       />
@@ -295,10 +309,11 @@ function EmployeeDetailPage() {
         >
           <SalaryTab
             createMutation={createSalaryMutation}
-            currentSalary={currentSalaryQuery.data}
-            currentSalaryError={currentSalaryQuery.error}
+            currentSalary={salaryHistoryQuery.data?.[0]}
+            currentSalaryError={salaryHistoryQuery.error}
             form={salaryForm}
             history={salaryHistoryQuery.data ?? []}
+            isLoading={salaryHistoryQuery.isLoading}
             isModalOpen={isSalaryModalOpen}
             onModalOpenChange={setIsSalaryModalOpen}
           />
@@ -343,12 +358,15 @@ function EmployeeDetailPage() {
 
 function ProfileTab({ employee }: { employee: Employee }) {
   const items = [
+    { label: "Role", value: employee.position || "-" },
     { label: "Phone", value: employee.phone || "-" },
     { label: "Department", value: employee.department || "-" },
     { label: "Status", value: employee.employment_status },
     { label: "Date joined", value: new Date(employee.date_joined).toLocaleDateString() },
     { label: "Emergency contact", value: employee.emergency_contact || "-" },
-    { label: "Avatar URL", value: employee.avatar_url || "-" },
+    { label: "Nomor rekening", value: employee.bank_account_number || "-" },
+    { label: "Bank / E-Wallet", value: employee.bank_name || "-" },
+    { label: "LinkedIn Profile", value: employee.linkedin_profile || "-" },
   ];
 
   return (
@@ -371,10 +389,19 @@ function ProfileTab({ employee }: { employee: Employee }) {
         </div>
       </Card>
 
-      <Card className="p-6">
-        <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Address</p>
-        <p className="mt-4 text-sm text-muted-foreground">{employee.address || "Belum ada alamat yang tercatat."}</p>
-      </Card>
+      <div className="space-y-6">
+        <Card className="p-6">
+          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Address</p>
+          <p className="mt-4 text-sm text-muted-foreground">{employee.address || "Belum ada alamat yang tercatat."}</p>
+        </Card>
+
+        <Card className="p-6">
+          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">SSH Keys</p>
+          <pre className="mt-4 whitespace-pre-wrap break-all rounded-[16px] border border-border/70 bg-background/70 p-4 text-xs text-muted-foreground">
+            {employee.ssh_keys || "Belum ada SSH key yang tercatat."}
+          </pre>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -391,6 +418,7 @@ function SalaryTab({
   currentSalary?: SalaryRecord;
   currentSalaryError: unknown;
   history: SalaryRecord[];
+  isLoading: boolean;
   form: ReturnType<typeof useForm<SalaryFormValues>>;
   createMutation: ReturnType<typeof useMutation<SalaryRecord, Error, SalaryFormValues>>;
   isModalOpen: boolean;
@@ -403,7 +431,7 @@ function SalaryTab({
     formState: { errors },
   } = form;
 
-  const noCurrentSalary = currentSalaryError instanceof ApiError && currentSalaryError.status === 404;
+  const noCurrentSalary = !isLoading && !currentSalary && !currentSalaryError;
 
   return (
     <div className="space-y-6">
@@ -881,6 +909,10 @@ function toEmployeeFormValues(employee: Employee): EmployeeFormValues {
     address: employee.address ?? "",
     emergency_contact: employee.emergency_contact ?? "",
     avatar_url: employee.avatar_url ?? "",
+    bank_account_number: employee.bank_account_number ?? "",
+    bank_name: employee.bank_name ?? "",
+    linkedin_profile: employee.linkedin_profile ?? "",
+    ssh_keys: employee.ssh_keys ?? "",
   };
 }
 
@@ -895,14 +927,4 @@ function resetBonusForm(form: Pick<ReturnType<typeof useForm<BonusFormValues>>, 
     period_month: new Date().getMonth() + 1,
     period_year: new Date().getFullYear(),
   });
-}
-
-function initials(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }

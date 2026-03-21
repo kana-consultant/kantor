@@ -191,7 +191,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	adsMetricsService := marketingservice.NewAdsMetricsService(adsMetricsRepository)
 	leadsService := marketingservice.NewLeadsService(leadsRepository, authRepository, notificationsService)
 	marketingOverviewService := marketingservice.NewOverviewService(marketingOverviewRepository)
-	filesService := filesservice.New(cfg.UploadsDir, reimbursementsRepository, campaignsRepository)
+	filesService := filesservice.New(cfg.UploadsDir, reimbursementsRepository, campaignsRepository, employeesRepository)
 
 	// WhatsApp Broadcast
 	waRepository := warepo.New(pool)
@@ -212,7 +212,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		operationalhandler.NewKanbanHandler(kanbanService),
 		operationalhandler.NewTrackerHandler(trackerService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
-		hrishandler.NewEmployeesHandler(employeesService, compensationService, authRepository),
+		hrishandler.NewEmployeesHandler(employeesService, compensationService, cfg.UploadsDir, authRepository),
 		hrishandler.NewDepartmentsHandler(departmentsService),
 		hrishandler.NewCompensationHandler(compensationService),
 		hrishandler.NewFinanceHandler(financeService, authRepository),

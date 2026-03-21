@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { ExportButton } from "@/components/shared/export-button";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -71,9 +72,11 @@ function EmployeesPage() {
       sortable: true,
       cell: (employee) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-hr-light text-sm font-semibold text-hr">
-            {initials(employee.full_name)}
-          </div>
+          <ProtectedAvatar
+            alt={employee.full_name}
+            avatarUrl={employee.avatar_url}
+            className="h-10 w-10 border border-border/70"
+          />
           <div className="space-y-1">
             <p className="font-semibold text-text-primary">{employee.full_name}</p>
             <p className="text-[13px] text-text-secondary">{employee.email}</p>
@@ -83,7 +86,7 @@ function EmployeesPage() {
     },
     {
       id: "position",
-      header: "Position",
+      header: "Role",
       accessor: "position",
       sortable: true,
       cell: (employee) => (
@@ -279,14 +282,4 @@ function EmployeesPage() {
       />
     </div>
   );
-}
-
-function initials(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }

@@ -12,6 +12,7 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { JsonDiffViewer } from "@/components/shared/json-diff-viewer";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { OverviewSkeleton } from "@/components/shared/skeletons";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -396,20 +397,12 @@ function AvatarChip({
   name: string;
   avatarUrl?: string | null;
 }) {
-  if (avatarUrl) {
-    return (
-      <img
-        alt={name}
-        className="h-6 w-6 rounded-full border border-border object-cover"
-        src={avatarUrl}
-      />
-    );
-  }
-
   return (
-    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-muted text-[11px] font-semibold text-text-primary">
-      {name.slice(0, 1).toUpperCase()}
-    </div>
+    <ProtectedAvatar
+      alt={name}
+      avatarUrl={avatarUrl}
+      className="h-6 w-6 border border-border"
+    />
   );
 }
 

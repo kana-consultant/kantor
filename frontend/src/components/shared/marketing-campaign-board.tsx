@@ -15,9 +15,10 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { CalendarDays, Paperclip } from "lucide-react";
 
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
-import { channelMeta, initials } from "@/lib/marketing";
+import { channelMeta } from "@/lib/marketing";
 import { cn } from "@/lib/utils";
 import type { Campaign, CampaignColumn } from "@/types/marketing";
 
@@ -240,9 +241,13 @@ function CampaignCard({
           <div className="flex items-center justify-between gap-3">
             <span className="text-text-secondary">PIC</span>
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-mkt text-[10px] font-[600] uppercase text-white shadow-sm ring-2 ring-background">
-                {initials(campaign.pic_employee_name)}
-              </div>
+              <ProtectedAvatar
+                alt={campaign.pic_employee_name ?? "Campaign PIC"}
+                avatarUrl={campaign.pic_avatar_url}
+                className="h-6 w-6 shadow-sm ring-2 ring-background"
+                fallbackClassName="bg-mkt text-white"
+                iconClassName="h-3 w-3"
+              />
               <span className="max-w-[9rem] truncate text-[12px] font-[500] text-text-primary">{campaign.pic_employee_name ?? "Unassigned"}</span>
             </div>
           </div>

@@ -30,17 +30,28 @@ type filesCampaignsRepository interface {
 	FindAttachmentPath(ctx context.Context, campaignID string, filename string) (string, error)
 }
 
+type filesEmployeesRepository interface {
+	FindAvatarPath(ctx context.Context, employeeID string, filename string) (string, error)
+}
+
 type Service struct {
 	uploadsDir         string
 	reimbursementsRepo filesReimbursementsRepository
 	campaignsRepo      filesCampaignsRepository
+	employeesRepo      filesEmployeesRepository
 }
 
-func New(uploadsDir string, reimbursementsRepo filesReimbursementsRepository, campaignsRepo filesCampaignsRepository) *Service {
+func New(
+	uploadsDir string,
+	reimbursementsRepo filesReimbursementsRepository,
+	campaignsRepo filesCampaignsRepository,
+	employeesRepo filesEmployeesRepository,
+) *Service {
 	return &Service{
 		uploadsDir:         uploadsDir,
 		reimbursementsRepo: reimbursementsRepo,
 		campaignsRepo:      campaignsRepo,
+		employeesRepo:      employeesRepo,
 	}
 }
 
@@ -66,6 +77,15 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 		relativePath, err = s.campaignsRepo.FindAttachmentPath(ctx, resourceID, filename)
 		if err != nil {
 			if errors.Is(err, marketingrepo.ErrCampaignNotFound) || errors.Is(err, marketingrepo.ErrCampaignAttachmentNotFound) {
+				return ResolvedFile{}, ErrFileNotFound
+			}
+			return ResolvedFile{}, err
+		}
+	case "employees":
+		permission = ""
+		relativePath, err = s.employeesRepo.FindAvatarPath(ctx, resourceID, filename)
+		if err != nil {
+			if errors.Is(err, hrisrepo.ErrEmployeeNotFound) || errors.Is(err, hrisrepo.ErrEmployeeAvatarNotFound) {
 				return ResolvedFile{}, ErrFileNotFound
 			}
 			return ResolvedFile{}, err

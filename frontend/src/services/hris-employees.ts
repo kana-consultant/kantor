@@ -73,6 +73,19 @@ export async function updateEmployee(employeeId: string, input: EmployeeFormValu
   );
 }
 
+export async function uploadEmployeeAvatar(employeeId: string, file: File) {
+  const formData = new FormData();
+  formData.set("avatar", file);
+
+  return authRequestJSON<Employee>(
+    `/hris/employees/${employeeId}/avatar`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}
+
 export async function deleteEmployee(employeeId: string) {
   return authRequestJSON<{ message: string }>(`/hris/employees/${employeeId}`, { method: "DELETE" });
 }
@@ -89,5 +102,9 @@ function serializeEmployeeForm(input: EmployeeFormValues) {
     address: input.address.trim() || null,
     emergency_contact: input.emergency_contact.trim() || null,
     avatar_url: input.avatar_url.trim() || null,
+    bank_account_number: input.bank_account_number.trim() || null,
+    bank_name: input.bank_name.trim() || null,
+    linkedin_profile: input.linkedin_profile.trim() || null,
+    ssh_keys: input.ssh_keys.trim() || null,
   };
 }

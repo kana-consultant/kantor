@@ -13,6 +13,10 @@ export interface Employee {
   address?: string | null;
   emergency_contact?: string | null;
   avatar_url?: string | null;
+  bank_account_number?: string | null;
+  bank_name?: string | null;
+  linkedin_profile?: string | null;
+  ssh_keys?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +60,10 @@ export interface EmployeeFormValues {
   address: string;
   emergency_contact: string;
   avatar_url: string;
+  bank_account_number: string;
+  bank_name: string;
+  linkedin_profile: string;
+  ssh_keys: string;
 }
 
 export interface DepartmentFormValues {

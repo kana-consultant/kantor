@@ -2,7 +2,13 @@ import { ApiError } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { ensureAuthenticated } from "@/services/auth";
 
-export type ProtectedFileType = "campaigns" | "reimbursements";
+export type ProtectedFileType = "campaigns" | "reimbursements" | "employees";
+
+export interface ProtectedFileReference {
+  type: ProtectedFileType;
+  resourceId: string;
+  filename: string;
+}
 
 const API_BASE_URL = env.VITE_API_BASE_URL;
 
@@ -74,4 +80,29 @@ export async function openProtectedFile(
 export function getProtectedFileName(filePath: string) {
   const parts = filePath.split("/");
   return parts[parts.length - 1] ?? filePath;
+}
+
+export function parseProtectedFilePath(filePath: string): ProtectedFileReference | null {
+  const normalized = filePath.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  const parts = normalized.split("/").filter(Boolean);
+
+  if (parts.length < 3) {
+    return null;
+  }
+
+  const [type, resourceId, ...filenameParts] = parts;
+  if (type !== "campaigns" && type !== "reimbursements" && type !== "employees") {
+    return null;
+  }
+
+  const filename = filenameParts.join("/");
+  if (!resourceId || !filename) {
+    return null;
+  }
+
+  return {
+    type,
+    resourceId,
+    filename,
+  };
 }

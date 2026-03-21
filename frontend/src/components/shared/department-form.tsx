@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,14 +45,32 @@ export function DepartmentForm({
   onCancel,
   onSubmit,
 }: DepartmentFormProps) {
+  const normalizedDefaultValues = useMemo<DepartmentFormValues>(
+    () => ({
+      name: defaultValues?.name ?? baseValues.name,
+      description: defaultValues?.description ?? baseValues.description,
+      head_id: defaultValues?.head_id ?? baseValues.head_id,
+    }),
+    [defaultValues?.name, defaultValues?.description, defaultValues?.head_id],
+  );
+
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<DepartmentFormValues>({
     resolver: zodResolver(departmentFormSchema),
-    defaultValues: defaultValues ?? baseValues,
+    defaultValues: normalizedDefaultValues,
   });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    reset(normalizedDefaultValues);
+  }, [isOpen, normalizedDefaultValues, reset]);
 
   const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-hr focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-hr/10 disabled:cursor-not-allowed disabled:opacity-50";
 

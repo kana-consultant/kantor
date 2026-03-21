@@ -15,10 +15,11 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { Clock3 } from "lucide-react";
 
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
-import { initials, leadSourceMeta } from "@/lib/marketing";
+import { leadSourceMeta } from "@/lib/marketing";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadPipelineColumn } from "@/types/marketing";
 
@@ -222,9 +223,13 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-mkt text-[10px] font-[600] uppercase text-white shadow-sm ring-2 ring-background">
-              {initials(lead.assigned_to_name)}
-            </div>
+            <ProtectedAvatar
+              alt={lead.assigned_to_name ?? "Lead assignee"}
+              avatarUrl={lead.assigned_to_avatar}
+              className="h-6 w-6 shadow-sm ring-2 ring-background"
+              fallbackClassName="bg-mkt text-white"
+              iconClassName="h-3 w-3"
+            />
             <span className="max-w-[8rem] truncate text-[12px] font-[500] text-text-primary">{lead.assigned_to_name ?? "Unassigned"}</span>
           </div>
           <span className="text-[13px] font-[600] text-text-primary">{formatIDR(lead.estimated_value)}</span>

@@ -16,6 +16,7 @@ import {
 
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { FormModal } from "@/components/shared/form-modal";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -442,9 +443,11 @@ function AdminUsersPage() {
           <div className="space-y-5">
             <div className="rounded-md border border-border bg-surface-muted/60 p-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-error-light text-sm font-semibold text-error">
-                  {userDetailQuery.data.user.full_name.slice(0, 1).toUpperCase()}
-                </div>
+                <ProtectedAvatar
+                  alt={userDetailQuery.data.user.full_name}
+                  avatarUrl={userDetailQuery.data.user.avatar_url}
+                  className="h-11 w-11 border border-border/70"
+                />
                 <div>
                   <p className="font-medium text-text-primary">
                     {userDetailQuery.data.user.full_name}

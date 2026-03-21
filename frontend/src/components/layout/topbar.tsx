@@ -3,6 +3,7 @@ import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun,
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
@@ -211,9 +212,13 @@ export function Topbar() {
             }}
             type="button"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-module text-[13px] font-semibold text-white">
-              {initials(user?.full_name ?? "Guest")}
-            </div>
+            <ProtectedAvatar
+              alt={user?.full_name ?? "Guest"}
+              avatarUrl={user?.avatar_url}
+              className="h-8 w-8 border border-border/70"
+              fallbackClassName="bg-module text-white"
+              iconClassName="h-4 w-4"
+            />
             <div className="hidden text-left md:block">
               <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
               <p className="text-xs text-text-secondary">{roleSummary}</p>
@@ -314,12 +319,3 @@ function formatPhone(phone: string) {
   return phone.startsWith("+") ? phone : `+${phone}`;
 }
 
-function initials(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}

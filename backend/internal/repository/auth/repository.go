@@ -888,6 +888,16 @@ func (r *Repository) UpdateUserFields(ctx context.Context, userID string, fullNa
 	return err
 }
 
+func (r *Repository) UpdateUserAvatar(ctx context.Context, userID string, avatarURL *string) error {
+	_, err := r.db.Exec(
+		ctx,
+		`UPDATE users SET avatar_url = NULLIF($2, ''), updated_at = NOW() WHERE id = $1::uuid`,
+		userID,
+		nullableText(avatarURL),
+	)
+	return err
+}
+
 func normalizePhone(phone *string) interface{} {
 	if phone == nil {
 		return nil

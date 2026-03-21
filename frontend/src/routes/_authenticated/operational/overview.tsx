@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { OverviewSkeleton } from "@/components/shared/skeletons";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -176,9 +177,13 @@ function OperationalOverviewPage() {
                     <StatusBadge status={task.priority} variant="priority" />
                     {task.assignee_name ? (
                       <span className="inline-flex items-center gap-2 rounded-full bg-surface-muted px-2 py-1 text-xs font-medium text-text-secondary">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-module text-[10px] font-semibold text-white">
-                          {initials(task.assignee_name)}
-                        </span>
+                        <ProtectedAvatar
+                          alt={task.assignee_name}
+                          avatarUrl={task.assignee_avatar}
+                          className="h-5 w-5"
+                          fallbackClassName="bg-module text-white"
+                          iconClassName="h-3 w-3"
+                        />
                         {task.assignee_name}
                       </span>
                     ) : (
@@ -202,16 +207,6 @@ function OperationalOverviewPage() {
       </div>
     </div>
   );
-}
-
-function initials(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }
 
 function formatDateTime(value: string) {

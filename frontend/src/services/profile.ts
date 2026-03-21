@@ -12,6 +12,10 @@ export interface UpdateProfileInput {
   address: string | null;
   emergency_contact: string | null;
   avatar_url: string | null;
+  bank_account_number: string | null;
+  bank_name: string | null;
+  linkedin_profile: string | null;
+  ssh_keys: string | null;
 }
 
 export async function getProfile(): Promise<Employee> {

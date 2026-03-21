@@ -28,6 +28,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/shared/drawer";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -909,7 +910,7 @@ function KanbanTaskCard({
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
           <div className="flex items-center gap-2">
-            <AvatarBadge name={task.assignee_name} />
+            <AvatarBadge avatarUrl={task.avatar_url} name={task.assignee_name} />
             <span className="text-[12px] font-[500] text-text-secondary truncate max-w-[120px]">{task.assignee_name ?? "Unassigned"}</span>
           </div>
           <span className="text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">{task.due_date ? formatDate(task.due_date) : "No due date"}</span>
@@ -1106,22 +1107,16 @@ function AssignmentBadge({ assignedVia }: { assignedVia: "manual" | "auto" }) {
   );
 }
 
-function AvatarBadge({ name }: { name?: string | null }) {
+function AvatarBadge({ name, avatarUrl }: { name?: string | null; avatarUrl?: string | null }) {
   return (
-    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ops text-[11px] font-[600] uppercase text-white shadow-sm ring-2 ring-background">
-      {initials(name ?? "NA")}
-    </div>
+    <ProtectedAvatar
+      alt={name ?? "Unassigned"}
+      avatarUrl={avatarUrl}
+      className="h-8 w-8 shadow-sm ring-2 ring-background"
+      fallbackClassName="bg-ops text-white"
+      iconClassName="h-4 w-4"
+    />
   );
-}
-
-function initials(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }
 
 function formatDate(value: string) {
