@@ -5,6 +5,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { ExportButton } from "@/components/shared/export-button";
+import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
