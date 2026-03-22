@@ -48,16 +48,25 @@ export function revokeRefreshToken() {
   );
 }
 
-export async function refreshSession() {
-  const store = useAuthStore.getState();
+let refreshSessionPromise: Promise<AuthSession> | null = null;
 
-  if (!store.session) {
+export async function refreshSession() {
+  if (!useAuthStore.getState().session) {
     throw new Error("No active session");
   }
 
-  const refreshedSession = await refresh();
-  store.setSession(refreshedSession);
-  return refreshedSession;
+  if (!refreshSessionPromise) {
+    refreshSessionPromise = refresh()
+      .then((refreshedSession) => {
+        useAuthStore.getState().setSession(refreshedSession);
+        return refreshedSession;
+      })
+      .finally(() => {
+        refreshSessionPromise = null;
+      });
+  }
+
+  return refreshSessionPromise;
 }
 
 export async function logout() {
@@ -85,9 +94,7 @@ export async function ensureAuthenticated(): Promise<AuthSession | null> {
   }
 
   try {
-    const refreshedSession = await refresh();
-    store.setSession(refreshedSession);
-    return refreshedSession;
+    return await refreshSession();
   } catch {
     store.clearSession();
     return null;

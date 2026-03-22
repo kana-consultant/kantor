@@ -111,31 +111,38 @@ function getAccessToken(): string | undefined {
   return getStoredSession()?.tokens.access_token;
 }
 
-let refreshPromise: Promise<unknown> | null = null;
-
 async function handleAuthRetry<T>(
   fn: (token?: string) => Promise<T>,
 ): Promise<T> {
+  const attemptedToken = getAccessToken();
+
   try {
-    return await fn(getAccessToken());
+    return await fn(attemptedToken);
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) {
+      const currentToken = getAccessToken();
+      if (attemptedToken && currentToken && currentToken !== attemptedToken) {
+        return await fn(currentToken);
+      }
+
       try {
-        if (!refreshPromise) {
-          const { refreshSession } = await import("@/services/auth");
-          refreshPromise = refreshSession();
+        const { refreshSession } = await import("@/services/auth");
+        await refreshSession();
+
+        const refreshedToken = getAccessToken();
+        return await fn(refreshedToken);
+      } catch (refreshErr) {
+        const latestToken = getAccessToken();
+        if (attemptedToken && latestToken && latestToken !== attemptedToken) {
+          return await fn(latestToken);
         }
-        await refreshPromise;
-        return await fn(getAccessToken());
-      } catch {
+
         const { useAuthStore } = await import("@/stores/auth-store");
         useAuthStore.getState().clearSession();
         // Hard navigation: app state is potentially corrupted at this
         // point, so a full reload ensures no stale data remains.
         window.location.href = "/login";
-        throw err;
-      } finally {
-        refreshPromise = null;
+        throw refreshErr;
       }
     }
     throw err;
