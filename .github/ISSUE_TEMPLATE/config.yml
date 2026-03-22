@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/kana-consultant/kantor/security/policy
+    about: Please do not file public issues for security vulnerabilities
