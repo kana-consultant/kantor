@@ -33,6 +33,14 @@ export interface ProjectMember {
   avatar_url?: string | null;
 }
 
+export interface ProjectMemberSelection {
+  user_id?: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string | null;
+  role_in_project: string;
+}
+
 export interface ProjectDetail {
   project: Project;
   members: ProjectMember[];
@@ -64,6 +72,7 @@ export interface ProjectFormValues {
   status: ProjectStatus;
   priority: ProjectPriority;
   auto_assign_mode?: AutoAssignMode;
+  members?: ProjectMemberSelection[];
   member_emails?: string[];
 }
 

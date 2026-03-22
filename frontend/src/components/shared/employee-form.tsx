@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { FormModal } from "@/components/shared/form-modal";
 import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { Department, EmployeeFormValues } from "@/types/hris";
 import { cn } from "@/lib/utils";
 
@@ -126,6 +127,7 @@ export function EmployeeForm({
   );
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -160,6 +162,27 @@ export function EmployeeForm({
   }, [avatarFile]);
 
   const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-hr focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-hr/10 disabled:cursor-not-allowed disabled:opacity-50";
+  const richTextareaClass = cn(formControlClass, "h-auto min-h-[96px] py-3");
+  const employeeRoleOptions = [
+    { value: "", label: "Pilih role" },
+    ...EMPLOYEE_ROLE_OPTIONS.map((roleOption) => ({
+      value: roleOption,
+      label: roleOption,
+    })),
+  ];
+  const departmentOptions = [
+    { value: "", label: "Pilih department" },
+    ...departments.map((department) => ({
+      value: department.name,
+      label: department.name,
+    })),
+  ];
+  const employmentStatusOptions = [
+    { value: "active", label: "Active" },
+    { value: "probation", label: "Probation" },
+    { value: "resigned", label: "Resigned" },
+    { value: "terminated", label: "Terminated" },
+  ];
   const avatarInputKey = avatarFile?.name ?? existingAvatarPath ?? "empty-avatar";
 
   return (
@@ -184,38 +207,49 @@ export function EmployeeForm({
 
         <div className="grid gap-5 md:grid-cols-3">
           <Field error={errors.position?.message} label="Role">
-            <select className={formControlClass} {...register("position")}>
-              <option value="">Pilih role</option>
-              {EMPLOYEE_ROLE_OPTIONS.map((roleOption) => (
-                <option key={roleOption} value={roleOption}>
-                  {roleOption}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="position"
+              render={({ field }) => (
+                <Select
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  options={employeeRoleOptions}
+                  triggerClassName="focus-visible:border-hr focus-visible:ring-hr/10"
+                  value={field.value}
+                />
+              )}
+            />
           </Field>
           <Field error={errors.department?.message} label="Department">
-            <select
-              className={formControlClass}
-              {...register("department")}
-            >
-              <option value="">Pilih department</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.name}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="department"
+              render={({ field }) => (
+                <Select
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  options={departmentOptions}
+                  triggerClassName="focus-visible:border-hr focus-visible:ring-hr/10"
+                  value={field.value}
+                />
+              )}
+            />
           </Field>
           <Field error={errors.employment_status?.message} label="Status">
-            <select
-              className={formControlClass}
-              {...register("employment_status")}
-            >
-              <option value="active">Active</option>
-              <option value="probation">Probation</option>
-              <option value="resigned">Resigned</option>
-              <option value="terminated">Terminated</option>
-            </select>
+            <Controller
+              control={control}
+              name="employment_status"
+              render={({ field }) => (
+                <Select
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  options={employmentStatusOptions}
+                  triggerClassName="focus-visible:border-hr focus-visible:ring-hr/10"
+                  value={field.value}
+                />
+              )}
+            />
           </Field>
         </div>
 
@@ -230,7 +264,7 @@ export function EmployeeForm({
 
         <Field error={errors.address?.message} label="Alamat">
           <textarea
-            className={cn(formControlClass, "min-h-[96px] py-3")}
+            className={richTextareaClass}
             {...register("address")}
             placeholder="Alamat tempat tinggal"
           />
@@ -293,7 +327,7 @@ export function EmployeeForm({
 
         <Field error={errors.ssh_keys?.message} label="SSH Keys">
           <textarea
-            className={cn(formControlClass, "min-h-[120px] py-3 font-mono text-[13px]")}
+            className={cn(richTextareaClass, "min-h-[120px] font-mono text-[13px]")}
             {...register("ssh_keys")}
             placeholder="Tempel public key SSH. Jika lebih dari satu, pisahkan per baris."
           />

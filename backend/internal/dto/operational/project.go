@@ -2,6 +2,11 @@ package operational
 
 import "time"
 
+type ProjectMemberAssignment struct {
+	UserEmail     string `json:"user_email" validate:"required,email"`
+	RoleInProject string `json:"role_in_project" validate:"required,min=2,max=80"`
+}
+
 type CreateProjectRequest struct {
 	Name         string     `json:"name" validate:"required,min=3,max=150"`
 	Description  *string    `json:"description"`
@@ -9,6 +14,7 @@ type CreateProjectRequest struct {
 	Status       string     `json:"status" validate:"required,oneof=draft active on_hold completed archived"`
 	Priority     string     `json:"priority" validate:"required,oneof=low medium high critical"`
 	MemberEmails []string   `json:"member_emails" validate:"omitempty,dive,email"`
+	Members      []ProjectMemberAssignment `json:"members" validate:"omitempty,dive"`
 }
 
 type UpdateProjectRequest struct {

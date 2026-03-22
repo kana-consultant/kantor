@@ -34,12 +34,12 @@ import { toast } from "@/stores/toast-store";
 
 const changePasswordSchema = z
   .object({
-    current_password: z.string().min(1, "Password saat ini wajib diisi"),
-    new_password: z.string().min(8, "Password baru minimal 8 karakter"),
-    confirm_password: z.string().min(1, "Konfirmasi password wajib diisi"),
+    current_password: z.string().min(1, "Kata sandi saat ini wajib diisi"),
+    new_password: z.string().min(8, "Kata sandi baru minimal 8 karakter"),
+    confirm_password: z.string().min(1, "Konfirmasi kata sandi wajib diisi"),
   })
   .refine((values) => values.new_password === values.confirm_password, {
-    message: "Konfirmasi password harus sama dengan password baru",
+    message: "Konfirmasi kata sandi harus sama dengan kata sandi baru",
     path: ["confirm_password"],
   });
 
@@ -181,30 +181,26 @@ function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-3xl space-y-6 px-4 py-4 sm:p-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-text-primary">Profil Saya</h1>
           <p className="text-sm text-text-tertiary">Kelola informasi pribadi Anda</p>
         </div>
         {!isEditing ? (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsPasswordModalOpen(true)}>
-              <KeyRound className="mr-2 h-4 w-4" />
-              Ganti Password
-            </Button>
-            <Button variant="outline" size="sm" onClick={startEditing}>
+          <div className="flex w-full md:w-auto">
+            <Button className="w-full md:w-auto" variant="outline" size="sm" onClick={startEditing}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit Profil
             </Button>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+            <Button className="w-full sm:w-auto" variant="outline" size="sm" onClick={() => setIsEditing(false)}>
               <X className="mr-2 h-4 w-4" />
               Batal
             </Button>
-            <Button size="sm" onClick={() => mutation.mutate(form)} disabled={mutation.isPending}>
+            <Button className="w-full sm:w-auto" size="sm" onClick={() => mutation.mutate(form)} disabled={mutation.isPending}>
               <Save className="mr-2 h-4 w-4" />
               Simpan
             </Button>
@@ -354,7 +350,7 @@ function ProfilePage() {
               Ganti password akun Anda. Setelah berhasil, Anda akan diminta login ulang.
             </p>
           </div>
-          <Button onClick={() => setIsPasswordModalOpen(true)} type="button">
+          <Button className="w-full md:w-auto" onClick={() => setIsPasswordModalOpen(true)} type="button">
             <KeyRound className="mr-2 h-4 w-4" />
             Ganti Password
           </Button>

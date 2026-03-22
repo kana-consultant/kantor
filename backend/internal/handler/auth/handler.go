@@ -39,13 +39,13 @@ func New(service *authservice.Service, cfg config.Config) *Handler {
 
 func (h *Handler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.NewIPRateLimit(5, time.Minute,
-		"AUTH_RATE_LIMITED", "Too many registration attempts. Try again later.",
+		"AUTH_RATE_LIMITED", "Terlalu banyak percobaan pendaftaran. Coba lagi nanti.",
 	)).Post("/register", h.register)
 	router.With(platformmiddleware.NewIPRateLimit(10, time.Minute,
-		"AUTH_RATE_LIMITED", "Too many login attempts. Try again later.",
+		"AUTH_RATE_LIMITED", "Terlalu banyak percobaan login. Coba lagi nanti.",
 	)).Post("/login", h.login)
 	router.With(platformmiddleware.NewIPRateLimit(30, time.Minute,
-		"AUTH_RATE_LIMITED", "Too many token refresh attempts. Try again later.",
+		"AUTH_RATE_LIMITED", "Terlalu banyak percobaan refresh token. Coba lagi nanti.",
 	)).Post("/refresh", h.refresh)
 	router.Post("/logout", h.logout)
 }
@@ -53,13 +53,13 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Sesi login tidak ditemukan", nil)
 		return
 	}
 
 	result, err := h.service.GetSession(r.Context(), principal.UserID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan yang tidak terduga", nil)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Sesi login tidak ditemukan", nil)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	})
 
 	response.WriteJSON(w, http.StatusOK, map[string]string{
-		"message": "Password changed successfully. All sessions have been revoked.",
+		"message": "Kata sandi berhasil diubah. Semua sesi aktif telah dicabut.",
 	}, nil)
 }
 
@@ -153,7 +153,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := h.readRefreshTokenCookie(r)
 	if err != nil {
-		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Refresh token cookie is missing", nil)
+		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Cookie refresh token tidak ditemukan", nil)
 		return
 	}
 
@@ -221,12 +221,12 @@ func (h *Handler) readRefreshTokenCookie(r *http.Request) (string, error) {
 
 func (h *Handler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {
 	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
+		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Body request harus berupa JSON yang valid", nil)
 		return false
 	}
 
 	if err := h.validator.Struct(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", validationDetails(err))
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Validasi request gagal", validationDetails(err))
 		return false
 	}
 
@@ -239,6 +239,8 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusConflict, "EMAIL_ALREADY_EXISTS", err.Error(), nil)
 	case errors.Is(err, authservice.ErrInvalidCredentials):
 		response.WriteError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", err.Error(), nil)
+	case errors.Is(err, authservice.ErrInvalidCurrentPassword):
+		response.WriteError(w, http.StatusBadRequest, "INVALID_CURRENT_PASSWORD", err.Error(), nil)
 	case errors.Is(err, authservice.ErrInactiveUser):
 		response.WriteError(w, http.StatusForbidden, "INACTIVE_USER", err.Error(), nil)
 	case errors.Is(err, authservice.ErrAccountLocked):
@@ -248,7 +250,7 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 	case errors.Is(err, authservice.ErrPasswordUnchanged):
 		response.WriteError(w, http.StatusBadRequest, "PASSWORD_UNCHANGED", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan yang tidak terduga", nil)
 	}
 }
 

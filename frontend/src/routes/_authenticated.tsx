@@ -75,11 +75,11 @@ function AuthenticatedErrorComponent({ error, reset }: ErrorComponentProps) {
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="rounded-[28px] border border-border bg-card/80 p-8 text-center shadow-panel max-w-md">
           <p className="text-sm uppercase tracking-[0.3em] text-destructive">
-            Error
+            Galat
           </p>
-          <h1 className="mt-3 text-2xl font-bold">Something went wrong</h1>
+          <h1 className="mt-3 text-2xl font-bold">Terjadi masalah</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {error.message || "An unexpected error occurred"}
+            {error.message || "Terjadi kesalahan yang tidak terduga"}
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">
             <Button
@@ -89,10 +89,10 @@ function AuthenticatedErrorComponent({ error, reset }: ErrorComponentProps) {
                 router.invalidate();
               }}
             >
-              Try again
+              Coba Lagi
             </Button>
             <Button variant="outline" onClick={() => router.navigate({ to: "/" })}>
-              Go home
+              Ke Beranda
             </Button>
           </div>
         </div>

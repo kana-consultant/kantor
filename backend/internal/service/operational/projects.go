@@ -27,6 +27,7 @@ type projectsRepository interface {
 	ListProjectMembers(ctx context.Context, projectID string) ([]model.ProjectMember, error)
 	MutateProjectMember(ctx context.Context, projectID string, params operationalrepo.ProjectMemberMutationParams) error
 	BulkAssignMembers(ctx context.Context, projectID string, userEmails []string, roleInProject string) error
+	BulkAssignMembersWithRoles(ctx context.Context, projectID string, members []operationalrepo.ProjectMemberAssignment) error
 }
 
 type projectsKanbanRepository interface {
@@ -69,7 +70,18 @@ func (s *ProjectsService) CreateProject(ctx context.Context, request operational
 		}
 	}
 
-	if len(request.MemberEmails) > 0 {
+	if len(request.Members) > 0 {
+		members := make([]operationalrepo.ProjectMemberAssignment, 0, len(request.Members))
+		for _, member := range request.Members {
+			members = append(members, operationalrepo.ProjectMemberAssignment{
+				UserEmail:     strings.ToLower(strings.TrimSpace(member.UserEmail)),
+				RoleInProject: strings.TrimSpace(member.RoleInProject),
+			})
+		}
+		if err := s.repo.BulkAssignMembersWithRoles(ctx, project.ID, members); err != nil {
+			return ProjectDetail{}, err
+		}
+	} else if len(request.MemberEmails) > 0 {
 		if err := s.repo.BulkAssignMembers(ctx, project.ID, request.MemberEmails, "member"); err != nil {
 			return ProjectDetail{}, err
 		}

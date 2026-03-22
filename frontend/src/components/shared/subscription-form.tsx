@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import { FormModal } from "@/components/shared/form-modal";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { Employee, SubscriptionFormValues } from "@/types/hris";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +70,7 @@ export function SubscriptionForm({
     control,
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema) as never,
@@ -76,6 +78,33 @@ export function SubscriptionForm({
   });
 
   const formControlClass = "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-hr focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-hr/10 disabled:cursor-not-allowed disabled:opacity-50";
+  const textareaClass = cn(formControlClass, "h-auto min-h-[96px] py-3");
+  const billingCycleOptions = [
+    { value: "monthly", label: "Monthly" },
+    { value: "quarterly", label: "Quarterly" },
+    { value: "yearly", label: "Yearly" },
+  ];
+  const statusOptions = [
+    { value: "active", label: "Active" },
+    { value: "cancelled", label: "Cancelled" },
+    { value: "expired", label: "Expired" },
+  ];
+  const employeeOptions = [
+    { value: "", label: "Belum ditentukan" },
+    ...employees.map((employee) => ({
+      value: employee.id,
+      label: employee.full_name,
+      description: employee.position,
+    })),
+  ];
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    reset(defaultValues ?? baseValues);
+  }, [defaultValues, isOpen, reset]);
 
   return (
     <FormModal
@@ -122,14 +151,19 @@ export function SubscriptionForm({
 
         <div className="grid gap-5 md:grid-cols-3">
           <Field error={errors.billing_cycle?.message} label="Billing cycle">
-            <select
-              className={formControlClass}
-              {...register("billing_cycle")}
-            >
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="yearly">Yearly</option>
-            </select>
+            <Controller
+              control={control}
+              name="billing_cycle"
+              render={({ field }) => (
+                <Select
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  options={billingCycleOptions}
+                  triggerClassName="focus-visible:border-hr focus-visible:ring-hr/10"
+                  value={field.value}
+                />
+              )}
+            />
           </Field>
           <Field error={errors.start_date?.message} label="Start date">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("start_date")} type="date" />
@@ -141,33 +175,40 @@ export function SubscriptionForm({
 
         <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.status?.message} label="Status">
-            <select
-              className={formControlClass}
-              {...register("status")}
-            >
-              <option value="active">Active</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="expired">Expired</option>
-            </select>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  options={statusOptions}
+                  triggerClassName="focus-visible:border-hr focus-visible:ring-hr/10"
+                  value={field.value}
+                />
+              )}
+            />
           </Field>
           <Field error={errors.pic_employee_id?.message} label="PIC employee">
-            <select
-              className={formControlClass}
-              {...register("pic_employee_id")}
-            >
-              <option value="">Belum ditentukan</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.full_name} - {employee.position}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="pic_employee_id"
+              render={({ field }) => (
+                <Select
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  options={employeeOptions}
+                  triggerClassName="focus-visible:border-hr focus-visible:ring-hr/10"
+                  value={field.value}
+                />
+              )}
+            />
           </Field>
         </div>
 
         <Field error={errors.description?.message} label="Description">
           <textarea
-            className={cn(formControlClass, "min-h-[96px] py-3")}
+            className={textareaClass}
             {...register("description")}
           />
         </Field>
@@ -175,14 +216,14 @@ export function SubscriptionForm({
         <div className="grid gap-5 md:grid-cols-2">
           <Field error={errors.login_credentials?.message} label="Encrypted login credentials">
             <textarea
-               className={cn(formControlClass, "min-h-[96px] py-3 font-mono text-[13px]")}
+               className={cn(textareaClass, "font-mono text-[13px]")}
               {...register("login_credentials")}
               placeholder="email: ops@company.com | password: ********"
             />
           </Field>
           <Field error={errors.notes?.message} label="Notes">
             <textarea
-              className={cn(formControlClass, "min-h-[96px] py-3")}
+              className={textareaClass}
               {...register("notes")}
             />
           </Field>

@@ -51,7 +51,7 @@ const tones = {
   renewal1: tone("bg-error-light", "text-error", "bg-error"),
   low: tone("bg-success-light", "text-low", "bg-low"),
   medium: tone("bg-warning-light", "text-medium", "bg-medium"),
-  high: tone("bg-[#FFF1E6]", "text-high", "bg-high"),
+  high: tone("bg-high/15", "text-high", "bg-high"),
   critical: tone("bg-error-light", "text-critical", "bg-critical"),
   draft: tone("bg-ops-light", "text-ops", "bg-ops"),
   archived: tone("bg-surface-muted", "text-text-tertiary", "bg-text-tertiary"),

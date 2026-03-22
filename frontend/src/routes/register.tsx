@@ -10,17 +10,17 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
 import { getValidStoredSession, register } from "@/services/auth";
-import { useAuthStore } from "@/stores/auth-store";
+import { toast } from "@/stores/toast-store";
 
 const registerSchema = z
   .object({
-    full_name: z.string().min(3, "Full name must contain at least 3 characters"),
-    email: z.email("Email must be valid"),
-    password: z.string().min(8, "Password must contain at least 8 characters"),
-    confirmPassword: z.string().min(8, "Please confirm the password"),
+    full_name: z.string().min(3, "Nama lengkap minimal 3 karakter"),
+    email: z.email("Email wajib valid"),
+    password: z.string().min(8, "Kata sandi minimal 8 karakter"),
+    confirmPassword: z.string().min(8, "Konfirmasi kata sandi wajib diisi"),
   })
   .refine((value) => value.password === value.confirmPassword, {
-    message: "Password confirmation does not match",
+    message: "Konfirmasi kata sandi tidak sama",
     path: ["confirmPassword"],
   });
 
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/register")({
     const session = getValidStoredSession();
     if (session?.tokens.access_token) {
       throw redirect({
-        to: "/operational",
+        to: "/operational/overview",
       });
     }
   },
@@ -40,7 +40,6 @@ export const Route = createFileRoute("/register")({
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const setSession = useAuthStore((state) => state.setSession);
   const {
     register: registerField,
     handleSubmit,
@@ -62,9 +61,9 @@ function RegisterPage() {
         password: values.password,
         full_name: values.full_name,
       }),
-    onSuccess: (session) => {
-      setSession(session);
-      void navigate({ to: "/operational" });
+    onSuccess: () => {
+      toast.success("Akun berhasil dibuat", "Silakan masuk dengan akun yang baru Anda daftarkan.");
+      void navigate({ to: "/login", replace: true });
     },
   });
 
@@ -88,16 +87,16 @@ function RegisterPage() {
             </div>
           </div>
           <p className="text-[12px] font-[500] leading-tight text-text-secondary">
-            KanA Intelligence Operational dashboaRd
+            KanA Intelligence Operational Dashboard
           </p>
         </div>
 
         <form className="space-y-4" onSubmit={submitForm}>
-          <Field label="Full name" error={errors.full_name?.message}>
+          <Field label="Nama Lengkap" error={errors.full_name?.message}>
             <Input
               {...registerField("full_name")}
               autoComplete="name"
-              placeholder="Jane Doe"
+              placeholder="Nama lengkap Anda"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
           </Field>
@@ -105,25 +104,25 @@ function RegisterPage() {
             <Input
               {...registerField("email")}
               autoComplete="email"
-              placeholder="jane@company.com"
+              placeholder="nama@company.com"
               type="email"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
           </Field>
-          <Field label="Password" error={errors.password?.message}>
+          <Field label="Kata Sandi" error={errors.password?.message}>
             <Input
               {...registerField("password")}
               autoComplete="new-password"
-              placeholder="Buat password"
+              placeholder="Buat kata sandi"
               type="password"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
           </Field>
-          <Field label="Confirm password" error={errors.confirmPassword?.message}>
+          <Field label="Konfirmasi Kata Sandi" error={errors.confirmPassword?.message}>
             <Input
               {...registerField("confirmPassword")}
               autoComplete="new-password"
-              placeholder="Konfirmasi password"
+              placeholder="Ulangi kata sandi"
               type="password"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />

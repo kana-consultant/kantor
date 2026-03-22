@@ -410,6 +410,7 @@ function SalaryTab({
   currentSalary,
   currentSalaryError,
   history,
+  isLoading,
   form,
   createMutation,
   isModalOpen,

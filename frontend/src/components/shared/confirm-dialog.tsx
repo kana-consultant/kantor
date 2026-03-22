@@ -69,8 +69,8 @@ export function ConfirmDialog({
           </div>
           <DialogClose disabled={isLoading} />
         </DialogHeader>
-        <DialogBody>
-          {noteLabel ? (
+        {noteLabel ? (
+          <DialogBody>
             <div className="space-y-2">
               <label className="text-[13px] font-[600] text-text-primary" htmlFor="confirm-dialog-note">
                 {noteLabel}
@@ -83,8 +83,8 @@ export function ConfirmDialog({
                 value={note}
               />
             </div>
-          ) : null}
-        </DialogBody>
+          </DialogBody>
+        ) : null}
         <DialogFooter>
           <Button disabled={isLoading} onClick={onClose} type="button" variant="ghost">
             Batal

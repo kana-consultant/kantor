@@ -21,13 +21,14 @@ const (
 )
 
 var (
-	ErrEmailAlreadyExists  = errors.New("email already exists")
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrInactiveUser        = errors.New("user account is inactive")
-	ErrAccountLocked       = errors.New("account is temporarily locked due to too many failed login attempts")
-	ErrInvalidRefreshToken = errors.New("invalid refresh token")
-	ErrExpiredRefreshToken = errors.New("refresh token has expired")
-	ErrPasswordUnchanged   = errors.New("new password must differ from current password")
+	ErrEmailAlreadyExists  = errors.New("email sudah terdaftar")
+	ErrInvalidCredentials  = errors.New("email atau kata sandi tidak valid")
+	ErrInvalidCurrentPassword = errors.New("kata sandi saat ini tidak sesuai")
+	ErrInactiveUser        = errors.New("akun pengguna sedang tidak aktif")
+	ErrAccountLocked       = errors.New("akun dikunci sementara karena terlalu banyak percobaan login yang gagal")
+	ErrInvalidRefreshToken = errors.New("refresh token tidak valid")
+	ErrExpiredRefreshToken = errors.New("refresh token sudah kedaluwarsa")
+	ErrPasswordUnchanged   = errors.New("kata sandi baru harus berbeda dari kata sandi saat ini")
 )
 
 type authRepository interface {
@@ -246,7 +247,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, currentPass
 	}
 
 	if err := backendauth.ComparePassword(user.PasswordHash, currentPassword); err != nil {
-		return ErrInvalidCredentials
+		return ErrInvalidCurrentPassword
 	}
 
 	if currentPassword == newPassword {

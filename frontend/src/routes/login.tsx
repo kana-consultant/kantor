@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Link, createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,8 +12,8 @@ import { getValidStoredSession, login } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth-store";
 
 const loginSchema = z.object({
-  email: z.email("Email must be valid"),
-  password: z.string().min(8, "Password must contain at least 8 characters"),
+  email: z.email("Email wajib valid"),
+  password: z.string().min(8, "Kata sandi minimal 8 karakter"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/login")({
     const session = getValidStoredSession();
     if (session?.tokens.access_token) {
       throw redirect({
-        to: "/operational",
+        to: "/operational/overview",
       });
     }
   },
@@ -31,7 +31,6 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
   const {
     register,
@@ -49,7 +48,7 @@ function LoginPage() {
     mutationFn: login,
     onSuccess: (session) => {
       setSession(session);
-      void navigate({ to: "/operational" });
+      window.location.replace("/operational/overview");
     },
   });
 
@@ -73,7 +72,7 @@ function LoginPage() {
             </div>
           </div>
           <p className="text-[12px] font-[500] leading-tight text-text-secondary">
-            KanA Intelligence Operational dashboaRd
+            KanA Intelligence Operational Dashboard
           </p>
         </div>
 
@@ -85,7 +84,7 @@ function LoginPage() {
             <Input
               id="email"
               autoComplete="email"
-              placeholder="you@company.com"
+              placeholder="nama@company.com"
               type="email"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
               {...register("email")}
@@ -97,12 +96,12 @@ function LoginPage() {
 
           <div className="space-y-1.5">
             <label className="text-[13px] font-[600] text-text-primary" htmlFor="password">
-              Password
+              Kata Sandi
             </label>
             <Input
               id="password"
               autoComplete="current-password"
-              placeholder="Masukkan password"
+              placeholder="Masukkan kata sandi"
               type="password"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
               {...register("password")}
@@ -124,7 +123,7 @@ function LoginPage() {
               disabled={loginMutation.isPending}
               type="submit"
             >
-              {loginMutation.isPending ? "Memproses..." : "Masuk ke Workspace"}
+              {loginMutation.isPending ? "Memproses..." : "Masuk"}
             </Button>
           </div>
         </form>

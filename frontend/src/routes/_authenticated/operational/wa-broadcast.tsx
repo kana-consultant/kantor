@@ -24,7 +24,8 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { useRBAC } from "@/hooks/use-rbac";
@@ -440,24 +441,32 @@ function TemplatesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          <select className="rounded-md border border-border bg-background px-3 py-1.5 text-sm" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="">Semua Kategori</option>
-            <option value="operational">Operational</option>
-            <option value="hris">HRIS</option>
-            <option value="marketing">Marketing</option>
-            <option value="general">General</option>
-          </select>
-          <select className="rounded-md border border-border bg-background px-3 py-1.5 text-sm" value={triggerFilter} onChange={(e) => setTriggerFilter(e.target.value)}>
-            <option value="">Semua Trigger</option>
-            <option value="auto_scheduled">Auto Scheduled</option>
-            <option value="event_triggered">Event Triggered</option>
-            <option value="manual">Manual</option>
-          </select>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Select
+            onValueChange={setCategoryFilter}
+            options={[
+              { value: "", label: "Semua Kategori" },
+              { value: "operational", label: "Operational" },
+              { value: "hris", label: "HRIS" },
+              { value: "marketing", label: "Marketing" },
+              { value: "general", label: "General" },
+            ]}
+            value={categoryFilter}
+          />
+          <Select
+            onValueChange={setTriggerFilter}
+            options={[
+              { value: "", label: "Semua Trigger" },
+              { value: "auto_scheduled", label: "Auto Scheduled" },
+              { value: "event_triggered", label: "Event Triggered" },
+              { value: "manual", label: "Manual" },
+            ]}
+            value={triggerFilter}
+          />
         </div>
         {canManage && (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Button className="w-full sm:w-auto" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> Buat Template
           </Button>
         )}
@@ -524,13 +533,28 @@ function TemplatesTab() {
       {/* Preview Dialog */}
       <Dialog open={previewData !== null} onOpenChange={() => setPreviewData(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Preview: {previewData?.name}</DialogTitle></DialogHeader>
-          <div className="rounded-lg bg-surface-muted p-4">
+          <DialogHeader className="flex items-start justify-between gap-4">
+            <div>
+              <DialogTitle>Preview: {previewData?.name}</DialogTitle>
+              <DialogDescription>
+                Pesan di bawah memakai data contoh. Saat dikirim, isi template akan memakai data aktual.
+              </DialogDescription>
+            </div>
+            <DialogClose />
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            <div className="rounded-lg bg-surface-muted p-4">
             <pre className="whitespace-pre-wrap text-sm leading-relaxed">{previewData?.text}</pre>
-          </div>
-          <p className="text-xs text-text-secondary">
-            * Variabel ditampilkan dengan data contoh. Pesan aktual akan menggunakan data real.
-          </p>
+            </div>
+            <p className="text-xs text-text-secondary">
+              Klik area luar modal atau tombol tutup untuk kembali ke daftar template.
+            </p>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={() => setPreviewData(null)} type="button" variant="ghost">
+              Tutup
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -598,35 +622,45 @@ function TemplateFormDialog({ template, onClose }: { template: WATemplate | null
         <DialogBody className="space-y-5 sm:max-h-[70vh]">
           <div className="grid gap-5 lg:grid-cols-[1.05fr,0.95fr]">
             <Card className="order-1 p-4 sm:p-5 lg:col-start-1">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-text-primary">Nama Template</label>
-                  <Input className="mt-1.5" placeholder="e.g. Reminder Meeting" value={name} onChange={(e) => setName(e.target.value)} disabled={isSystem} />
+                  <Input className="mt-1.5" placeholder="Contoh: Reminder Meeting" value={name} onChange={(e) => setName(e.target.value)} disabled={isSystem} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-text-primary">Slug</label>
-                  <Input className="mt-1.5 font-mono text-sm" placeholder="e.g. reminder_meeting" value={slug} onChange={(e) => setSlug(e.target.value)} disabled={isEdit} />
+                  <label className="text-sm font-medium text-text-primary">Slug Template</label>
+                  <Input className="mt-1.5 font-mono text-sm" placeholder="contoh: reminder_meeting" value={slug} onChange={(e) => setSlug(e.target.value)} disabled={isEdit} />
                   <p className="text-xs leading-5 text-text-secondary">Identifier unik, tidak bisa diubah setelah dibuat.</p>
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-text-primary">Kategori</label>
-                  <select className="field-select mt-1.5 w-full" value={category} onChange={(e) => setCategory(e.target.value)} disabled={isSystem}>
-                    <option value="operational">Operational</option>
-                    <option value="hris">HRIS</option>
-                    <option value="marketing">Marketing</option>
-                    <option value="general">General</option>
-                  </select>
+                  <Select
+                    disabled={isSystem}
+                    onValueChange={setCategory}
+                    options={[
+                      { value: "operational", label: "Operasional" },
+                      { value: "hris", label: "HRIS" },
+                      { value: "marketing", label: "Marketing" },
+                      { value: "general", label: "Umum" },
+                    ]}
+                    value={category}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-text-primary">Trigger Type</label>
-                  <select className="field-select mt-1.5 w-full" value={triggerType} onChange={(e) => setTriggerType(e.target.value)} disabled={isSystem}>
-                    <option value="auto_scheduled">Auto Scheduled</option>
-                    <option value="event_triggered">Event Triggered</option>
-                    <option value="manual">Manual</option>
-                  </select>
+                  <label className="text-sm font-medium text-text-primary">Tipe Pemicu</label>
+                  <Select
+                    disabled={isSystem}
+                    onValueChange={setTriggerType}
+                    options={[
+                      { value: "auto_scheduled", label: "Terjadwal Otomatis" },
+                      { value: "event_triggered", label: "Dipicu Event" },
+                      { value: "manual", label: "Manual" },
+                    ]}
+                    value={triggerType}
+                  />
                 </div>
               </div>
 
@@ -884,22 +918,36 @@ function ScheduleFormDialog({ schedule, onClose }: { schedule: WASchedule | null
           </div>
           <div>
             <label className="text-sm font-medium text-text-primary">Template</label>
-            <select className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-              <option value="">-- Pilih Template --</option>
-              {templatesQuery.data?.map((t) => (
-                <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>
-              ))}
-            </select>
+            <div className="mt-1.5">
+              <Select
+                onValueChange={setTemplateId}
+                options={[
+                  { value: "", label: "-- Pilih Template --" },
+                  ...(templatesQuery.data?.map((t) => ({
+                    value: t.id,
+                    label: t.name,
+                    description: t.slug,
+                  })) ?? []),
+                ]}
+                value={templateId}
+              />
+            </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="text-sm font-medium text-text-primary">Tipe Jadwal</label>
-              <select className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={scheduleType} onChange={(e) => setScheduleType(e.target.value)}>
-                <option value="daily">Harian</option>
-                <option value="weekly">Mingguan</option>
-                <option value="monthly">Bulanan</option>
-                <option value="once">Sekali</option>
-              </select>
+              <div className="mt-1.5">
+                <Select
+                  onValueChange={setScheduleType}
+                  options={[
+                    { value: "daily", label: "Harian" },
+                    { value: "weekly", label: "Mingguan" },
+                    { value: "monthly", label: "Bulanan" },
+                    { value: "once", label: "Sekali" },
+                  ]}
+                  value={scheduleType}
+                />
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium text-text-primary">Cron Expression</label>
@@ -909,12 +957,18 @@ function ScheduleFormDialog({ schedule, onClose }: { schedule: WASchedule | null
           </div>
           <div>
             <label className="text-sm font-medium text-text-primary">Target Penerima</label>
-            <select className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={targetType} onChange={(e) => setTargetType(e.target.value)}>
-              <option value="all_employees">Semua Karyawan</option>
-              <option value="department">Per Department</option>
-              <option value="specific_users">User Tertentu</option>
-              <option value="project_members">Anggota Project</option>
-            </select>
+            <div className="mt-1.5">
+              <Select
+                onValueChange={setTargetType}
+                options={[
+                  { value: "all_employees", label: "Semua Karyawan" },
+                  { value: "department", label: "Per Department" },
+                  { value: "specific_users", label: "User Tertentu" },
+                  { value: "project_members", label: "Anggota Project" },
+                ]}
+                value={targetType}
+              />
+            </div>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-4 w-4 rounded border-border" />
@@ -974,23 +1028,31 @@ function LogsTab() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <select className="rounded-md border border-border bg-background px-3 py-1.5 text-sm" value={filters.triggerType ?? ""} onChange={(e) => setFilters({ ...filters, triggerType: e.target.value || undefined, page: 1 })}>
-          <option value="">Semua Trigger</option>
-          <option value="auto_scheduled">Auto</option>
-          <option value="event_triggered">Event</option>
-          <option value="manual_quick_send">Manual</option>
-        </select>
-        <select className="rounded-md border border-border bg-background px-3 py-1.5 text-sm" value={filters.status ?? ""} onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined, page: 1 })}>
-          <option value="">Semua Status</option>
-          <option value="sent">Terkirim</option>
-          <option value="failed">Gagal</option>
-          <option value="skipped_no_phone">Dilewati (no phone)</option>
-          <option value="skipped_no_wa">Dilewati (no WA)</option>
-          <option value="daily_limit_reached">Limit Harian</option>
-        </select>
+      <div className="grid gap-2 sm:grid-cols-[180px_220px_minmax(0,1fr)_auto]">
+        <Select
+          onValueChange={(value) => setFilters({ ...filters, triggerType: value || undefined, page: 1 })}
+          options={[
+            { value: "", label: "Semua Trigger" },
+            { value: "auto_scheduled", label: "Auto" },
+            { value: "event_triggered", label: "Event" },
+            { value: "manual_quick_send", label: "Manual" },
+          ]}
+          value={filters.triggerType ?? ""}
+        />
+        <Select
+          onValueChange={(value) => setFilters({ ...filters, status: value || undefined, page: 1 })}
+          options={[
+            { value: "", label: "Semua Status" },
+            { value: "sent", label: "Terkirim" },
+            { value: "failed", label: "Gagal" },
+            { value: "skipped_no_phone", label: "Dilewati (no phone)" },
+            { value: "skipped_no_wa", label: "Dilewati (no WA)" },
+            { value: "daily_limit_reached", label: "Limit Harian" },
+          ]}
+          value={filters.status ?? ""}
+        />
         <Input
-          className="w-48"
+          className="w-full"
           placeholder="Cari nama/nomor..."
           value={filters.search ?? ""}
           onChange={(e) => setFilters({ ...filters, search: e.target.value || undefined, page: 1 })}

@@ -13,9 +13,9 @@ const buttonVariants = cva(
         ops: "bg-ops text-white shadow-sm hover:bg-ops-dark",
         hr: "bg-hr text-white shadow-sm hover:bg-hr-dark",
         mkt: "bg-mkt text-white shadow-sm hover:bg-mkt-dark",
-        secondary: "border-[1.5px] border-module bg-transparent text-[color:var(--module-primary)] hover:bg-module-light",
-        outline: "border border-border bg-surface text-text-primary hover:bg-surface-muted font-[500]",
-        ghost: "hover:bg-surface-muted hover:text-text-primary text-text-secondary font-[500]",
+        secondary: "border-[1.5px] border-module bg-transparent text-[color:var(--module-primary)] hover:bg-module-light dark:hover:bg-white/10",
+        outline: "border border-border bg-surface text-text-primary font-[500] hover:bg-surface-muted dark:hover:bg-white/10 dark:hover:text-white",
+        ghost: "text-text-secondary font-[500] hover:bg-surface-muted hover:text-text-primary dark:hover:bg-white/10 dark:hover:text-white",
         danger: "bg-error text-white shadow-xs hover:brightness-95",
       },
       size: {

@@ -2,12 +2,14 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { X } from "lucide-react";
 import { z } from "zod";
 
 import { FormModal } from "@/components/shared/form-modal";
+import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { listAvailableUsers, projectsKeys } from "@/services/operational-projects";
 import type { ProjectFormValues } from "@/types/project";
 import { cn } from "@/lib/utils";
@@ -18,11 +20,32 @@ const projectFormSchema = z.object({
   deadline: z.string().min(1, "Deadline wajib diisi"),
   status: z.enum(["draft", "active", "on_hold", "completed", "archived"]),
   priority: z.enum(["low", "medium", "high", "critical"]),
+  members: z
+    .array(
+      z.object({
+        user_id: z.string().optional(),
+        email: z.string().email(),
+        full_name: z.string().optional(),
+        avatar_url: z.string().nullable().optional(),
+        role_in_project: z.string().min(2, "Role wajib dipilih"),
+      }),
+    )
+    .optional(),
   member_emails: z.array(z.string()).optional(),
 });
 
 const projectFormSchemaWithMembers = projectFormSchema.extend({
-  member_emails: z.array(z.string()).min(1, "Pilih minimal 1 member"),
+  members: z
+    .array(
+      z.object({
+        user_id: z.string().optional(),
+        email: z.string().email(),
+        full_name: z.string().optional(),
+        avatar_url: z.string().nullable().optional(),
+        role_in_project: z.string().min(2, "Role wajib dipilih"),
+      }),
+    )
+    .min(1, "Pilih minimal 1 member"),
 });
 
 interface ProjectFormProps {
@@ -43,6 +66,7 @@ const baseValues: ProjectFormValues = {
   deadline: "",
   status: "draft",
   priority: "medium",
+  members: [],
   member_emails: [],
 };
 
@@ -60,8 +84,10 @@ export function ProjectForm({
   const schema = showMemberPicker ? projectFormSchemaWithMembers : projectFormSchema;
 
   const {
+    control,
     register,
     handleSubmit,
+    reset,
     setValue,
     watch,
     formState: { errors },
@@ -70,7 +96,7 @@ export function ProjectForm({
     defaultValues: defaultValues ?? baseValues,
   });
 
-  const selectedEmails = watch("member_emails") ?? [];
+  const selectedMembers = watch("members") ?? [];
   const [memberSearch, setMemberSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -84,32 +110,63 @@ export function ProjectForm({
   const availableUsers = usersQuery.data ?? [];
   const filteredUsers = availableUsers.filter(
     (u) =>
-      !selectedEmails.includes(u.email) &&
+      !selectedMembers.some((member) => member.email === u.email) &&
       (memberSearch === "" ||
         u.full_name.toLowerCase().includes(memberSearch.toLowerCase()) ||
         u.email.toLowerCase().includes(memberSearch.toLowerCase())),
   );
 
   const addMember = useCallback(
-    (email: string) => {
-      const current = selectedEmails;
-      if (!current.includes(email)) {
-        setValue("member_emails", [...current, email], { shouldValidate: true });
+    (user: (typeof availableUsers)[number]) => {
+      const current = selectedMembers;
+      if (!current.some((member) => member.email === user.email)) {
+        setValue(
+          "members",
+          [
+            ...current,
+            {
+              user_id: user.id,
+              email: user.email,
+              full_name: user.full_name,
+              avatar_url: user.avatar_url ?? null,
+              role_in_project: "member",
+            },
+          ],
+          { shouldValidate: true },
+        );
       }
       setMemberSearch("");
     },
-    [selectedEmails, setValue],
+    [selectedMembers, setValue],
   );
 
   const removeMember = useCallback(
     (email: string) => {
       setValue(
-        "member_emails",
-        selectedEmails.filter((e) => e !== email),
+        "members",
+        selectedMembers.filter((member) => member.email !== email),
         { shouldValidate: true },
       );
     },
-    [selectedEmails, setValue],
+    [selectedMembers, setValue],
+  );
+
+  const updateMemberRole = useCallback(
+    (email: string, roleInProject: string) => {
+      setValue(
+        "members",
+        selectedMembers.map((member) =>
+          member.email === email
+            ? {
+                ...member,
+                role_in_project: roleInProject,
+              }
+            : member,
+        ),
+        { shouldValidate: true },
+      );
+    },
+    [selectedMembers, setValue],
   );
 
   // Close dropdown on click outside
@@ -133,11 +190,45 @@ export function ProjectForm({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    reset({
+      ...baseValues,
+      ...defaultValues,
+      members: defaultValues?.members ?? [],
+      member_emails: defaultValues?.member_emails ?? [],
+    });
+  }, [defaultValues, isOpen, reset]);
+
   const formControlClass =
     "flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10 disabled:cursor-not-allowed disabled:opacity-50";
+  const richTextareaClass = cn(formControlClass, "h-auto min-h-[96px] py-3");
+  const statusOptions = [
+    { value: "draft", label: "Draft" },
+    { value: "active", label: "Aktif" },
+    { value: "on_hold", label: "Ditunda" },
+    { value: "completed", label: "Selesai" },
+    { value: "archived", label: "Arsip" },
+  ];
+  const priorityOptions = [
+    { value: "low", label: "Rendah" },
+    { value: "medium", label: "Sedang" },
+    { value: "high", label: "Tinggi" },
+    { value: "critical", label: "Kritis" },
+  ];
+  const memberRoleOptions = [
+    { value: "lead", label: "Lead" },
+    { value: "developer", label: "Developer" },
+    { value: "designer", label: "Designer" },
+    { value: "qa", label: "QA" },
+    { value: "member", label: "Member" },
+  ];
 
   const memberError = showMemberPicker
-    ? (errors.member_emails as { message?: string } | undefined)?.message
+    ? (errors.members as { message?: string } | undefined)?.message
     : undefined;
 
   return (
@@ -151,7 +242,7 @@ export function ProjectForm({
       title={title}
       subtitle={description}
     >
-      <Field error={errors.name?.message} label="Project name" required>
+      <Field error={errors.name?.message} label="Nama project" required>
         <Input
           className="focus-visible:border-ops focus-visible:ring-ops/10"
           {...register("name")}
@@ -159,32 +250,45 @@ export function ProjectForm({
         />
       </Field>
 
-      <Field error={errors.description?.message} label="Description">
-        <textarea
-          className={cn(formControlClass, "min-h-[96px] py-3")}
+        <Field error={errors.description?.message} label="Deskripsi">
+          <textarea
+          className={richTextareaClass}
           {...register("description")}
-          placeholder="Short brief about objectives, scope, and owners."
+          placeholder="Ringkasan singkat tujuan, scope, dan pemilik project."
         />
       </Field>
 
       <div className="grid gap-5 md:grid-cols-3">
         <Field error={errors.status?.message} label="Status" required>
-          <select className={formControlClass} {...register("status")}>
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-            <option value="on_hold">On Hold</option>
-            <option value="completed">Completed</option>
-            <option value="archived">Archived</option>
-          </select>
+          <Controller
+            control={control}
+            name="status"
+            render={({ field }) => (
+              <Select
+                onBlur={field.onBlur}
+                onValueChange={field.onChange}
+                options={statusOptions}
+                triggerClassName="focus-visible:border-ops focus-visible:ring-ops/10"
+                value={field.value}
+              />
+            )}
+          />
         </Field>
 
-        <Field error={errors.priority?.message} label="Priority" required>
-          <select className={formControlClass} {...register("priority")}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
+        <Field error={errors.priority?.message} label="Prioritas" required>
+          <Controller
+            control={control}
+            name="priority"
+            render={({ field }) => (
+              <Select
+                onBlur={field.onBlur}
+                onValueChange={field.onChange}
+                options={priorityOptions}
+                triggerClassName="focus-visible:border-ops focus-visible:ring-ops/10"
+                value={field.value}
+              />
+            )}
+          />
         </Field>
 
         <Field error={errors.deadline?.message} label="Deadline" required>
@@ -200,32 +304,14 @@ export function ProjectForm({
       </div>
 
       {showMemberPicker ? (
-        <Field error={memberError} label="Members" required>
+        <Field error={memberError} label="Anggota project" required>
           <div className="relative" ref={dropdownRef}>
             <div
               className={cn(
-                "flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-[6px] border bg-surface-muted px-2 py-1.5 transition-all focus-within:border-ops focus-within:bg-surface focus-within:ring-4 focus-within:ring-ops/10",
+                "flex min-h-[48px] items-center rounded-[6px] border bg-surface-muted px-3 py-2 transition-all focus-within:border-ops focus-within:bg-surface focus-within:ring-4 focus-within:ring-ops/10",
                 memberError ? "border-priority-high" : "border-transparent",
               )}
             >
-              {selectedEmails.map((email) => {
-                const user = availableUsers.find((u) => u.email === email);
-                return (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full bg-ops/10 px-2 py-0.5 text-xs font-medium text-ops"
-                    key={email}
-                  >
-                    {user?.full_name ?? email}
-                    <button
-                      className="rounded-full p-0.5 hover:bg-ops/20"
-                      onClick={() => removeMember(email)}
-                      type="button"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                );
-              })}
               <input
                 className="min-w-[120px] flex-1 border-none bg-transparent py-1 text-[14px] text-text-primary outline-none placeholder:text-text-tertiary"
                 onChange={(e) => {
@@ -234,43 +320,48 @@ export function ProjectForm({
                 }}
                 onFocus={() => setDropdownOpen(true)}
                 onKeyDown={(e) => {
-                  if (e.key === "Backspace" && memberSearch === "" && selectedEmails.length > 0) {
-                    removeMember(selectedEmails[selectedEmails.length - 1]);
+                  if (e.key === "Backspace" && memberSearch === "" && selectedMembers.length > 0) {
+                    removeMember(selectedMembers[selectedMembers.length - 1].email);
                   }
                   if (e.key === "Escape") {
                     setDropdownOpen(false);
                   }
                 }}
-                placeholder={selectedEmails.length > 0 ? "Tambah member lagi..." : "Cari employee atau user..."}
+                placeholder={selectedMembers.length > 0 ? "Tambah anggota lain..." : "Cari employee atau user..."}
                 value={memberSearch}
               />
             </div>
 
             {dropdownOpen && usersQuery.isLoading && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-[130] mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
                 Memuat daftar user...
               </div>
             )}
 
             {dropdownOpen && usersQuery.isError && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-error/30 bg-error-light px-3 py-3 text-center text-sm text-error shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-[130] mt-1 rounded-lg border border-error/30 bg-error-light px-3 py-3 text-center text-sm text-error shadow-lg">
                 Gagal memuat daftar user. Coba tutup lalu buka lagi form project.
               </div>
             )}
 
             {dropdownOpen && filteredUsers.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-[130] mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
                 {filteredUsers.slice(0, 10).map((user) => (
                   <button
                     className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-surface-muted"
                     key={user.id}
                     onMouseDown={(e) => {
                       e.preventDefault(); // prevent blur from closing dropdown
-                      addMember(user.email);
+                      addMember(user);
+                      setDropdownOpen(false);
                     }}
                     type="button"
                   >
-                    <UserAvatar name={user.full_name} />
+                    <ProtectedAvatar
+                      alt={user.full_name}
+                      avatarUrl={user.avatar_url}
+                      className="h-8 w-8 shrink-0 border border-border/70"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-text-primary">
                         {user.full_name}
@@ -283,38 +374,62 @@ export function ProjectForm({
             )}
 
             {dropdownOpen && !usersQuery.isLoading && !usersQuery.isError && filteredUsers.length === 0 && availableUsers.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
-                {selectedEmails.length === availableUsers.length
+              <div className="absolute left-0 right-0 top-full z-[130] mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
+                {selectedMembers.length === availableUsers.length
                   ? "Semua user sudah dipilih"
                   : "Tidak ada hasil"}
               </div>
             )}
 
             {dropdownOpen && !usersQuery.isLoading && !usersQuery.isError && filteredUsers.length === 0 && availableUsers.length === 0 && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-[130] mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
                 Belum ada user aktif yang bisa dipilih.
               </div>
             )}
           </div>
+
+          {selectedMembers.length > 0 ? (
+            <div className="mt-3 space-y-3">
+              {selectedMembers.map((member) => (
+                <div
+                  className="grid gap-3 rounded-[14px] border border-border/80 bg-background/70 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_170px_auto]"
+                  key={member.email}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ProtectedAvatar
+                      alt={member.full_name ?? member.email}
+                      avatarUrl={member.avatar_url}
+                      className="h-9 w-9 shrink-0 border border-border/70"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-text-primary">
+                        {member.full_name ?? member.email}
+                      </p>
+                      <p className="truncate text-xs text-text-tertiary">{member.email}</p>
+                    </div>
+                  </div>
+
+                  <Select
+                    onValueChange={(nextRole) => updateMemberRole(member.email, nextRole)}
+                    options={memberRoleOptions}
+                    triggerClassName="focus-visible:border-ops focus-visible:ring-ops/10"
+                    value={member.role_in_project}
+                  />
+
+                  <button
+                    className="inline-flex h-11 items-center justify-center rounded-[10px] border border-border bg-surface px-3 text-sm font-semibold text-text-secondary transition hover:bg-surface-muted"
+                    onClick={() => removeMember(member.email)}
+                    type="button"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </Field>
       ) : null}
     </FormModal>
-  );
-}
-
-function UserAvatar({ name }: { name: string }) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join("")
-    .toUpperCase();
-
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ops/15 text-[10px] font-semibold text-ops">
-      {initials}
-    </div>
   );
 }
 

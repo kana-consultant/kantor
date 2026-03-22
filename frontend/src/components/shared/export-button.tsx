@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createPortal,
+} from "react-dom";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   Download,
   FileDown,
@@ -54,8 +63,11 @@ export function ExportButton({
   variant = "outline",
 }: ExportButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [loadingFormat, setLoadingFormat] = useState<ExportFormat | null>(null);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
 
   const normalizedFormats = useMemo(
     () => Array.from(new Set(formats)),
@@ -64,16 +76,48 @@ export function ExportButton({
 
   useEffect(() => {
     if (!isOpen) {
+      setMenuStyle(null);
       return undefined;
     }
 
-    const handlePointerDown = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
+    const updateMenuPosition = () => {
+      const button = buttonRef.current;
+      if (!button) {
+        return;
       }
+
+      const rect = button.getBoundingClientRect();
+      const margin = 12;
+      const minWidth = Math.max(190, rect.width);
+      const maxWidth = Math.min(260, window.innerWidth - margin * 2);
+      const width = Math.min(minWidth, maxWidth);
+      const left =
+        align === "right"
+          ? Math.min(
+              Math.max(margin, rect.right - width),
+              window.innerWidth - width - margin,
+            )
+          : Math.min(
+              Math.max(margin, rect.left),
+              window.innerWidth - width - margin,
+            );
+
+      setMenuStyle({
+        left,
+        top: rect.bottom + 8,
+        width,
+      });
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        containerRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setIsOpen(false);
     };
 
     const handleEscape = (event: KeyboardEvent) => {
@@ -82,14 +126,20 @@ export function ExportButton({
       }
     };
 
+    updateMenuPosition();
+
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
 
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [isOpen]);
+  }, [align, isOpen]);
 
   const downloadReport = async (format: ExportFormat) => {
     setIsOpen(false);
@@ -127,6 +177,7 @@ export function ExportButton({
       <Button
         disabled={Boolean(loadingFormat)}
         onClick={() => setIsOpen((current) => !current)}
+        ref={buttonRef}
         size={size}
         type="button"
         variant={variant}
@@ -139,36 +190,38 @@ export function ExportButton({
         Export
       </Button>
 
-      {isOpen ? (
-        <div
-          className={cn(
-            "absolute top-full z-20 mt-2 min-w-[190px] rounded-lg border border-border bg-surface p-2 shadow-lg",
-            align === "right" ? "right-0" : "left-0",
-          )}
-          role="menu"
-        >
-          <div className="flex flex-col gap-1">
-            {normalizedFormats.map((format) => {
-              const meta = formatMeta[format];
-              const Icon = meta.icon;
+      {isOpen && menuStyle && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed z-[140] rounded-lg border border-border bg-surface p-2 shadow-xl"
+              ref={menuRef}
+              role="menu"
+              style={menuStyle}
+            >
+              <div className="flex flex-col gap-1">
+                {normalizedFormats.map((format) => {
+                  const meta = formatMeta[format];
+                  const Icon = meta.icon;
 
-              return (
-                <button
-                  className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={Boolean(loadingFormat)}
-                  key={format}
-                  onClick={() => void downloadReport(format)}
-                  role="menuitem"
-                  type="button"
-                >
-                  <Icon className="h-4 w-4 text-text-secondary" />
-                  <span>{meta.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+                  return (
+                    <button
+                      className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={Boolean(loadingFormat)}
+                      key={format}
+                      onClick={() => void downloadReport(format)}
+                      role="menuitem"
+                      type="button"
+                    >
+                      <Icon className="h-4 w-4 text-text-secondary" />
+                      <span>{meta.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

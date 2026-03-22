@@ -5,6 +5,7 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -22,7 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
-import { Plus } from "lucide-react";
+import { GripVertical, Plus } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/shared/drawer";
@@ -51,7 +52,7 @@ import type { KanbanColumn, KanbanFilters, KanbanTask, TaskFormValues } from "@/
 import type { ProjectMember, ProjectPriority } from "@/types/project";
 
 const taskSchema = z.object({
-  title: z.string().trim().min(2, "Title must be at least 2 characters").max(160),
+  title: z.string().trim().min(2, "Judul minimal 2 karakter").max(160),
   description: z.string(),
   assignee_id: z.string(),
   due_date: z.string(),
@@ -222,7 +223,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
   async function handleQuickAdd(columnId: string) {
     const title = quickDrafts[columnId]?.trim() ?? "";
     if (title.length < 2) {
-      setBoardError("Quick add title must be at least 2 characters.");
+      setBoardError("Judul task cepat minimal 2 karakter.");
       return;
     }
 
@@ -248,7 +249,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
   function handleColumnSubmit() {
     const name = columnForm.name.trim();
     if (name.length < 2) {
-      setBoardError("List name must be at least 2 characters.");
+      setBoardError("Nama kolom minimal 2 karakter.");
       return;
     }
 
@@ -332,7 +333,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
     const activeData = event.active.data.current;
 
     if (isColumnDragData(activeData)) {
-      finishColumnDrag(event, columns, dragSnapshot, queryClient, projectId);
+      finishColumnDrag(event, columns, tasks, dragSnapshot, queryClient, projectId);
       resetDrag();
       return;
     }
@@ -345,7 +346,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
   }
 
   if (columnsQuery.isLoading || tasksQuery.isLoading) {
-    return <Card className="p-8">Loading Kanban board...</Card>;
+    return <Card className="p-8">Memuat board proyek...</Card>;
   }
 
   if (columnsQuery.error instanceof Error || tasksQuery.error instanceof Error) {
@@ -353,7 +354,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
       <Card className="p-8 text-error">
         {(columnsQuery.error as Error | undefined)?.message ??
           (tasksQuery.error as Error | undefined)?.message ??
-          "Failed to load Kanban board"}
+          "Gagal memuat board proyek"}
       </Card>
     );
   }
@@ -364,8 +365,8 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">Board view</p>
-              <h4 className="text-[20px] font-[700] text-text-primary leading-tight">Project execution board</h4>
+              <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-ops">Board proyek</p>
+              <h4 className="text-[20px] font-[700] text-text-primary leading-tight">Ruang kerja task proyek</h4>
               <p className="mt-1 max-w-3xl text-[13px] text-text-secondary">
                 Kelola task proyek dalam satu board, pindahkan kartu antar tahap kerja, dan gunakan filter tanpa keluar dari halaman ini.
               </p>
@@ -383,7 +384,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
                   type="button"
                 >
                   <Plus className="h-4 w-4" />
-                  New list
+                  Kolom baru
                 </Button>
               </div>
             </PermissionGate>
@@ -395,7 +396,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             onChange={(event) => setFilters((current) => ({ ...current, assignee: event.target.value }))}
             value={filters.assignee}
           >
-            <option value="">All assignees</option>
+            <option value="">Semua PIC</option>
             {members.map((member) => (
               <option key={member.user_id} value={member.user_id}>
                 {member.full_name || member.user_email || member.user_id}
@@ -407,16 +408,16 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
             value={filters.priority}
           >
-            <option value="">All priorities</option>
-            <option value="low">Low</option>
+            <option value="">Semua prioritas</option>
+            <option value="low">Rendah</option>
             <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
+            <option value="high">Tinggi</option>
+            <option value="critical">Kritis</option>
           </select>
           <Input
             className="h-[44px] focus-visible:border-ops focus-visible:ring-ops/10"
             onChange={(event) => setFilters((current) => ({ ...current, label: event.target.value }))}
-            placeholder="Filter by label"
+            placeholder="Filter label"
             value={filters.label}
           />
           <Input
@@ -437,7 +438,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
               variant="secondary"
               className="h-[44px]"
             >
-              Clear {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
+              Reset {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
             </Button>
           </div>
         </div>
@@ -510,12 +511,12 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
           handleColumnSubmit();
         }}
         size="sm"
-        submitLabel={columnModal?.mode === "edit" ? "Save list" : "Create list"}
-        title={columnModal?.mode === "edit" ? "Edit list" : "Create list"}
-        subtitle="Use a short label and a single accent color so this column stays easy to scan on the board."
+        submitLabel={columnModal?.mode === "edit" ? "Simpan kolom" : "Buat kolom"}
+        title={columnModal?.mode === "edit" ? "Edit kolom" : "Buat kolom"}
+        subtitle="Gunakan nama singkat dan warna aksen yang jelas agar kolom mudah dipindai di board."
       >
         <div className="space-y-2">
-          <label className="text-[13px] font-[600] text-text-primary">List name</label>
+          <label className="text-[13px] font-[600] text-text-primary">Nama kolom</label>
           <Input
             className="focus-visible:border-ops focus-visible:ring-ops/10"
             onChange={(event) => setColumnForm((current) => ({ ...current, name: event.target.value }))}
@@ -524,7 +525,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
           />
         </div>
         <div className="space-y-2">
-          <p className="text-[13px] font-[600] text-text-primary">Accent color</p>
+          <p className="text-[13px] font-[600] text-text-primary">Warna aksen</p>
           <div className="flex flex-wrap gap-2">
             {columnColorOptions.map((color) => (
               <button
@@ -544,10 +545,10 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
       </FormModal>
 
       <ConfirmDialog
-        confirmLabel="Delete list"
+        confirmLabel="Hapus kolom"
         description={
           columnToDelete
-            ? `All tasks inside "${columnToDelete.name}" will be deleted with this column.`
+            ? `Semua task di dalam "${columnToDelete.name}" akan ikut terhapus bersama kolom ini.`
             : ""
         }
         isLoading={deleteColumnMutation.isPending}
@@ -558,12 +559,12 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             deleteColumnMutation.mutate(columnToDelete.id);
           }
         }}
-        title={columnToDelete ? `Delete ${columnToDelete.name}?` : "Delete list?"}
+        title={columnToDelete ? `Hapus ${columnToDelete.name}?` : "Hapus kolom?"}
       />
 
       <ConfirmDialog
-        confirmLabel="Delete task"
-        description={taskToDelete ? `Task "${taskToDelete.title}" will be removed from this board.` : ""}
+        confirmLabel="Hapus task"
+        description={taskToDelete ? `Task "${taskToDelete.title}" akan dihapus dari board ini.` : ""}
         isLoading={deleteTaskMutation.isPending}
         isOpen={Boolean(taskToDelete)}
         onClose={() => setTaskToDelete(null)}
@@ -572,7 +573,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
             deleteTaskMutation.mutate(taskToDelete.id);
           }
         }}
-        title={taskToDelete ? `Delete ${taskToDelete.title}?` : "Delete task?"}
+        title={taskToDelete ? `Hapus ${taskToDelete.title}?` : "Hapus task?"}
       />
     </div>
   );
@@ -719,6 +720,7 @@ function finishTaskDrag(
 function finishColumnDrag(
   event: DragEndEvent,
   columns: KanbanColumn[],
+  tasks: KanbanTask[],
   snapshot: DragSnapshot | null,
   queryClient: ReturnType<typeof useQueryClient>,
   projectId: string,
@@ -729,7 +731,9 @@ function finishColumnDrag(
 
   const currentColumns = queryClient.getQueryData<KanbanColumn[]>(kanbanKeys.columns(projectId)) ?? columns;
   const activeIndex = currentColumns.findIndex((column) => column.id === event.active.id);
-  const overIndex = currentColumns.findIndex((column) => column.id === event.over?.id);
+  const currentTasks = queryClient.getQueryData<KanbanTask[]>(kanbanKeys.tasks(projectId)) ?? tasks;
+  const overColumnId = resolveOverColumnId(event, currentColumns, currentTasks);
+  const overIndex = currentColumns.findIndex((column) => column.id === overColumnId);
   if (activeIndex < 0 || overIndex < 0 || activeIndex === overIndex) {
     return;
   }
@@ -750,6 +754,28 @@ function finishColumnDrag(
     });
 }
 
+function resolveOverColumnId(
+  event: DragEndEvent,
+  columns: KanbanColumn[],
+  tasks: KanbanTask[],
+) {
+  const overData = event.over?.data.current;
+  if (isColumnDragData(overData)) {
+    return overData.column.id;
+  }
+
+  const overId = event.over?.id?.toString();
+  if (!overId) {
+    return null;
+  }
+
+  if (columns.some((column) => column.id === overId)) {
+    return overId;
+  }
+
+  return tasks.find((task) => task.id === overId)?.column_id ?? null;
+}
+
 function isTaskDragData(value: unknown): value is DragTaskData {
   return typeof value === "object" && value !== null && "type" in value && value.type === "task";
 }
@@ -759,7 +785,7 @@ function isColumnDragData(value: unknown): value is DragColumnData {
 }
 
 function extractErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unexpected request error";
+  return error instanceof Error ? error.message : "Terjadi kesalahan yang tidak terduga";
 }
 
 interface KanbanColumnCardProps {
@@ -779,6 +805,10 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
     id: props.column.id,
     data: { type: "column", column: props.column } satisfies DragColumnData,
   });
+  const droppable = useDroppable({
+    id: `column-drop-${props.column.id}`,
+    data: { type: "column", column: props.column } satisfies DragColumnData,
+  });
   const style = {
     transform: CSS.Transform.toString(sortable.transform),
     transition: sortable.transition,
@@ -786,7 +816,14 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
 
   return (
     <div className="w-[min(82vw,320px)] shrink-0 md:w-[320px]" ref={sortable.setNodeRef} style={style}>
-      <Card className={cn("flex h-full min-h-[420px] flex-col border-border bg-surface-muted p-3 shadow-sm md:min-h-[500px] md:p-4", sortable.isDragging && "opacity-70")}>
+      <Card
+        className={cn(
+          "flex h-full min-h-[420px] flex-col border-border bg-surface-muted p-3 shadow-sm transition-all md:min-h-[500px] md:p-4",
+          sortable.isDragging && "opacity-70",
+          droppable.isOver && "border-ops/40 bg-ops/5 shadow-card",
+        )}
+        ref={droppable.setNodeRef}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
@@ -795,14 +832,14 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
               className="rounded-[6px] border border-border bg-background px-2 py-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-secondary hover:bg-surface-muted transition-colors cursor-grab"
               type="button"
             >
-              Drag
+              Geser
             </button>
             <div>
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: props.column.color ?? "#94A3B8" }} />
                 <h5 className="font-[600] text-[14px] text-text-primary truncate max-w-[120px]">{props.column.name}</h5>
               </div>
-              <p className="text-[12px] font-[500] text-text-tertiary">{props.tasks.length} cards</p>
+              <p className="text-[12px] font-[500] text-text-tertiary">{props.tasks.length} task</p>
             </div>
           </div>
 
@@ -813,7 +850,7 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
               </Button>
               <PermissionGate permission={permissions.operationalColumnManage}>
                 <Button onClick={props.onDeleteColumn} size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
-                   Delete
+                  Hapus
                 </Button>
               </PermissionGate>
             </div>
@@ -833,7 +870,7 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
 
           {props.tasks.length === 0 ? (
             <div className="rounded-[12px] border border-dashed border-border bg-background/50 px-4 py-8 text-center text-[13px] font-[500] text-text-tertiary">
-              No matching tasks in this column.
+              Belum ada task di kolom ini.
             </div>
           ) : null}
         </div>
@@ -843,15 +880,15 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
             <Input
               className="focus-visible:border-ops focus-visible:ring-ops/10"
               onChange={(event) => props.onQuickDraftChange(event.target.value)}
-              placeholder="Add another card"
+              placeholder="Tambahkan task cepat"
               value={props.quickDraft}
             />
             <div className="flex gap-3">
               <Button variant="ops" onClick={props.onQuickAdd} size="sm">
-                Quick add
+                Tambah cepat
               </Button>
               <Button onClick={props.onTaskCreate} size="sm" variant="ghost">
-                Open form
+                Form lengkap
               </Button>
             </div>
           </div>
@@ -880,10 +917,8 @@ function KanbanTaskCard({
   return (
     <div ref={sortable.setNodeRef} style={style}>
       <Card
-        {...sortable.attributes}
-        {...sortable.listeners}
         className={cn(
-          "cursor-grab p-4 shadow-sm transition-all hover:border-ops/30 hover:shadow-card active:cursor-grabbing group",
+          "cursor-pointer p-4 shadow-sm transition-all hover:border-ops/30 hover:shadow-card group",
           sortable.isDragging && "opacity-60 ring-2 ring-ops",
         )}
         onClick={onClick}
@@ -901,9 +936,16 @@ function KanbanTaskCard({
             </div>
             <h6 className="text-[14px] font-[600] text-text-primary leading-tight">{task.title}</h6>
           </div>
-          <span className="opacity-0 group-hover:opacity-100 transition-opacity rounded-[6px] border border-border bg-surface-muted px-2 py-1 text-[10px] font-[700] uppercase tracking-[0.08em] text-text-tertiary">
-            Move
-          </span>
+          <button
+            {...sortable.attributes}
+            {...sortable.listeners}
+            aria-label={`Pindahkan task ${task.title}`}
+            className="rounded-[8px] border border-border bg-surface-muted p-2 text-text-tertiary transition hover:border-ops/40 hover:bg-ops/10 hover:text-ops active:cursor-grabbing"
+            onClick={(event) => event.stopPropagation()}
+            type="button"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
         </div>
 
         {task.description ? <p className="mt-2 line-clamp-2 text-[12px] text-text-secondary leading-relaxed">{task.description}</p> : null}
@@ -911,9 +953,9 @@ function KanbanTaskCard({
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
           <div className="flex items-center gap-2">
             <AvatarBadge avatarUrl={task.avatar_url} name={task.assignee_name} />
-            <span className="text-[12px] font-[500] text-text-secondary truncate max-w-[120px]">{task.assignee_name ?? "Unassigned"}</span>
+            <span className="text-[12px] font-[500] text-text-secondary truncate max-w-[120px]">{task.assignee_name ?? "Belum ada PIC"}</span>
           </div>
-          <span className="text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">{task.due_date ? formatDate(task.due_date) : "No due date"}</span>
+          <span className="text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">{task.due_date ? formatDate(task.due_date) : "Tanpa deadline"}</span>
         </div>
 
       </Card>
@@ -977,13 +1019,13 @@ function TaskModal({
         <DrawerHeader className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
-              {mode === "create" ? "Create task" : "Task detail"}
+              {mode === "create" ? "Buat task" : "Detail task"}
             </p>
-            <DrawerTitle>{mode === "create" ? "New task" : "Edit task"}</DrawerTitle>
+            <DrawerTitle>{mode === "create" ? "Task baru" : "Edit task"}</DrawerTitle>
             <DrawerDescription>
               {mode === "create"
-                ? "Capture the task brief, assignee, and due date without losing the board context."
-                : "Review task details, edit delivery info, or remove the task from the board."}
+                ? "Isi ringkasan task, PIC, dan due date tanpa keluar dari board."
+                : "Tinjau detail task, edit informasi pengerjaan, atau hapus task dari board."}
             </DrawerDescription>
           </div>
           <DrawerClose />
@@ -992,17 +1034,17 @@ function TaskModal({
         <DrawerBody>
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-2">
-            <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-title">
-              Title
-            </label>
+              <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-title">
+                Judul
+              </label>
             <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-title" {...register("title")} />
             {errors.title ? <p className="text-[13px] font-[500] text-priority-high">{errors.title.message}</p> : null}
           </div>
 
           <div className="grid gap-2">
-            <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-description">
-              Description
-            </label>
+              <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-description">
+                Deskripsi
+              </label>
             <textarea
               className="min-h-32 w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10 disabled:cursor-not-allowed disabled:opacity-50"
               id="task-description"
@@ -1013,14 +1055,14 @@ function TaskModal({
           <div className="grid gap-5 md:grid-cols-2">
             <div className="grid gap-2">
               <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-assignee">
-                Assignee
+                PIC
               </label>
               <select
                 className="flex h-[44px] w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
                 id="task-assignee"
                 {...register("assignee_id")}
               >
-                <option value="">Unassigned</option>
+                <option value="">Belum ditentukan</option>
                 {members.map((member) => (
                   <option key={member.user_id} value={member.user_id}>
                     {member.full_name || member.user_email || member.user_id}
@@ -1031,7 +1073,7 @@ function TaskModal({
 
             <div className="grid gap-2">
               <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-due-date">
-                Due date
+                Deadline
               </label>
               <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-due-date" type="date" {...register("due_date")} />
             </div>
@@ -1040,17 +1082,17 @@ function TaskModal({
           <div className="grid gap-5 md:grid-cols-2">
             <div className="grid gap-2">
               <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-priority">
-                Priority
+                Prioritas
               </label>
               <select
                 className="flex h-[44px] w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
                 id="task-priority"
                 {...register("priority")}
               >
-                <option value="low">Low</option>
+                <option value="low">Rendah</option>
                 <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
+                <option value="high">Tinggi</option>
+                <option value="critical">Kritis</option>
               </select>
             </div>
 
@@ -1058,18 +1100,18 @@ function TaskModal({
               <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-label">
                 Label
               </label>
-              <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-label" placeholder="Bug, design, backend" {...register("label")} />
+              <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-label" placeholder="Bug, desain, backend" {...register("label")} />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3 pt-4 border-t border-border">
             <Button variant="ops" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Saving..." : mode === "create" ? "Create task" : "Save changes"}
+              {isSubmitting ? "Menyimpan..." : mode === "create" ? "Buat task" : "Simpan perubahan"}
             </Button>
             {mode === "edit" ? (
               <PermissionGate permission={permissions.operationalTaskDelete}>
                 <Button disabled={isDeleting} onClick={onDelete} type="button" variant="ghost">
-                  {isDeleting ? "Deleting..." : "Delete task"}
+                  {isDeleting ? "Menghapus..." : "Hapus task"}
                 </Button>
               </PermissionGate>
             ) : null}
@@ -1090,8 +1132,16 @@ function PriorityBadge({ priority }: { priority: ProjectPriority }) {
         : priority === "medium"
           ? "bg-priority-medium-bg text-priority-medium"
           : "bg-surface-muted text-text-secondary border border-border";
+  const label =
+    priority === "critical"
+      ? "kritis"
+      : priority === "high"
+        ? "tinggi"
+        : priority === "medium"
+          ? "medium"
+          : "rendah";
 
-  return <span className={cn("rounded-[6px] px-2 py-0.5 text-[11px] font-[700] uppercase tracking-[0.08em]", tone)}>{priority}</span>;
+  return <span className={cn("rounded-[6px] px-2 py-0.5 text-[11px] font-[700] uppercase tracking-[0.08em]", tone)}>{label}</span>;
 }
 
 function AssignmentBadge({ assignedVia }: { assignedVia: "manual" | "auto" }) {
@@ -1102,7 +1152,7 @@ function AssignmentBadge({ assignedVia }: { assignedVia: "manual" | "auto" }) {
 
   return (
     <span className={cn("rounded-[6px] px-2 py-0.5 text-[11px] font-[700] uppercase tracking-[0.08em]", tone)}>
-      {assignedVia}
+      {assignedVia === "auto" ? "otomatis" : "manual"}
     </span>
   );
 }

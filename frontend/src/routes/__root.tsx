@@ -18,7 +18,7 @@ function NotFoundComponent() {
         <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">
           404
         </p>
-        <h1 className="mt-3 text-3xl font-bold">Page not found</h1>
+        <h1 className="mt-3 text-3xl font-bold">Halaman tidak ditemukan</h1>
       </div>
     </div>
   );
@@ -29,20 +29,20 @@ function RootErrorComponent({ error }: ErrorComponentProps) {
     <div className="flex min-h-screen items-center justify-center p-6">
       <div className="rounded-[28px] border border-border bg-card/80 p-8 text-center shadow-panel max-w-md">
         <p className="text-sm uppercase tracking-[0.3em] text-destructive">
-          Error
+          Galat
         </p>
-        <h1 className="mt-3 text-2xl font-bold">Something went wrong</h1>
+        <h1 className="mt-3 text-2xl font-bold">Terjadi masalah</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {import.meta.env.DEV
-            ? error.message || "An unexpected error occurred"
-            : "An unexpected error occurred"}
+            ? error.message || "Terjadi kesalahan yang tidak terduga"
+            : "Terjadi kesalahan yang tidak terduga"}
         </p>
         <Button
           variant="outline"
           className="mt-6"
           onClick={() => window.location.reload()}
         >
-          Reload page
+          Muat Ulang
         </Button>
       </div>
     </div>

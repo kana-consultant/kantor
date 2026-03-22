@@ -46,7 +46,7 @@ export function FormModal({
   return (
     <Dialog dismissible={!isLoading} onOpenChange={(open) => (!open ? onClose() : undefined)} open={isOpen}>
       <DialogContent size={size}>
-        <form onSubmit={onSubmit}>
+        <form className="flex min-h-0 flex-1 flex-col overflow-hidden" onSubmit={onSubmit}>
           <DialogHeader className="flex items-start justify-between gap-4">
             <div>
               <DialogTitle>{title}</DialogTitle>

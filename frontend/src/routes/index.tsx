@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
     const session = await ensureAuthenticated();
 
     throw redirect({
-      to: session ? "/operational" : "/login",
+      to: session ? "/operational/overview" : "/login",
     });
   },
 });

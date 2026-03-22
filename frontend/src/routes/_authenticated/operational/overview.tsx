@@ -93,7 +93,7 @@ function OperationalOverviewPage() {
             Operasional
           </p>
             <h1 className="mt-2 text-[24px] font-bold tracking-tight text-text-primary sm:text-[28px]">
-            Project execution overview
+            Ringkasan eksekusi project
           </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
             Pantau jumlah project aktif, beban task berjalan, task overdue, dan update task terbaru dari seluruh board.
@@ -101,7 +101,7 @@ function OperationalOverviewPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button className="w-full sm:w-auto" onClick={() => void navigate({ to: "/operational/projects" })}>
-            {canCreateProject ? "Manage Projects" : "View Projects"}
+            {canCreateProject ? "Kelola project" : "Lihat project"}
           </Button>
           </div>
         </div>
@@ -111,28 +111,28 @@ function OperationalOverviewPage() {
         <StatCard
           helper="Seluruh project yang tercatat di workspace."
           icon={FolderKanban}
-          label="Total Projects"
+          label="Total project"
           tone="ops"
           value={overview.total_projects.toLocaleString("id-ID")}
         />
         <StatCard
           helper="Task yang saat ini berada di kolom In Progress."
           icon={Activity}
-          label="Active Tasks"
+          label="Task aktif"
           tone="ops"
           value={overview.active_tasks.toLocaleString("id-ID")}
         />
         <StatCard
           helper="Task melewati due date dan belum berada di kolom Done."
           icon={AlertTriangle}
-          label="Overdue Tasks"
+          label="Task overdue"
           tone={overview.overdue_tasks > 0 ? "error" : "success"}
           value={overview.overdue_tasks.toLocaleString("id-ID")}
         />
         <StatCard
           helper="Member unik yang sudah di-assign ke project."
           icon={Users}
-          label="Team Members"
+          label="Anggota tim"
           tone="info"
           value={overview.team_members.toLocaleString("id-ID")}
         />
@@ -142,10 +142,10 @@ function OperationalOverviewPage() {
         <Card className="p-6">
           <div className="border-b border-border pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
-              Project Activity
+              Aktivitas project
             </p>
             <h2 className="mt-2 text-[22px] font-bold text-text-primary">
-              Tasks completed per week
+              Task selesai per minggu
             </h2>
           </div>
           <div className="mt-6 h-[320px] min-w-0" ref={chartContainerRef}>
@@ -174,10 +174,10 @@ function OperationalOverviewPage() {
         <Card className="p-6">
           <div className="border-b border-border pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
-              Recent Tasks
+              Task terbaru
             </p>
             <h2 className="mt-2 text-[22px] font-bold text-text-primary">
-              Updated most recently
+              Update paling baru
             </h2>
           </div>
           <div className="mt-6 space-y-3">
@@ -211,7 +211,7 @@ function OperationalOverviewPage() {
                         {task.assignee_name}
                       </span>
                     ) : (
-                      <span className="text-xs text-text-tertiary">Unassigned</span>
+                      <span className="text-xs text-text-tertiary">Belum ada PIC</span>
                     )}
                     <span className="text-xs text-text-tertiary">
                       {formatDateTime(task.updated_at)}

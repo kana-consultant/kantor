@@ -163,19 +163,23 @@ export function DataTable<TData>({
                   </div>
                 ) : null}
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2.5">
                   {mobileColumns
                     .filter((column) => column.id !== mobilePrimaryColumn?.id)
                     .map((column) => (
-                      <div className="space-y-1" key={column.id}>
+                      <div
+                        className="grid grid-cols-[minmax(0,92px)_minmax(0,1fr)] items-start gap-3 border-t border-border/60 pt-2.5 first:border-t-0 first:pt-0"
+                        key={column.id}
+                      >
                         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">
                           {column.header}
                         </p>
                         <div
                           className={cn(
-                            "text-sm text-text-primary",
+                            "min-w-0 text-right text-sm text-text-primary",
                             column.numeric && "font-mono tabular-nums",
-                            column.align === "right" && "text-left",
+                            column.align === "left" && "text-left",
+                            column.align === "center" && "text-center",
                           )}
                         >
                           {column.cell ? column.cell(row) : formatValue(readValue(row, column))}

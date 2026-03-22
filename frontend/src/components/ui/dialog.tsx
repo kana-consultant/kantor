@@ -31,10 +31,10 @@ interface DialogContextValue {
 const DialogContext = createContext<DialogContextValue | null>(null);
 
 const sizeClassNames: Record<DialogSize, string> = {
-  sm: "sm:max-w-[420px]",
-  md: "sm:max-w-[560px]",
-  lg: "sm:max-w-[720px]",
-  xl: "sm:max-w-[960px]",
+  sm: "max-w-[360px] sm:max-w-[420px]",
+  md: "max-w-[min(calc(100vw-1rem),520px)] sm:max-w-[560px]",
+  lg: "max-w-[min(calc(100vw-1rem),680px)] sm:max-w-[720px]",
+  xl: "max-w-[min(calc(100vw-1rem),920px)] sm:max-w-[960px]",
 };
 
 interface DialogProps {
@@ -186,7 +186,7 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
     const state = context.open ? "open" : "closed";
 
     return createPortal(
-      <div className="fixed inset-0 z-[90]">
+      <div className="fixed inset-0 z-[110]">
         <button
           aria-label="Close dialog"
           className={cn(
@@ -202,13 +202,13 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
           }}
           type="button"
         />
-        <div className="absolute inset-0 flex items-end justify-center p-2 sm:items-center sm:p-6">
+        <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
           <div
             aria-describedby={context.descriptionId}
             aria-labelledby={context.titleId}
             aria-modal="true"
             className={cn(
-              "relative flex h-[calc(100vh-1rem)] w-full flex-col overflow-hidden rounded-[20px] border border-border bg-surface text-text-primary shadow-xl outline-none sm:h-auto sm:max-h-[90vh] sm:rounded-[16px]",
+              "relative flex max-h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-[20px] border border-border bg-surface text-text-primary shadow-xl outline-none sm:max-h-[90vh] sm:rounded-[16px]",
               "motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:fade-in motion-safe:data-[state=open]:zoom-in-95 motion-safe:data-[state=open]:duration-200",
               "motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:fade-out motion-safe:data-[state=closed]:zoom-out-95 motion-safe:data-[state=closed]:duration-150",
               sizeClassNames[size],
@@ -295,7 +295,7 @@ export function DialogBody({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("flex-1 overflow-y-auto px-4 py-4 sm:max-h-[65vh] sm:px-6 sm:py-6", className)}>{children}</div>;
+  return <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:max-h-[65vh] sm:px-6 sm:py-6", className)}>{children}</div>;
 }
 
 export function DialogFooter({

@@ -14,6 +14,7 @@ import { ProjectForm } from "@/components/shared/project-form";
 import { StatusBadge as SharedStatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
@@ -48,8 +49,6 @@ function ProjectWorkspacePage() {
   const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  const [memberUserRef, setMemberUserRef] = useState("");
-  const [memberRole, setMemberRole] = useState("");
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -116,8 +115,6 @@ function ProjectWorkspacePage() {
       role_in_project?: string;
     }) => mutateProjectMember(projectId, payload),
     onSuccess: async () => {
-      setMemberUserRef("");
-      setMemberRole("");
       setIsMemberModalOpen(false);
       setMemberToRemove(null);
       await queryClient.invalidateQueries({ queryKey: projectsKeys.detail(projectId) });
@@ -129,22 +126,20 @@ function ProjectWorkspacePage() {
     return (
       <div className="space-y-6">
         <Card className="overflow-hidden border-ops/20 bg-gradient-to-br from-ops/10 via-background to-background p-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-            <div className="flex-1 w-full">
-              <Skeleton className="h-4 w-[250px] bg-muted/60" />
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Skeleton className="h-7 w-[90px] rounded-full bg-muted/60" />
-                <Skeleton className="h-7 w-[80px] rounded-full bg-muted/60" />
-                <Skeleton className="h-7 w-[100px] rounded-full bg-muted/60" />
-              </div>
-              <Skeleton className="mt-5 h-10 w-[400px] max-w-full bg-muted/60" />
-              <Skeleton className="mt-3 h-5 w-[500px] max-w-full bg-muted/60" />
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Skeleton className="h-10 w-[80px] rounded-[6px] bg-muted/60" />
-                <Skeleton className="h-10 w-[90px] rounded-[6px] bg-muted/60" />
-              </div>
+          <div className="flex flex-col gap-6">
+            <Skeleton className="h-4 w-[250px] bg-muted/60" />
+            <div className="flex flex-wrap items-center gap-3">
+              <Skeleton className="h-7 w-[90px] rounded-full bg-muted/60" />
+              <Skeleton className="h-7 w-[80px] rounded-full bg-muted/60" />
+              <Skeleton className="h-7 w-[100px] rounded-full bg-muted/60" />
             </div>
-            <Skeleton className="h-[180px] w-full min-w-[20rem] xl:w-[320px] rounded-[28px] bg-muted/60" />
+            <Skeleton className="h-10 w-[400px] max-w-full bg-muted/60" />
+            <Skeleton className="h-5 w-[500px] max-w-full bg-muted/60" />
+            <div className="flex flex-wrap gap-3">
+              <Skeleton className="h-10 w-[90px] rounded-[6px] bg-muted/60" />
+              <Skeleton className="h-10 w-[110px] rounded-[6px] bg-muted/60" />
+              <Skeleton className="h-10 w-[110px] rounded-[6px] bg-muted/60" />
+            </div>
           </div>
         </Card>
       </div>
@@ -154,35 +149,35 @@ function ProjectWorkspacePage() {
   if (projectQuery.error instanceof Error || !project) {
     return (
       <Card className="p-8 text-error">
-        {projectQuery.error instanceof Error ? projectQuery.error.message : "Project not found"}
+        {projectQuery.error instanceof Error ? projectQuery.error.message : "Project tidak ditemukan"}
       </Card>
     );
   }
 
   const autoAssignLabels: Record<AutoAssignMode, string> = {
-    off: "Off",
+    off: "Nonaktif",
     round_robin: "Round Robin",
-    least_busy: "Least Busy",
+    least_busy: "Paling ringan",
   };
 
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-ops/20 bg-gradient-to-br from-ops/10 via-background to-background p-8">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div>
+        <div className="flex flex-col gap-6">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground">
               <Link
                 className="underline-offset-4 hover:underline"
                 to="/operational"
               >
-                Operational
+                Operasional
               </Link>
               <span>/</span>
               <Link
                 className="underline-offset-4 hover:underline"
                 to="/operational/projects"
               >
-                Projects
+                Project
               </Link>
               <span>/</span>
               <span>{project.name}</span>
@@ -191,31 +186,34 @@ function ProjectWorkspacePage() {
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <SharedStatusBadge status={project.status} variant="project-status" />
               <SharedStatusBadge status={project.priority} variant="priority" />
-              <Badge value={`${project.member_count} members`} />
+              <Badge value={`${project.member_count} anggota`} />
               <Badge
-                value={project.deadline ? `Due ${new Date(project.deadline).toLocaleDateString()}` : "No deadline"}
+                value={project.deadline ? `Deadline ${new Date(project.deadline).toLocaleDateString()}` : "Tanpa deadline"}
               />
             </div>
 
-            <h3 className="mt-5 max-w-4xl text-4xl font-bold leading-tight tracking-tight text-foreground">{project.name}</h3>
+            <h3 className="mt-5 max-w-4xl text-3xl font-bold leading-tight tracking-tight text-foreground sm:text-4xl">{project.name}</h3>
             <p className="mt-3 max-w-3xl text-muted-foreground">
-              {project.description || "This board is ready for daily task execution and collaboration."}
+              {project.description || "Board ini siap dipakai untuk koordinasi task harian dan kerja bareng tim."}
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              {(["board", "settings"] as const).map((view) => (
+              {([
+                { key: "board", label: "Board" },
+                { key: "settings", label: "Pengaturan" },
+              ] as const).map((view) => (
                 <Button
-                  key={view}
+                  key={view.key}
                   onClick={() =>
                     void navigate({
                       to: "/operational/projects/$projectId",
                       params: { projectId },
-                      search: { view },
+                      search: { view: view.key },
                     })
                   }
-                  variant={activeView === view ? "ops" : "outline"}
+                  variant={activeView === view.key ? "ops" : "outline"}
                 >
-                  {view}
+                  {view.label}
                 </Button>
               ))}
               <PermissionGate permission={permissions.operationalProjectView}>
@@ -227,47 +225,15 @@ function ProjectWorkspacePage() {
               </PermissionGate>
             </div>
           </div>
-
-          <div className="grid min-w-[20rem] gap-4 rounded-[28px] border border-ops/20 bg-background/80 p-5 shadow-sm backdrop-blur-md">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                Team pulse
-              </p>
-              <div className="mt-4 flex flex-wrap -space-x-3">
-                {members.slice(0, 5).map((member) => (
-                  <ProtectedAvatar
-                    alt={member.full_name || member.user_email || member.user_id}
-                    avatarUrl={member.avatar_url}
-                    className="h-12 w-12 border-2 border-background shadow-sm"
-                    key={member.user_id}
-                  />
-                ))}
-                {members.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No members yet</div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="grid gap-3">
-              <Link
-                className="inline-flex h-11 items-center justify-center rounded-full bg-ops px-5 text-sm font-medium text-white transition hover:opacity-95 shadow-sm"
-                params={{ projectId }}
-                search={{ view: "board" }}
-                to="/operational/projects/$projectId"
-              >
-                Open board
-              </Link>
-            </div>
-          </div>
         </div>
       </Card>
 
       {activeView === "board" ? (
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <PermissionGate
             fallback={
               <Card className="p-8 text-sm text-muted-foreground">
-                You do not have permission to view this board.
+                Anda tidak punya akses untuk melihat board ini.
               </Card>
             }
             permission={permissions.operationalTaskView}
@@ -278,7 +244,7 @@ function ProjectWorkspacePage() {
           <div className="space-y-6">
             <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                Board summary
+                Ringkasan board
               </p>
               <div className="mt-4 grid gap-3">
                 <SummaryRow label="Status" value={project.status.replace("_", " ")} />
@@ -287,19 +253,19 @@ function ProjectWorkspacePage() {
                   label="Deadline"
                   value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"}
                 />
-                <SummaryRow label="Members" value={String(project.member_count)} />
-                <SummaryRow label="Auto-assign" value={autoAssignLabels[project.auto_assign_mode] ?? "Off"} />
+                <SummaryRow label="Anggota" value={String(project.member_count)} />
+                <SummaryRow label="Auto-assign" value={autoAssignLabels[project.auto_assign_mode] ?? "Nonaktif"} />
               </div>
             </Card>
 
             <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                    People on this board
+                    Anggota project
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Invite by email or remove member without leaving the board.
+                    Lihat siapa saja yang ikut bekerja di board ini tanpa pindah halaman.
                   </p>
                 </div>
                 <Button
@@ -313,23 +279,23 @@ function ProjectWorkspacePage() {
                   size="sm"
                   variant="outline"
                 >
-                  Manage
+                  Kelola
                 </Button>
               </div>
 
               <div className="mt-5 space-y-3">
                 {members.map((member) => (
                   <div
-                    className="flex items-center justify-between gap-3 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3"
+                    className="flex flex-col gap-3 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                     key={member.user_id}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <ProtectedAvatar
                         alt={member.full_name || member.user_email || member.user_id}
                         avatarUrl={member.avatar_url}
                         className="h-11 w-11 border border-border/70"
                       />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">
                           {member.full_name || member.user_id}
                         </p>
@@ -338,14 +304,14 @@ function ProjectWorkspacePage() {
                         </p>
                       </div>
                     </div>
-                    <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
-                      {member.role_in_project}
+                    <span className="inline-flex max-w-full self-start rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground sm:self-auto">
+                      <span className="truncate">{member.role_in_project}</span>
                     </span>
                   </div>
                 ))}
 
                 {members.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No members assigned yet.</p>
+                  <p className="text-sm text-muted-foreground">Belum ada anggota yang ditambahkan.</p>
                 ) : null}
               </div>
             </Card>
@@ -360,11 +326,11 @@ function ProjectWorkspacePage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                    Project settings
+                    Pengaturan project
                   </p>
-                  <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Core project details</h4>
+                  <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Detail project utama</h4>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Update the project brief, deadline, and priority.
+                    Perbarui brief, deadline, dan prioritas project.
                   </p>
                 </div>
                 <PermissionGate permission={permissions.operationalProjectEdit}>
@@ -378,7 +344,7 @@ function ProjectWorkspacePage() {
                 <SummaryRow label="Status" value={project.status.replace("_", " ")} />
                 <SummaryRow label="Priority" value={project.priority} />
                 <SummaryRow label="Deadline" value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"} />
-                <SummaryRow label="Description" value={project.description || "-"} />
+                <SummaryRow label="Deskripsi" value={project.description || "-"} />
               </div>
             </Card>
 
@@ -418,15 +384,15 @@ function ProjectWorkspacePage() {
             <PermissionGate permission={permissions.operationalProjectEdit}>
               <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                  Members
+                  Anggota
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
                   <p className="text-sm text-muted-foreground">
-                    Invite by email or user ID, then manage removals from the member list below.
+                    Tambahkan user dari daftar yang tersedia, lalu kelola member dari list di bawah.
                   </p>
                   <Button onClick={() => setIsMemberModalOpen(true)} variant="ops">
                     <Plus className="h-4 w-4" />
-                    Add member
+                    Tambah anggota
                   </Button>
                 </div>
               </Card>
@@ -436,34 +402,54 @@ function ProjectWorkspacePage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">
-                    Current members
+                    Anggota saat ini
                   </p>
-                  <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Project collaborators</h4>
+                  <h4 className="mt-2 text-xl font-bold tracking-tight text-foreground">Kolaborator project</h4>
                 </div>
               </div>
 
               <div className="mt-5 space-y-3">
                 {members.map((member) => (
                   <div
-                    className="flex items-center justify-between gap-3 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3"
+                    className="flex flex-col gap-3 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                     key={member.user_id}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <ProtectedAvatar
                         alt={member.full_name || member.user_email || member.user_id}
                         avatarUrl={member.avatar_url}
                         className="h-11 w-11 border border-border/70"
                       />
-                      <div>
-                        <p className="font-semibold">{member.full_name || member.user_id}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{member.full_name || member.user_id}</p>
+                        <p className="truncate text-sm text-muted-foreground">
                           {member.user_email || member.user_id}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Badge value={member.role_in_project} />
-                      <PermissionGate permission={permissions.operationalProjectEdit}>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                      <PermissionGate fallback={<Badge value={member.role_in_project} />} permission={permissions.operationalProjectManageMembers}>
+                        <Select
+                          className="min-w-[150px]"
+                          disabled={memberMutation.isPending}
+                          onValueChange={(nextRole) =>
+                            memberMutation.mutate({
+                              operation: "assign",
+                              user_id: member.user_id,
+                              role_in_project: nextRole,
+                            })
+                          }
+                          options={[
+                            { value: "lead", label: "Lead" },
+                            { value: "developer", label: "Developer" },
+                            { value: "designer", label: "Designer" },
+                            { value: "qa", label: "QA" },
+                            { value: "member", label: "Member" },
+                          ]}
+                          value={member.role_in_project}
+                        />
+                      </PermissionGate>
+                      <PermissionGate permission={permissions.operationalProjectManageMembers}>
                         <Button
                           onClick={() =>
                             setMemberToRemove({
@@ -476,12 +462,16 @@ function ProjectWorkspacePage() {
                           variant="ghost"
                         >
                           <UserMinus className="h-4 w-4" />
-                          Remove
+                          Keluarkan
                         </Button>
                       </PermissionGate>
                     </div>
                   </div>
                 ))}
+
+                {members.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Belum ada anggota yang ditambahkan.</p>
+                ) : null}
               </div>
             </Card>
 
@@ -489,13 +479,13 @@ function ProjectWorkspacePage() {
               <Card className="border-border/60 bg-background/50 p-6 backdrop-blur-sm">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">Danger zone</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-ops">Zona berbahaya</p>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      Deleting this project removes the board and all related task data.
+                      Menghapus project akan menghapus board dan semua data task terkait.
                     </p>
                   </div>
                   <Button onClick={() => setIsDeleteDialogOpen(true)} variant="ghost">
-                    Delete project
+                    Hapus project
                   </Button>
                 </div>
               </Card>
@@ -507,13 +497,13 @@ function ProjectWorkspacePage() {
       {editDefaults ? (
         <ProjectForm
           defaultValues={editDefaults}
-          description="Edit core project information without interrupting the board context."
+          description="Edit informasi utama project tanpa kehilangan konteks board."
           isOpen={isEditOpen}
           isSubmitting={updateMutation.isPending}
           onCancel={() => setIsEditOpen(false)}
           onSubmit={(values) => updateMutation.mutate(values)}
-          submitLabel="Save project"
-          title="Project settings"
+          submitLabel="Simpan project"
+          title="Pengaturan project"
         />
       ) : null}
 
@@ -530,8 +520,6 @@ function ProjectWorkspacePage() {
         }}
         onClose={() => {
           setIsMemberModalOpen(false);
-          setMemberUserRef("");
-          setMemberRole("");
         }}
       />
 
@@ -581,7 +569,7 @@ function AddMemberModal({
 }) {
   const [search, setSearch] = useState("");
   const [selectedEmail, setSelectedEmail] = useState("");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState("member");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -609,7 +597,7 @@ function AddMemberModal({
     if (!isOpen) {
       setSearch("");
       setSelectedEmail("");
-      setRole("");
+      setRole("member");
       setDropdownOpen(false);
     }
   }, [isOpen]);
@@ -638,8 +626,8 @@ function AddMemberModal({
         }
       }}
       size="md"
-      submitLabel="Add member"
-      title="Add project member"
+      submitLabel="Tambah anggota"
+      title="Tambah anggota project"
       subtitle="Pilih user yang akan ditambahkan ke project ini."
     >
       <div className="grid gap-4">
@@ -685,7 +673,7 @@ function AddMemberModal({
                 value={search}
               />
               {dropdownOpen && filtered.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
+                <div className="absolute left-0 right-0 top-full z-[130] mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
                   {filtered.slice(0, 10).map((user) => (
                     <button
                       className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-surface-muted"
@@ -712,7 +700,7 @@ function AddMemberModal({
                 </div>
               )}
               {dropdownOpen && filtered.length === 0 && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
+                <div className="absolute left-0 right-0 top-full z-[130] mt-1 rounded-lg border border-border bg-surface px-3 py-3 text-center text-sm text-text-tertiary shadow-lg">
                   {availableUsers.length === 0 ? "Semua user sudah menjadi member" : "Tidak ada hasil"}
                 </div>
               )}
@@ -720,13 +708,12 @@ function AddMemberModal({
           )}
         </div>
         <div className="space-y-2">
-          <label className="text-[13px] font-[600] text-text-primary">Role in project</label>
+          <label className="text-[13px] font-[600] text-text-primary">Peran di project</label>
           <select
             className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
             onChange={(e) => setRole(e.target.value)}
             value={role}
           >
-            <option value="">Pilih role...</option>
             <option value="lead">Lead</option>
             <option value="developer">Developer</option>
             <option value="designer">Designer</option>
@@ -741,17 +728,19 @@ function AddMemberModal({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold capitalize">{value}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 rounded-[22px] border border-border/70 bg-background/80 px-4 py-3">
+      <span className="min-w-0 text-sm text-muted-foreground">{label}</span>
+      <span className="max-w-[52vw] text-right text-sm font-semibold sm:max-w-[220px]">
+        {value}
+      </span>
     </div>
   );
 }
 
 function Badge({ value }: { value: string }) {
   return (
-    <span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-      {value}
+    <span className="inline-flex max-w-full items-center rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <span className="truncate">{value}</span>
     </span>
   );
 }

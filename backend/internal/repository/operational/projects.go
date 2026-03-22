@@ -55,6 +55,11 @@ type ProjectMemberMutationParams struct {
 	RoleInProject string
 }
 
+type ProjectMemberAssignment struct {
+	UserEmail     string
+	RoleInProject string
+}
+
 func NewProjectsRepository(db *pgxpool.Pool) *ProjectsRepository {
 	return &ProjectsRepository{db: db}
 }
@@ -483,6 +488,30 @@ func (r *ProjectsRepository) BulkAssignMembers(ctx context.Context, projectID st
 			INSERT INTO project_members (project_id, user_id, role_in_project)
 			VALUES ($1::uuid, $2::uuid, $3)
 			ON CONFLICT (project_id, user_id) DO NOTHING
+		`, projectID, userID, roleInProject)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ProjectsRepository) BulkAssignMembersWithRoles(ctx context.Context, projectID string, members []ProjectMemberAssignment) error {
+	for _, member := range members {
+		roleInProject := strings.TrimSpace(member.RoleInProject)
+		if roleInProject == "" {
+			continue
+		}
+
+		userID, err := r.resolveProjectMemberUserID(ctx, "", member.UserEmail)
+		if err != nil {
+			continue
+		}
+		_, err = r.db.Exec(ctx, `
+			INSERT INTO project_members (project_id, user_id, role_in_project)
+			VALUES ($1::uuid, $2::uuid, $3)
+			ON CONFLICT (project_id, user_id)
+			DO UPDATE SET role_in_project = EXCLUDED.role_in_project, assigned_at = NOW()
 		`, projectID, userID, roleInProject)
 		if err != nil {
 			return err

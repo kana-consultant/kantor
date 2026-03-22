@@ -122,6 +122,14 @@ function serializeProjectForm(input: ProjectFormValues) {
     status: input.status,
     priority: input.priority,
     ...(input.auto_assign_mode ? { auto_assign_mode: input.auto_assign_mode } : {}),
+    ...(input.members && input.members.length > 0
+      ? {
+          members: input.members.map((member) => ({
+            user_email: member.email,
+            role_in_project: member.role_in_project,
+          })),
+        }
+      : {}),
     ...(input.member_emails && input.member_emails.length > 0 ? { member_emails: input.member_emails } : {}),
   };
 }

@@ -25,6 +25,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
 import {
@@ -449,32 +450,32 @@ function MarketingCampaignsPage() {
             placeholder="Search by campaign name"
             value={filters.search}
           />
-          <select
-            className="field-select"
-            onChange={(event) => setFilters((current) => ({ ...current, channel: event.target.value }))}
+          <Select
+            onValueChange={(value) => setFilters((current) => ({ ...current, channel: value }))}
+            options={[
+              { value: "", label: "All channels" },
+              { value: "instagram", label: "Instagram" },
+              { value: "facebook", label: "Facebook" },
+              { value: "google_ads", label: "Google Ads" },
+              { value: "tiktok", label: "TikTok" },
+              { value: "youtube", label: "YouTube" },
+              { value: "email", label: "Email" },
+              { value: "other", label: "Other" },
+            ]}
             value={filters.channel}
-          >
-            <option value="">All channels</option>
-            <option value="instagram">Instagram</option>
-            <option value="facebook">Facebook</option>
-            <option value="google_ads">Google Ads</option>
-            <option value="tiktok">TikTok</option>
-            <option value="youtube">YouTube</option>
-            <option value="email">Email</option>
-            <option value="other">Other</option>
-          </select>
-          <select
-            className="field-select"
-            onChange={(event) => setFilters((current) => ({ ...current, pic: event.target.value }))}
+          />
+          <Select
+            onValueChange={(value) => setFilters((current) => ({ ...current, pic: value }))}
+            options={[
+              { value: "", label: "All PIC" },
+              ...employees.map((employee) => ({
+                value: employee.id,
+                label: employee.full_name,
+                description: employee.position,
+              })),
+            ]}
             value={filters.pic}
-          >
-            <option value="">All PIC</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.full_name}
-              </option>
-            ))}
-          </select>
+          />
           <Input onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))} type="date" value={filters.dateFrom} />
           <Input onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))} type="date" value={filters.dateTo} />
         </div>

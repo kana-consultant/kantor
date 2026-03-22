@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun, User } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun, User, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 
@@ -78,6 +78,10 @@ export function Topbar() {
   const unreadLabel = useMemo(() => (unreadCount > 99 ? "99+" : String(unreadCount)), [unreadCount]);
   const notificationItems = notificationsQuery.data?.items ?? [];
   const BreadcrumbIcon = breadcrumb.icon;
+  const notificationsPanelClasses =
+    "z-30 overflow-hidden rounded-[20px] border border-border/90 bg-surface shadow-[0_24px_56px_-28px_rgba(15,23,42,0.45)] motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200 sm:absolute sm:right-0 sm:top-12 sm:w-[320px]";
+  const profilePanelClasses =
+    "z-30 overflow-hidden rounded-[20px] border border-border/90 bg-surface shadow-[0_24px_56px_-28px_rgba(15,23,42,0.45)] motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200 sm:absolute sm:right-0 sm:top-12 sm:w-[280px]";
 
   const handleLogout = () => {
     void logout().finally(() => {
@@ -114,7 +118,7 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-20 flex min-w-0 items-center justify-between gap-2 rounded-[20px] border border-border/70 bg-surface/88 px-2 py-2 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.3)] backdrop-blur-xl sm:gap-4 sm:px-3">
+    <header className="sticky top-1 z-20 flex min-w-0 items-center justify-between gap-2 rounded-[20px] border border-border/70 bg-surface px-2 py-2 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.3)] sm:top-1.5 sm:gap-4 sm:px-3 lg:top-2">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <Button
           aria-label="Open sidebar"
@@ -174,26 +178,36 @@ export function Topbar() {
               <span className="absolute right-0 top-0 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold leading-none text-white">
                 {unreadLabel}
               </span>
-            ) : null}
-          </Button>
+          ) : null}
+        </Button>
 
           {isNotificationsOpen ? (
-            <div className="absolute right-0 top-12 z-30 w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-[20px] border border-border/80 bg-surface/95 shadow-[0_24px_56px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
+            <div className={cn(notificationsPanelClasses, "fixed inset-x-2 top-[4.75rem] max-h-[min(32rem,calc(100dvh-5.5rem))] sm:left-auto sm:right-0 sm:top-12 sm:max-h-[420px]")}>
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <h3 className="text-sm font-semibold text-text-primary">Notifications</h3>
-                <button
-                  className="text-xs font-semibold text-module transition hover:opacity-80 disabled:opacity-50"
-                  disabled={markAllMutation.isPending || unreadCount === 0}
-                  onClick={() => markAllMutation.mutate()}
-                  type="button"
-                >
-                  Mark all as read
-                </button>
+                <h3 className="text-sm font-semibold text-text-primary">Notifikasi</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="text-xs font-semibold text-module transition hover:opacity-80 disabled:opacity-50"
+                    disabled={markAllMutation.isPending || unreadCount === 0}
+                    onClick={() => markAllMutation.mutate()}
+                    type="button"
+                  >
+                    Tandai semua
+                  </button>
+                  <button
+                    aria-label="Tutup notifikasi"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-text-secondary transition hover:bg-surface-muted hover:text-text-primary"
+                    onClick={() => setIsNotificationsOpen(false)}
+                    type="button"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <div className="max-h-[320px] overflow-y-auto">
+              <div className="max-h-[calc(100dvh-9.5rem)] overflow-y-auto sm:max-h-[320px]">
                 {notificationItems.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-text-secondary">
-                    No notifications yet.
+                    Belum ada notifikasi.
                   </div>
                 ) : (
                   <div className="divide-y divide-border">
@@ -243,24 +257,24 @@ export function Topbar() {
             type="button"
           >
             <ProtectedAvatar
-              alt={user?.full_name ?? "Guest"}
+              alt={user?.full_name ?? "Pengguna"}
               avatarUrl={user?.avatar_url}
               className="h-8 w-8 border border-border/70"
               fallbackClassName="bg-module text-white"
               iconClassName="h-4 w-4"
             />
             <div className="hidden text-left md:block">
-              <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
+              <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Pengguna"}</p>
               <p className="text-xs text-text-secondary">{roleSummary}</p>
             </div>
             <ChevronDown className="hidden h-4 w-4 text-text-secondary md:block" />
           </button>
 
           {isProfileOpen ? (
-            <div className="absolute right-0 top-12 z-30 w-[min(280px,calc(100vw-1rem))] overflow-hidden rounded-[20px] border border-border/80 bg-surface/95 shadow-[0_24px_56px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
+            <div className={cn(profilePanelClasses, "fixed inset-x-2 top-[4.75rem] max-h-[min(34rem,calc(100dvh-5.5rem))] overflow-y-auto sm:left-auto sm:right-0 sm:top-12 sm:max-h-none")}>
               <div className="border-b border-border px-4 py-4">
-                <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
-                <p className="mt-1 text-xs text-text-secondary">{user?.email ?? "guest@kantor.local"}</p>
+                <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Pengguna"}</p>
+                <p className="mt-1 text-xs text-text-secondary">{user?.email ?? "-"}</p>
                 {roleLabels.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {roleLabels.map((label) => (
@@ -277,7 +291,7 @@ export function Topbar() {
               <div className="border-b border-border px-4 py-3">
                 <div className="flex items-center gap-2 text-xs text-text-secondary mb-2">
                   <Phone className="h-3.5 w-3.5" />
-                  <span>WhatsApp Number</span>
+                  <span>Nomor WhatsApp</span>
                 </div>
                 {isEditingPhone ? (
                   <div className="flex gap-2">
@@ -301,7 +315,7 @@ export function Topbar() {
                       onClick={() => phoneUpdateMutation.mutate(phoneInput.trim() || null)}
                       size="sm"
                     >
-                      {phoneUpdateMutation.isPending ? "..." : "Save"}
+                      {phoneUpdateMutation.isPending ? "..." : "Simpan"}
                     </Button>
                   </div>
                 ) : (
@@ -313,7 +327,7 @@ export function Topbar() {
                     }}
                     type="button"
                   >
-                    {phoneQuery.data?.phone ? formatPhone(phoneQuery.data.phone) : "Set phone number"}
+                    {phoneQuery.data?.phone ? formatPhone(phoneQuery.data.phone) : "Atur nomor"}
                   </button>
                 )}
               </div>
@@ -334,7 +348,7 @@ export function Topbar() {
                   variant="ghost"
                 >
                   <LogOut className="h-4 w-4" />
-                  Logout
+                  Keluar
                 </Button>
               </div>
             </div>

@@ -211,18 +211,18 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
       className={cn(
         "relative flex h-full shrink-0 flex-col transition-all duration-200 ease-in-out",
         mobile
-          ? "h-[100dvh] w-full rounded-none rounded-r-[32px] border-r border-border/70 bg-background shadow-[0_24px_72px_-28px_rgba(15,23,42,0.55)]"
+          ? "h-full w-full rounded-[28px] border border-border/80 bg-surface shadow-[0_28px_64px_-28px_rgba(15,23,42,0.55)]"
           : "rounded-[24px] border border-border/70 bg-surface/92 shadow-[0_24px_56px_-32px_rgba(15,23,42,0.38)] backdrop-blur-xl",
         !mobile && (collapsed ? "w-[68px]" : "w-[256px]")
       )}
     >
-      <div className={cn("flex shrink-0 items-center", mobile ? "h-[76px] px-5 pt-1.5" : "h-[72px] px-5")}>
+      <div className={cn("flex shrink-0 items-center", mobile ? "h-[78px] px-5" : "h-[72px] px-5")}>
         <div className={cn("flex w-full items-center", collapsed ? "justify-center" : "justify-between")}>
           <KantorLogo compact={collapsed} />
           {mobile ? (
             <button
               aria-label="Close sidebar"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-surface/90 text-text-secondary transition hover:bg-surface-muted hover:text-text-primary"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-surface text-text-secondary transition hover:bg-surface-muted hover:text-text-primary"
               onClick={onNavigate}
               type="button"
             >
@@ -232,7 +232,7 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
         </div>
       </div>
 
-      <div className={cn("flex-1 space-y-5 overflow-y-auto overflow-x-hidden", mobile ? "px-4 pb-6 pt-1" : "px-3 py-2")}>
+      <div className={cn("flex-1 space-y-5 overflow-y-auto overflow-x-hidden", mobile ? "px-4 pb-6 pt-2" : "px-3 py-2")}>
         {visibleSections.map((section) => (
           <div key={section.id}>
              {!collapsed ? (
@@ -276,7 +276,7 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
                           mobile ? "flex h-11 items-center rounded-2xl px-3.5 text-[15px] transition-all" : "flex h-10 items-center rounded-xl px-3 text-[14px] transition-all",
                           collapsed ? "justify-center px-0 w-11 mx-auto" : "",
                           !active && (mobile
-                            ? "font-[600] text-text-primary/80 hover:bg-surface-muted hover:text-text-primary"
+                            ? "font-[600] text-text-primary hover:bg-surface-muted hover:text-text-primary"
                             : "font-[500] text-text-secondary hover:bg-surface-muted/80 hover:text-text-primary"),
                           activeColors
                         )}
