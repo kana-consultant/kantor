@@ -8,7 +8,7 @@ import { ExportButton } from "@/components/shared/export-button";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useRBAC } from "@/hooks/use-rbac";
@@ -125,7 +125,7 @@ function EmployeesPage() {
       cell: (employee) => (
         <div className="flex justify-end gap-2">
           <Link
-            className="inline-flex h-9 items-center justify-center rounded-md bg-module px-4 text-sm font-semibold text-white transition hover:brightness-95"
+            className={buttonVariants({ size: "sm" })}
             params={{ employeeId: employee.id }}
             to="/hris/employees/$employeeId"
           >

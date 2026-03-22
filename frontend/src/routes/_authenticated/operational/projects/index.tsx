@@ -9,7 +9,7 @@ import { ExportButton } from "@/components/shared/export-button";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProjectForm } from "@/components/shared/project-form";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -132,7 +132,7 @@ function ProjectsListPage() {
       cell: (project) => (
         <div className="flex flex-wrap justify-end gap-2">
           <Link
-            className="inline-flex h-9 items-center justify-center rounded-md bg-module px-4 text-sm font-semibold text-white transition hover:brightness-95"
+            className={buttonVariants({ size: "sm" })}
             params={{ projectId: project.id }}
             search={{ view: "board" }}
             to="/operational/projects/$projectId"
@@ -140,7 +140,7 @@ function ProjectsListPage() {
             Buka
           </Link>
           <Link
-            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted"
+            className={buttonVariants({ size: "sm", variant: "outline" })}
             params={{ projectId: project.id }}
             search={{ view: "settings" }}
             to="/operational/projects/$projectId"

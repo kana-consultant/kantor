@@ -13,7 +13,7 @@ import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
@@ -190,7 +190,7 @@ function ReimbursementsPage() {
       align: "right",
       cell: (item) => (
         <Link
-          className="inline-flex h-9 items-center justify-center rounded-md bg-module px-4 text-sm font-semibold text-white transition hover:brightness-95"
+          className={buttonVariants({ size: "sm" })}
           params={{ reimbursementId: item.id }}
           to="/hris/reimbursements/$reimbursementId"
         >

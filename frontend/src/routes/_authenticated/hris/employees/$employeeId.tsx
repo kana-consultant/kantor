@@ -16,7 +16,7 @@ import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
@@ -838,7 +838,7 @@ function ReimbursementsTab({
       align: "right",
       cell: (item) => (
         <Link
-          className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-sm font-semibold text-text-primary transition hover:bg-surface-muted"
+          className={buttonVariants({ size: "sm", variant: "outline" })}
           params={{ reimbursementId: item.id }}
           to="/hris/reimbursements/$reimbursementId"
         >

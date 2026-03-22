@@ -558,7 +558,7 @@ function OperationalTrackerPage() {
           </Button>
           <Button
             type="button"
-            variant={activeTab === "setup" ? "primary" : "outline"}
+            variant={activeTab === "setup" ? "default" : "outline"}
             onClick={() => setActiveTab("setup")}
           >
             <PlugZap className="h-4 w-4" />
@@ -576,7 +576,7 @@ function OperationalTrackerPage() {
           {isExtensionReady || consented ? (
             <Button
               type="button"
-              variant={consented ? "outline" : "primary"}
+              variant={consented ? "outline" : "default"}
               onClick={() => (consented ? setConsentDialogOpen(true) : void handleExtensionConnect(true))}
               disabled={isConnectingExtension}
             >
