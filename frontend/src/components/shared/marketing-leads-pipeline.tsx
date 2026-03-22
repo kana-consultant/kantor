@@ -8,7 +8,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -55,27 +54,6 @@ export function MarketingLeadsPipeline({
     setSnapshot(boardColumns);
   }
 
-  function handleDragOver(event: DragOverEvent) {
-    if (!event.over) {
-      return;
-    }
-
-    const data = event.active.data.current;
-    if (!isLeadDragData(data)) {
-      return;
-    }
-
-    const nextColumns = moveLeadInMemory(
-      boardColumns,
-      data.lead.id,
-      event.over.id.toString(),
-      event.over.data.current,
-    );
-    if (nextColumns) {
-      setBoardColumns(nextColumns);
-    }
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     const data = event.active.data.current;
     if (!event.over || !isLeadDragData(data)) {
@@ -87,11 +65,17 @@ export function MarketingLeadsPipeline({
       return;
     }
 
-    const nextLocation = locateLead(boardColumns, data.lead.id);
+    const nextColumns = moveLeadInMemory(
+      snapshot ?? boardColumns,
+      data.lead.id,
+      event.over.id.toString(),
+      event.over.data.current,
+    );
+    const nextLocation = nextColumns ? locateLead(nextColumns, data.lead.id) : null;
     const previousLocation = snapshot ? locateLead(snapshot, data.lead.id) : null;
     setActiveLead(null);
 
-    if (!nextLocation || !previousLocation) {
+    if (!nextColumns || !nextLocation || !previousLocation) {
       if (snapshot) {
         setBoardColumns(snapshot);
       }
@@ -104,6 +88,7 @@ export function MarketingLeadsPipeline({
       return;
     }
 
+    setBoardColumns(nextColumns);
     void onMoveLead(data.lead.id, nextLocation.status).catch(() => {
       if (snapshot) {
         setBoardColumns(snapshot);
@@ -116,7 +101,6 @@ export function MarketingLeadsPipeline({
     <DndContext
       collisionDetection={closestCorners}
       onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
       onDragStart={handleDragStart}
       sensors={sensors}
     >

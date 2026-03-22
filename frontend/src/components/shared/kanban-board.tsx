@@ -9,7 +9,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
@@ -294,20 +293,6 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
     }
   }
 
-  function handleDragOver(event: DragOverEvent) {
-    const activeData = event.active.data.current;
-    const overData = event.over?.data.current;
-    if (!isTaskDragData(activeData) || !event.over) {
-      return;
-    }
-
-    const cachedTasks = queryClient.getQueryData<KanbanTask[]>(kanbanKeys.tasks(projectId)) ?? tasks;
-    const nextTasks = moveTaskInMemory(cachedTasks, activeData.task.id, overData, event.over.id.toString());
-    if (nextTasks && taskPlacementChanged(cachedTasks, nextTasks, activeData.task.id)) {
-      queryClient.setQueryData(kanbanKeys.tasks(projectId), nextTasks);
-    }
-  }
-
   function rollbackDrag() {
     if (!dragSnapshot) {
       return;
@@ -339,7 +324,14 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
     }
 
     if (isTaskDragData(activeData)) {
-      finishTaskDrag(activeData.task.id, tasks, dragSnapshot, queryClient, projectId);
+      const nextTasks = moveTaskInMemory(
+        dragSnapshot?.tasks ?? tasks,
+        activeData.task.id,
+        event.over.data.current,
+        event.over.id.toString(),
+      );
+
+      finishTaskDrag(activeData.task.id, nextTasks, dragSnapshot, queryClient, projectId);
     }
 
     resetDrag();
@@ -449,7 +441,6 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
       <DndContext
         collisionDetection={closestCorners}
         onDragEnd={handleDragEnd}
-        onDragOver={handleDragOver}
         onDragStart={handleDragStart}
         sensors={sensors}
       >
@@ -685,18 +676,17 @@ async function invalidateBoard(queryClient: ReturnType<typeof useQueryClient>, p
 
 function finishTaskDrag(
   taskId: string,
-  tasks: KanbanTask[],
+  nextTasks: KanbanTask[] | null,
   snapshot: DragSnapshot | null,
   queryClient: ReturnType<typeof useQueryClient>,
   projectId: string,
 ) {
-  if (!snapshot) {
+  if (!snapshot || !nextTasks) {
     return;
   }
 
   const previousTask = snapshot.tasks.find((task) => task.id === taskId);
-  const currentTasks = queryClient.getQueryData<KanbanTask[]>(kanbanKeys.tasks(projectId)) ?? tasks;
-  const nextTask = currentTasks.find((task) => task.id === taskId);
+  const nextTask = nextTasks.find((task) => task.id === taskId);
 
   if (!previousTask || !nextTask) {
     queryClient.setQueryData(kanbanKeys.tasks(projectId), snapshot.tasks);
@@ -707,6 +697,7 @@ function finishTaskDrag(
     return;
   }
 
+  queryClient.setQueryData(kanbanKeys.tasks(projectId), nextTasks);
   void moveKanbanTask(projectId, nextTask.id, nextTask.column_id, nextTask.position)
     .then(async () => {
       await invalidateBoard(queryClient, projectId);

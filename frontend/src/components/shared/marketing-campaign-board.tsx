@@ -8,7 +8,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -55,28 +54,6 @@ export function MarketingCampaignBoard({
     setSnapshot(boardColumns);
   }
 
-  function handleDragOver(event: DragOverEvent) {
-    if (!event.over) {
-      return;
-    }
-
-    const data = event.active.data.current;
-    if (!isCampaignDragData(data)) {
-      return;
-    }
-
-    const nextColumns = moveCampaignInMemory(
-      boardColumns,
-      data.campaign.id,
-      event.over.id.toString(),
-      event.over.data.current,
-    );
-
-    if (nextColumns) {
-      setBoardColumns(nextColumns);
-    }
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     const data = event.active.data.current;
     if (!event.over || !isCampaignDragData(data)) {
@@ -88,12 +65,18 @@ export function MarketingCampaignBoard({
       return;
     }
 
-    const nextLocation = locateCampaign(boardColumns, data.campaign.id);
+    const nextColumns = moveCampaignInMemory(
+      snapshot ?? boardColumns,
+      data.campaign.id,
+      event.over.id.toString(),
+      event.over.data.current,
+    );
+    const nextLocation = nextColumns ? locateCampaign(nextColumns, data.campaign.id) : null;
     const previousLocation = snapshot ? locateCampaign(snapshot, data.campaign.id) : null;
 
     setActiveCampaign(null);
 
-    if (!nextLocation || !previousLocation) {
+    if (!nextColumns || !nextLocation || !previousLocation) {
       if (snapshot) {
         setBoardColumns(snapshot);
       }
@@ -109,6 +92,7 @@ export function MarketingCampaignBoard({
       return;
     }
 
+    setBoardColumns(nextColumns);
     void onMoveCampaign(data.campaign.id, nextLocation.columnId, nextLocation.position).catch(() => {
       if (snapshot) {
         setBoardColumns(snapshot);
@@ -122,7 +106,6 @@ export function MarketingCampaignBoard({
     <DndContext
       collisionDetection={closestCorners}
       onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
       onDragStart={handleDragStart}
       sensors={sensors}
     >
