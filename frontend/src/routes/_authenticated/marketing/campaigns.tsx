@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
@@ -95,6 +95,16 @@ function MarketingCampaignsPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = useRBAC();
   const activeView = search.view ?? "kanban";
+
+  useEffect(() => {
+    if (typeof window === "undefined" || search.view) {
+      return;
+    }
+
+    if (window.innerWidth < 768) {
+      void navigate({ replace: true, search: { view: "table" } });
+    }
+  }, [navigate, search.view]);
 
   const [filters, setFilters] = useState<CampaignFilters>(defaultFilters);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -357,47 +367,52 @@ function MarketingCampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-8">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between border-b border-border pb-4">
+      <Card className="p-5 sm:p-6 lg:p-7">
+        <div className="flex flex-col gap-4 border-b border-border/80 pb-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-mkt mb-1">Marketing workspace</p>
-            <h3 className="text-[28px] font-[700] text-text-primary">Campaigns</h3>
+            <h3 className="text-[24px] font-[700] text-text-primary sm:text-[28px]">Campaigns</h3>
             <p className="mt-2 max-w-3xl text-[14px] text-text-secondary leading-relaxed">
               Kelola campaign dari board utama atau table view, pindahkan antar stage,
               dan buka drawer detail untuk brief, attachment, dan context eksekusi.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={() => void navigate({ search: { view: "kanban" } })} variant={activeView === "kanban" ? "default" : "outline"}>
+          <div className="flex w-full flex-col gap-3 xl:w-auto">
+            <div className="grid grid-cols-2 gap-2 sm:inline-flex sm:w-auto">
+              <Button className="w-full sm:w-auto" onClick={() => void navigate({ search: { view: "kanban" } })} variant={activeView === "kanban" ? "default" : "outline"}>
               <FolderKanban className="mr-2 h-4 w-4" />
               Kanban view
-            </Button>
-            <Button onClick={() => void navigate({ search: { view: "table" } })} variant={activeView === "table" ? "default" : "outline"}>
+              </Button>
+              <Button className="w-full sm:w-auto" onClick={() => void navigate({ search: { view: "table" } })} variant={activeView === "table" ? "default" : "outline"}>
               <LayoutList className="mr-2 h-4 w-4" />
               Table view
-            </Button>
-            <PermissionGate permission={permissions.marketingCampaignView}>
-              <ExportButton
-                endpoint="/marketing/campaigns/export"
-                filename="campaigns-report"
-                filters={{
-                  channel: filters.channel,
-                  date_from: filters.dateFrom,
-                  date_to: filters.dateTo,
-                  pic: filters.pic,
-                  search: filters.search,
-                  status: filters.status,
-                }}
-                formats={["pdf", "xlsx"]}
-              />
-            </PermissionGate>
-            <PermissionGate permission={permissions.marketingCampaignCreate}>
-              <Button onClick={() => setIsComposerOpen(true)} variant="mkt">
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto]">
+              <PermissionGate permission={permissions.marketingCampaignView}>
+                <ExportButton
+                  className="w-full sm:w-auto"
+                  endpoint="/marketing/campaigns/export"
+                  filename="campaigns-report"
+                  filters={{
+                    channel: filters.channel,
+                    date_from: filters.dateFrom,
+                    date_to: filters.dateTo,
+                    pic: filters.pic,
+                    search: filters.search,
+                    status: filters.status,
+                  }}
+                  formats={["pdf", "xlsx"]}
+                />
+              </PermissionGate>
+              <PermissionGate permission={permissions.marketingCampaignCreate}>
+                <Button className="w-full sm:w-auto" onClick={() => setIsComposerOpen(true)} variant="mkt">
                 <Plus className="mr-2 h-4 w-4" />
                 New campaign
-              </Button>
-            </PermissionGate>
+                </Button>
+              </PermissionGate>
+            </div>
           </div>
         </div>
       </Card>
@@ -427,8 +442,8 @@ function MarketingCampaignsPage() {
         />
       ) : null}
 
-      <Card className="p-6">
-        <div className="grid gap-4 xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]">
+      <Card className="p-4 sm:p-5">
+        <div className="grid gap-3 xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]">
           <Input
             onChange={(event) => setFilters((current) => ({ ...current, page: 1, search: event.target.value }))}
             placeholder="Search by campaign name"
@@ -465,7 +480,7 @@ function MarketingCampaignsPage() {
         </div>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <SummaryCard label="Campaigns on page" value={String(tableItems.length)} />
         <SummaryCard label="Live campaigns" value={String(tableItems.filter((campaign) => campaign.status === "live").length)} />
         <SummaryCard label="Tracked budget" value={formatIDR(tableItems.reduce((total, campaign) => total + campaign.budget_amount, 0))} />

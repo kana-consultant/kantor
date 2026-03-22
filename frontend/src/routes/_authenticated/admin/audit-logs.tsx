@@ -3,7 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarClock,
+  ChevronDown,
+  ChevronUp,
   Download,
+  Filter,
   ScrollText,
   Shield,
   UserRound,
@@ -84,6 +87,7 @@ function AuditLogsPage() {
   const [filters, setFilters] = useState<AuditLogFilters>(defaultFilters);
   const [searchInput, setSearchInput] = useState("");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -134,6 +138,7 @@ function AuditLogsPage() {
       header: "User",
       sortable: true,
       accessor: "user_name",
+      mobilePrimary: true,
       widthClassName: "min-w-[200px]",
       cell: (row) => (
         <div className="flex items-center gap-3">
@@ -198,6 +203,7 @@ function AuditLogsPage() {
       header: "IP Address",
       accessor: "ip_address",
       sortable: true,
+      hideOnMobile: true,
       widthClassName: "min-w-[140px]",
       cell: (row) => <span className="font-mono text-[12px] text-text-secondary">{row.ip_address || "-"}</span>,
     },
@@ -224,28 +230,30 @@ function AuditLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+      <Card className="p-5 sm:p-6">
+        <div className="flex flex-col gap-4 border-b border-border/80 pb-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-error">Admin</p>
-          <h1 className="mt-2 font-display text-[28px] font-[700] tracking-[-0.02em] text-text-primary">
+          <h1 className="mt-2 font-display text-[24px] font-[700] tracking-[-0.02em] text-text-primary sm:text-[28px]">
             Audit Logs
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
             Telusuri perubahan penting lintas modul, lihat diff JSON, dan export jejak audit untuk investigasi atau compliance review.
           </p>
+          </div>
+          {canExport ? (
+            <Button className="w-full sm:w-auto" onClick={() => void downloadExport()} type="button" variant="outline">
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+          ) : null}
         </div>
-        {canExport ? (
-          <Button onClick={() => void downloadExport()} type="button" variant="outline">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-        ) : null}
-      </div>
+      </Card>
 
       {summaryQuery.isLoading ? (
         <OverviewSkeleton />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             icon={ScrollText}
             label="Total Logs Today"
@@ -275,8 +283,20 @@ function AuditLogsPage() {
         </div>
       )}
 
-      <Card className="p-6">
-        <div className="grid gap-4 xl:grid-cols-[180px_180px_180px_180px_220px_minmax(0,1fr)]">
+      <div className="flex items-center justify-between gap-3 lg:hidden">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">Filters</p>
+          <p className="text-xs text-text-secondary">Persempit hasil sebelum buka detail log.</p>
+        </div>
+        <Button onClick={() => setShowFilters((current) => !current)} type="button" variant="outline">
+          <Filter className="h-4 w-4" />
+          {showFilters ? "Hide" : "Show"}
+          {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      <Card className={showFilters ? "p-4 sm:p-5" : "hidden p-4 sm:p-5 lg:block"}>
+        <div className="grid gap-3 xl:grid-cols-[160px_160px_170px_170px_220px_minmax(260px,1fr)]">
           <select
             className="field-select"
             onChange={(event) =>

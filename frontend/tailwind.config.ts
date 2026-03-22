@@ -69,37 +69,37 @@ const config: Config = {
 
         // Module Identity Colors
         ops: {
-          DEFAULT: "#0065FF",
-          light: "#DEEBFF",
-          dark: "#0747A6",
+          DEFAULT: "rgb(var(--ops) / <alpha-value>)",
+          light: "rgb(var(--ops-light) / <alpha-value>)",
+          dark: "rgb(var(--ops-dark) / <alpha-value>)",
         },
         hr: {
-          DEFAULT: "#6554C0",
-          light: "#EAE6FF",
-          dark: "#403294",
+          DEFAULT: "rgb(var(--hr) / <alpha-value>)",
+          light: "rgb(var(--hr-light) / <alpha-value>)",
+          dark: "rgb(var(--hr-dark) / <alpha-value>)",
         },
         mkt: {
-          DEFAULT: "#FF5630",
-          light: "#FFEBE6",
-          dark: "#BF2600",
+          DEFAULT: "rgb(var(--mkt) / <alpha-value>)",
+          light: "rgb(var(--mkt-light) / <alpha-value>)",
+          dark: "rgb(var(--mkt-dark) / <alpha-value>)",
         },
 
         // Semantic Colors
         success: {
-          DEFAULT: "#36B37E",
-          light: "#E3FCEF",
+          DEFAULT: "rgb(var(--success) / <alpha-value>)",
+          light: "rgb(var(--success-light) / <alpha-value>)",
         },
         warning: {
-          DEFAULT: "#FFAB00",
-          light: "#FFFAE6",
+          DEFAULT: "rgb(var(--warning) / <alpha-value>)",
+          light: "rgb(var(--warning-light) / <alpha-value>)",
         },
         error: {
-          DEFAULT: "#FF5630",
-          light: "#FFEBE6",
+          DEFAULT: "hsl(var(--error) / <alpha-value>)",
+          light: "rgb(var(--error-light) / <alpha-value>)",
         },
         info: {
-          DEFAULT: "#00B8D9",
-          light: "#E6FCFF",
+          DEFAULT: "rgb(var(--info) / <alpha-value>)",
+          light: "rgb(var(--info-light) / <alpha-value>)",
         },
 
         // Priority Colors

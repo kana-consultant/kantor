@@ -143,7 +143,9 @@ export const Route = createFileRoute("/_authenticated/marketing/leads")({
 function MarketingLeadsPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = useRBAC();
-  const [activeView, setActiveView] = useState<"pipeline" | "table">("pipeline");
+  const [activeView, setActiveView] = useState<"pipeline" | "table">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "table" : "pipeline",
+  );
   const [filters, setFilters] = useState<LeadFilters>(defaultFilters);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -469,62 +471,68 @@ function MarketingLeadsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-mkt/20 bg-gradient-to-br from-mkt/10 via-background to-background p-8">
+      <Card className="border-mkt/20 bg-gradient-to-br from-mkt/10 via-background to-background p-5 sm:p-6 lg:p-7">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-mkt">Marketing CRM</p>
-            <h3 className="mt-2 text-3xl font-bold tracking-tight text-foreground">Leads pipeline</h3>
+            <h3 className="mt-2 text-[24px] font-bold tracking-tight text-foreground sm:text-3xl">Leads pipeline</h3>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               Lacak lead dari kontak pertama sampai won atau lost, lengkap dengan assigned sales, nilai estimasi, dan history follow-up.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setActiveView("pipeline")} variant={activeView === "pipeline" ? "mkt" : "outline"}>
+          <div className="flex w-full flex-col gap-3 xl:w-auto">
+            <div className="grid grid-cols-2 gap-2 sm:inline-flex sm:w-auto">
+              <Button className="w-full sm:w-auto" onClick={() => setActiveView("pipeline")} variant={activeView === "pipeline" ? "mkt" : "outline"}>
               <FolderKanban className="mr-2 h-4 w-4" />
               Pipeline
-            </Button>
-            <Button onClick={() => setActiveView("table")} variant={activeView === "table" ? "mkt" : "outline"}>
+              </Button>
+              <Button className="w-full sm:w-auto" onClick={() => setActiveView("table")} variant={activeView === "table" ? "mkt" : "outline"}>
               <LayoutList className="mr-2 h-4 w-4" />
               Table view
-            </Button>
-            <PermissionGate permission={permissions.marketingLeadsView}>
-              <ExportButton
-                endpoint="/marketing/leads/export"
-                filename="leads-report"
-                filters={{
-                  assigned_to: filters.assignedTo,
-                  campaign_id: filters.campaignId,
-                  date_from: filters.dateFrom,
-                  date_to: filters.dateTo,
-                  pipeline_status: filters.pipelineStatus,
-                  search: filters.search,
-                  source_channel: filters.sourceChannel,
-                }}
-                formats={["pdf", "xlsx"]}
-              />
-            </PermissionGate>
-            <PermissionGate permission={permissions.marketingLeadsCreate}>
-              <Button
-                onClick={() => {
-                  resetLeadForm(form);
-                  setEditingLead(null);
-                  setShowForm(true);
-                }}
-                variant="mkt"
-              >
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_auto_auto]">
+              <PermissionGate permission={permissions.marketingLeadsView}>
+                <ExportButton
+                  className="w-full sm:w-auto"
+                  endpoint="/marketing/leads/export"
+                  filename="leads-report"
+                  filters={{
+                    assigned_to: filters.assignedTo,
+                    campaign_id: filters.campaignId,
+                    date_from: filters.dateFrom,
+                    date_to: filters.dateTo,
+                    pipeline_status: filters.pipelineStatus,
+                    search: filters.search,
+                    source_channel: filters.sourceChannel,
+                  }}
+                  formats={["pdf", "xlsx"]}
+                />
+              </PermissionGate>
+              <PermissionGate permission={permissions.marketingLeadsCreate}>
+                <Button
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    resetLeadForm(form);
+                    setEditingLead(null);
+                    setShowForm(true);
+                  }}
+                  variant="mkt"
+                >
                 <Plus className="mr-2 h-4 w-4" />
                 New lead
-              </Button>
-              <Button onClick={() => setShowImport(true)} variant="outline">
+                </Button>
+                <Button className="w-full sm:w-auto" onClick={() => setShowImport(true)} variant="outline">
                 <Download className="mr-2 h-4 w-4" />
                 Import CSV
-              </Button>
-            </PermissionGate>
+                </Button>
+              </PermissionGate>
+            </div>
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Total leads" value={String(summaryQuery.data?.total_leads ?? 0)} />
         <SummaryCard label="Won leads" value={String(summaryQuery.data?.won_leads ?? 0)} />
         <SummaryCard label="Conversion rate" value={`${(summaryQuery.data?.conversion_rate ?? 0).toFixed(2)}%`} />
@@ -534,7 +542,7 @@ function MarketingLeadsPage() {
         />
       </div>
 
-      <Card className="p-6">
+      <Card className="p-4 sm:p-5">
         <div className="grid gap-3 lg:grid-cols-6">
           <Input
             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value, page: 1 }))}

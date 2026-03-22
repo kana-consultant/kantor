@@ -96,6 +96,7 @@ function RegisterPage() {
           <Field label="Full name" error={errors.full_name?.message}>
             <Input
               {...registerField("full_name")}
+              autoComplete="name"
               placeholder="Jane Doe"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
@@ -103,6 +104,7 @@ function RegisterPage() {
           <Field label="Email" error={errors.email?.message}>
             <Input
               {...registerField("email")}
+              autoComplete="email"
               placeholder="jane@company.com"
               type="email"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
@@ -111,6 +113,7 @@ function RegisterPage() {
           <Field label="Password" error={errors.password?.message}>
             <Input
               {...registerField("password")}
+              autoComplete="new-password"
               placeholder="Buat password"
               type="password"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
@@ -119,6 +122,7 @@ function RegisterPage() {
           <Field label="Confirm password" error={errors.confirmPassword?.message}>
             <Input
               {...registerField("confirmPassword")}
+              autoComplete="new-password"
               placeholder="Konfirmasi password"
               type="password"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"

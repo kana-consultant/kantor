@@ -24,7 +24,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { useRBAC } from "@/hooks/use-rbac";
@@ -587,104 +587,137 @@ function TemplateFormDialog({ template, onClose }: { template: WATemplate | null
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="flex max-h-[92vh] flex-col sm:max-w-[860px]" size="xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Template" : "Buat Template Baru"}</DialogTitle>
+          <DialogDescription>
+            <span className="sm:hidden">Rakit template WA yang rapi dan siap dipakai.</span>
+            <span className="hidden sm:inline">Susun template WhatsApp dengan struktur yang jelas, slug yang rapi, dan body yang siap dipakai untuk automasi maupun kirim manual.</span>
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-text-primary">Nama Template</label>
-              <Input className="mt-1.5" placeholder="e.g. Reminder Meeting" value={name} onChange={(e) => setName(e.target.value)} disabled={isSystem} />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-text-primary">Slug</label>
-              <Input className="mt-1.5 font-mono text-sm" placeholder="e.g. reminder_meeting" value={slug} onChange={(e) => setSlug(e.target.value)} disabled={isEdit} />
-              <p className="mt-1 text-xs text-text-secondary">Identifier unik, tidak bisa diubah setelah dibuat</p>
-            </div>
+        <DialogBody className="space-y-5 sm:max-h-[70vh]">
+          <div className="grid gap-5 lg:grid-cols-[1.05fr,0.95fr]">
+            <Card className="order-1 p-4 sm:p-5 lg:col-start-1">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-text-primary">Nama Template</label>
+                  <Input className="mt-1.5" placeholder="e.g. Reminder Meeting" value={name} onChange={(e) => setName(e.target.value)} disabled={isSystem} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-text-primary">Slug</label>
+                  <Input className="mt-1.5 font-mono text-sm" placeholder="e.g. reminder_meeting" value={slug} onChange={(e) => setSlug(e.target.value)} disabled={isEdit} />
+                  <p className="text-xs leading-5 text-text-secondary">Identifier unik, tidak bisa diubah setelah dibuat.</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-text-primary">Kategori</label>
+                  <select className="field-select mt-1.5 w-full" value={category} onChange={(e) => setCategory(e.target.value)} disabled={isSystem}>
+                    <option value="operational">Operational</option>
+                    <option value="hris">HRIS</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="general">General</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-text-primary">Trigger Type</label>
+                  <select className="field-select mt-1.5 w-full" value={triggerType} onChange={(e) => setTriggerType(e.target.value)} disabled={isSystem}>
+                    <option value="auto_scheduled">Auto Scheduled</option>
+                    <option value="event_triggered">Event Triggered</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-1.5">
+                <label className="text-sm font-medium text-text-primary">Deskripsi</label>
+                <Input className="mt-1.5" placeholder="Deskripsi singkat tentang template ini" value={description} onChange={(e) => setDescription(e.target.value)} />
+              </div>
+            </Card>
+
+            <Card className="order-2 border-blue-200 bg-blue-50/70 p-4 dark:border-blue-800 dark:bg-blue-950/20 sm:p-5 lg:col-start-2 lg:row-start-1">
+              <div className="mb-3 flex items-center gap-2">
+                <Info className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">Variabel yang tersedia</span>
+              </div>
+              <p className="mb-3 text-xs leading-5 text-blue-700/90 dark:text-blue-300">
+                Klik variabel untuk menyisipkan ke body template. Format: {"{{nama_variabel}}"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {availableVars.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => insertVariable(v)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-blue-300 bg-white px-3 py-1.5 text-xs font-mono text-blue-700 transition hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                  >
+                    <Copy className="h-3 w-3" />
+                    {`{{${v}}}`}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="order-3 p-4 sm:p-5 lg:col-start-1 lg:row-start-2">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Body Template</p>
+                  <p className="mt-1 text-xs leading-5 text-text-secondary">Tulis pesan final yang akan dikirim. Variabel bisa disisipkan dari panel kanan.</p>
+                </div>
+                <div className="rounded-full bg-surface-muted px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
+                  {bodyTemplate.length} chars
+                </div>
+              </div>
+              <textarea
+                className="min-h-[220px] w-full rounded-2xl border border-border/70 bg-surface-muted/90 px-4 py-3 font-mono text-sm leading-relaxed text-text-primary outline-none transition-all duration-150 focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
+                placeholder={"Halo {{name}},\n\nIni adalah pesan template...\n\n{{app_url}}"}
+                value={bodyTemplate}
+                onChange={(e) => setBodyTemplate(e.target.value)}
+              />
+            </Card>
+
+            <Card className="order-4 p-4 sm:p-5 lg:col-start-2 lg:row-start-2">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-border"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Template aktif</p>
+                  <p className="mt-1 text-xs leading-5 text-text-secondary">
+                    Nonaktifkan jika template hanya ingin disimpan sebagai draft atau arsip.
+                  </p>
+                </div>
+              </label>
+            </Card>
+
+            <Card className="order-5 hidden p-4 sm:block sm:p-5 lg:col-start-2 lg:row-start-3">
+              <p className="text-sm font-semibold text-text-primary">Catatan cepat</p>
+              <ul className="mt-3 space-y-2 text-xs leading-5 text-text-secondary">
+                <li>Slug sebaiknya singkat dan stabil karena dipakai sebagai identifier template.</li>
+                <li>Gunakan <span className="font-semibold text-text-primary">Manual</span> untuk template kirim cepat.</li>
+                <li>Gunakan <span className="font-semibold text-text-primary">Event Triggered</span> atau <span className="font-semibold text-text-primary">Auto Scheduled</span> untuk automasi.</li>
+              </ul>
+            </Card>
           </div>
+        </DialogBody>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-text-primary">Kategori</label>
-              <select className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} disabled={isSystem}>
-                <option value="operational">Operational</option>
-                <option value="hris">HRIS</option>
-                <option value="marketing">Marketing</option>
-                <option value="general">General</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-text-primary">Trigger Type</label>
-              <select className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={triggerType} onChange={(e) => setTriggerType(e.target.value)} disabled={isSystem}>
-                <option value="auto_scheduled">Auto Scheduled</option>
-                <option value="event_triggered">Event Triggered</option>
-                <option value="manual">Manual</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-text-primary">Deskripsi</label>
-            <Input className="mt-1.5" placeholder="Deskripsi singkat tentang template ini" value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-
-          {/* Available Variables */}
-          <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Info className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Variabel yang tersedia</span>
-            </div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">
-              Klik variabel untuk menyisipkan ke body template. Format: {"{{nama_variabel}}"}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {availableVars.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => insertVariable(v)}
-                  className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-mono text-blue-700 transition hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
-                >
-                  <Copy className="h-3 w-3" />
-                  {`{{${v}}}`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-text-primary">Body Template</label>
-            <textarea
-              className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono min-h-[180px] focus:outline-none focus:ring-2 focus:ring-ring leading-relaxed"
-              placeholder={"Halo {{name}},\n\nIni adalah pesan template...\n\n{{app_url}}"}
-              value={bodyTemplate}
-              onChange={(e) => setBodyTemplate(e.target.value)}
-            />
-          </div>
-
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="h-4 w-4 rounded border-border"
-            />
-            <span className="text-sm font-medium">Template aktif</span>
-          </label>
-        </div>
-
-        <DialogFooter className="mt-4">
+        <DialogFooter className="grid grid-cols-2 gap-3 sm:flex sm:justify-end">
           <Button variant="outline" onClick={onClose}>Batal</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !name.trim() || !slug.trim() || !bodyTemplate.trim()}>
             {mutation.isPending ? "Menyimpan..." : "Simpan"}
           </Button>
         </DialogFooter>
-        {mutation.isError && (
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
-            Gagal menyimpan template. Pastikan slug unik dan data valid.
+        {mutation.isError ? (
+          <div className="px-4 pb-4 sm:px-6 sm:pb-5">
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
+              Gagal menyimpan template. Pastikan slug unik dan data valid.
+            </div>
           </div>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -858,7 +891,7 @@ function ScheduleFormDialog({ schedule, onClose }: { schedule: WASchedule | null
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="text-sm font-medium text-text-primary">Tipe Jadwal</label>
               <select className="mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={scheduleType} onChange={(e) => setScheduleType(e.target.value)}>

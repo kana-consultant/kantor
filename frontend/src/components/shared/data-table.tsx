@@ -17,6 +17,8 @@ export interface DataTableColumn<TData> {
   align?: "left" | "center" | "right";
   widthClassName?: string;
   cell?: (row: TData) => ReactNode;
+  mobilePrimary?: boolean;
+  hideOnMobile?: boolean;
 }
 
 interface DataTableProps<TData> {
@@ -101,6 +103,9 @@ export function DataTable<TData>({
   }, [columns, data, sortState]);
 
   const totalPages = pagination ? Math.max(1, Math.ceil(pagination.total / pagination.perPage)) : 1;
+  const mobileColumns = columns.filter((column) => !column.hideOnMobile);
+  const mobilePrimaryColumn =
+    mobileColumns.find((column) => column.mobilePrimary) ?? mobileColumns[0] ?? null;
 
   if (loading) {
     return <DataTablePageSkeleton columns={columns.length} rows={loadingRows} />;
@@ -120,7 +125,76 @@ export function DataTable<TData>({
 
   return (
     <div className="table-shell">
-      <div className="overflow-x-auto">
+      <div className="space-y-3 p-3 md:hidden">
+        {sortedRows.map((row) => {
+          const rowId = getRowId(row);
+          const selected = rowId === selectedRowId;
+
+          return (
+            <Fragment key={rowId}>
+              <div
+                className={cn(
+                  "block w-full space-y-4 rounded-[18px] border border-border/70 bg-surface px-4 py-4 text-left transition hover:border-border hover:bg-surface-muted/50",
+                  selected && "border-module/20 bg-module-light shadow-[0_12px_30px_-24px_var(--module-primary)]",
+                  getRowClassName?.(row),
+                  !onRowClick && "cursor-default hover:bg-transparent",
+                  onRowClick && "cursor-pointer",
+                )}
+                onClick={() => onRowClick?.(row)}
+                onKeyDown={(event) => {
+                  if (onRowClick && (event.key === "Enter" || event.key === " ")) {
+                    event.preventDefault();
+                    onRowClick(row);
+                  }
+                }}
+                role={onRowClick ? "button" : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+              >
+                {mobilePrimaryColumn ? (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">
+                      {mobilePrimaryColumn.header}
+                    </p>
+                    <div className="text-sm text-text-primary">
+                      {mobilePrimaryColumn.cell
+                        ? mobilePrimaryColumn.cell(row)
+                        : formatValue(readValue(row, mobilePrimaryColumn))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {mobileColumns
+                    .filter((column) => column.id !== mobilePrimaryColumn?.id)
+                    .map((column) => (
+                      <div className="space-y-1" key={column.id}>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">
+                          {column.header}
+                        </p>
+                        <div
+                          className={cn(
+                            "text-sm text-text-primary",
+                            column.numeric && "font-mono tabular-nums",
+                            column.align === "right" && "text-left",
+                          )}
+                        >
+                          {column.cell ? column.cell(row) : formatValue(readValue(row, column))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              {selected && renderExpandedRow ? (
+                <div className="rounded-[18px] border border-border/70 bg-surface-muted/40 px-4 py-4">
+                  {renderExpandedRow(row)}
+                </div>
+              ) : null}
+            </Fragment>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <table className="min-w-full border-collapse">
           <thead className="bg-surface-muted">
             <tr>
@@ -199,7 +273,7 @@ export function DataTable<TData>({
           <p className="text-sm text-text-secondary">
             Page {pagination.page} of {totalPages} | Total {pagination.total}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button
               disabled={pagination.page <= 1}
               onClick={() => pagination.onPageChange(pagination.page - 1)}

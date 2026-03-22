@@ -120,8 +120,8 @@ export function MarketingLeadsPipeline({
       onDragStart={handleDragStart}
       sensors={sensors}
     >
-      <div className="overflow-x-auto pb-3">
-        <div className="flex min-w-max gap-5">
+      <div className="-mx-1 overflow-x-auto px-1 pb-3">
+        <div className="flex min-w-max gap-3 md:gap-5">
           {boardColumns.map((column) => (
             <LeadLane column={column} key={column.status} onLeadOpen={onLeadOpen} />
           ))}
@@ -146,10 +146,10 @@ function LeadLane({
   });
 
   return (
-    <div className="w-[320px] shrink-0">
+    <div className="w-[min(82vw,320px)] shrink-0 md:w-[320px]">
       <Card
         className={cn(
-          "flex min-h-[500px] flex-col border border-border bg-surface-muted p-4 shadow-sm transition-all",
+          "flex min-h-[420px] flex-col border border-border bg-surface-muted p-3 shadow-sm transition-all md:min-h-[500px] md:p-4",
           droppable.isOver && "border-mkt/50 shadow-card bg-mkt/5",
         )}
         ref={droppable.setNodeRef}
@@ -246,7 +246,7 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 
 function LeadOverlay({ lead }: { lead: Lead }) {
   return (
-    <div className="w-[320px]">
+    <div className="w-[min(82vw,320px)] md:w-[320px]">
       <Card className="border-mkt shadow-2xl p-4 rotate-2 rounded-[12px]">
         <StatusBadge status={lead.pipeline_status} variant="lead-status" />
         <p className="mt-2 text-[14px] font-[600] text-text-primary leading-tight">{lead.name}</p>

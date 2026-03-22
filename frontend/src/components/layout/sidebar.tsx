@@ -1,6 +1,7 @@
 import {
   Activity,
   ChevronsLeft,
+  X,
   FolderKanban,
   LayoutDashboard,
   Megaphone,
@@ -208,22 +209,35 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
   return (
     <aside
       className={cn(
-        "relative flex h-full flex-col rounded-lg bg-surface transition-all duration-200 ease-in-out shrink-0",
-        collapsed ? "w-[68px]" : "w-[256px]"
+        "relative flex h-full shrink-0 flex-col transition-all duration-200 ease-in-out",
+        mobile
+          ? "h-[100dvh] w-full rounded-none rounded-r-[32px] border-r border-border/70 bg-background shadow-[0_24px_72px_-28px_rgba(15,23,42,0.55)]"
+          : "rounded-[24px] border border-border/70 bg-surface/92 shadow-[0_24px_56px_-32px_rgba(15,23,42,0.38)] backdrop-blur-xl",
+        !mobile && (collapsed ? "w-[68px]" : "w-[256px]")
       )}
     >
-      <div className="flex h-[64px] items-center px-5 shrink-0">
+      <div className={cn("flex shrink-0 items-center", mobile ? "h-[76px] px-5 pt-1.5" : "h-[72px] px-5")}>
         <div className={cn("flex w-full items-center", collapsed ? "justify-center" : "justify-between")}>
           <KantorLogo compact={collapsed} />
+          {mobile ? (
+            <button
+              aria-label="Close sidebar"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-surface/90 text-text-secondary transition hover:bg-surface-muted hover:text-text-primary"
+              onClick={onNavigate}
+              type="button"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+          ) : null}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2 space-y-6">
+      <div className={cn("flex-1 space-y-5 overflow-y-auto overflow-x-hidden", mobile ? "px-4 pb-6 pt-1" : "px-3 py-2")}>
         {visibleSections.map((section) => (
           <div key={section.id}>
              {!collapsed ? (
                 <div className={cn(
-                  "mt-6 mb-2 px-3 text-[11px] font-[700] uppercase tracking-[0.08em]",
+                  mobile ? "mb-2 mt-5 px-3 text-[10px] font-[800] uppercase tracking-[0.18em]" : "mb-2 mt-6 px-3 text-[11px] font-[700] uppercase tracking-[0.12em]",
                   section.id === 'ops' ? 'text-ops' : section.id === 'hr' ? 'text-hr' : section.id === 'mkt' ? 'text-mkt' : 'text-error'
                 )}>
                  {section.label}
@@ -247,10 +261,10 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
                   
                   let activeColors = "";
                   if (active) {
-                     if (section.id === 'ops') activeColors = "bg-ops-light text-ops font-[600]";
-                     if (section.id === 'hr') activeColors = "bg-hr-light text-hr font-[600]";
-                     if (section.id === 'mkt') activeColors = "bg-mkt-light text-mkt font-[600]";
-                     if (section.id === 'admin') activeColors = "bg-error-light text-error font-[600]";
+                     if (section.id === 'ops') activeColors = "border border-ops/15 bg-ops-light text-ops font-[700] shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]";
+                     if (section.id === 'hr') activeColors = "border border-hr/15 bg-hr-light text-hr font-[700] shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]";
+                     if (section.id === 'mkt') activeColors = "border border-mkt/15 bg-mkt-light text-mkt font-[700] shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]";
+                     if (section.id === 'admin') activeColors = "border border-error/15 bg-error-light text-error font-[700] shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]";
                   }
 
                   return (
@@ -259,14 +273,15 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
                         to={item.to}
                         onClick={onNavigate}
                         className={cn(
-                          "flex items-center h-[36px] px-3 rounded-sm text-[14px] transition-colors",
+                          mobile ? "flex h-11 items-center rounded-2xl px-3.5 text-[15px] transition-all" : "flex h-10 items-center rounded-xl px-3 text-[14px] transition-all",
                           collapsed ? "justify-center px-0 w-11 mx-auto" : "",
-                          !active && "text-text-secondary font-[500] hover:bg-surface-muted hover:text-text-primary",
-                          active && "shadow-[inset_3px_0_0_0_currentColor]",
+                          !active && (mobile
+                            ? "font-[600] text-text-primary/80 hover:bg-surface-muted hover:text-text-primary"
+                            : "font-[500] text-text-secondary hover:bg-surface-muted/80 hover:text-text-primary"),
                           activeColors
                         )}
                       >
-                        <Icon className={cn("shrink-0", collapsed ? "w-5 h-5 mx-auto" : "w-5 h-5 mr-3")} strokeWidth={1.5} />
+                        <Icon className={cn("shrink-0", collapsed ? "w-5 h-5 mx-auto" : mobile ? "mr-3 h-5 w-5" : "w-5 h-5 mr-3")} strokeWidth={1.5} />
                         {!collapsed && <span>{item.label}</span>}
                       </Link>
                     </Tooltip>
@@ -278,11 +293,11 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
       </div>
 
       {!mobile && onToggleCollapse && (
-        <div className="p-3 mt-auto shrink-0 border-t border-border/50">
+        <div className="mt-auto shrink-0 border-t border-border/50 p-3">
            <button
              onClick={onToggleCollapse}
              className={cn(
-               "flex items-center text-text-secondary hover:bg-surface-muted hover:text-text-primary h-[36px] rounded-[6px] transition-colors w-full",
+               "flex h-10 w-full items-center rounded-xl text-text-secondary transition-colors hover:bg-surface-muted hover:text-text-primary",
                collapsed ? "justify-center" : "px-3"
              )}
              aria-label="Toggle sidebar"

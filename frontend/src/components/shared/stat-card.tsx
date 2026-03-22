@@ -41,7 +41,7 @@ export function StatCard({
   const style = toneClasses[tone];
 
   return (
-    <Card className={cn("border-t-[3px] p-5", style.border)}>
+    <Card className={cn("border-t-[3px] p-4 sm:p-5", style.border)}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
@@ -49,15 +49,15 @@ export function StatCard({
           </p>
           <p
             className={cn(
-              "mt-3 text-[28px] font-bold leading-none text-text-primary",
+              "mt-3 text-[24px] font-bold leading-none text-text-primary sm:text-[28px]",
               mono ? "font-mono tabular-nums" : "font-display",
             )}
           >
             {value}
           </p>
-          {helper ? <p className="mt-2 text-[13px] text-text-secondary">{helper}</p> : null}
+          {helper ? <p className="mt-2 max-w-[24ch] text-[13px] leading-5 text-text-secondary">{helper}</p> : null}
         </div>
-        <div className={cn("flex h-10 w-10 items-center justify-center rounded-md", style.iconBg)}>
+        <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl shadow-inner", style.iconBg)}>
           <Icon className={cn("h-5 w-5", style.icon)} />
         </div>
       </div>

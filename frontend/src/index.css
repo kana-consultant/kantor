@@ -38,6 +38,22 @@
     /* Semantic Colors */
     --error: 11 100% 59%; /* #FF5630 */
     --error-foreground: 0 0% 100%;
+    --ops: 0 101 255;
+    --ops-light: 222 235 255;
+    --ops-dark: 7 71 166;
+    --hr: 101 84 192;
+    --hr-light: 234 230 255;
+    --hr-dark: 64 50 148;
+    --mkt: 255 86 48;
+    --mkt-light: 255 235 230;
+    --mkt-dark: 191 38 0;
+    --error-light: 255 235 230;
+    --success: 54 179 126;
+    --success-light: 227 252 239;
+    --warning: 255 171 0;
+    --warning-light: 255 250 230;
+    --info: 0 184 217;
+    --info-light: 230 252 255;
     --module-primary: #0065ff;
     --module-light: #deebff;
     --module-dark: #0747a6;
@@ -47,13 +63,14 @@
   }
 
   .dark {
-    --background: 218 35% 16%; /* #1B2638 */
-    --surface: 218 41% 25%; /* #253858 */
-    --surface-muted: 216 34% 26%; /* #2C3E5A */
-    --text-primary: 214 32% 91%; /* #E2E8F0 */
-    --text-secondary: 218 13% 64%; /* #97A0AF */
-    --border: 218 31% 30%; /* #344563 */
-    --input: 216 34% 26%;
+    --background: 220 35% 12%;
+    --foreground: 214 33% 93%;
+    --surface: 220 30% 19%;
+    --surface-muted: 220 25% 23%;
+    --text-primary: 214 33% 93%;
+    --text-secondary: 218 15% 72%;
+    --border: 220 20% 29%;
+    --input: 220 25% 23%;
 
     --primary: 214 100% 65%;
     --primary-foreground: 0 0% 100%;
@@ -67,6 +84,19 @@
     --popover-foreground: 214 32% 91%;
     --card: 218 41% 25%;
     --card-foreground: 214 32% 91%;
+    --ops: 76 154 255;
+    --ops-light: 31 55 101;
+    --ops-dark: 222 235 255;
+    --hr: 153 141 217;
+    --hr-light: 53 45 102;
+    --hr-dark: 234 230 255;
+    --mkt: 255 139 115;
+    --mkt-light: 90 47 39;
+    --mkt-dark: 255 235 230;
+    --error-light: 90 47 39;
+    --success-light: 32 61 49;
+    --warning-light: 87 64 10;
+    --info-light: 16 73 84;
     --module-primary: #4c9aff;
     --module-light: #1f3765;
     --module-dark: #deebff;
@@ -124,15 +154,15 @@
 
 @layer components {
   .field-select {
-    @apply h-10 rounded-sm border-[1.5px] border-transparent bg-surface-muted px-3 text-[14px] text-text-primary outline-none transition-all duration-150 focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus;
+    @apply h-11 rounded-xl border border-border/70 bg-surface-muted/90 px-3.5 text-[14px] text-text-primary outline-none transition-all duration-150 focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus;
   }
 
   .surface-panel {
-    @apply rounded-md border border-border bg-surface shadow-card transition-shadow hover:shadow-card-hover;
+    @apply rounded-[20px] border border-border/80 bg-surface/95 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.32)] transition-shadow hover:shadow-[0_24px_56px_-30px_rgba(15,23,42,0.38)];
   }
 
   .table-shell {
-    @apply overflow-hidden rounded-md border border-border bg-surface shadow-xs;
+    @apply overflow-hidden rounded-[22px] border border-border/80 bg-surface/95 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)];
   }
 
   .page-transition {

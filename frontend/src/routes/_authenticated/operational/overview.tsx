@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
@@ -40,11 +41,30 @@ export const Route = createFileRoute("/_authenticated/operational/overview")({
 function OperationalOverviewPage() {
   const navigate = useNavigate();
   const { hasPermission } = useRBAC();
+  const [canRenderCharts, setCanRenderCharts] = useState(false);
+  const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const canCreateProject = hasPermission(permissions.operationalProjectCreate);
   const overviewQuery = useQuery({
     queryKey: overviewKeys.operational(),
     queryFn: getOperationalOverview,
   });
+
+  useEffect(() => {
+    const node = chartContainerRef.current;
+    if (!node) {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) {
+        setCanRenderCharts(true);
+      }
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   if (overviewQuery.isLoading) {
     return <OverviewSkeleton />;
@@ -66,26 +86,28 @@ function OperationalOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+      <Card className="p-5 sm:p-6 lg:p-7">
+        <div className="flex flex-col gap-4 border-b border-border/80 pb-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
             Operasional
           </p>
-          <h1 className="mt-2 text-[28px] font-bold tracking-tight text-text-primary">
+            <h1 className="mt-2 text-[24px] font-bold tracking-tight text-text-primary sm:text-[28px]">
             Project execution overview
           </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
             Pantau jumlah project aktif, beban task berjalan, task overdue, dan update task terbaru dari seluruh board.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void navigate({ to: "/operational/projects" })}>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button className="w-full sm:w-auto" onClick={() => void navigate({ to: "/operational/projects" })}>
             {canCreateProject ? "Manage Projects" : "View Projects"}
           </Button>
+          </div>
         </div>
-      </div>
+      </Card>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           helper="Seluruh project yang tercatat di workspace."
           icon={FolderKanban}
@@ -126,24 +148,26 @@ function OperationalOverviewPage() {
               Tasks completed per week
             </h2>
           </div>
-          <div className="mt-6 h-[320px]">
-            <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
-              <BarChart data={overview.completed_by_week}>
-                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
-                <YAxis allowDecimals={false} stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--surface))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
-                  }}
-                  cursor={{ fill: "hsl(var(--surface-muted))" }}
-                />
-                <Bar dataKey="value" fill="var(--module-primary)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="mt-6 h-[320px] min-w-0" ref={chartContainerRef}>
+            {canRenderCharts ? (
+              <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
+                <BarChart data={overview.completed_by_week}>
+                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
+                  <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
+                  <YAxis allowDecimals={false} stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--surface))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: 8,
+                      boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
+                    }}
+                    cursor={{ fill: "hsl(var(--surface-muted))" }}
+                  />
+                  <Bar dataKey="value" fill="var(--module-primary)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : null}
           </div>
         </Card>
 

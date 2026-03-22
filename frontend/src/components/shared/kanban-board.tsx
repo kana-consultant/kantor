@@ -453,8 +453,8 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
         sensors={sensors}
       >
         <SortableContext items={columns.map((column) => column.id)} strategy={horizontalListSortingStrategy}>
-          <div className="overflow-x-auto pb-3">
-            <div className="flex min-w-max gap-5">
+          <div className="-mx-1 overflow-x-auto px-1 pb-3">
+            <div className="flex min-w-max gap-3 md:gap-5">
             {columns.map((column) => (
               <KanbanColumnCard
                 column={column}
@@ -785,8 +785,8 @@ function KanbanColumnCard(props: KanbanColumnCardProps) {
   };
 
   return (
-    <div className="w-[320px] shrink-0" ref={sortable.setNodeRef} style={style}>
-      <Card className={cn("flex flex-col h-full min-h-[500px] border-border bg-surface-muted p-4 shadow-sm", sortable.isDragging && "opacity-70")}>
+    <div className="w-[min(82vw,320px)] shrink-0 md:w-[320px]" ref={sortable.setNodeRef} style={style}>
+      <Card className={cn("flex h-full min-h-[420px] flex-col border-border bg-surface-muted p-3 shadow-sm md:min-h-[500px] md:p-4", sortable.isDragging && "opacity-70")}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
@@ -923,7 +923,7 @@ function KanbanTaskCard({
 
 function TaskOverlay({ task }: { task: KanbanTask }) {
   return (
-    <div className="w-[320px]">
+    <div className="w-[min(82vw,320px)] md:w-[320px]">
       <Card className="border-ops shadow-2xl p-4 rotate-2">
         <PriorityBadge priority={task.priority} />
         <p className="mt-2 text-[14px] font-[600] text-text-primary leading-tight">{task.title}</p>
@@ -934,7 +934,7 @@ function TaskOverlay({ task }: { task: KanbanTask }) {
 
 function ColumnOverlay({ column, taskCount }: { column: KanbanColumn; taskCount: number }) {
   return (
-    <div className="w-[320px]">
+    <div className="w-[min(82vw,320px)] md:w-[320px]">
       <Card className="border-ops shadow-2xl p-4 rotate-2">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: column.color ?? "#94A3B8" }} />

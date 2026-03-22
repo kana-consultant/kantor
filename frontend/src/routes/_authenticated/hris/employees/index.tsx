@@ -70,6 +70,7 @@ function EmployeesPage() {
       header: "Employee",
       accessor: "full_name",
       sortable: true,
+      mobilePrimary: true,
       cell: (employee) => (
         <div className="flex items-center gap-3">
           <ProtectedAvatar
@@ -110,6 +111,7 @@ function EmployeesPage() {
       header: "Joined",
       accessor: "date_joined",
       sortable: true,
+      hideOnMobile: true,
       cell: (employee) => (
         <span className="text-sm text-text-secondary">
           {new Date(employee.date_joined).toLocaleDateString("id-ID")}
@@ -147,13 +149,13 @@ function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-8">
-        <div className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
+      <Card className="p-5 sm:p-6 lg:p-7">
+        <div className="flex flex-col gap-4 border-b border-border/80 pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-hr">
               HRIS directory
             </p>
-            <h3 className="text-[28px] font-[700] text-text-primary">Employees</h3>
+            <h3 className="text-[24px] font-[700] text-text-primary sm:text-[28px]">Employees</h3>
             <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-text-secondary">
               Employee otomatis terdaftar saat mendaftar akun. Kelola profil, departemen, dan status dari sini.
             </p>
@@ -162,6 +164,7 @@ function EmployeesPage() {
             <ExportButton
               endpoint="/hris/employees/export"
               filename="employees-report"
+              className="w-full sm:w-auto"
               filters={{
                 department: filters.department,
                 search: filters.search,
@@ -173,8 +176,8 @@ function EmployeesPage() {
         </div>
       </Card>
 
-      <Card className="p-6">
-        <div className="grid gap-4 md:grid-cols-4">
+      <Card className="p-4 sm:p-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Input
             onChange={(event) =>
               setFilters((current) => ({

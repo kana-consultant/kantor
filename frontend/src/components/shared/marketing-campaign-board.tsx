@@ -126,8 +126,8 @@ export function MarketingCampaignBoard({
       onDragStart={handleDragStart}
       sensors={sensors}
     >
-      <div className="overflow-x-auto pb-3">
-        <div className="flex min-w-max gap-5">
+      <div className="-mx-1 overflow-x-auto px-1 pb-3">
+        <div className="flex min-w-max gap-3 md:gap-5">
           {boardColumns.map((column) => (
             <CampaignLane column={column} key={column.id} onCampaignOpen={onCampaignOpen} />
           ))}
@@ -152,10 +152,10 @@ function CampaignLane({
   });
 
   return (
-    <div className="w-[320px] shrink-0">
+    <div className="w-[min(82vw,320px)] shrink-0 md:w-[320px]">
       <Card
         className={cn(
-          "flex min-h-[500px] flex-col border border-border bg-surface-muted p-4 shadow-sm transition-all",
+          "flex min-h-[420px] flex-col border border-border bg-surface-muted p-3 shadow-sm transition-all md:min-h-[500px] md:p-4",
           droppable.isOver && "border-mkt/50 shadow-card bg-mkt/5",
         )}
         ref={droppable.setNodeRef}
@@ -273,7 +273,7 @@ function CampaignOverlay({ campaign }: { campaign: Campaign }) {
   const ChannelIcon = channel.icon;
 
   return (
-    <div className="w-[320px]">
+    <div className="w-[min(82vw,320px)] md:w-[320px]">
       <Card className="border-mkt shadow-2xl p-4 rotate-2 rounded-[12px]">
         <div className={cn("inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-0.5 text-[11px] font-[700] uppercase tracking-wider", channel.badgeClassName)}>
           <ChannelIcon className="h-3.5 w-3.5" />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun, User } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -32,6 +32,8 @@ export function Topbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
+  const profileRef = useRef<HTMLDivElement | null>(null);
 
   const notificationsQuery = useQuery({
     queryKey: notificationsKeys.list({ page: 1, perPage: 8 }),
@@ -83,9 +85,37 @@ export function Topbar() {
     });
   };
 
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setIsNotificationsOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(target)) {
+        setIsProfileOpen(false);
+        setIsEditingPhone(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsNotificationsOpen(false);
+        setIsProfileOpen(false);
+        setIsEditingPhone(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   return (
-    <header className="sticky top-0 z-20 flex h-[56px] items-center justify-between gap-4 bg-transparent px-1">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-20 flex min-w-0 items-center justify-between gap-2 rounded-[20px] border border-border/70 bg-surface/88 px-2 py-2 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.3)] backdrop-blur-xl sm:gap-4 sm:px-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <Button
           aria-label="Open sidebar"
           className="lg:hidden"
@@ -105,21 +135,21 @@ export function Topbar() {
           {isDesktopCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
         </Button>
 
-        <div className="flex items-center gap-3">
-          <div className={cn("flex h-9 w-9 items-center justify-center rounded-md", breadcrumb.module.lightClassName)}>
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl shadow-inner", breadcrumb.module.lightClassName)}>
             <BreadcrumbIcon className={cn("h-5 w-5", breadcrumb.module.accentClassName)} />
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className={cn("font-semibold uppercase tracking-[0.08em]", breadcrumb.module.accentClassName)}>
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <span className={cn("hidden font-semibold uppercase tracking-[0.08em] sm:inline", breadcrumb.module.accentClassName)}>
               {breadcrumb.module.label}
             </span>
-            <span className="text-text-tertiary">/</span>
-            <span className="font-semibold text-text-primary">{breadcrumb.title}</span>
+            <span className="hidden text-text-tertiary sm:inline">/</span>
+            <span className="truncate font-semibold text-text-primary">{breadcrumb.title}</span>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <Button
           aria-label="Toggle theme"
           onClick={toggleTheme}
@@ -129,7 +159,7 @@ export function Topbar() {
           {mode === "dark" ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
         </Button>
 
-        <div className="relative">
+        <div className="relative" ref={notificationsRef}>
           <Button
             aria-label="Open notifications"
             onClick={() => {
@@ -148,7 +178,7 @@ export function Topbar() {
           </Button>
 
           {isNotificationsOpen ? (
-            <div className="absolute right-0 top-12 w-[320px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
+            <div className="absolute right-0 top-12 z-30 w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-[20px] border border-border/80 bg-surface/95 shadow-[0_24px_56px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <h3 className="text-sm font-semibold text-text-primary">Notifications</h3>
                 <button
@@ -203,9 +233,9 @@ export function Topbar() {
           ) : null}
         </div>
 
-        <div className="relative">
+        <div className="relative" ref={profileRef}>
           <button
-            className="flex items-center gap-3 rounded-full bg-surface px-2 py-1.5 shadow-xs transition hover:shadow-sm"
+            className="flex items-center gap-2 rounded-full border border-border/70 bg-surface/92 px-2 py-1.5 shadow-sm transition hover:border-border hover:shadow-md sm:gap-3"
             onClick={() => {
               setIsProfileOpen((value) => !value);
               setIsNotificationsOpen(false);
@@ -227,7 +257,7 @@ export function Topbar() {
           </button>
 
           {isProfileOpen ? (
-            <div className="absolute right-0 top-12 w-[280px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
+            <div className="absolute right-0 top-12 z-30 w-[min(280px,calc(100vw-1rem))] overflow-hidden rounded-[20px] border border-border/80 bg-surface/95 shadow-[0_24px_56px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200">
               <div className="border-b border-border px-4 py-4">
                 <p className="text-sm font-semibold text-text-primary">{user?.full_name ?? "Guest"}</p>
                 <p className="mt-1 text-xs text-text-secondary">{user?.email ?? "guest@kantor.local"}</p>

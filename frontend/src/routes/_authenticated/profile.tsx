@@ -378,6 +378,7 @@ function ProfilePage() {
           </label>
           <Input
             id="current_password"
+            autoComplete="current-password"
             placeholder="Masukkan password saat ini"
             type="password"
             {...registerPasswordField("current_password")}
@@ -393,6 +394,7 @@ function ProfilePage() {
           </label>
           <Input
             id="new_password"
+            autoComplete="new-password"
             placeholder="Minimal 8 karakter"
             type="password"
             {...registerPasswordField("new_password")}
@@ -408,6 +410,7 @@ function ProfilePage() {
           </label>
           <Input
             id="confirm_password"
+            autoComplete="new-password"
             placeholder="Ulangi password baru"
             type="password"
             {...registerPasswordField("confirm_password")}

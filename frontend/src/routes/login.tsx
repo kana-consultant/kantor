@@ -84,6 +84,7 @@ function LoginPage() {
             </label>
             <Input
               id="email"
+              autoComplete="email"
               placeholder="you@company.com"
               type="email"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
@@ -100,6 +101,7 @@ function LoginPage() {
             </label>
             <Input
               id="password"
+              autoComplete="current-password"
               placeholder="Masukkan password"
               type="password"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
