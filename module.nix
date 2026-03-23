@@ -115,7 +115,8 @@ in
       preStart = ''
         mkdir -p ${cfg.uploadsDir}
         ln -sfn ${backend}/share/kantor/migrations migrations
-        ln -sfn ${backend}/share/kantor/extension extension
+        rm -rf extension
+        cp -rL ${backend}/share/kantor/extension extension
       '';
 
       serviceConfig = {
