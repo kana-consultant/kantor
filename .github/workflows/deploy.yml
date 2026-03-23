@@ -48,12 +48,8 @@ jobs:
       - name: Push to Cachix
         run: cachix push kantor-kana ${{ steps.build.outputs.path }}
 
-  deploy:
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup SSH
+      - name: Deploy to server
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy-key
@@ -61,10 +57,7 @@ jobs:
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
           echo -e "Host *\n  IdentityFile ~/.ssh/deploy-key\n  StrictHostKeyChecking accept-new" > ~/.ssh/config
           chmod 600 ~/.ssh/config
-
-      - name: Deploy to server
-        run: |
+          nix copy --to ssh://root@${{ secrets.DEPLOY_HOST }} ${{ steps.build.outputs.path }}
           ssh root@${{ secrets.DEPLOY_HOST }} "\
-            nix-store -r ${{ needs.build.outputs.system-path }} && \
-            nix-env -p /nix/var/nix/profiles/system --set ${{ needs.build.outputs.system-path }} && \
-            ${{ needs.build.outputs.system-path }}/bin/switch-to-configuration switch"
+            nix-env -p /nix/var/nix/profiles/system --set ${{ steps.build.outputs.path }} && \
+            ${{ steps.build.outputs.path }}/bin/switch-to-configuration switch"

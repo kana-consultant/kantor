@@ -95,7 +95,12 @@ in
           then "https://${cfg.domain}"
           else "http://72.60.79.109:${toString cfg.listenPort}";
         SEED_SUPERADMIN_ENABLED = "false";
-        WAHA_ENABLED = "false";
+        WAHA_ENABLED = "true";
+        WAHA_MAX_DAILY_MESSAGES = "100";
+        WAHA_MIN_DELAY_MS = "1000";
+        WAHA_MAX_DELAY_MS = "3000";
+        WAHA_REMINDER_CRON = "0 8 * * 1-5";
+        WAHA_WEEKLY_DIGEST_CRON = "0 9 * * 1";
       };
 
       preStart = ''
