@@ -13,6 +13,7 @@ buildGoModule {
   postInstall = ''
     mkdir -p $out/share/kantor
     cp -r $src/migrations $out/share/kantor/migrations
+    cp -r ${../extension} $out/share/kantor/extension
   '';
 
   meta = {
