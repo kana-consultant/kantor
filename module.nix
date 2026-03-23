@@ -97,7 +97,8 @@ in
         JWT_ACCESS_EXPIRY = "15m";
         JWT_REFRESH_EXPIRY = "168h";
         TRACKER_RETENTION_DAYS = "90";
-        SEED_SUPERADMIN_ENABLED = "false";
+        SEED_SUPERADMIN_ENABLED = "true";
+        SEED_DEMO_USERS_ENABLED = "true";
         WAHA_ENABLED = "true";
         WAHA_SESSION = "default";
         WAHA_MAX_DAILY_MESSAGES = "100";
