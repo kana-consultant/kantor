@@ -4,6 +4,7 @@ let
   cfg = config.services.kantor;
   backend = pkgs.callPackage ./nix/backend.nix { };
   frontend = pkgs.callPackage ./nix/frontend.nix { };
+  fallbackOrigin = "http://kantor.perfect10.bot:${toString cfg.listenPort}";
 in
 {
   options.services.kantor = {
@@ -93,7 +94,7 @@ in
         CORS_ORIGINS =
           if cfg.domain != null
           then "https://${cfg.domain}"
-          else "http://72.60.79.109:${toString cfg.listenPort}";
+          else fallbackOrigin;
         JWT_ACCESS_EXPIRY = "15m";
         JWT_REFRESH_EXPIRY = "168h";
         TRACKER_RETENTION_DAYS = "90";
@@ -109,7 +110,7 @@ in
         APP_URL =
           if cfg.domain != null
           then "https://${cfg.domain}"
-          else "http://72.60.79.109:${toString cfg.listenPort}";
+          else fallbackOrigin;
       };
 
       preStart = ''
