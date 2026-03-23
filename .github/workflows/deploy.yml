@@ -19,6 +19,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            access-tokens = github.com=${{ secrets.GH_TOKEN }}
 
       - uses: cachix/cachix-action@v15
         with:
@@ -43,7 +46,7 @@ jobs:
           echo "path=$SYSTEM" >> "$GITHUB_OUTPUT"
 
       - name: Push to Cachix
-        run: cachix push kana-consultant ${{ steps.build.outputs.path }}
+        run: cachix push kantor-kana ${{ steps.build.outputs.path }}
 
   deploy:
     needs: build
