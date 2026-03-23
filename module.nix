@@ -161,7 +161,6 @@ in
       defaults.email = cfg.acmeEmail;
       certs.${cfg.domain} = {
         domain = cfg.domain;
-        extraDomainNames = [ "*.${cfg.domain}" ];
         group = "nginx";
         dnsProvider = "cloudflare";
         dnsResolver = "1.1.1.1:53";
@@ -179,7 +178,7 @@ in
       recommendedProxySettings = true;
 
       virtualHosts."kantor" = {
-        listen = [{ addr = "0.0.0.0"; port = cfg.listenPort; }];
+        listen = lib.mkIf (cfg.domain == null) [{ addr = "0.0.0.0"; port = cfg.listenPort; }];
         serverName = if cfg.domain != null then cfg.domain else "_";
         forceSSL = cfg.domain != null;
         useACMEHost = lib.mkIf (cfg.domain != null) cfg.domain;
@@ -221,6 +220,7 @@ in
       };
     };
 
-    networking.firewall.allowedTCPPorts = [ cfg.listenPort ];
+    networking.firewall.allowedTCPPorts =
+      if cfg.domain != null then [ 80 443 ] else [ cfg.listenPort ];
   };
 }
