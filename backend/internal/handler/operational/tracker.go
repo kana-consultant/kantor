@@ -3,6 +3,7 @@ package operational
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -210,6 +211,7 @@ func (h *TrackerHandler) getMyActivity(w http.ResponseWriter, r *http.Request) {
 func (h *TrackerHandler) downloadExtension(w http.ResponseWriter, r *http.Request) {
 	archiveBytes, filename, err := h.service.BuildExtensionArchive(r.Context())
 	if err != nil {
+		slog.Error("failed to build extension archive", "error", err)
 		response.WriteError(w, http.StatusInternalServerError, "TRACKER_EXTENSION_UNAVAILABLE", "Tracker extension package is not available right now", nil)
 		return
 	}
