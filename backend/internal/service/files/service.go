@@ -90,6 +90,9 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 			}
 			return ResolvedFile{}, err
 		}
+	case "profiles":
+		permission = ""
+		relativePath = filepath.Join("profiles", resourceID, filename)
 	default:
 		return ResolvedFile{}, ErrUnsupportedType
 	}

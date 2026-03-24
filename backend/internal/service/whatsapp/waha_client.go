@@ -70,6 +70,40 @@ func NewWAHAClient(cfg config.WAHAConfig) *WAHAClient {
 	}
 }
 
+// NewWAHAClientFromDBConfig creates a WAHAClient from the per-tenant DB config.
+func NewWAHAClientFromDBConfig(dbCfg WADBConfig) *WAHAClient {
+	return &WAHAClient{
+		cfg: config.WAHAConfig{
+			APIURL:           dbCfg.APIURL,
+			APIKey:           dbCfg.APIKey,
+			Session:          dbCfg.SessionName,
+			Enabled:          dbCfg.Enabled,
+			MaxDailyMessages: dbCfg.MaxDailyMessages,
+			MinDelayMS:       dbCfg.MinDelayMS,
+			MaxDelayMS:       dbCfg.MaxDelayMS,
+			ReminderCron:     dbCfg.ReminderCron,
+			WeeklyDigestCron: dbCfg.WeeklyDigestCron,
+		},
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		resetDate: today(),
+	}
+}
+
+// WADBConfig mirrors the per-tenant WA config stored in the database.
+type WADBConfig struct {
+	APIURL           string
+	APIKey           string
+	SessionName      string
+	Enabled          bool
+	MaxDailyMessages int
+	MinDelayMS       int
+	MaxDelayMS       int
+	ReminderCron     string
+	WeeklyDigestCron string
+}
+
 func (c *WAHAClient) IsEnabled() bool {
 	return c.cfg.Enabled
 }

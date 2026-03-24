@@ -25,6 +25,7 @@ type Handler struct {
 	cookieSecure  bool
 	cookiePath    string
 	refreshExpiry time.Duration
+	uploadsDir    string
 }
 
 func New(service *authservice.Service, cfg config.Config) *Handler {
@@ -34,6 +35,7 @@ func New(service *authservice.Service, cfg config.Config) *Handler {
 		cookieSecure:  cfg.AppEnv == "production",
 		cookiePath:    "/api/v1/auth",
 		refreshExpiry: cfg.JWTRefreshExpiry,
+		uploadsDir:    cfg.UploadsDir,
 	}
 }
 

@@ -4,17 +4,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 type OverviewRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
-func NewOverviewRepository(db *pgxpool.Pool) *OverviewRepository {
+func NewOverviewRepository(db repository.DBTX) *OverviewRepository {
 	return &OverviewRepository{db: db}
 }
 
@@ -23,11 +21,11 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 	defer cancel()
 	overview := model.OperationalOverview{}
 
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM projects`).Scan(&overview.TotalProjects); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM projects`).Scan(&overview.TotalProjects); err != nil {
 		return model.OperationalOverview{}, err
 	}
 
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COUNT(*)
 		FROM kanban_tasks
 		INNER JOIN kanban_columns ON kanban_columns.id = kanban_tasks.column_id
@@ -36,7 +34,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 		return model.OperationalOverview{}, err
 	}
 
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COUNT(*)
 		FROM kanban_tasks
 		INNER JOIN kanban_columns ON kanban_columns.id = kanban_tasks.column_id
@@ -47,7 +45,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 		return model.OperationalOverview{}, err
 	}
 
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(DISTINCT user_id) FROM project_members`).Scan(&overview.TeamMembers); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(DISTINCT user_id) FROM project_members`).Scan(&overview.TeamMembers); err != nil {
 		return model.OperationalOverview{}, err
 	}
 
@@ -70,7 +68,7 @@ func (r *OverviewRepository) listCompletedByWeek(ctx context.Context, now time.T
 	startOfCurrentWeek := startOfWeek(now)
 	startWindow := startOfCurrentWeek.AddDate(0, 0, -21)
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT DATE_TRUNC('week', kanban_tasks.updated_at)::date AS week_start, COUNT(*)::bigint
 		FROM kanban_tasks
 		INNER JOIN kanban_columns ON kanban_columns.id = kanban_tasks.column_id
@@ -112,7 +110,7 @@ func (r *OverviewRepository) listCompletedByWeek(ctx context.Context, now time.T
 }
 
 func (r *OverviewRepository) listRecentTasks(ctx context.Context) ([]model.OperationalRecentTask, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			kanban_tasks.id::text,
 			projects.id::text,

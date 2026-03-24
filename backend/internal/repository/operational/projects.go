@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
@@ -19,7 +17,7 @@ var (
 )
 
 type ProjectsRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type ListProjectsParams struct {
@@ -60,7 +58,7 @@ type ProjectMemberAssignment struct {
 	RoleInProject string
 }
 
-func NewProjectsRepository(db *pgxpool.Pool) *ProjectsRepository {
+func NewProjectsRepository(db repository.DBTX) *ProjectsRepository {
 	return &ProjectsRepository{db: db}
 }
 
@@ -74,7 +72,7 @@ func (r *ProjectsRepository) CreateProject(ctx context.Context, params CreatePro
 	`
 
 	var project model.Project
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		params.Name,
@@ -131,7 +129,7 @@ func (r *ProjectsRepository) ListProjects(ctx context.Context, params ListProjec
 
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM projects WHERE %s`, whereClause)
 	var total int64
-	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -158,7 +156,7 @@ func (r *ProjectsRepository) ListProjects(ctx context.Context, params ListProjec
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
-	rows, err := r.db.Query(ctx, listQuery, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, listQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -216,7 +214,7 @@ func (r *ProjectsRepository) GetProjectByID(ctx context.Context, projectID strin
 	`
 
 	var project model.Project
-	err := r.db.QueryRow(ctx, query, projectID).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, projectID).Scan(
 		&project.ID,
 		&project.Name,
 		&project.Description,
@@ -264,7 +262,7 @@ func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string
 	`
 
 	var project model.Project
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		projectID,
@@ -301,7 +299,7 @@ func (r *ProjectsRepository) UpdateProject(ctx context.Context, projectID string
 func (r *ProjectsRepository) DeleteProject(ctx context.Context, projectID string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	commandTag, err := r.db.Exec(ctx, `DELETE FROM projects WHERE id = $1::uuid`, projectID)
+	commandTag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM projects WHERE id = $1::uuid`, projectID)
 	if err != nil {
 		return err
 	}
@@ -331,7 +329,7 @@ func (r *ProjectsRepository) ListProjectMembers(ctx context.Context, projectID s
 		ORDER BY project_members.assigned_at ASC
 	`
 
-	rows, err := r.db.Query(ctx, query, projectID)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -381,10 +379,10 @@ func (r *ProjectsRepository) MutateProjectMember(ctx context.Context, projectID 
 			ON CONFLICT (project_id, user_id)
 			DO UPDATE SET role_in_project = EXCLUDED.role_in_project, assigned_at = NOW()
 		`
-		_, err := r.db.Exec(ctx, query, projectID, userID, params.RoleInProject)
+		_, err := repository.DB(ctx, r.db).Exec(ctx, query, projectID, userID, params.RoleInProject)
 		return err
 	case "remove":
-		_, err := r.db.Exec(ctx, `DELETE FROM project_members WHERE project_id = $1::uuid AND user_id = $2::uuid`, projectID, userID)
+		_, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM project_members WHERE project_id = $1::uuid AND user_id = $2::uuid`, projectID, userID)
 		return err
 	default:
 		return fmt.Errorf("unsupported project member operation")
@@ -392,14 +390,14 @@ func (r *ProjectsRepository) MutateProjectMember(ctx context.Context, projectID 
 }
 
 func (r *ProjectsRepository) AdvanceCursor(ctx context.Context, projectID string, newCursor int) error {
-	_, err := r.db.Exec(ctx,
+	_, err := repository.DB(ctx, r.db).Exec(ctx,
 		`UPDATE projects SET auto_assign_cursor = $2 WHERE id = $1::uuid`,
 		projectID, newCursor)
 	return err
 }
 
 func (r *ProjectsRepository) ListMemberIDsOrdered(ctx context.Context, projectID string) ([]string, error) {
-	rows, err := r.db.Query(ctx,
+	rows, err := repository.DB(ctx, r.db).Query(ctx,
 		`SELECT user_id::text FROM project_members WHERE project_id = $1::uuid ORDER BY assigned_at ASC, user_id ASC`,
 		projectID)
 	if err != nil {
@@ -419,7 +417,7 @@ func (r *ProjectsRepository) ListMemberIDsOrdered(ctx context.Context, projectID
 }
 
 func (r *ProjectsRepository) GetMemberWorkloads(ctx context.Context, projectID string) ([]MemberWorkload, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			pm.user_id::text,
 			COALESCE((SELECT COUNT(*) FROM kanban_tasks WHERE assignee_id = pm.user_id AND project_id = pm.project_id), 0)::int AS workload
@@ -456,7 +454,7 @@ type AvailableUser struct {
 }
 
 func (r *ProjectsRepository) ListActiveUsers(ctx context.Context) ([]AvailableUser, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT id::text, email, full_name, avatar_url
 		FROM users
 		WHERE is_active = TRUE
@@ -484,7 +482,7 @@ func (r *ProjectsRepository) BulkAssignMembers(ctx context.Context, projectID st
 		if err != nil {
 			continue // skip users that don't exist
 		}
-		_, err = r.db.Exec(ctx, `
+		_, err = repository.DB(ctx, r.db).Exec(ctx, `
 			INSERT INTO project_members (project_id, user_id, role_in_project)
 			VALUES ($1::uuid, $2::uuid, $3)
 			ON CONFLICT (project_id, user_id) DO NOTHING
@@ -507,7 +505,7 @@ func (r *ProjectsRepository) BulkAssignMembersWithRoles(ctx context.Context, pro
 		if err != nil {
 			continue
 		}
-		_, err = r.db.Exec(ctx, `
+		_, err = repository.DB(ctx, r.db).Exec(ctx, `
 			INSERT INTO project_members (project_id, user_id, role_in_project)
 			VALUES ($1::uuid, $2::uuid, $3)
 			ON CONFLICT (project_id, user_id)
@@ -522,7 +520,7 @@ func (r *ProjectsRepository) BulkAssignMembersWithRoles(ctx context.Context, pro
 
 func (r *ProjectsRepository) countProjectMembers(ctx context.Context, projectID string) int {
 	var count int
-	_ = r.db.QueryRow(ctx, `SELECT COUNT(*) FROM project_members WHERE project_id = $1::uuid`, projectID).Scan(&count)
+	_ = repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM project_members WHERE project_id = $1::uuid`, projectID).Scan(&count)
 	return count
 }
 
@@ -559,7 +557,7 @@ func (r *ProjectsRepository) resolveProjectMemberUserID(ctx context.Context, use
 	}
 
 	var resolvedUserID string
-	if err := r.db.QueryRow(ctx, `SELECT id::text FROM users WHERE email = $1`, trimmedEmail).Scan(&resolvedUserID); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT id::text FROM users WHERE email = $1`, trimmedEmail).Scan(&resolvedUserID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrProjectMemberNotFound
 		}

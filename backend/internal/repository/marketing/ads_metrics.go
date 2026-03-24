@@ -9,7 +9,6 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -21,7 +20,7 @@ var (
 )
 
 type AdsMetricsRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type UpsertAdsMetricParams struct {
@@ -58,7 +57,7 @@ type AdsMetricsExportParams struct {
 	DateTo   string
 }
 
-func NewAdsMetricsRepository(db *pgxpool.Pool) *AdsMetricsRepository {
+func NewAdsMetricsRepository(db repository.DBTX) *AdsMetricsRepository {
 	return &AdsMetricsRepository{db: db}
 }
 
@@ -66,7 +65,7 @@ func (r *AdsMetricsRepository) CreateMetric(ctx context.Context, params UpsertAd
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	row := r.db.QueryRow(
+	row := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`
 			INSERT INTO ads_metrics (
@@ -102,7 +101,7 @@ func (r *AdsMetricsRepository) BatchCreateMetrics(ctx context.Context, params []
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +191,7 @@ func (r *AdsMetricsRepository) ListMetrics(ctx context.Context, params ListAdsMe
 	whereClause := strings.Join(filters, " AND ")
 
 	var total int64
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM ads_metrics WHERE `+whereClause, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM ads_metrics WHERE `+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -222,7 +221,7 @@ func (r *AdsMetricsRepository) ListMetrics(ctx context.Context, params ListAdsMe
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -263,7 +262,7 @@ func (r *AdsMetricsRepository) GetMetricByID(ctx context.Context, metricID strin
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	row := r.db.QueryRow(
+	row := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`
 			SELECT
@@ -323,7 +322,7 @@ func (r *AdsMetricsRepository) UpdateMetric(ctx context.Context, metricID string
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	row := r.db.QueryRow(
+	row := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`
 			UPDATE ads_metrics
@@ -367,7 +366,7 @@ func (r *AdsMetricsRepository) DeleteMetric(ctx context.Context, metricID string
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(ctx, `DELETE FROM ads_metrics WHERE id = $1::uuid`, metricID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM ads_metrics WHERE id = $1::uuid`, metricID)
 	if err != nil {
 		return err
 	}
@@ -431,7 +430,7 @@ func (r *AdsMetricsRepository) Summary(ctx context.Context, params AdsMetricsSum
 		GROUP BY ` + groupBy + `
 		ORDER BY ` + orderBy
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return model.AdsMetricsSummary{}, err
 	}
@@ -508,7 +507,7 @@ func (r *AdsMetricsRepository) ListForExport(ctx context.Context, params AdsMetr
 		ORDER BY ads_metrics.period_start DESC, ads_metrics.created_at DESC
 	`
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +574,7 @@ func (r *AdsMetricsRepository) scanMetricRow(row pgx.Row) (model.AdsMetric, erro
 
 func (r *AdsMetricsRepository) hydrateCampaignName(ctx context.Context, item model.AdsMetric) (model.AdsMetric, error) {
 	var campaignName string
-	if err := r.db.QueryRow(ctx, `SELECT name FROM campaigns WHERE id = $1::uuid`, item.CampaignID).Scan(&campaignName); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT name FROM campaigns WHERE id = $1::uuid`, item.CampaignID).Scan(&campaignName); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.AdsMetric{}, ErrAdsMetricCampaignMissing
 		}

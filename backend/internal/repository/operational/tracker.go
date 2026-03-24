@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
@@ -49,10 +47,10 @@ type UpsertDomainCategoryParams struct {
 }
 
 type TrackerRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
-func NewTrackerRepository(db *pgxpool.Pool) *TrackerRepository {
+func NewTrackerRepository(db repository.DBTX) *TrackerRepository {
 	return &TrackerRepository{db: db}
 }
 
@@ -64,7 +62,7 @@ func (r *TrackerRepository) GetConsent(ctx context.Context, userID string) (mode
 	var consentedAt sql.NullTime
 	var revokedAt sql.NullTime
 	var ipAddress sql.NullString
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT id::text, user_id::text, consented, consented_at, revoked_at, ip_address, created_at
 		FROM activity_consents
 		WHERE user_id = $1::uuid
@@ -99,7 +97,7 @@ func (r *TrackerRepository) UpsertConsent(ctx context.Context, userID string, co
 	var consentedAt sql.NullTime
 	var revokedAt sql.NullTime
 	var ipAddressValue sql.NullString
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		INSERT INTO activity_consents (user_id, consented, consented_at, revoked_at, ip_address)
 		VALUES (
 			$1::uuid,
@@ -108,7 +106,7 @@ func (r *TrackerRepository) UpsertConsent(ctx context.Context, userID string, co
 			CASE WHEN $2 THEN NULL::timestamptz ELSE $3::timestamptz END,
 			NULLIF($4, '')
 		)
-		ON CONFLICT (user_id) DO UPDATE
+		ON CONFLICT (tenant_id, user_id) DO UPDATE
 		SET
 			consented = EXCLUDED.consented,
 			consented_at = CASE WHEN EXCLUDED.consented THEN EXCLUDED.consented_at ELSE activity_consents.consented_at END,
@@ -140,7 +138,7 @@ func (r *TrackerRepository) StartSession(ctx context.Context, userID string, sta
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return model.ActivitySession{}, err
 	}
@@ -213,7 +211,7 @@ func (r *TrackerRepository) EndSession(ctx context.Context, userID string, sessi
 	defer cancel()
 
 	var session model.ActivitySession
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		UPDATE activity_sessions
 		SET end_time = $3, is_active = FALSE, updated_at = $3
 		WHERE id = $1::uuid AND user_id = $2::uuid
@@ -244,7 +242,7 @@ func (r *TrackerRepository) RecordHeartbeat(ctx context.Context, params TrackerH
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return model.ActivityEntry{}, model.ActivitySession{}, err
 	}
@@ -309,13 +307,13 @@ func (r *TrackerRepository) GetActivityOverview(ctx context.Context, userID stri
 		TopDomains:        make([]model.TrackerTopDomain, 0),
 	}
 
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT full_name FROM users WHERE id = $1::uuid
 	`, userID).Scan(&overview.UserName); err != nil {
 		return model.TrackerActivityOverview{}, err
 	}
 
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COALESCE(SUM(total_active_seconds), 0), COALESCE(SUM(total_idle_seconds), 0)
 		FROM activity_sessions
 		WHERE user_id = $1::uuid
@@ -360,7 +358,7 @@ func (r *TrackerRepository) GetTeamActivity(ctx context.Context, activityRange T
 	}
 	whereClause := strings.Join(filters, " AND ")
 
-	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+	rows, err := repository.DB(ctx, r.db).Query(ctx, fmt.Sprintf(`
 		WITH session_totals AS (
 			SELECT s.user_id::text, COALESCE(SUM(s.total_active_seconds), 0)::bigint AS active_seconds, COALESCE(SUM(s.total_idle_seconds), 0)::bigint AS idle_seconds
 			FROM activity_sessions s
@@ -431,7 +429,7 @@ func (r *TrackerRepository) GetTeamActivity(ctx context.Context, activityRange T
 		return model.TrackerTeamOverview{}, err
 	}
 
-	breakdownRows, err := r.db.Query(ctx, fmt.Sprintf(`
+	breakdownRows, err := repository.DB(ctx, r.db).Query(ctx, fmt.Sprintf(`
 		SELECT e.user_id::text, e.category, COALESCE(SUM(e.duration_seconds), 0)::bigint
 		FROM activity_entries e
 		WHERE e.started_at::date BETWEEN $1::date AND $2::date
@@ -490,7 +488,7 @@ func (r *TrackerRepository) GetDailySummary(ctx context.Context, date time.Time)
 		TopUnproductiveDomains: make([]model.TrackerTopDomain, 0),
 	}
 
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COUNT(DISTINCT user_id)::bigint, COALESCE(AVG(total_active_seconds), 0)::bigint
 		FROM activity_sessions
 		WHERE date = $1::date
@@ -516,7 +514,7 @@ func (r *TrackerRepository) ListDomainCategories(ctx context.Context) ([]model.D
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT id::text, domain_pattern, category, is_productive, created_at
 		FROM domain_categories
 		ORDER BY domain_pattern ASC
@@ -542,7 +540,7 @@ func (r *TrackerRepository) ListConsentAudit(ctx context.Context) ([]model.Track
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			u.id::text,
 			u.full_name,
@@ -601,7 +599,7 @@ func (r *TrackerRepository) CreateDomainCategory(ctx context.Context, params Ups
 	defer cancel()
 
 	var item model.DomainCategory
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		INSERT INTO domain_categories (domain_pattern, category, is_productive)
 		VALUES ($1, $2, $3)
 		RETURNING id::text, domain_pattern, category, is_productive, created_at
@@ -620,7 +618,7 @@ func (r *TrackerRepository) UpdateDomainCategory(ctx context.Context, domainID s
 	defer cancel()
 
 	var item model.DomainCategory
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		UPDATE domain_categories
 		SET domain_pattern = $2, category = $3, is_productive = $4
 		WHERE id = $1::uuid
@@ -645,7 +643,7 @@ func (r *TrackerRepository) DeleteDomainCategory(ctx context.Context, domainID s
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(ctx, `DELETE FROM domain_categories WHERE id = $1::uuid`, domainID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM domain_categories WHERE id = $1::uuid`, domainID)
 	if err != nil {
 		return err
 	}
@@ -659,7 +657,7 @@ func (r *TrackerRepository) PurgeOldSessions(ctx context.Context, cutoff time.Ti
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(ctx, `
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `
 		DELETE FROM activity_sessions
 		WHERE date < $1::date
 	`, cutoff.UTC().Format("2006-01-02"))
@@ -829,7 +827,7 @@ func (r *TrackerRepository) updateSessionAfterHeartbeat(ctx context.Context, tx 
 
 func (r *TrackerRepository) getProductiveSeconds(ctx context.Context, userID string, activityRange TrackerActivityRange) (int64, error) {
 	var productiveSeconds int64
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COALESCE(SUM(e.duration_seconds) FILTER (WHERE COALESCE(dc.is_productive, FALSE)), 0)::bigint
 		FROM activity_entries e
 		LEFT JOIN LATERAL (
@@ -846,7 +844,7 @@ func (r *TrackerRepository) getProductiveSeconds(ctx context.Context, userID str
 }
 
 func (r *TrackerRepository) listCategoryBreakdown(ctx context.Context, userID string, activityRange TrackerActivityRange) ([]model.TrackerCategoryBreakdown, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			e.category,
 			COALESCE(SUM(e.duration_seconds), 0)::bigint AS duration_seconds,
@@ -881,7 +879,7 @@ func (r *TrackerRepository) listCategoryBreakdown(ctx context.Context, userID st
 }
 
 func (r *TrackerRepository) listHourlyBreakdown(ctx context.Context, userID string, activityRange TrackerActivityRange) ([]model.TrackerHourlyBreakdown, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT EXTRACT(HOUR FROM started_at)::int AS hour_value, COALESCE(SUM(duration_seconds), 0)::bigint
 		FROM activity_entries
 		WHERE user_id = $1::uuid
@@ -919,7 +917,7 @@ func (r *TrackerRepository) listHourlyBreakdown(ctx context.Context, userID stri
 }
 
 func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, activityRange TrackerActivityRange, limit int) ([]model.TrackerTopDomain, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			e.domain,
 			COALESCE(MAX(dc.category), 'uncategorized') AS category,
@@ -945,7 +943,7 @@ func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, a
 	defer rows.Close()
 
 	var totalActive int64
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COALESCE(SUM(total_active_seconds), 0)::bigint
 		FROM activity_sessions
 		WHERE user_id = $1::uuid AND date BETWEEN $2::date AND $3::date
@@ -968,7 +966,7 @@ func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, a
 }
 
 func (r *TrackerRepository) listDomainsByProductivity(ctx context.Context, date time.Time, productive bool) ([]model.TrackerTopDomain, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			e.domain,
 			COALESCE(MAX(dc.category), 'uncategorized') AS category,

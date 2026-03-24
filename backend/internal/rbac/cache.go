@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
+	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
 
 type ModuleRole struct {
@@ -36,11 +37,11 @@ func (c *CachedPermissions) PermissionList() []string {
 type PermissionCache struct {
 	mu    sync.RWMutex
 	store map[string]*CachedPermissions
-	db    *pgxpool.Pool
+	db    repository.DBTX
 	ttl   time.Duration
 }
 
-func NewPermissionCache(db *pgxpool.Pool, ttl time.Duration) *PermissionCache {
+func NewPermissionCache(db repository.DBTX, ttl time.Duration) *PermissionCache {
 	if ttl <= 0 {
 		ttl = 5 * time.Minute
 	}
@@ -52,9 +53,17 @@ func NewPermissionCache(db *pgxpool.Pool, ttl time.Duration) *PermissionCache {
 	}
 }
 
-func (c *PermissionCache) Get(userID string) *CachedPermissions {
+func (c *PermissionCache) cacheKey(ctx context.Context, userID string) string {
+	if info, ok := tenant.FromContext(ctx); ok {
+		return info.ID + ":" + userID
+	}
+	return userID
+}
+
+func (c *PermissionCache) Get(ctx context.Context, userID string) *CachedPermissions {
+	key := c.cacheKey(ctx, userID)
 	c.mu.RLock()
-	cached := c.store[userID]
+	cached := c.store[key]
 	c.mu.RUnlock()
 
 	if cached == nil {
@@ -62,7 +71,7 @@ func (c *PermissionCache) Get(userID string) *CachedPermissions {
 	}
 
 	if time.Since(cached.CachedAt) > cached.TTL {
-		c.Invalidate(userID)
+		c.InvalidateKey(key)
 		return nil
 	}
 
@@ -70,12 +79,14 @@ func (c *PermissionCache) Get(userID string) *CachedPermissions {
 }
 
 func (c *PermissionCache) Load(ctx context.Context, userID string) (*CachedPermissions, error) {
-	if cached := c.Get(userID); cached != nil {
+	if cached := c.Get(ctx, userID); cached != nil {
 		return cached, nil
 	}
 
+	db := repository.DB(ctx, c.db)
+
 	var isSuperAdmin bool
-	if err := c.db.QueryRow(ctx, `SELECT is_super_admin FROM users WHERE id = $1::uuid`, userID).Scan(&isSuperAdmin); err != nil {
+	if err := db.QueryRow(ctx, `SELECT is_super_admin FROM users WHERE id = $1::uuid`, userID).Scan(&isSuperAdmin); err != nil {
 		return nil, fmt.Errorf("load super admin flag: %w", err)
 	}
 
@@ -88,7 +99,7 @@ func (c *PermissionCache) Load(ctx context.Context, userID string) (*CachedPermi
 	}
 
 	if !isSuperAdmin {
-		roleRows, err := c.db.Query(ctx, `
+		roleRows, err := db.Query(ctx, `
 			SELECT umr.module_id, r.id::text, r.slug, r.name
 			FROM user_module_roles umr
 			INNER JOIN roles r ON r.id = umr.role_id
@@ -114,7 +125,7 @@ func (c *PermissionCache) Load(ctx context.Context, userID string) (*CachedPermi
 		}
 		roleRows.Close()
 
-		permissionRows, err := c.db.Query(ctx, `
+		permissionRows, err := db.Query(ctx, `
 			SELECT DISTINCT p.id
 			FROM user_module_roles umr
 			INNER JOIN roles r ON r.id = umr.role_id
@@ -143,16 +154,21 @@ func (c *PermissionCache) Load(ctx context.Context, userID string) (*CachedPermi
 		permissionRows.Close()
 	}
 
+	key := c.cacheKey(ctx, userID)
 	c.mu.Lock()
-	c.store[userID] = cached
+	c.store[key] = cached
 	c.mu.Unlock()
 
 	return cached, nil
 }
 
-func (c *PermissionCache) Invalidate(userID string) {
+func (c *PermissionCache) Invalidate(ctx context.Context, userID string) {
+	c.InvalidateKey(c.cacheKey(ctx, userID))
+}
+
+func (c *PermissionCache) InvalidateKey(key string) {
 	c.mu.Lock()
-	delete(c.store, userID)
+	delete(c.store, key)
 	c.mu.Unlock()
 }
 

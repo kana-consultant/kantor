@@ -12,6 +12,7 @@ import (
 
 type Principal struct {
 	UserID       string
+	TenantID     string
 	IsSuperAdmin bool
 	Roles        []string
 	Permissions  []string
@@ -63,6 +64,7 @@ func AuthMiddleware(
 
 			principal := Principal{
 				UserID:       claims.Subject,
+				TenantID:     claims.TenantID,
 				IsSuperAdmin: cachedPermissions.IsSuperAdmin,
 				Roles:        roles,
 				Permissions:  cachedPermissions.PermissionList(),

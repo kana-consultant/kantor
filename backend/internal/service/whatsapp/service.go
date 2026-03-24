@@ -3,13 +3,16 @@ package whatsapp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
+	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
 
 var (
@@ -19,43 +22,145 @@ var (
 )
 
 type Service struct {
-	repo   *warepo.Repository
-	client *WAHAClient
-	cfg    config.Config
+	repo *warepo.Repository
+	cfg  config.Config
+
+	mu      sync.RWMutex
+	clients map[string]*WAHAClient // tenantID → cached client
 }
 
-func NewService(repo *warepo.Repository, client *WAHAClient, cfg config.Config) *Service {
-	return &Service{repo: repo, client: client, cfg: cfg}
+func NewService(repo *warepo.Repository, cfg config.Config) *Service {
+	return &Service{
+		repo:    repo,
+		cfg:     cfg,
+		clients: make(map[string]*WAHAClient),
+	}
+}
+
+// getClient returns (or creates) the per-tenant WAHAClient.
+func (s *Service) getClient(ctx context.Context) (*WAHAClient, error) {
+	info, ok := tenant.FromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("tenant context required for WA client")
+	}
+
+	s.mu.RLock()
+	if c, exists := s.clients[info.ID]; exists {
+		s.mu.RUnlock()
+		return c, nil
+	}
+	s.mu.RUnlock()
+
+	dbCfg, err := s.repo.GetWAConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load wa config: %w", err)
+	}
+
+	client := NewWAHAClientFromDBConfig(WADBConfig{
+		APIURL:           dbCfg.APIURL,
+		APIKey:           dbCfg.APIKey,
+		SessionName:      dbCfg.SessionName,
+		Enabled:          dbCfg.Enabled,
+		MaxDailyMessages: dbCfg.MaxDailyMessages,
+		MinDelayMS:       dbCfg.MinDelayMS,
+		MaxDelayMS:       dbCfg.MaxDelayMS,
+		ReminderCron:     dbCfg.ReminderCron,
+		WeeklyDigestCron: dbCfg.WeeklyDigestCron,
+	})
+
+	s.mu.Lock()
+	if existing, exists := s.clients[info.ID]; exists {
+		s.mu.Unlock()
+		return existing, nil
+	}
+	s.clients[info.ID] = client
+	s.mu.Unlock()
+
+	return client, nil
+}
+
+// InvalidateClient removes the cached client for the current tenant (e.g. after config update).
+func (s *Service) InvalidateClient(ctx context.Context) {
+	info, ok := tenant.FromContext(ctx)
+	if !ok {
+		return
+	}
+	s.mu.Lock()
+	delete(s.clients, info.ID)
+	s.mu.Unlock()
+}
+
+// --------------- WA Config ---------------
+
+func (s *Service) GetWAConfig(ctx context.Context) (warepo.WAConfig, error) {
+	return s.repo.GetWAConfig(ctx)
+}
+
+func (s *Service) UpdateWAConfig(ctx context.Context, cfg warepo.WAConfig) error {
+	if err := s.repo.UpsertWAConfig(ctx, cfg); err != nil {
+		return err
+	}
+	// Invalidate cached client so next call picks up new config.
+	s.InvalidateClient(ctx)
+	return nil
 }
 
 // --------------- Connection ---------------
 
-func (s *Service) GetStatus() (*SessionStatus, error) {
-	return s.client.GetStatus()
+func (s *Service) GetStatus(ctx context.Context) (*SessionStatus, error) {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return client.GetStatus()
 }
 
-func (s *Service) GetQR() (string, error) {
-	return s.client.GetQR()
+func (s *Service) GetQR(ctx context.Context) (string, error) {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return "", err
+	}
+	return client.GetQR()
 }
 
-func (s *Service) StartSession() error {
-	return s.client.StartSession()
+func (s *Service) StartSession(ctx context.Context) error {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return err
+	}
+	return client.StartSession()
 }
 
-func (s *Service) StopSession() error {
-	return s.client.StopSession()
+func (s *Service) StopSession(ctx context.Context) error {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return err
+	}
+	return client.StopSession()
 }
 
-func (s *Service) GetAccountInfo() (*AccountInfo, error) {
-	return s.client.GetAccountInfo()
+func (s *Service) GetAccountInfo(ctx context.Context) (*AccountInfo, error) {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return client.GetAccountInfo()
 }
 
-func (s *Service) IsEnabled() bool {
-	return s.client.IsEnabled()
+func (s *Service) IsEnabled(ctx context.Context) bool {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return false
+	}
+	return client.IsEnabled()
 }
 
-func (s *Service) GetDailyStats() *DailyStats {
-	return s.client.GetDailyStats()
+func (s *Service) GetDailyStats(ctx context.Context) *DailyStats {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return &DailyStats{}
+	}
+	return client.GetDailyStats()
 }
 
 // --------------- Templates ---------------
@@ -167,15 +272,22 @@ func (s *Service) GetLogSummary(ctx context.Context, date string) (model.WALogSu
 	if err != nil {
 		return summary, err
 	}
-	summary.DailyLimit = s.cfg.WAHA.MaxDailyMessages
+	client, clientErr := s.getClient(ctx)
+	if clientErr == nil {
+		summary.DailyLimit = client.GetDailyStats().DailyLimit
+	}
 	return summary, nil
 }
 
 // --------------- Quick Send ---------------
 
 func (s *Service) QuickSend(ctx context.Context, phone string, message string) error {
+	client, clientErr := s.getClient(ctx)
+	if clientErr != nil {
+		return clientErr
+	}
 	normalized := NormalizePhone(phone)
-	err := s.client.SendMessage(normalized, message)
+	err := client.SendMessage(normalized, message)
 
 	status := "sent"
 	errMsg := (*string)(nil)
@@ -288,7 +400,13 @@ func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimb
 func (s *Service) sendAndLog(ctx context.Context, phone string, body string, triggerType string,
 	templateID *string, templateSlug *string, userID *string, refType *string, refID *string) {
 
-	err := s.client.SendMessage(phone, body)
+	var err error
+	client, clientErr := s.getClient(ctx)
+	if clientErr != nil {
+		err = clientErr
+	} else {
+		err = client.SendMessage(phone, body)
+	}
 
 	status := "sent"
 	errMsg := (*string)(nil)

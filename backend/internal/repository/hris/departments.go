@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -20,7 +19,7 @@ var (
 )
 
 type DepartmentsRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type UpsertDepartmentParams struct {
@@ -29,7 +28,7 @@ type UpsertDepartmentParams struct {
 	HeadID      *string
 }
 
-func NewDepartmentsRepository(db *pgxpool.Pool) *DepartmentsRepository {
+func NewDepartmentsRepository(db repository.DBTX) *DepartmentsRepository {
 	return &DepartmentsRepository{db: db}
 }
 
@@ -47,7 +46,7 @@ func (r *DepartmentsRepository) CreateDepartment(ctx context.Context, params Ups
 	`
 
 	var department model.Department
-	err := r.db.QueryRow(ctx, query, strings.TrimSpace(params.Name), nullableString(params.Description), nullableUUID(params.HeadID)).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, strings.TrimSpace(params.Name), nullableString(params.Description), nullableUUID(params.HeadID)).Scan(
 		&department.ID,
 		&department.Name,
 		&department.Description,
@@ -77,7 +76,7 @@ func (r *DepartmentsRepository) ListDepartments(ctx context.Context) ([]model.De
 		ORDER BY departments.name ASC
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +122,7 @@ func (r *DepartmentsRepository) GetDepartmentByID(ctx context.Context, departmen
 	`
 
 	var department model.Department
-	err := r.db.QueryRow(ctx, query, departmentID).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, departmentID).Scan(
 		&department.ID,
 		&department.Name,
 		&department.Description,
@@ -160,7 +159,7 @@ func (r *DepartmentsRepository) UpdateDepartment(ctx context.Context, department
 	`
 
 	var department model.Department
-	err := r.db.QueryRow(ctx, query, departmentID, strings.TrimSpace(params.Name), nullableString(params.Description), nullableUUID(params.HeadID)).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, departmentID, strings.TrimSpace(params.Name), nullableString(params.Description), nullableUUID(params.HeadID)).Scan(
 		&department.ID,
 		&department.Name,
 		&department.Description,
@@ -182,7 +181,7 @@ func (r *DepartmentsRepository) DeleteDepartment(ctx context.Context, department
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	var deletedName string
-	err := r.db.QueryRow(ctx, `DELETE FROM departments WHERE id = $1::uuid RETURNING name`, departmentID).Scan(&deletedName)
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `DELETE FROM departments WHERE id = $1::uuid RETURNING name`, departmentID).Scan(&deletedName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrDepartmentNotFound
@@ -200,7 +199,7 @@ func (r *DepartmentsRepository) ensureHeadEmployeeExists(ctx context.Context, he
 	}
 
 	var exists bool
-	if err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM employees WHERE id = $1::uuid)`, strings.TrimSpace(*headID)).Scan(&exists); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM employees WHERE id = $1::uuid)`, strings.TrimSpace(*headID)).Scan(&exists); err != nil {
 		return err
 	}
 

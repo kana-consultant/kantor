@@ -8,11 +8,12 @@ import (
 	"strings"
 
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 func (r *Repository) GetDefaultRoleAssignments(ctx context.Context) ([]rbac.RoleKey, error) {
 	var raw []byte
-	if err := r.db.QueryRow(ctx, `SELECT value FROM system_settings WHERE key = 'default_roles'`).Scan(&raw); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT value FROM system_settings WHERE key = 'default_roles'`).Scan(&raw); err != nil {
 		return nil, err
 	}
 
@@ -35,7 +36,7 @@ func (r *Repository) GetDefaultRoleAssignments(ctx context.Context) ([]rbac.Role
 		}
 
 		var roleSlug string
-		if err := r.db.QueryRow(ctx, `SELECT slug FROM roles WHERE id = $1::uuid`, strings.TrimSpace(*roleID)).Scan(&roleSlug); err != nil {
+		if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT slug FROM roles WHERE id = $1::uuid`, strings.TrimSpace(*roleID)).Scan(&roleSlug); err != nil {
 			return nil, fmt.Errorf("resolve default role for module %s: %w", moduleID, err)
 		}
 
@@ -49,7 +50,7 @@ func (r *Repository) GetDefaultRoleAssignments(ctx context.Context) ([]rbac.Role
 }
 
 func (r *Repository) GetUserModuleRoles(ctx context.Context, userID string) (map[string]rbac.ModuleRole, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT umr.module_id, r.id::text, r.slug, r.name
 		FROM user_module_roles umr
 		INNER JOIN roles r ON r.id = umr.role_id
@@ -76,7 +77,7 @@ func (r *Repository) GetUserModuleRoles(ctx context.Context, userID string) (map
 }
 
 func (r *Repository) GetEffectivePermissions(ctx context.Context, userID string) ([]string, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT DISTINCT p.id
 		FROM user_module_roles umr
 		INNER JOIN roles r ON r.id = umr.role_id

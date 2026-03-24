@@ -10,7 +10,6 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -24,7 +23,7 @@ var (
 )
 
 type EmployeesRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type ListEmployeesParams struct {
@@ -52,7 +51,7 @@ type UpsertEmployeeParams struct {
 	SSHKeys           *string
 }
 
-func NewEmployeesRepository(db *pgxpool.Pool) *EmployeesRepository {
+func NewEmployeesRepository(db repository.DBTX) *EmployeesRepository {
 	return &EmployeesRepository{db: db}
 }
 
@@ -96,7 +95,7 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 	`
 
 	var employee model.Employee
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		params.FullName,
@@ -169,7 +168,7 @@ func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmpl
 
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM employees WHERE %s`, whereClause)
 	var total int64
-	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -183,7 +182,7 @@ func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmpl
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
-	rows, err := r.db.Query(ctx, listQuery, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, listQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -234,7 +233,7 @@ func (r *EmployeesRepository) GetEmployeeByID(ctx context.Context, employeeID st
 	`
 
 	var employee model.Employee
-	err := r.db.QueryRow(ctx, query, employeeID).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, employeeID).Scan(
 		&employee.ID,
 		&employee.UserID,
 		&employee.FullName,
@@ -275,7 +274,7 @@ func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID st
 	`
 
 	var employee model.Employee
-	err := r.db.QueryRow(ctx, query, userID).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, userID).Scan(
 		&employee.ID,
 		&employee.UserID,
 		&employee.FullName,
@@ -331,7 +330,7 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 	`
 
 	var employee model.Employee
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		employeeID,
@@ -394,7 +393,7 @@ func (r *EmployeesRepository) UpdateEmployeeAvatar(ctx context.Context, employee
 	`
 
 	var employee model.Employee
-	err := r.db.QueryRow(ctx, query, employeeID, nullableString(avatarURL)).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, employeeID, nullableString(avatarURL)).Scan(
 		&employee.ID,
 		&employee.UserID,
 		&employee.FullName,
@@ -428,7 +427,7 @@ func (r *EmployeesRepository) UpdateEmployeeAvatar(ctx context.Context, employee
 func (r *EmployeesRepository) DeleteEmployee(ctx context.Context, employeeID string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	commandTag, err := r.db.Exec(ctx, `DELETE FROM employees WHERE id = $1::uuid`, employeeID)
+	commandTag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM employees WHERE id = $1::uuid`, employeeID)
 	if err != nil {
 		return err
 	}
@@ -443,14 +442,14 @@ func (r *EmployeesRepository) DeleteEmployee(ctx context.Context, employeeID str
 func (r *EmployeesRepository) RenameDepartmentReferences(ctx context.Context, oldName string, newName string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	_, err := r.db.Exec(ctx, `UPDATE employees SET department = $2, updated_at = NOW() WHERE department = $1`, oldName, newName)
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `UPDATE employees SET department = $2, updated_at = NOW() WHERE department = $1`, oldName, newName)
 	return err
 }
 
 func (r *EmployeesRepository) ClearDepartmentReferences(ctx context.Context, departmentName string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	_, err := r.db.Exec(ctx, `UPDATE employees SET department = NULL, updated_at = NOW() WHERE department = $1`, departmentName)
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `UPDATE employees SET department = NULL, updated_at = NOW() WHERE department = $1`, departmentName)
 	return err
 }
 
@@ -485,7 +484,7 @@ func (r *EmployeesRepository) UpdateEmployeeProfile(
 	`
 
 	var employee model.Employee
-	err := r.db.QueryRow(ctx, query,
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query,
 		userID,
 		fullName,
 		normalizePhone(phone),
@@ -513,7 +512,7 @@ func (r *EmployeesRepository) UpdateEmployeeProfile(
 }
 
 func (r *EmployeesRepository) SyncUserFieldsToEmployee(ctx context.Context, userID string, fullName string, email string) error {
-	_, err := r.db.Exec(ctx,
+	_, err := repository.DB(ctx, r.db).Exec(ctx,
 		`UPDATE employees SET full_name = $2, email = $3, updated_at = NOW() WHERE user_id = $1::uuid`,
 		userID, fullName, strings.ToLower(strings.TrimSpace(email)))
 	return err
@@ -524,7 +523,7 @@ func (r *EmployeesRepository) FindAvatarPath(ctx context.Context, employeeID str
 	defer cancel()
 
 	var avatarPath *string
-	err := r.db.QueryRow(ctx, `SELECT avatar_url FROM employees WHERE id = $1::uuid`, employeeID).Scan(&avatarPath)
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT avatar_url FROM employees WHERE id = $1::uuid`, employeeID).Scan(&avatarPath)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrEmployeeNotFound

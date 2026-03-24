@@ -29,6 +29,10 @@ func New(service *waservice.Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router chi.Router) {
+	// Config (per-tenant)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/config", h.getWAConfig)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Put("/config", h.updateWAConfig)
+
 	// Connection
 	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/status", h.getStatus)
 	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/qr", h.getQR)
@@ -63,22 +67,71 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 	router.Put("/phone", h.updateUserPhone)
 }
 
+// --------------- Config ---------------
+
+func (h *Handler) getWAConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := h.service.GetWAConfig(r.Context())
+	if err != nil {
+		h.writeInternalError(w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"api_url":            cfg.APIURL,
+		"api_key":            cfg.APIKey,
+		"session_name":       cfg.SessionName,
+		"enabled":            cfg.Enabled,
+		"max_daily_messages": cfg.MaxDailyMessages,
+		"min_delay_ms":       cfg.MinDelayMS,
+		"max_delay_ms":       cfg.MaxDelayMS,
+		"reminder_cron":      cfg.ReminderCron,
+		"weekly_digest_cron": cfg.WeeklyDigestCron,
+	}, nil)
+}
+
+func (h *Handler) updateWAConfig(w http.ResponseWriter, r *http.Request) {
+	var input wadto.UpdateWAConfigRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	cfg := warepo.WAConfig{
+		APIURL:           input.APIURL,
+		APIKey:           input.APIKey,
+		SessionName:      input.SessionName,
+		Enabled:          input.Enabled,
+		MaxDailyMessages: input.MaxDailyMessages,
+		MinDelayMS:       input.MinDelayMS,
+		MaxDelayMS:       input.MaxDelayMS,
+		ReminderCron:     input.ReminderCron,
+		WeeklyDigestCron: input.WeeklyDigestCron,
+	}
+
+	if err := h.service.UpdateWAConfig(r.Context(), cfg); err != nil {
+		h.writeInternalError(w, err)
+		return
+	}
+
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_config", "", nil, cfg)
+	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "WhatsApp configuration updated"}, nil)
+}
+
 // --------------- Connection ---------------
 
 func (h *Handler) getStatus(w http.ResponseWriter, r *http.Request) {
-	status, err := h.service.GetStatus()
+	ctx := r.Context()
+	status, err := h.service.GetStatus(ctx)
 	if err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"enabled": h.service.IsEnabled(),
+		"enabled": h.service.IsEnabled(ctx),
 		"session": status,
 	}, nil)
 }
 
 func (h *Handler) getQR(w http.ResponseWriter, r *http.Request) {
-	qr, err := h.service.GetQR()
+	qr, err := h.service.GetQR(r.Context())
 	if err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
@@ -93,7 +146,7 @@ func (h *Handler) startSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.StartSession(); err != nil {
+	if err := h.service.StartSession(r.Context()); err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
@@ -108,7 +161,7 @@ func (h *Handler) stopSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.StopSession(); err != nil {
+	if err := h.service.StopSession(r.Context()); err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
@@ -117,10 +170,11 @@ func (h *Handler) stopSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
-	stats := h.service.GetDailyStats()
-	info, _ := h.service.GetAccountInfo()
+	ctx := r.Context()
+	stats := h.service.GetDailyStats(ctx)
+	info, _ := h.service.GetAccountInfo(ctx)
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"enabled":     h.service.IsEnabled(),
+		"enabled":     h.service.IsEnabled(ctx),
 		"daily_stats": stats,
 		"account":     info,
 	}, nil)

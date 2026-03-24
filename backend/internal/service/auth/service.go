@@ -13,6 +13,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
 
 const (
@@ -29,6 +30,7 @@ var (
 	ErrInvalidRefreshToken = errors.New("refresh token tidak valid")
 	ErrExpiredRefreshToken = errors.New("refresh token sudah kedaluwarsa")
 	ErrPasswordUnchanged   = errors.New("kata sandi baru harus berbeda dari kata sandi saat ini")
+	ErrEmailUnchanged      = errors.New("email baru harus berbeda dari email saat ini")
 )
 
 type authRepository interface {
@@ -54,6 +56,8 @@ type authRepository interface {
 	UpdateUserFullNameAndPhone(ctx context.Context, userID string, fullName string, phone *string) error
 	UpdateUserFields(ctx context.Context, userID string, fullName string, email string) error
 	UpdateUserAvatar(ctx context.Context, userID string, avatarURL *string) error
+	UpdateEmployeeEmailByUserID(ctx context.Context, userID string, email string) error
+	UpdateEmployeeAvatarByUserID(ctx context.Context, userID string, avatarURL string) error
 	ListRoles(ctx context.Context, params authrepo.RoleListParams) ([]authrepo.RoleListItem, error)
 	GetRoleDetail(ctx context.Context, roleID string) (authrepo.RoleDetail, error)
 	CreateRole(ctx context.Context, params authrepo.UpsertRoleParams, createdBy string) (authrepo.RoleDetail, error)
@@ -348,6 +352,46 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, input dto.Up
 	return employee, nil
 }
 
+func (s *Service) ChangeEmail(ctx context.Context, userID string, newEmail string, password string) error {
+	newEmail = strings.ToLower(strings.TrimSpace(newEmail))
+
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if backendauth.ComparePassword(user.PasswordHash, password) != nil {
+		return ErrInvalidCurrentPassword
+	}
+
+	if strings.EqualFold(user.Email, newEmail) {
+		return ErrEmailUnchanged
+	}
+
+	if err := s.repo.UpdateUserFields(ctx, userID, user.FullName, newEmail); err != nil {
+		if s.repo.IsUniqueViolation(err) {
+			return ErrEmailAlreadyExists
+		}
+		return err
+	}
+
+	// Also sync to employees table
+	if err := s.repo.UpdateEmployeeEmailByUserID(ctx, userID, newEmail); err != nil {
+		slog.Warn("failed to sync email to employee", "user_id", userID, "error", err)
+	}
+
+	return nil
+}
+
+func (s *Service) UpdateProfileAvatar(ctx context.Context, userID string, avatarURL string) error {
+	// Update employee avatar
+	if err := s.repo.UpdateEmployeeAvatarByUserID(ctx, userID, avatarURL); err != nil {
+		slog.Warn("failed to sync avatar to employee", "user_id", userID, "error", err)
+	}
+	// Sync to users table
+	return s.repo.UpdateUserAvatar(ctx, userID, &avatarURL)
+}
+
 // ---------------------------------------------------------------------------
 // User management (admin)
 // ---------------------------------------------------------------------------
@@ -376,7 +420,7 @@ func (s *Service) UpdateUserRoles(ctx context.Context, userID string, roles []rb
 	if err := s.repo.ReplaceUserRoles(ctx, userID, roles); err != nil {
 		return err
 	}
-	s.permissionCache.Invalidate(userID)
+	s.permissionCache.Invalidate(ctx, userID)
 	return nil
 }
 
@@ -455,7 +499,7 @@ func (s *Service) UpdateUserModuleRoles(ctx context.Context, userID string, modu
 	if err := s.repo.ReplaceUserModuleRoles(ctx, userID, moduleRoles); err != nil {
 		return err
 	}
-	s.permissionCache.Invalidate(userID)
+	s.permissionCache.Invalidate(ctx, userID)
 	return nil
 }
 
@@ -466,7 +510,7 @@ func (s *Service) ToggleUserSuperAdmin(ctx context.Context, actorID string, targ
 	if err := s.repo.SetUserSuperAdmin(ctx, targetUserID, enabled); err != nil {
 		return err
 	}
-	s.permissionCache.Invalidate(targetUserID)
+	s.permissionCache.Invalidate(ctx, targetUserID)
 	return nil
 }
 
@@ -497,7 +541,11 @@ func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldToken
 	}
 
 	now := time.Now().UTC()
-	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(user.ID, now)
+	var tenantID string
+	if info, ok := tenant.FromContext(ctx); ok {
+		tenantID = info.ID
+	}
+	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(user.ID, tenantID, now)
 	if err != nil {
 		return AuthResult{}, err
 	}

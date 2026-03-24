@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -20,11 +20,77 @@ var (
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
-func New(db *pgxpool.Pool) *Repository {
+func New(db repository.DBTX) *Repository {
 	return &Repository{db: db}
+}
+
+// --------------- WA Config ---------------
+
+type WAConfig struct {
+	APIURL           string
+	APIKey           string
+	SessionName      string
+	Enabled          bool
+	MaxDailyMessages int
+	MinDelayMS       int
+	MaxDelayMS       int
+	ReminderCron     string
+	WeeklyDigestCron string
+}
+
+func (r *Repository) GetWAConfig(ctx context.Context) (WAConfig, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	var cfg WAConfig
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT api_url, api_key, session_name, enabled,
+			   max_daily_messages, min_delay_ms, max_delay_ms,
+			   reminder_cron, weekly_digest_cron
+		FROM tenant_wa_configs
+		LIMIT 1
+	`).Scan(
+		&cfg.APIURL, &cfg.APIKey, &cfg.SessionName, &cfg.Enabled,
+		&cfg.MaxDailyMessages, &cfg.MinDelayMS, &cfg.MaxDelayMS,
+		&cfg.ReminderCron, &cfg.WeeklyDigestCron,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return WAConfig{}, nil
+		}
+		return WAConfig{}, fmt.Errorf("load wa config: %w", err)
+	}
+	return cfg, nil
+}
+
+func (r *Repository) UpsertWAConfig(ctx context.Context, cfg WAConfig) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `
+		INSERT INTO tenant_wa_configs (api_url, api_key, session_name, enabled,
+			max_daily_messages, min_delay_ms, max_delay_ms,
+			reminder_cron, weekly_digest_cron, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+		ON CONFLICT (tenant_id) DO UPDATE SET
+			api_url = EXCLUDED.api_url,
+			api_key = EXCLUDED.api_key,
+			session_name = EXCLUDED.session_name,
+			enabled = EXCLUDED.enabled,
+			max_daily_messages = EXCLUDED.max_daily_messages,
+			min_delay_ms = EXCLUDED.min_delay_ms,
+			max_delay_ms = EXCLUDED.max_delay_ms,
+			reminder_cron = EXCLUDED.reminder_cron,
+			weekly_digest_cron = EXCLUDED.weekly_digest_cron,
+			updated_at = NOW()
+	`, cfg.APIURL, cfg.APIKey, cfg.SessionName, cfg.Enabled,
+		cfg.MaxDailyMessages, cfg.MinDelayMS, cfg.MaxDelayMS,
+		cfg.ReminderCron, cfg.WeeklyDigestCron,
+	)
+	return err
 }
 
 // --------------- Templates ---------------
@@ -71,7 +137,7 @@ func (r *Repository) ListTemplates(ctx context.Context, category string, trigger
 
 	query += " ORDER BY is_system DESC, name ASC"
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list templates: %w", err)
 	}
@@ -92,7 +158,7 @@ func (r *Repository) ListTemplates(ctx context.Context, category string, trigger
 
 func (r *Repository) GetTemplateByID(ctx context.Context, id string) (model.WAMessageTemplate, error) {
 	var t model.WAMessageTemplate
-	err := r.db.QueryRow(ctx, `SELECT id, name, slug, category, trigger_type, body_template,
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT id, name, slug, category, trigger_type, body_template,
 		description, available_variables, is_active, is_system, created_by, created_at, updated_at
 		FROM wa_message_templates WHERE id = $1`, id).Scan(
 		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
@@ -106,7 +172,7 @@ func (r *Repository) GetTemplateByID(ctx context.Context, id string) (model.WAMe
 
 func (r *Repository) GetTemplateBySlug(ctx context.Context, slug string) (model.WAMessageTemplate, error) {
 	var t model.WAMessageTemplate
-	err := r.db.QueryRow(ctx, `SELECT id, name, slug, category, trigger_type, body_template,
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT id, name, slug, category, trigger_type, body_template,
 		description, available_variables, is_active, is_system, created_by, created_at, updated_at
 		FROM wa_message_templates WHERE slug = $1`, slug).Scan(
 		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
@@ -120,7 +186,7 @@ func (r *Repository) GetTemplateBySlug(ctx context.Context, slug string) (model.
 
 func (r *Repository) CreateTemplate(ctx context.Context, params CreateTemplateParams) (model.WAMessageTemplate, error) {
 	var t model.WAMessageTemplate
-	err := r.db.QueryRow(ctx, `INSERT INTO wa_message_templates
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `INSERT INTO wa_message_templates
 		(name, slug, category, trigger_type, body_template, description, available_variables, is_active, created_by)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, name, slug, category, trigger_type, body_template, description,
@@ -157,7 +223,7 @@ func (r *Repository) UpdateTemplate(ctx context.Context, id string, params Updat
 	}
 
 	var t model.WAMessageTemplate
-	err := r.db.QueryRow(ctx, query, args...).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, args...).Scan(
 		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
 		&t.Description, &t.AvailableVariables, &t.IsActive, &t.IsSystem,
 		&t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
@@ -169,7 +235,7 @@ func (r *Repository) UpdateTemplate(ctx context.Context, id string, params Updat
 
 func (r *Repository) DeleteTemplate(ctx context.Context, id string) error {
 	var isSystem bool
-	err := r.db.QueryRow(ctx, "SELECT is_system FROM wa_message_templates WHERE id = $1", id).Scan(&isSystem)
+	err := repository.DB(ctx, r.db).QueryRow(ctx, "SELECT is_system FROM wa_message_templates WHERE id = $1", id).Scan(&isSystem)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrTemplateNotFound
 	}
@@ -180,7 +246,7 @@ func (r *Repository) DeleteTemplate(ctx context.Context, id string) error {
 		return ErrSystemTemplate
 	}
 
-	_, err = r.db.Exec(ctx, "DELETE FROM wa_message_templates WHERE id = $1", id)
+	_, err = repository.DB(ctx, r.db).Exec(ctx, "DELETE FROM wa_message_templates WHERE id = $1", id)
 	return err
 }
 
@@ -208,7 +274,7 @@ type UpdateScheduleParams struct {
 }
 
 func (r *Repository) ListSchedules(ctx context.Context) ([]model.WABroadcastSchedule, error) {
-	rows, err := r.db.Query(ctx, `SELECT s.id, s.name, s.template_id, t.name, s.schedule_type,
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT s.id, s.name, s.template_id, t.name, s.schedule_type,
 		s.cron_expression, s.target_type, s.target_config::text, s.is_active,
 		s.last_run_at, s.next_run_at, s.created_by, s.created_at, s.updated_at
 		FROM wa_broadcast_schedules s
@@ -234,7 +300,7 @@ func (r *Repository) ListSchedules(ctx context.Context) ([]model.WABroadcastSche
 
 func (r *Repository) GetScheduleByID(ctx context.Context, id string) (model.WABroadcastSchedule, error) {
 	var s model.WABroadcastSchedule
-	err := r.db.QueryRow(ctx, `SELECT s.id, s.name, s.template_id, t.name, s.schedule_type,
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT s.id, s.name, s.template_id, t.name, s.schedule_type,
 		s.cron_expression, s.target_type, s.target_config::text, s.is_active,
 		s.last_run_at, s.next_run_at, s.created_by, s.created_at, s.updated_at
 		FROM wa_broadcast_schedules s
@@ -251,7 +317,7 @@ func (r *Repository) GetScheduleByID(ctx context.Context, id string) (model.WABr
 
 func (r *Repository) CreateSchedule(ctx context.Context, params CreateScheduleParams) (model.WABroadcastSchedule, error) {
 	var s model.WABroadcastSchedule
-	err := r.db.QueryRow(ctx, `INSERT INTO wa_broadcast_schedules
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `INSERT INTO wa_broadcast_schedules
 		(name, template_id, schedule_type, cron_expression, target_type, target_config, is_active, created_by)
 		VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
 		RETURNING id, name, template_id, schedule_type, cron_expression, target_type,
@@ -266,7 +332,7 @@ func (r *Repository) CreateSchedule(ctx context.Context, params CreateSchedulePa
 
 func (r *Repository) UpdateSchedule(ctx context.Context, id string, params UpdateScheduleParams) (model.WABroadcastSchedule, error) {
 	var s model.WABroadcastSchedule
-	err := r.db.QueryRow(ctx, `UPDATE wa_broadcast_schedules SET
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `UPDATE wa_broadcast_schedules SET
 		name = $1, template_id = $2, schedule_type = $3, cron_expression = $4,
 		target_type = $5, target_config = $6::jsonb, is_active = $7, updated_at = NOW()
 		WHERE id = $8
@@ -285,7 +351,7 @@ func (r *Repository) UpdateSchedule(ctx context.Context, id string, params Updat
 
 func (r *Repository) ToggleSchedule(ctx context.Context, id string, active bool) (model.WABroadcastSchedule, error) {
 	var s model.WABroadcastSchedule
-	err := r.db.QueryRow(ctx, `UPDATE wa_broadcast_schedules SET is_active = $1, updated_at = NOW()
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `UPDATE wa_broadcast_schedules SET is_active = $1, updated_at = NOW()
 		WHERE id = $2
 		RETURNING id, name, template_id, schedule_type, cron_expression, target_type,
 		target_config::text, is_active, last_run_at, next_run_at, created_by, created_at, updated_at`,
@@ -300,7 +366,7 @@ func (r *Repository) ToggleSchedule(ctx context.Context, id string, active bool)
 }
 
 func (r *Repository) DeleteSchedule(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, "DELETE FROM wa_broadcast_schedules WHERE id = $1", id)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, "DELETE FROM wa_broadcast_schedules WHERE id = $1", id)
 	if err != nil {
 		return err
 	}
@@ -311,7 +377,7 @@ func (r *Repository) DeleteSchedule(ctx context.Context, id string) error {
 }
 
 func (r *Repository) UpdateScheduleLastRun(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx, "UPDATE wa_broadcast_schedules SET last_run_at = NOW() WHERE id = $1", id)
+	_, err := repository.DB(ctx, r.db).Exec(ctx, "UPDATE wa_broadcast_schedules SET last_run_at = NOW() WHERE id = $1", id)
 	return err
 }
 
@@ -351,7 +417,7 @@ func (r *Repository) CreateLog(ctx context.Context, params CreateLogParams) (mod
 	}
 
 	var log model.WABroadcastLog
-	err := r.db.QueryRow(ctx, `INSERT INTO wa_broadcast_logs
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `INSERT INTO wa_broadcast_logs
 		(schedule_id, template_id, template_slug, trigger_type, recipient_user_id, recipient_phone,
 		 message_body, status, error_message, reference_type, reference_id, sent_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -420,7 +486,7 @@ func (r *Repository) ListLogs(ctx context.Context, params ListLogsParams) ([]mod
 	var total int64
 	countArgs := make([]interface{}, len(args))
 	copy(countArgs, args)
-	err := r.db.QueryRow(ctx,
+	err := repository.DB(ctx, r.db).QueryRow(ctx,
 		"SELECT COUNT(*) FROM wa_broadcast_logs l LEFT JOIN users u ON u.id = l.recipient_user_id "+where,
 		countArgs...).Scan(&total)
 	if err != nil {
@@ -436,7 +502,7 @@ func (r *Repository) ListLogs(ctx context.Context, params ListLogsParams) ([]mod
 		LIMIT $%d OFFSET $%d`, where, argIdx, argIdx+1)
 	args = append(args, perPage, (page-1)*perPage)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list logs: %w", err)
 	}
@@ -461,7 +527,7 @@ func (r *Repository) GetLogSummary(ctx context.Context, date string) (model.WALo
 		date = time.Now().Format("2006-01-02")
 	}
 	var summary model.WALogSummary
-	err := r.db.QueryRow(ctx, `SELECT
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT
 		COALESCE(SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN status LIKE 'skipped%' THEN 1 ELSE 0 END), 0),
@@ -474,7 +540,7 @@ func (r *Repository) GetLogSummary(ctx context.Context, date string) (model.WALo
 // CheckDuplicateToday checks if a message was already sent today for a given user+template+reference combo.
 func (r *Repository) CheckDuplicateToday(ctx context.Context, userID string, templateSlug string, referenceID string) (bool, error) {
 	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM wa_broadcast_logs
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM wa_broadcast_logs
 		WHERE recipient_user_id = $1 AND template_slug = $2 AND reference_id = $3
 		AND created_at::date = CURRENT_DATE AND status = 'sent'`,
 		userID, templateSlug, referenceID).Scan(&count)
@@ -513,7 +579,7 @@ func (r *Repository) queryTasksByDue(ctx context.Context, dateCondition string) 
 		WHERE %s AND LOWER(kc.name) NOT IN ('done', 'archived')
 		AND kt.assignee_id IS NOT NULL`, dateCondition)
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query tasks: %w", err)
 	}
@@ -548,7 +614,7 @@ type ProjectMemberInfo struct {
 }
 
 func (r *Repository) GetProjectsDeadlineIn3Days(ctx context.Context) ([]ProjectDeadlineInfo, error) {
-	rows, err := r.db.Query(ctx, `SELECT p.id, p.name,
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT p.id, p.name,
 		COALESCE(to_char(p.deadline, 'YYYY-MM-DD'), ''), p.status,
 		COALESCE((
 			SELECT COUNT(*)
@@ -587,7 +653,7 @@ func (r *Repository) GetProjectsDeadlineIn3Days(ctx context.Context) ([]ProjectD
 }
 
 func (r *Repository) getProjectMembers(ctx context.Context, projectID string) ([]ProjectMemberInfo, error) {
-	rows, err := r.db.Query(ctx, `SELECT u.id, u.full_name, u.phone
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT u.id, u.full_name, u.phone
 		FROM project_members pm
 		JOIN users u ON u.id = pm.user_id
 		WHERE pm.project_id = $1`, projectID)
@@ -617,7 +683,7 @@ type WeeklyDigestInfo struct {
 }
 
 func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInfo, error) {
-	rows, err := r.db.Query(ctx, `SELECT u.id, u.full_name, u.phone,
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT u.id, u.full_name, u.phone,
 		COALESCE(SUM(CASE WHEN LOWER(kc.name) = 'done' AND kt.updated_at >= (CURRENT_DATE - INTERVAL '7 days') THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') AND kt.due_date < CURRENT_DATE THEN 1 ELSE 0 END), 0)
@@ -647,7 +713,7 @@ func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInf
 // GetTaskWithProject returns task and project info for a single task.
 func (r *Repository) GetTaskWithProject(ctx context.Context, taskID string) (*TaskDueInfo, error) {
 	var t TaskDueInfo
-	err := r.db.QueryRow(ctx, `SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.phone,
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.phone,
 		COALESCE(to_char(kt.due_date, 'YYYY-MM-DD'), ''), kt.priority
 		FROM kanban_tasks kt
 		JOIN projects p ON p.id = kt.project_id
@@ -677,7 +743,7 @@ type ReimbursementNotifyInfo struct {
 
 func (r *Repository) GetReimbursementWithSubmitter(ctx context.Context, reimbursementID string) (*ReimbursementNotifyInfo, error) {
 	var info ReimbursementNotifyInfo
-	err := r.db.QueryRow(ctx, `SELECT r.id, r.title, r.amount, r.status,
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT r.id, r.title, r.amount, r.status,
 		u.id, u.full_name, u.phone
 		FROM reimbursements r
 		JOIN users u ON u.id = r.submitted_by
@@ -696,7 +762,7 @@ func (r *Repository) GetReimbursementWithSubmitter(ctx context.Context, reimburs
 // GetUserPhone returns the phone number of a user.
 func (r *Repository) GetUserPhone(ctx context.Context, userID string) (*string, error) {
 	var phone *string
-	err := r.db.QueryRow(ctx, "SELECT phone FROM users WHERE id = $1", userID).Scan(&phone)
+	err := repository.DB(ctx, r.db).QueryRow(ctx, "SELECT phone FROM users WHERE id = $1", userID).Scan(&phone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -712,12 +778,12 @@ func (r *Repository) UpdateUserPhone(ctx context.Context, userID string, phone *
 			normalized = &p
 		}
 	}
-	_, err := r.db.Exec(ctx, "UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2", normalized, userID)
+	_, err := repository.DB(ctx, r.db).Exec(ctx, "UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2", normalized, userID)
 	if err != nil {
 		return err
 	}
 	// Sync phone to employees table so both stay in sync.
-	_, _ = r.db.Exec(ctx, "UPDATE employees SET phone = $1, updated_at = NOW() WHERE user_id = $2::uuid", normalized, userID)
+	_, _ = repository.DB(ctx, r.db).Exec(ctx, "UPDATE employees SET phone = $1, updated_at = NOW() WHERE user_id = $2::uuid", normalized, userID)
 	return nil
 }
 

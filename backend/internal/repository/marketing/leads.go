@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -20,7 +19,7 @@ var (
 )
 
 type LeadsRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type UpsertLeadParams struct {
@@ -58,7 +57,7 @@ type CreateLeadActivityParams struct {
 	CreatedBy    string
 }
 
-func NewLeadsRepository(db *pgxpool.Pool) *LeadsRepository {
+func NewLeadsRepository(db repository.DBTX) *LeadsRepository {
 	return &LeadsRepository{db: db}
 }
 
@@ -73,7 +72,7 @@ func (r *LeadsRepository) CreateLead(ctx context.Context, params UpsertLeadParam
 		return model.Lead{}, err
 	}
 
-	row := r.db.QueryRow(ctx, `
+	row := repository.DB(ctx, r.db).QueryRow(ctx, `
 		INSERT INTO leads (
 			name, phone, email, source_channel, pipeline_status, campaign_id, assigned_to, notes, company_name, estimated_value, created_by
 		)
@@ -148,7 +147,7 @@ func (r *LeadsRepository) ListLeads(ctx context.Context, params ListLeadsParams)
 	whereClause := strings.Join(filters, " AND ")
 
 	var total int64
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM leads WHERE `+whereClause, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM leads WHERE `+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -183,7 +182,7 @@ func (r *LeadsRepository) ListLeads(ctx context.Context, params ListLeadsParams)
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -205,7 +204,7 @@ func (r *LeadsRepository) GetLeadByID(ctx context.Context, leadID string) (model
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	row := r.db.QueryRow(ctx, `
+	row := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			leads.id::text,
 			leads.name,
@@ -254,7 +253,7 @@ func (r *LeadsRepository) UpdateLead(ctx context.Context, leadID string, params 
 		return model.Lead{}, err
 	}
 
-	tag, err := r.db.Exec(ctx, `
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `
 		UPDATE leads
 		SET
 			name = $2,
@@ -296,7 +295,7 @@ func (r *LeadsRepository) DeleteLead(ctx context.Context, leadID string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(ctx, `DELETE FROM leads WHERE id = $1::uuid`, leadID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM leads WHERE id = $1::uuid`, leadID)
 	if err != nil {
 		return err
 	}
@@ -310,7 +309,7 @@ func (r *LeadsRepository) ListPipeline(ctx context.Context) ([]model.LeadPipelin
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			leads.id::text,
 			leads.name,
@@ -372,7 +371,7 @@ func (r *LeadsRepository) MoveLeadStatus(ctx context.Context, leadID string, sta
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return model.Lead{}, err
 	}
@@ -422,7 +421,7 @@ func (r *LeadsRepository) ListActivities(ctx context.Context, leadID string) ([]
 		return nil, err
 	}
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			lead_activities.id::text,
 			lead_activities.lead_id::text,
@@ -474,7 +473,7 @@ func (r *LeadsRepository) CreateActivity(ctx context.Context, params CreateLeadA
 	}
 
 	var item model.LeadActivity
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		INSERT INTO lead_activities (lead_id, activity_type, description, old_status, new_status, created_by)
 		VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid)
 		RETURNING id::text, lead_id::text, activity_type, description, old_status, new_status, created_by::text, created_at
@@ -499,7 +498,7 @@ func (r *LeadsRepository) CreateActivity(ctx context.Context, params CreateLeadA
 		return model.LeadActivity{}, err
 	}
 
-	if err := r.db.QueryRow(ctx, `SELECT full_name FROM users WHERE id = $1::uuid`, item.CreatedBy).Scan(&item.CreatedByName); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT full_name FROM users WHERE id = $1::uuid`, item.CreatedBy).Scan(&item.CreatedByName); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return model.LeadActivity{}, err
 	}
 
@@ -510,7 +509,7 @@ func (r *LeadsRepository) Summary(ctx context.Context) (model.LeadSummary, error
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT pipeline_status, COUNT(*)::bigint, COALESCE(SUM(estimated_value), 0)::bigint
 		FROM leads
 		GROUP BY pipeline_status
@@ -587,7 +586,7 @@ func (r *LeadsRepository) ensureEmployeeExists(ctx context.Context, employeeID *
 	}
 
 	var exists bool
-	if err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM employees WHERE id = $1::uuid)`, strings.TrimSpace(*employeeID)).Scan(&exists); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM employees WHERE id = $1::uuid)`, strings.TrimSpace(*employeeID)).Scan(&exists); err != nil {
 		return err
 	}
 	if !exists {
@@ -603,7 +602,7 @@ func (r *LeadsRepository) ensureCampaignExists(ctx context.Context, campaignID *
 	}
 
 	var exists bool
-	if err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM campaigns WHERE id = $1::uuid)`, strings.TrimSpace(*campaignID)).Scan(&exists); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM campaigns WHERE id = $1::uuid)`, strings.TrimSpace(*campaignID)).Scan(&exists); err != nil {
 		return err
 	}
 	if !exists {

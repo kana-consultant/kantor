@@ -3,12 +3,14 @@ package hris
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
+	"github.com/kana-consultant/kantor/backend/internal/repository"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 )
@@ -53,6 +55,7 @@ type ReimbursementsService struct {
 	authRepo             reimbursementsAuthRepository
 	notificationsService reimbursementsNotificationsService
 	waNotifier           ReimbursementStatusNotifier
+	financeService       *FinanceService
 }
 
 func NewReimbursementsService(
@@ -60,12 +63,14 @@ func NewReimbursementsService(
 	employeesRepo reimbursementsEmployeesRepository,
 	authRepo reimbursementsAuthRepository,
 	notificationsService reimbursementsNotificationsService,
+	financeService *FinanceService,
 ) *ReimbursementsService {
 	return &ReimbursementsService{
 		repo:                 repo,
 		employeesRepo:        employeesRepo,
 		authRepo:             authRepo,
 		notificationsService: notificationsService,
+		financeService:       financeService,
 	}
 }
 
@@ -195,10 +200,38 @@ func (s *ReimbursementsService) MarkPaid(ctx context.Context, reimbursementID st
 	if !canMarkPaidReimbursements(perms) {
 		return model.Reimbursement{}, ErrReimbursementForbidden
 	}
-	updated, err := s.repo.MarkPaid(ctx, reimbursementID, actorID, notes)
+
+	// Use a transaction so MarkPaid + finance record are atomic.
+	db := repository.DB(ctx, nil)
+	if db == nil {
+		return model.Reimbursement{}, fmt.Errorf("no database connection in context")
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return model.Reimbursement{}, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	txCtx := repository.WithConn(ctx, tx)
+
+	updated, err := s.repo.MarkPaid(txCtx, reimbursementID, actorID, notes)
 	if err != nil {
 		return model.Reimbursement{}, mapReimbursementError(err)
 	}
+
+	if s.financeService != nil {
+		recordDate := time.Now()
+		if updated.PaidAt != nil {
+			recordDate = *updated.PaidAt
+		}
+		if finErr := s.financeService.RecordOutcome(txCtx, "reimbursement", updated.Amount, "Reimbursement: "+updated.Title, recordDate, actorID); finErr != nil {
+			return model.Reimbursement{}, fmt.Errorf("record finance entry: %w", finErr)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return model.Reimbursement{}, fmt.Errorf("commit transaction: %w", err)
+	}
+
 	if err := s.notifyRequester(ctx, updated, "reimbursement.paid", "Reimbursement has been marked as paid"); err != nil {
 		return model.Reimbursement{}, err
 	}

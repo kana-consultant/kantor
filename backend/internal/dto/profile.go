@@ -1,5 +1,10 @@
 package dto
 
+type ChangeEmailRequest struct {
+	Email    string `json:"email" validate:"required,email,max=255"`
+	Password string `json:"password" validate:"required"`
+}
+
 type UpdateProfileRequest struct {
 	FullName          string  `json:"full_name" validate:"required,min=3,max=150"`
 	Phone             *string `json:"phone" validate:"omitempty,max=50"`

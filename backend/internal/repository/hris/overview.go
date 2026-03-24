@@ -4,17 +4,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 type OverviewRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
-func NewOverviewRepository(db *pgxpool.Pool) *OverviewRepository {
+func NewOverviewRepository(db repository.DBTX) *OverviewRepository {
 	return &OverviewRepository{db: db}
 }
 
@@ -24,11 +22,11 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 
 	overview := model.HrisOverview{}
 
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM employees WHERE employment_status = 'active'`).Scan(&overview.TotalEmployees); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM employees WHERE employment_status = 'active'`).Scan(&overview.TotalEmployees); err != nil {
 		return model.HrisOverview{}, err
 	}
 
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			COUNT(*)::bigint,
 			COALESCE(SUM(
@@ -52,7 +50,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 	overview.IncomeVsOutcome = financeSeries
 	overview.MonthlyNet = monthlyNet
 
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM reimbursements WHERE status = 'submitted'`).Scan(&overview.PendingReimbursements); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM reimbursements WHERE status = 'submitted'`).Scan(&overview.PendingReimbursements); err != nil {
 		return model.HrisOverview{}, err
 	}
 
@@ -75,7 +73,7 @@ func (r *OverviewRepository) financeSeries(ctx context.Context, now time.Time) (
 	startMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, -5, 0)
 	endMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, 1, 0)
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			DATE_TRUNC('month', record_date)::date AS month_start,
 			COALESCE(SUM(CASE WHEN type = 'income' AND approval_status = 'approved' THEN amount ELSE 0 END), 0)::bigint AS income,
@@ -134,7 +132,7 @@ func (r *OverviewRepository) financeSeries(ctx context.Context, now time.Time) (
 
 func (r *OverviewRepository) listUpcomingRenewals(ctx context.Context, now time.Time) ([]model.HrisUpcomingRenewal, error) {
 	endDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, 30)
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			subscriptions.id::text,
 			subscriptions.name,
@@ -178,7 +176,7 @@ func (r *OverviewRepository) listUpcomingRenewals(ctx context.Context, now time.
 }
 
 func (r *OverviewRepository) listRecentReimbursements(ctx context.Context) ([]model.Reimbursement, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			reimbursements.id::text,
 			reimbursements.employee_id::text,

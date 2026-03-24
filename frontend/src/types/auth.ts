@@ -20,8 +20,15 @@ export interface AuthModuleRole {
   role_slug: string;
 }
 
+export interface TenantInfo {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 export interface AuthSession {
   user: AuthUser;
+  tenant?: TenantInfo;
   module_roles: Record<string, AuthModuleRole>;
   permissions: string[];
   is_super_admin: boolean;

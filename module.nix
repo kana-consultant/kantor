@@ -4,18 +4,46 @@ let
   cfg = config.services.kantor;
   backend = pkgs.callPackage ./nix/backend.nix { };
   frontend = pkgs.callPackage ./nix/frontend.nix { };
-  hasDomains = cfg.domains != [];
-  primaryDomain = if hasDomains then builtins.head cfg.domains else null;
-  fallbackOrigin = "http://kantor.perfect10.bot:${toString cfg.listenPort}";
+
+  # Derive values from tenants list
+  allDomains = lib.concatLists (map (t: t.domains) cfg.tenants);
+  hasDomains = allDomains != [];
+  primaryDomain = if hasDomains then builtins.head allDomains else null;
+
+  # TENANTS env: "name|slug|d1,d2;name2|slug2|d3"
+  tenantsEnv = lib.concatStringsSep ";" (map
+    (t: "${t.name}|${t.slug}|${lib.concatStringsSep "," t.domains}")
+    cfg.tenants
+  );
+
+  corsOrigins =
+    if hasDomains
+    then lib.concatStringsSep "," (map (d: "https://${d}") allDomains)
+    else "http://localhost:${toString cfg.listenPort}";
 in
 {
   options.services.kantor = {
     enable = lib.mkEnableOption "Kantor internal platform";
 
-    domains = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
+    tenants = lib.mkOption {
+      type = lib.types.listOf (lib.types.submodule {
+        options = {
+          name = lib.mkOption {
+            type = lib.types.str;
+            description = "Display name for the tenant";
+          };
+          slug = lib.mkOption {
+            type = lib.types.str;
+            description = "URL-safe slug for the tenant";
+          };
+          domains = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            description = "Domain names for this tenant (first = primary)";
+          };
+        };
+      });
       default = [];
-      description = "Domain names for the Kantor platform. If empty, serves on IP with HTTP only.";
+      description = "List of tenants to seed on startup. First tenant owns existing data.";
     };
 
     listenPort = lib.mkOption {
@@ -93,10 +121,7 @@ in
         PORT = toString cfg.port;
         DATABASE_URL = "postgres://${cfg.database.user}@localhost/${cfg.database.name}?sslmode=disable&host=/run/postgresql";
         UPLOADS_DIR = cfg.uploadsDir;
-        CORS_ORIGINS =
-          if hasDomains
-          then builtins.concatStringsSep "," (map (d: "https://${d}") cfg.domains)
-          else fallbackOrigin;
+        CORS_ORIGINS = corsOrigins;
         JWT_ACCESS_EXPIRY = "15m";
         JWT_REFRESH_EXPIRY = "168h";
         TRACKER_RETENTION_DAYS = "90";
@@ -110,9 +135,10 @@ in
         WAHA_REMINDER_CRON = "0 8 * * 1-5";
         WAHA_WEEKLY_DIGEST_CRON = "0 9 * * 1";
         APP_URL =
-          if hasDomains
+          if primaryDomain != null
           then "https://${primaryDomain}"
-          else fallbackOrigin;
+          else "http://localhost:${toString cfg.listenPort}";
+        TENANTS = tenantsEnv;
       };
 
       preStart = ''
@@ -164,117 +190,69 @@ in
     security.acme = lib.mkIf (hasDomains && cfg.cloudflareTokenFile != null) {
       acceptTerms = true;
       defaults.email = cfg.acmeEmail;
-      certs = builtins.listToAttrs (map (d: {
-        name = d;
-        value = {
-          domain = d;
-          group = "nginx";
-          dnsProvider = "cloudflare";
-          dnsResolver = "1.1.1.1:53";
-          credentialFiles = {
-            "CF_DNS_API_TOKEN_FILE" = cfg.cloudflareTokenFile;
-          };
+      certs.${primaryDomain} = {
+        domain = primaryDomain;
+        extraDomainNames = builtins.tail allDomains;
+        group = "nginx";
+        dnsProvider = "cloudflare";
+        dnsResolver = "1.1.1.1:53";
+        credentialFiles = {
+          "CF_DNS_API_TOKEN_FILE" = cfg.cloudflareTokenFile;
         };
-      }) cfg.domains);
+      };
     };
 
-    # Nginx
+    # Nginx — serves all tenant domains from a single vhost
     services.nginx = {
       enable = true;
       recommendedOptimisation = true;
       recommendedGzipSettings = true;
       recommendedProxySettings = true;
 
-      virtualHosts = let
-        kantorVhost = d: {
-          serverName = d;
-          forceSSL = true;
-          useACMEHost = d;
+      virtualHosts."kantor" = {
+        listen = [{ addr = "0.0.0.0"; port = cfg.listenPort; }];
+        serverName =
+          if hasDomains
+          then lib.concatStringsSep " " allDomains
+          else "_";
+        forceSSL = hasDomains;
+        useACMEHost = lib.mkIf hasDomains primaryDomain;
 
-          root = "${frontend}";
+        root = "${frontend}";
 
-          locations."/" = {
-            tryFiles = "$uri $uri/ /index.html";
-          };
+        locations."/" = {
+          tryFiles = "$uri $uri/ /index.html";
+        };
 
-          locations."/api/" = {
-            proxyPass = "http://127.0.0.1:${toString cfg.port}";
-            proxyWebsockets = true;
-            extraConfig = ''
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto $scheme;
-            '';
-          };
-
-          locations."/assets/" = {
-            root = "${frontend}";
-            extraConfig = ''
-              add_header Cache-Control "public, max-age=31536000, immutable";
-              add_header X-Frame-Options "DENY" always;
-              add_header X-Content-Type-Options "nosniff" always;
-              add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-              add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-              try_files $uri =404;
-            '';
-          };
-
+        locations."/api/" = {
+          proxyPass = "http://127.0.0.1:${toString cfg.port}";
+          proxyWebsockets = true;
           extraConfig = ''
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+          '';
+        };
+
+        locations."/assets/" = {
+          root = "${frontend}";
+          extraConfig = ''
+            add_header Cache-Control "public, max-age=31536000, immutable";
             add_header X-Frame-Options "DENY" always;
             add_header X-Content-Type-Options "nosniff" always;
             add_header Referrer-Policy "strict-origin-when-cross-origin" always;
             add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+            try_files $uri =404;
           '';
         };
 
-        domainHosts = builtins.listToAttrs (map (d: {
-          name = d;
-          value = kantorVhost d;
-        }) cfg.domains);
-
-        fallbackHost = {
-          "kantor" = {
-            listen = [{ addr = "0.0.0.0"; port = cfg.listenPort; }];
-            serverName = "_";
-
-            root = "${frontend}";
-
-            locations."/" = {
-              tryFiles = "$uri $uri/ /index.html";
-            };
-
-            locations."/api/" = {
-              proxyPass = "http://127.0.0.1:${toString cfg.port}";
-              proxyWebsockets = true;
-              extraConfig = ''
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-              '';
-            };
-
-            locations."/assets/" = {
-              root = "${frontend}";
-              extraConfig = ''
-                add_header Cache-Control "public, max-age=31536000, immutable";
-                add_header X-Frame-Options "DENY" always;
-                add_header X-Content-Type-Options "nosniff" always;
-                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-                add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-                try_files $uri =404;
-              '';
-            };
-
-            extraConfig = ''
-              add_header X-Frame-Options "DENY" always;
-              add_header X-Content-Type-Options "nosniff" always;
-              add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-              add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-            '';
-          };
-        };
-      in
-        if hasDomains then domainHosts else fallbackHost;
+        extraConfig = ''
+          add_header X-Frame-Options "DENY" always;
+          add_header X-Content-Type-Options "nosniff" always;
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+          add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        '';
+      };
     };
 
     networking.firewall.allowedTCPPorts =

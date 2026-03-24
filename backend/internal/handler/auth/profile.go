@@ -1,11 +1,22 @@
 package auth
 
 import (
+	"errors"
+	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
+	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 )
 
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
@@ -43,4 +54,126 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteJSON(w, http.StatusOK, employee, nil)
+}
+
+func (h *Handler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	var input dto.ChangeEmailRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	err := h.service.ChangeEmail(r.Context(), principal.UserID, input.Email, input.Password)
+	if err != nil {
+		switch {
+		case errors.Is(err, authservice.ErrInvalidCurrentPassword):
+			response.WriteError(w, http.StatusBadRequest, "INVALID_PASSWORD", err.Error(), nil)
+		case errors.Is(err, authservice.ErrEmailAlreadyExists):
+			response.WriteError(w, http.StatusConflict, "EMAIL_ALREADY_EXISTS", err.Error(), nil)
+		case errors.Is(err, authservice.ErrEmailUnchanged):
+			response.WriteError(w, http.StatusBadRequest, "EMAIL_UNCHANGED", err.Error(), nil)
+		default:
+			response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to change email", nil)
+		}
+		return
+	}
+
+	platformmiddleware.AuditLogWithUser(r.Context(), principal.UserID, "update", "admin", "email", principal.UserID, nil, map[string]any{
+		"new_email": input.Email,
+	})
+	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Email berhasil diubah"}, nil)
+}
+
+func (h *Handler) UploadProfileAvatar(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "INVALID_MULTIPART", "Upload harus menggunakan multipart form data", nil)
+		return
+	}
+
+	var fileHeader *multipart.FileHeader
+	if files := r.MultipartForm.File["avatar"]; len(files) > 0 {
+		fileHeader = files[0]
+	} else if files := r.MultipartForm.File["file"]; len(files) > 0 {
+		fileHeader = files[0]
+	}
+	if fileHeader == nil {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "File avatar diperlukan", map[string]string{"avatar": "required"})
+		return
+	}
+
+	avatarPath, err := saveProfileAvatar(h.uploadsDir, principal.UserID, fileHeader)
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "AVATAR_UPLOAD_FAILED", err.Error(), nil)
+		return
+	}
+
+	if err := h.service.UpdateProfileAvatar(r.Context(), principal.UserID, avatarPath); err != nil {
+		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(avatarPath)))
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menyimpan avatar", nil)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{"avatar_url": avatarPath}, nil)
+}
+
+var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
+
+func saveProfileAvatar(baseDir string, userID string, file *multipart.FileHeader) (string, error) {
+	if file.Size > 5<<20 {
+		return "", fmt.Errorf("avatar harus lebih kecil dari 5MB")
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return "", fmt.Errorf("gagal membuka file: %w", err)
+	}
+	defer src.Close()
+
+	sniff := make([]byte, 512)
+	n, readErr := src.Read(sniff)
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return "", fmt.Errorf("gagal membaca file: %w", readErr)
+	}
+	if _, err := src.Seek(0, 0); err != nil {
+		return "", err
+	}
+
+	contentType := http.DetectContentType(sniff[:n])
+	if !strings.HasPrefix(contentType, "image/") {
+		return "", fmt.Errorf("file harus berupa gambar")
+	}
+
+	dir := filepath.Join(baseDir, "profiles", userID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("gagal membuat direktori: %w", err)
+	}
+
+	sanitized := unsafeCharsRe.ReplaceAllString(filepath.Base(file.Filename), "_")
+	filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitized
+	destPath := filepath.Join(dir, filename)
+
+	dst, err := os.Create(destPath)
+	if err != nil {
+		return "", fmt.Errorf("gagal membuat file: %w", err)
+	}
+
+	if _, err := io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		_ = os.Remove(destPath)
+		return "", fmt.Errorf("gagal menyimpan file: %w", err)
+	}
+	_ = dst.Close()
+
+	return filepath.ToSlash(filepath.Join("profiles", userID, filename)), nil
 }

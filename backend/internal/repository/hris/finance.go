@@ -9,7 +9,6 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -22,7 +21,7 @@ var (
 )
 
 type FinanceRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type UpsertFinanceCategoryParams struct {
@@ -55,7 +54,7 @@ type ListFinanceExportParams struct {
 	Month int
 }
 
-func NewFinanceRepository(db *pgxpool.Pool) *FinanceRepository {
+func NewFinanceRepository(db repository.DBTX) *FinanceRepository {
 	return &FinanceRepository{db: db}
 }
 
@@ -69,7 +68,7 @@ func (r *FinanceRepository) CreateCategory(ctx context.Context, params UpsertFin
 		RETURNING id::text, name, type, is_default, created_at
 	`
 	var item model.FinanceCategory
-	err := r.db.QueryRow(ctx, query, strings.TrimSpace(params.Name), strings.TrimSpace(params.Type)).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, strings.TrimSpace(params.Name), strings.TrimSpace(params.Type)).Scan(
 		&item.ID,
 		&item.Name,
 		&item.Type,
@@ -92,7 +91,7 @@ func (r *FinanceRepository) ListCategories(ctx context.Context, recordType strin
 		WHERE ($1 = '' OR type = $1)
 		ORDER BY type ASC, name ASC
 	`
-	rows, err := r.db.Query(ctx, query, strings.TrimSpace(recordType))
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, strings.TrimSpace(recordType))
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +119,7 @@ func (r *FinanceRepository) UpdateCategory(ctx context.Context, categoryID strin
 		RETURNING id::text, name, type, is_default, created_at
 	`
 	var item model.FinanceCategory
-	err := r.db.QueryRow(ctx, query, categoryID, strings.TrimSpace(params.Name), strings.TrimSpace(params.Type)).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, categoryID, strings.TrimSpace(params.Name), strings.TrimSpace(params.Type)).Scan(
 		&item.ID,
 		&item.Name,
 		&item.Type,
@@ -140,7 +139,7 @@ func (r *FinanceRepository) DeleteCategory(ctx context.Context, categoryID strin
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(ctx, `DELETE FROM finance_categories WHERE id = $1::uuid AND is_default = FALSE`, categoryID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM finance_categories WHERE id = $1::uuid AND is_default = FALSE`, categoryID)
 	if err != nil {
 		return err
 	}
@@ -159,7 +158,7 @@ func (r *FinanceRepository) CreateRecord(ctx context.Context, params UpsertFinan
 		VALUES ($1::uuid, $2, $3, $4, $5::date, EXTRACT(MONTH FROM $5::date)::int, EXTRACT(YEAR FROM $5::date)::int, NULLIF($6, '')::uuid)
 		RETURNING id::text, category_id::text, type, amount, description, record_date, record_month, record_year, approval_status, submitted_by::text, reviewed_by::text, reviewed_at, approved_by::text, approved_at, created_at, updated_at
 	`
-	record, err := r.scanRecordRow(ctx, r.db.QueryRow(ctx, query, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate, params.SubmittedBy))
+	record, err := r.scanRecordRow(ctx, repository.DB(ctx, r.db).QueryRow(ctx, query, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate, params.SubmittedBy))
 	if err != nil {
 		return model.FinanceRecord{}, err
 	}
@@ -207,7 +206,7 @@ func (r *FinanceRepository) ListRecords(ctx context.Context, params ListFinanceR
 
 	whereClause := strings.Join(filters, " AND ")
 	var total int64
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM finance_records WHERE `+whereClause, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM finance_records WHERE `+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -239,7 +238,7 @@ func (r *FinanceRepository) ListRecords(ctx context.Context, params ListFinanceR
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -302,7 +301,7 @@ func (r *FinanceRepository) GetRecordByID(ctx context.Context, recordID string) 
 		WHERE finance_records.id = $1::uuid
 	`
 	var item model.FinanceRecord
-	err := r.db.QueryRow(ctx, query, recordID).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, recordID).Scan(
 		&item.ID,
 		&item.CategoryID,
 		&item.CategoryName,
@@ -347,7 +346,7 @@ func (r *FinanceRepository) UpdateRecord(ctx context.Context, recordID string, p
 		WHERE id = $1::uuid AND approval_status IN ('draft', 'rejected')
 		RETURNING id::text, category_id::text, type, amount, description, record_date, record_month, record_year, approval_status, submitted_by::text, reviewed_by::text, reviewed_at, approved_by::text, approved_at, created_at, updated_at
 	`
-	record, err := r.scanRecordRow(ctx, r.db.QueryRow(ctx, query, recordID, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate))
+	record, err := r.scanRecordRow(ctx, repository.DB(ctx, r.db).QueryRow(ctx, query, recordID, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate))
 	if err != nil {
 		return model.FinanceRecord{}, err
 	}
@@ -358,7 +357,7 @@ func (r *FinanceRepository) DeleteRecord(ctx context.Context, recordID string) e
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(ctx, `DELETE FROM finance_records WHERE id = $1::uuid AND approval_status IN ('draft', 'rejected')`, recordID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM finance_records WHERE id = $1::uuid AND approval_status IN ('draft', 'rejected')`, recordID)
 	if err != nil {
 		return err
 	}
@@ -380,7 +379,7 @@ func (r *FinanceRepository) SubmitRecord(ctx context.Context, recordID string, a
 		WHERE id = $1::uuid AND approval_status = 'draft'
 		RETURNING id::text, category_id::text, type, amount, description, record_date, record_month, record_year, approval_status, submitted_by::text, reviewed_by::text, reviewed_at, approved_by::text, approved_at, created_at, updated_at
 	`
-	record, err := r.scanRecordRow(ctx, r.db.QueryRow(ctx, query, recordID, actorID))
+	record, err := r.scanRecordRow(ctx, repository.DB(ctx, r.db).QueryRow(ctx, query, recordID, actorID))
 	if err != nil {
 		return model.FinanceRecord{}, err
 	}
@@ -402,7 +401,7 @@ func (r *FinanceRepository) ReviewRecord(ctx context.Context, recordID string, d
 		WHERE id = $1::uuid AND approval_status = 'pending_review'
 		RETURNING id::text, category_id::text, type, amount, description, record_date, record_month, record_year, approval_status, submitted_by::text, reviewed_by::text, reviewed_at, approved_by::text, approved_at, created_at, updated_at
 	`
-	record, err := r.scanRecordRow(ctx, r.db.QueryRow(ctx, query, recordID, decision, actorID))
+	record, err := r.scanRecordRow(ctx, repository.DB(ctx, r.db).QueryRow(ctx, query, recordID, decision, actorID))
 	if err != nil {
 		return model.FinanceRecord{}, err
 	}
@@ -413,7 +412,7 @@ func (r *FinanceRepository) Summary(ctx context.Context, year int) (model.Financ
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			record_month,
 			COALESCE(SUM(CASE WHEN type = 'income' AND approval_status = 'approved' THEN amount ELSE 0 END), 0) AS income,
@@ -454,7 +453,7 @@ func (r *FinanceRepository) Summary(ctx context.Context, year int) (model.Financ
 	}
 
 	byCategory := map[string]int64{}
-	categoryRows, err := r.db.Query(ctx, `
+	categoryRows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT finance_categories.name, COALESCE(SUM(finance_records.amount), 0)
 		FROM finance_records
 		INNER JOIN finance_categories ON finance_categories.id = finance_records.category_id
@@ -532,7 +531,7 @@ func (r *FinanceRepository) ListForExport(ctx context.Context, params ListFinanc
 		WHERE ` + strings.Join(filters, " AND ") + `
 		ORDER BY finance_records.record_date DESC, finance_records.created_at DESC
 	`
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -597,13 +596,69 @@ func (r *FinanceRepository) scanRecordRow(ctx context.Context, row pgx.Row) (mod
 }
 
 func (r *FinanceRepository) hydrateCategoryName(ctx context.Context, record model.FinanceRecord) (model.FinanceRecord, error) {
-	if err := r.db.QueryRow(ctx, `SELECT name FROM finance_categories WHERE id = $1::uuid`, record.CategoryID).Scan(&record.CategoryName); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT name FROM finance_categories WHERE id = $1::uuid`, record.CategoryID).Scan(&record.CategoryName); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.FinanceRecord{}, ErrFinanceCategoryNotFound
 		}
 		return model.FinanceRecord{}, err
 	}
 	return record, nil
+}
+
+// SeedDefaultCategories ensures all default finance categories exist for the current tenant.
+func (r *FinanceRepository) SeedDefaultCategories(ctx context.Context) error {
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `
+		INSERT INTO finance_categories (name, type, is_default) VALUES
+			('project revenue', 'income', TRUE),
+			('service fee', 'income', TRUE),
+			('other income', 'income', TRUE),
+			('gaji', 'outcome', TRUE),
+			('sewa', 'outcome', TRUE),
+			('utilitas', 'outcome', TRUE),
+			('marketing spend', 'outcome', TRUE),
+			('subscription', 'outcome', TRUE),
+			('reimbursement', 'outcome', TRUE),
+			('operational', 'outcome', TRUE),
+			('other expense', 'outcome', TRUE)
+		ON CONFLICT ON CONSTRAINT uq_finance_categories_tenant_name_type DO NOTHING
+	`)
+	return err
+}
+
+func (r *FinanceRepository) FindOrCreateCategoryID(ctx context.Context, name string, recordType string) (string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	var id string
+	err := repository.DB(ctx, r.db).QueryRow(ctx,
+		`SELECT id::text FROM finance_categories WHERE name = $1 AND type = $2`,
+		name, recordType,
+	).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	err = repository.DB(ctx, r.db).QueryRow(ctx,
+		`INSERT INTO finance_categories (name, type, is_default) VALUES ($1, $2, TRUE)
+		 ON CONFLICT ON CONSTRAINT uq_finance_categories_tenant_name_type DO UPDATE SET name = EXCLUDED.name
+		 RETURNING id::text`,
+		name, recordType,
+	).Scan(&id)
+	return id, err
+}
+
+func (r *FinanceRepository) CreateApprovedRecord(ctx context.Context, params UpsertFinanceRecordParams) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `
+		INSERT INTO finance_records (category_id, type, amount, description, record_date, record_month, record_year, submitted_by, approval_status, approved_by, approved_at)
+		VALUES ($1::uuid, $2, $3, $4, $5::date, EXTRACT(MONTH FROM $5::date)::int, EXTRACT(YEAR FROM $5::date)::int, NULLIF($6, '')::uuid, 'approved', NULLIF($6, '')::uuid, NOW())
+	`, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate, params.SubmittedBy)
+	return err
 }
 
 func mapFinanceError(err error) error {
