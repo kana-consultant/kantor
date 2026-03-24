@@ -54,6 +54,18 @@ type UpdatePhoneRequest struct {
 	Phone *string `json:"phone"`
 }
 
+type UpdateWAConfigRequest struct {
+	APIURL           string `json:"api_url" validate:"required,url"`
+	APIKey           string `json:"api_key"`
+	SessionName      string `json:"session_name" validate:"required"`
+	Enabled          bool   `json:"enabled"`
+	MaxDailyMessages int    `json:"max_daily_messages" validate:"min=1"`
+	MinDelayMS       int    `json:"min_delay_ms" validate:"min=0"`
+	MaxDelayMS       int    `json:"max_delay_ms" validate:"min=0"`
+	ReminderCron     string `json:"reminder_cron" validate:"required"`
+	WeeklyDigestCron string `json:"weekly_digest_cron" validate:"required"`
+}
+
 type ListLogsQuery struct {
 	Page         int    `json:"page"`
 	PerPage      int    `json:"per_page"`

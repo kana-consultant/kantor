@@ -19,6 +19,8 @@ import {
   QrCode,
   Info,
   Copy,
+  Settings,
+  Save,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -51,6 +53,9 @@ import {
   listLogs,
   getLogSummary,
   quickSend,
+  getWAConfig,
+  updateWAConfig,
+  type WAConfig,
   type WATemplate,
   type WASchedule,
   type WALogFilters,
@@ -64,9 +69,11 @@ export const Route = createFileRoute("/_authenticated/operational/wa-broadcast")
   component: WABroadcastPage,
 });
 
-type TabKey = "dashboard" | "templates" | "schedules" | "logs";
+type TabKey = "dashboard" | "templates" | "schedules" | "logs" | "settings";
 
 function WABroadcastPage() {
+  const { hasPermission } = useRBAC();
+  const canManage = hasPermission(permissions.operationalWAManage);
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -74,6 +81,7 @@ function WABroadcastPage() {
     { key: "templates", label: "Templates" },
     { key: "schedules", label: "Schedules" },
     { key: "logs", label: "Logs" },
+    ...(canManage ? [{ key: "settings" as const, label: "Settings" }] : []),
   ];
 
   return (
@@ -109,6 +117,7 @@ function WABroadcastPage() {
       {activeTab === "templates" && <TemplatesTab />}
       {activeTab === "schedules" && <SchedulesTab />}
       {activeTab === "logs" && <LogsTab />}
+      {activeTab === "settings" && <SettingsTab />}
     </div>
   );
 }
@@ -181,7 +190,7 @@ function DashboardTab() {
           <div className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-surface-muted p-4">
             <WifiOff className="h-5 w-5 text-text-secondary" />
             <p className="text-sm text-text-secondary">
-              WA Broadcast tidak aktif. Set <code className="rounded bg-surface px-1.5 py-0.5 text-xs font-mono">WAHA_ENABLED=true</code> di environment variables.
+              WA Broadcast belum dikonfigurasi. Buka tab <strong>Settings</strong> untuk mengatur koneksi WhatsApp.
             </p>
           </div>
         ) : (
@@ -1140,6 +1149,184 @@ function LogRow({ log, expanded, onToggle }: { log: import("@/services/wa-broadc
         </tr>
       )}
     </>
+  );
+}
+
+// ===================== Settings Tab =====================
+
+function SettingsTab() {
+  const queryClient = useQueryClient();
+  const configQuery = useQuery({ queryKey: waKeys.config(), queryFn: getWAConfig });
+
+  const [form, setForm] = useState<WAConfig>({
+    api_url: "http://localhost:3000",
+    api_key: "",
+    session_name: "default",
+    enabled: false,
+    max_daily_messages: 50,
+    min_delay_ms: 2000,
+    max_delay_ms: 5000,
+    reminder_cron: "0 8 * * 1-5",
+    weekly_digest_cron: "0 8 * * 1",
+  });
+
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (configQuery.data && !loaded) {
+      setForm(configQuery.data);
+      setLoaded(true);
+    }
+  }, [configQuery.data, loaded]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => updateWAConfig(form),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: waKeys.config() });
+      queryClient.invalidateQueries({ queryKey: waKeys.status() });
+      queryClient.invalidateQueries({ queryKey: waKeys.stats() });
+    },
+  });
+
+  const updateField = <K extends keyof WAConfig>(key: K, value: WAConfig[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  if (configQuery.isLoading) {
+    return <Card className="p-6"><p className="text-sm text-text-secondary">Memuat konfigurasi...</p></Card>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Settings className="h-5 w-5 text-ops" />
+          <h3 className="text-lg font-semibold">Konfigurasi WhatsApp</h3>
+        </div>
+
+        <div className="space-y-6">
+          {/* Enable toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.enabled}
+              onChange={(e) => updateField("enabled", e.target.checked)}
+              className="h-4 w-4 rounded border-border text-ops focus:ring-ops"
+            />
+            <div>
+              <span className="text-sm font-medium">Aktifkan WA Broadcast</span>
+              <p className="text-xs text-text-secondary">Aktifkan pengiriman pesan WhatsApp untuk tenant ini</p>
+            </div>
+          </label>
+
+          {/* WAHA Connection */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-text-secondary uppercase tracking-wider">Koneksi WAHA</h4>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">API URL</label>
+                <Input
+                  value={form.api_url}
+                  onChange={(e) => updateField("api_url", e.target.value)}
+                  placeholder="http://localhost:3000"
+                />
+                <p className="mt-1 text-xs text-text-secondary">URL instance WAHA</p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">API Key</label>
+                <Input
+                  type="password"
+                  value={form.api_key}
+                  onChange={(e) => updateField("api_key", e.target.value)}
+                  placeholder="WAHA API key"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Session Name</label>
+                <Input
+                  value={form.session_name}
+                  onChange={(e) => updateField("session_name", e.target.value)}
+                  placeholder="default"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Rate Limiting */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-text-secondary uppercase tracking-wider">Rate Limiting</h4>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Maks Pesan / Hari</label>
+                <Input
+                  type="number"
+                  value={form.max_daily_messages}
+                  onChange={(e) => updateField("max_daily_messages", parseInt(e.target.value) || 1)}
+                  min={1}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Min Delay (ms)</label>
+                <Input
+                  type="number"
+                  value={form.min_delay_ms}
+                  onChange={(e) => updateField("min_delay_ms", parseInt(e.target.value) || 0)}
+                  min={0}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Max Delay (ms)</label>
+                <Input
+                  type="number"
+                  value={form.max_delay_ms}
+                  onChange={(e) => updateField("max_delay_ms", parseInt(e.target.value) || 0)}
+                  min={0}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Cron Schedules */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-text-secondary uppercase tracking-wider">Jadwal Otomatis</h4>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Reminder Cron</label>
+                <Input
+                  value={form.reminder_cron}
+                  onChange={(e) => updateField("reminder_cron", e.target.value)}
+                  placeholder="0 8 * * 1-5"
+                />
+                <p className="mt-1 text-xs text-text-secondary">Jadwal reminder harian (default: Senin-Jumat jam 8)</p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Weekly Digest Cron</label>
+                <Input
+                  value={form.weekly_digest_cron}
+                  onChange={(e) => updateField("weekly_digest_cron", e.target.value)}
+                  placeholder="0 8 * * 1"
+                />
+                <p className="mt-1 text-xs text-text-secondary">Jadwal digest mingguan (default: Senin jam 8)</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Save button */}
+          <div className="flex items-center gap-3 border-t border-border pt-4">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              <Save className="mr-1.5 h-4 w-4" />
+              {saveMutation.isPending ? "Menyimpan..." : "Simpan Konfigurasi"}
+            </Button>
+            {saveMutation.isSuccess && (
+              <p className="text-sm text-green-600">Konfigurasi berhasil disimpan</p>
+            )}
+            {saveMutation.isError && (
+              <p className="text-sm text-red-500">Gagal menyimpan konfigurasi</p>
+            )}
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 }
 

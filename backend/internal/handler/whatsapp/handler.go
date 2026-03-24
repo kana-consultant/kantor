@@ -29,6 +29,10 @@ func New(service *waservice.Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router chi.Router) {
+	// Config (per-tenant)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/config", h.getWAConfig)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Put("/config", h.updateWAConfig)
+
 	// Connection
 	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/status", h.getStatus)
 	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Get("/qr", h.getQR)
@@ -61,6 +65,54 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 	// User phone
 	router.Get("/phone", h.getUserPhone)
 	router.Put("/phone", h.updateUserPhone)
+}
+
+// --------------- Config ---------------
+
+func (h *Handler) getWAConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := h.service.GetWAConfig(r.Context())
+	if err != nil {
+		h.writeInternalError(w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"api_url":            cfg.APIURL,
+		"api_key":            cfg.APIKey,
+		"session_name":       cfg.SessionName,
+		"enabled":            cfg.Enabled,
+		"max_daily_messages": cfg.MaxDailyMessages,
+		"min_delay_ms":       cfg.MinDelayMS,
+		"max_delay_ms":       cfg.MaxDelayMS,
+		"reminder_cron":      cfg.ReminderCron,
+		"weekly_digest_cron": cfg.WeeklyDigestCron,
+	}, nil)
+}
+
+func (h *Handler) updateWAConfig(w http.ResponseWriter, r *http.Request) {
+	var input wadto.UpdateWAConfigRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	cfg := warepo.WAConfig{
+		APIURL:           input.APIURL,
+		APIKey:           input.APIKey,
+		SessionName:      input.SessionName,
+		Enabled:          input.Enabled,
+		MaxDailyMessages: input.MaxDailyMessages,
+		MinDelayMS:       input.MinDelayMS,
+		MaxDelayMS:       input.MaxDelayMS,
+		ReminderCron:     input.ReminderCron,
+		WeeklyDigestCron: input.WeeklyDigestCron,
+	}
+
+	if err := h.service.UpdateWAConfig(r.Context(), cfg); err != nil {
+		h.writeInternalError(w, err)
+		return
+	}
+
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_config", "", nil, cfg)
+	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "WhatsApp configuration updated"}, nil)
 }
 
 // --------------- Connection ---------------

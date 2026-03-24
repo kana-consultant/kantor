@@ -90,6 +90,21 @@ func (s *Service) InvalidateClient(ctx context.Context) {
 	s.mu.Unlock()
 }
 
+// --------------- WA Config ---------------
+
+func (s *Service) GetWAConfig(ctx context.Context) (warepo.WAConfig, error) {
+	return s.repo.GetWAConfig(ctx)
+}
+
+func (s *Service) UpdateWAConfig(ctx context.Context, cfg warepo.WAConfig) error {
+	if err := s.repo.UpsertWAConfig(ctx, cfg); err != nil {
+		return err
+	}
+	// Invalidate cached client so next call picks up new config.
+	s.InvalidateClient(ctx)
+	return nil
+}
+
 // --------------- Connection ---------------
 
 func (s *Service) GetStatus(ctx context.Context) (*SessionStatus, error) {

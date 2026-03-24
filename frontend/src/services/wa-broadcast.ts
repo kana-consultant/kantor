@@ -99,10 +99,23 @@ export interface WALogFilters {
   search?: string;
 }
 
+export interface WAConfig {
+  api_url: string;
+  api_key: string;
+  session_name: string;
+  enabled: boolean;
+  max_daily_messages: number;
+  min_delay_ms: number;
+  max_delay_ms: number;
+  reminder_cron: string;
+  weekly_digest_cron: string;
+}
+
 // ---- Query keys ----
 
 export const waKeys = {
   all: ["wa"] as const,
+  config: () => [...waKeys.all, "config"] as const,
   status: () => [...waKeys.all, "status"] as const,
   stats: () => [...waKeys.all, "stats"] as const,
   templates: (category?: string, triggerType?: string) => [...waKeys.all, "templates", category, triggerType] as const,
@@ -116,6 +129,19 @@ export const waKeys = {
 
 function token() {
   return getStoredSession()?.tokens.access_token;
+}
+
+// Config
+export function getWAConfig() {
+  return getJSON<WAConfig>("/wa/config", token());
+}
+
+export function updateWAConfig(data: WAConfig) {
+  return requestJSON<{ message: string }>("/wa/config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }, token());
 }
 
 // Connection
