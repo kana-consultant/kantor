@@ -93,15 +93,19 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("seed tenants: %w", err)
 	}
 
-	// Seed RBAC defaults and users per-tenant.
+	// Seed RBAC defaults and finance categories per-tenant.
+	financeRepositoryForSeed := hrisrepo.NewFinanceRepository(pool)
 	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {
 		if err := rbac.SeedDefaults(tCtx, pool); err != nil {
 			return fmt.Errorf("seed rbac defaults for tenant %s: %w", t.Slug, err)
 		}
+		if err := financeRepositoryForSeed.SeedDefaultCategories(tCtx); err != nil {
+			return fmt.Errorf("seed finance categories for tenant %s: %w", t.Slug, err)
+		}
 		return nil
 	}); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("seed rbac defaults: %w", err)
+		return nil, fmt.Errorf("seed per-tenant defaults: %w", err)
 	}
 
 	auditRepository := auditrepo.NewRepository(pool)
@@ -204,8 +208,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	compensationService := hrisservice.NewCompensationService(compensationRepository, employeesRepository, encrypter)
 	financeService := hrisservice.NewFinanceService(financeRepository)
 	notificationsService := notificationsservice.New(notificationsRepository)
-	reimbursementsService := hrisservice.NewReimbursementsService(reimbursementsRepository, employeesRepository, authRepository, notificationsService)
-	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter)
+	reimbursementsService := hrisservice.NewReimbursementsService(reimbursementsRepository, employeesRepository, authRepository, notificationsService, financeService)
+	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter, financeService)
 	hrisOverviewService := hrisservice.NewOverviewService(hrisOverviewRepository)
 	campaignsService := marketingservice.NewCampaignsService(campaignsRepository, authRepository, notificationsService)
 	adsMetricsService := marketingservice.NewAdsMetricsService(adsMetricsRepository)
@@ -342,6 +346,8 @@ func (a *App) buildRouter(
 			protected.Get("/auth/me", authHandler.Me)
 			protected.Get("/auth/profile", authHandler.GetProfile)
 			protected.Put("/auth/profile", authHandler.UpdateProfile)
+			protected.Put("/auth/profile/email", authHandler.ChangeEmail)
+			protected.Post("/auth/profile/avatar", authHandler.UploadProfileAvatar)
 			protected.Post("/auth/change-password", authHandler.ChangePassword)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.With(platformmiddleware.RequireAnyPermission(

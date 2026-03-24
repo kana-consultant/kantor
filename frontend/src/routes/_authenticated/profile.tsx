@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import {
   Building2,
   Calendar,
+  Camera,
   CreditCard,
   KeyRound,
   Link2,
@@ -29,7 +30,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { changePassword, ensureAuthenticated, logout } from "@/services/auth";
-import { getProfile, profileKeys, updateProfile } from "@/services/profile";
+import { changeEmail, getProfile, profileKeys, updateProfile, uploadProfileAvatar } from "@/services/profile";
 import { toast } from "@/stores/toast-store";
 
 const changePasswordSchema = z
@@ -44,6 +45,13 @@ const changePasswordSchema = z
   });
 
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
+
+const changeEmailSchema = z.object({
+  email: z.string().email("Email tidak valid").min(1, "Email wajib diisi"),
+  password: z.string().min(1, "Password wajib diisi untuk konfirmasi"),
+});
+
+type ChangeEmailFormValues = z.infer<typeof changeEmailSchema>;
 
 export const Route = createFileRoute("/_authenticated/profile")({
   beforeLoad: async () => {
@@ -61,6 +69,8 @@ function ProfilePage() {
   const { user, roleLabels, roleSummary } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const profileQuery = useQuery({
     queryKey: profileKeys.me,
@@ -129,6 +139,54 @@ function ProfilePage() {
       await navigate({ to: "/login" });
     },
   });
+
+  const {
+    register: registerEmailField,
+    handleSubmit: submitEmailForm,
+    reset: resetEmailForm,
+    formState: { errors: emailErrors },
+  } = useForm<ChangeEmailFormValues>({
+    resolver: zodResolver(changeEmailSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const changeEmailMutation = useMutation({
+    mutationFn: (values: ChangeEmailFormValues) => changeEmail(values),
+    onSuccess: () => {
+      setIsEmailModalOpen(false);
+      resetEmailForm();
+      toast.success("Email berhasil diubah");
+      queryClient.invalidateQueries({ queryKey: profileKeys.me });
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+  });
+
+  const avatarMutation = useMutation({
+    mutationFn: (file: File) => uploadProfileAvatar(file),
+    onSuccess: () => {
+      toast.success("Foto profil berhasil diubah");
+      queryClient.invalidateQueries({ queryKey: profileKeys.me });
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : "Gagal mengupload foto");
+    },
+  });
+
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      avatarMutation.mutate(file);
+    }
+    e.target.value = "";
+  }
+
+  function closeEmailModal() {
+    if (changeEmailMutation.isPending) return;
+    setIsEmailModalOpen(false);
+    changeEmailMutation.reset();
+    resetEmailForm();
+  }
 
   const employee = profileQuery.data;
 
@@ -217,11 +275,29 @@ function ProfilePage() {
       {/* Header card */}
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-center gap-4">
-          <ProtectedAvatar
-            alt={employee?.full_name ?? user?.full_name ?? "Profil"}
-            avatarUrl={employee?.avatar_url ?? user?.avatar_url}
-            className="h-16 w-16 border border-border/70"
-          />
+          <div className="group relative">
+            <ProtectedAvatar
+              alt={employee?.full_name ?? user?.full_name ?? "Profil"}
+              avatarUrl={employee?.avatar_url ?? user?.avatar_url}
+              className="h-16 w-16 border border-border/70"
+            />
+            <button
+              type="button"
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarMutation.isPending}
+              title="Ganti foto profil"
+            >
+              <Camera className="h-5 w-5 text-white" />
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+          </div>
           <div className="flex-1">
             {isEditing ? (
               <Input
@@ -245,7 +321,9 @@ function ProfilePage() {
 
       {/* Info grid */}
       <div className="grid gap-4 md:grid-cols-2">
-        <InfoCard icon={Mail} label="Email" value={user?.email ?? "-"} />
+        <div className="cursor-pointer" onClick={() => setIsEmailModalOpen(true)} title="Klik untuk ganti email">
+          <InfoCard icon={Mail} label="Email" value={user?.email ?? "-"} />
+        </div>
         <InfoCard icon={Shield} label="Role" value={roleLabels.join(", ") || roleSummary || "-"} />
         <InfoCard
           icon={Phone}
@@ -413,6 +491,50 @@ function ProfilePage() {
           />
           {passwordErrors.confirm_password ? (
             <p className="text-[12px] text-error">{passwordErrors.confirm_password.message}</p>
+          ) : null}
+        </div>
+      </FormModal>
+
+      <FormModal
+        error={changeEmailMutation.error instanceof ApiError ? changeEmailMutation.error.message : null}
+        isLoading={changeEmailMutation.isPending}
+        isOpen={isEmailModalOpen}
+        onClose={closeEmailModal}
+        onSubmit={submitEmailForm((values) => changeEmailMutation.mutate(values))}
+        size="md"
+        submitLabel="Simpan Email Baru"
+        subtitle="Masukkan email baru dan konfirmasi dengan password Anda."
+        title="Ganti Email"
+      >
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-[600] text-text-primary" htmlFor="change_email">
+            Email Baru
+          </label>
+          <Input
+            id="change_email"
+            autoComplete="email"
+            placeholder="email@contoh.com"
+            type="email"
+            {...registerEmailField("email")}
+          />
+          {emailErrors.email ? (
+            <p className="text-[12px] text-error">{emailErrors.email.message}</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-[600] text-text-primary" htmlFor="email_confirm_password">
+            Password
+          </label>
+          <Input
+            id="email_confirm_password"
+            autoComplete="current-password"
+            placeholder="Masukkan password untuk konfirmasi"
+            type="password"
+            {...registerEmailField("password")}
+          />
+          {emailErrors.password ? (
+            <p className="text-[12px] text-error">{emailErrors.password.message}</p>
           ) : null}
         </div>
       </FormModal>

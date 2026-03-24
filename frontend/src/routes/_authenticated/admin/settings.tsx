@@ -5,14 +5,17 @@ import { Save, Settings2, UserRoundPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { useRBAC } from "@/hooks/use-rbac";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { permissions } from "@/lib/permissions";
 import {
   adminRbacKeys,
   getAdminSettings,
+  getRole,
   listSettingsDepartments,
   listModules,
+  listPermissionGroups,
   listRoles,
   updateAutoCreateEmployee,
   updateDefaultRoles,
@@ -31,7 +34,7 @@ function AdminSettingsPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = useRBAC();
   const canManageSettings = hasPermission(permissions.adminSettingsManage);
-  const [defaultRoles, setDefaultRoles] = useState<Record<string, string | null>>({});
+  const [selectedDefaultRoleID, setSelectedDefaultRoleID] = useState("");
   const [autoCreateEmployeeEnabled, setAutoCreateEmployeeEnabled] = useState(true);
   const [defaultDepartmentID, setDefaultDepartmentID] = useState<string | null>(null);
 
@@ -56,6 +59,15 @@ function AdminSettingsPage() {
     queryKey: adminRbacKeys.modules(),
     queryFn: listModules,
   });
+  const permissionsQuery = useQuery({
+    queryKey: adminRbacKeys.permissions(),
+    queryFn: listPermissionGroups,
+  });
+  const selectedRoleQuery = useQuery({
+    queryKey: adminRbacKeys.roleDetail(selectedDefaultRoleID || "pending"),
+    queryFn: () => getRole(selectedDefaultRoleID),
+    enabled: Boolean(selectedDefaultRoleID),
+  });
   const departmentsQuery = useQuery({
     queryKey: adminRbacKeys.settingsDepartments(),
     queryFn: listSettingsDepartments,
@@ -66,20 +78,51 @@ function AdminSettingsPage() {
       return;
     }
 
-    const nextDefaultRoles: Record<string, string | null> = {};
-    for (const [moduleID, role] of Object.entries(settingsQuery.data.default_roles)) {
-      nextDefaultRoles[moduleID] = role?.role_id ?? null;
-    }
-
-    setDefaultRoles(nextDefaultRoles);
+    const uniqueRoleIDs = Array.from(
+      new Set(
+        Object.values(settingsQuery.data.default_roles)
+          .map((role) => role?.role_id)
+          .filter((roleID): roleID is string => Boolean(roleID)),
+      ),
+    );
+    setSelectedDefaultRoleID(uniqueRoleIDs.length === 1 ? (uniqueRoleIDs[0] ?? "") : "");
     setAutoCreateEmployeeEnabled(settingsQuery.data.auto_create_employee.enabled);
     setDefaultDepartmentID(
       settingsQuery.data.auto_create_employee.default_department_id ?? null,
     );
   }, [settingsQuery.data]);
 
+  const permissionModuleMap = useMemo(() => {
+    const mapping = new Map<string, string>();
+    for (const group of permissionsQuery.data ?? []) {
+      for (const permission of group.permissions) {
+        mapping.set(permission.id, group.id);
+      }
+    }
+    return mapping;
+  }, [permissionsQuery.data]);
+
+  const selectedRoleModules = useMemo(() => {
+    if (!selectedRoleQuery.data) {
+      return [];
+    }
+    return Array.from(
+      new Set(
+        selectedRoleQuery.data.permission_ids
+          .map((permissionID: string) => permissionModuleMap.get(permissionID))
+          .filter((moduleID): moduleID is string => Boolean(moduleID)),
+      ),
+    );
+  }, [permissionModuleMap, selectedRoleQuery.data]);
+
   const defaultRolesMutation = useMutation({
-    mutationFn: updateDefaultRoles,
+    mutationFn: (roleID: string) => {
+      const moduleRoles: Record<string, string | null> = {};
+      for (const module of moduleOptions) {
+        moduleRoles[module.id] = roleID && selectedRoleModules.includes(module.id) ? roleID : null;
+      }
+      return updateDefaultRoles(moduleRoles);
+    },
     onSuccess: () => {
       toast.success("Default role berhasil diperbarui");
       void queryClient.invalidateQueries({ queryKey: adminRbacKeys.settings() });
@@ -107,13 +150,7 @@ function AdminSettingsPage() {
   });
 
   const roleOptions = useMemo(
-    () =>
-      (rolesQuery.data ?? [])
-        .filter((role) => role.slug !== "super_admin")
-        .map((role) => ({
-          id: role.id,
-          label: `${role.name} (${role.slug})`,
-        })),
+    () => (rolesQuery.data ?? []).filter((role) => role.slug !== "super_admin"),
     [rolesQuery.data],
   );
 
@@ -161,45 +198,74 @@ function AdminSettingsPage() {
           </div>
 
           <div className="space-y-4">
-            {moduleOptions.map((module) => (
-              <div className="space-y-1.5" key={module.id}>
-                <label
-                  className="text-[13px] font-[600] text-text-primary"
-                  htmlFor={`default-role-${module.id}`}
-                >
-                  {module.name}
-                </label>
-                <select
-                  className="h-10 w-full rounded-sm border-[1.5px] border-transparent bg-surface-muted px-3 text-[14px] text-text-primary outline-none transition-all focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
-                  disabled={!canManageSettings}
-                  id={`default-role-${module.id}`}
-                  onChange={(event) =>
-                    setDefaultRoles((current) => ({
-                      ...current,
-                      [module.id]: event.target.value || null,
-                    }))
-                  }
-                  value={defaultRoles[module.id] ?? ""}
-                >
-                  <option value="">Tidak ada akses</option>
-                  {roleOptions.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+            <div className="space-y-1.5">
+              <label
+                className="text-[13px] font-[600] text-text-primary"
+                htmlFor="default-role"
+              >
+                Role
+              </label>
+              <select
+                className="h-10 w-full rounded-sm border-[1.5px] border-transparent bg-surface-muted px-3 text-[14px] text-text-primary outline-none transition-all focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
+                disabled={!canManageSettings}
+                id="default-role"
+                onChange={(event) => setSelectedDefaultRoleID(event.target.value)}
+                value={selectedDefaultRoleID}
+              >
+                <option value="">Tidak ada akses</option>
+                {roleOptions.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name} ({role.slug})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-text-secondary">
+                Sistem akan mengaktifkan modul otomatis berdasarkan permission di role ini.
+              </p>
+            </div>
+
+            <div className="rounded-md border border-border p-4">
+              <p className="text-sm font-semibold text-text-primary">Modul yang akan aktif</p>
+              {selectedDefaultRoleID && selectedRoleQuery.isLoading ? (
+                <div className="mt-3 h-10 animate-pulse rounded-md bg-surface-muted" />
+              ) : selectedRoleModules.length === 0 ? (
+                <p className="mt-3 text-sm text-text-secondary">
+                  Tidak ada modul aktif. Pilih role untuk memberi akses default.
+                </p>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {moduleOptions
+                    .filter((module) => selectedRoleModules.includes(module.id))
+                    .map((module) => (
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
+                          module.id === "operational"
+                            ? "bg-ops-light text-ops"
+                            : module.id === "hris"
+                              ? "bg-hr-light text-hr"
+                              : module.id === "marketing"
+                                ? "bg-mkt-light text-mkt"
+                                : "bg-error-light text-error",
+                        )}
+                        key={module.id}
+                      >
+                        {module.name}
+                      </span>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end">
             <Button
               disabled={!canManageSettings || defaultRolesMutation.isPending || settingsQuery.isLoading}
-              onClick={() => defaultRolesMutation.mutate(defaultRoles)}
+              onClick={() => defaultRolesMutation.mutate(selectedDefaultRoleID)}
               type="button"
             >
               <Save className="h-4 w-4" />
-              Simpan Default Roles
+              Simpan Default Role
             </Button>
           </div>
         </Card>

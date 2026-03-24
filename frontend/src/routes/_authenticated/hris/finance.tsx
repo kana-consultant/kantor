@@ -285,7 +285,7 @@ function FinancePage() {
       align: "right",
       cell: (record) => (
         <div className="flex justify-end gap-2">
-          {hasPermission(permissions.hrisFinanceEdit) ? (
+          {hasPermission(permissions.hrisFinanceEdit) && record.approval_status === "draft" ? (
             <>
               <Button
                 onClick={() => {

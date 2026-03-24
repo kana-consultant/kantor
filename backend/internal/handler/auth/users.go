@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		SuperAdmin: superAdmin,
 	})
 	if err != nil {
+		slog.Error("failed to list users", "error", err)
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users", nil)
 		return
 	}

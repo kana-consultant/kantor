@@ -897,6 +897,20 @@ func (r *Repository) UpdateUserAvatar(ctx context.Context, userID string, avatar
 	return err
 }
 
+func (r *Repository) UpdateEmployeeEmailByUserID(ctx context.Context, userID string, email string) error {
+	_, err := repository.DB(ctx, r.db).Exec(ctx,
+		`UPDATE employees SET email = $2, updated_at = NOW() WHERE user_id = $1::uuid`,
+		userID, strings.ToLower(strings.TrimSpace(email)))
+	return err
+}
+
+func (r *Repository) UpdateEmployeeAvatarByUserID(ctx context.Context, userID string, avatarURL string) error {
+	_, err := repository.DB(ctx, r.db).Exec(ctx,
+		`UPDATE employees SET avatar_url = NULLIF($2, ''), updated_at = NOW() WHERE user_id = $1::uuid`,
+		userID, avatarURL)
+	return err
+}
+
 func normalizePhone(phone *string) interface{} {
 	if phone == nil {
 		return nil

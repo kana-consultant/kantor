@@ -3,6 +3,7 @@ package hris
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -36,16 +37,18 @@ type subscriptionsEmployeesRepository interface {
 }
 
 type SubscriptionsService struct {
-	repo          subscriptionsRepository
-	employeesRepo subscriptionsEmployeesRepository
-	encrypter     *security.Encrypter
+	repo           subscriptionsRepository
+	employeesRepo  subscriptionsEmployeesRepository
+	encrypter      *security.Encrypter
+	financeService *FinanceService
 }
 
-func NewSubscriptionsService(repo subscriptionsRepository, employeesRepo subscriptionsEmployeesRepository, encrypter *security.Encrypter) *SubscriptionsService {
+func NewSubscriptionsService(repo subscriptionsRepository, employeesRepo subscriptionsEmployeesRepository, encrypter *security.Encrypter, financeService *FinanceService) *SubscriptionsService {
 	return &SubscriptionsService{
-		repo:          repo,
-		employeesRepo: employeesRepo,
-		encrypter:     encrypter,
+		repo:           repo,
+		employeesRepo:  employeesRepo,
+		encrypter:      encrypter,
+		financeService: financeService,
 	}
 }
 
@@ -58,6 +61,14 @@ func (s *SubscriptionsService) CreateSubscription(ctx context.Context, request h
 	if err != nil {
 		return model.Subscription{}, mapSubscriptionError(err)
 	}
+
+	if s.financeService != nil && subscription.Status == "active" {
+		desc := "Subscription: " + subscription.Name + " (" + subscription.Vendor + ")"
+		if finErr := s.financeService.RecordOutcome(ctx, "subscription", subscription.CostAmount, desc, subscription.StartDate, actorID); finErr != nil {
+			return model.Subscription{}, fmt.Errorf("record finance entry: %w", finErr)
+		}
+	}
+
 	return s.decryptSubscription(subscription)
 }
 

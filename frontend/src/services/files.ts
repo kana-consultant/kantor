@@ -2,7 +2,7 @@ import { ApiError } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { ensureAuthenticated } from "@/services/auth";
 
-export type ProtectedFileType = "campaigns" | "reimbursements" | "employees";
+export type ProtectedFileType = "campaigns" | "reimbursements" | "employees" | "profiles";
 
 export interface ProtectedFileReference {
   type: ProtectedFileType;
@@ -91,7 +91,7 @@ export function parseProtectedFilePath(filePath: string): ProtectedFileReference
   }
 
   const [type, resourceId, ...filenameParts] = parts;
-  if (type !== "campaigns" && type !== "reimbursements" && type !== "employees") {
+  if (type !== "campaigns" && type !== "reimbursements" && type !== "employees" && type !== "profiles") {
     return null;
   }
 

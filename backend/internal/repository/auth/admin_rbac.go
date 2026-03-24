@@ -544,7 +544,9 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 	}
 	defer rows.Close()
 
-	items := make([]AdminUserSummary, 0)
+	// Collect all users first, then close rows before issuing sub-queries.
+	// pgx does not allow concurrent queries on the same connection.
+	var users []model.User
 	for rows.Next() {
 		var user model.User
 		if err := rows.Scan(
@@ -564,12 +566,19 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 		); err != nil {
 			return nil, 0, err
 		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	rows.Close()
 
+	items := make([]AdminUserSummary, 0, len(users))
+	for _, user := range users {
 		moduleRoles, err := r.GetUserModuleRoles(ctx, user.ID)
 		if err != nil {
 			return nil, 0, err
 		}
-
 		items = append(items, AdminUserSummary{
 			User:         user,
 			ModuleRoles:  moduleRoles,
@@ -577,7 +586,7 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 		})
 	}
 
-	return items, total, rows.Err()
+	return items, total, nil
 }
 
 func (r *Repository) GetAdminUserDetail(ctx context.Context, userID string) (AdminUserDetail, error) {

@@ -605,6 +605,62 @@ func (r *FinanceRepository) hydrateCategoryName(ctx context.Context, record mode
 	return record, nil
 }
 
+// SeedDefaultCategories ensures all default finance categories exist for the current tenant.
+func (r *FinanceRepository) SeedDefaultCategories(ctx context.Context) error {
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `
+		INSERT INTO finance_categories (name, type, is_default) VALUES
+			('project revenue', 'income', TRUE),
+			('service fee', 'income', TRUE),
+			('other income', 'income', TRUE),
+			('gaji', 'outcome', TRUE),
+			('sewa', 'outcome', TRUE),
+			('utilitas', 'outcome', TRUE),
+			('marketing spend', 'outcome', TRUE),
+			('subscription', 'outcome', TRUE),
+			('reimbursement', 'outcome', TRUE),
+			('operational', 'outcome', TRUE),
+			('other expense', 'outcome', TRUE)
+		ON CONFLICT ON CONSTRAINT uq_finance_categories_tenant_name_type DO NOTHING
+	`)
+	return err
+}
+
+func (r *FinanceRepository) FindOrCreateCategoryID(ctx context.Context, name string, recordType string) (string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	var id string
+	err := repository.DB(ctx, r.db).QueryRow(ctx,
+		`SELECT id::text FROM finance_categories WHERE name = $1 AND type = $2`,
+		name, recordType,
+	).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	err = repository.DB(ctx, r.db).QueryRow(ctx,
+		`INSERT INTO finance_categories (name, type, is_default) VALUES ($1, $2, TRUE)
+		 ON CONFLICT ON CONSTRAINT uq_finance_categories_tenant_name_type DO UPDATE SET name = EXCLUDED.name
+		 RETURNING id::text`,
+		name, recordType,
+	).Scan(&id)
+	return id, err
+}
+
+func (r *FinanceRepository) CreateApprovedRecord(ctx context.Context, params UpsertFinanceRecordParams) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `
+		INSERT INTO finance_records (category_id, type, amount, description, record_date, record_month, record_year, submitted_by, approval_status, approved_by, approved_at)
+		VALUES ($1::uuid, $2, $3, $4, $5::date, EXTRACT(MONTH FROM $5::date)::int, EXTRACT(YEAR FROM $5::date)::int, NULLIF($6, '')::uuid, 'approved', NULLIF($6, '')::uuid, NOW())
+	`, params.CategoryID, params.Type, params.Amount, params.Description, params.RecordDate, params.SubmittedBy)
+	return err
+}
+
 func mapFinanceError(err error) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {

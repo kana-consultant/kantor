@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
@@ -34,6 +36,8 @@ type financeRepository interface {
 	ReviewRecord(ctx context.Context, recordID string, decision string, actorID string) (model.FinanceRecord, error)
 	Summary(ctx context.Context, year int) (model.FinanceSummary, error)
 	ListForExport(ctx context.Context, params hrisrepo.ListFinanceExportParams) ([]model.FinanceRecord, error)
+	FindOrCreateCategoryID(ctx context.Context, name string, recordType string) (string, error)
+	CreateApprovedRecord(ctx context.Context, params hrisrepo.UpsertFinanceRecordParams) error
 }
 
 type FinanceService struct {
@@ -193,6 +197,22 @@ func (s *FinanceService) ExportCSV(ctx context.Context, year int, month int) ([]
 		return nil, err
 	}
 	return []byte(builder.String()), nil
+}
+
+// RecordOutcome creates an auto-approved outcome finance entry linked to a category by name.
+func (s *FinanceService) RecordOutcome(ctx context.Context, categoryName string, amount int64, description string, recordDate time.Time, actorID string) error {
+	categoryID, err := s.repo.FindOrCreateCategoryID(ctx, categoryName, "outcome")
+	if err != nil {
+		return fmt.Errorf("finance: find category %q: %w", categoryName, err)
+	}
+	return s.repo.CreateApprovedRecord(ctx, hrisrepo.UpsertFinanceRecordParams{
+		CategoryID:  categoryID,
+		Type:        "outcome",
+		Amount:      amount,
+		Description: description,
+		RecordDate:  recordDate,
+		SubmittedBy: actorID,
+	})
 }
 
 func mapFinanceServiceError(err error) error {
