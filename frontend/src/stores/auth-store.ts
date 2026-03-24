@@ -18,7 +18,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "kantor-auth",
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         session: state.session,
       }),

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -20,7 +19,7 @@ var ErrReimbursementNotFound = errors.New("reimbursement not found")
 var ErrReimbursementAttachmentNotFound = errors.New("reimbursement attachment not found")
 
 type ReimbursementsRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type CreateReimbursementParams struct {
@@ -49,7 +48,7 @@ type ReviewReimbursementParams struct {
 	Notes    *string
 }
 
-func NewReimbursementsRepository(db *pgxpool.Pool) *ReimbursementsRepository {
+func NewReimbursementsRepository(db repository.DBTX) *ReimbursementsRepository {
 	return &ReimbursementsRepository{db: db}
 }
 
@@ -62,7 +61,7 @@ func (r *ReimbursementsRepository) Create(ctx context.Context, params CreateReim
 		VALUES ($1::uuid, $2, $3, $4, $5::date, $6, $7::uuid, 'submitted')
 		RETURNING id::text, employee_id::text, title, category, amount, transaction_date, description, status, attachments, submitted_by::text, manager_id::text, manager_action_at, manager_notes, finance_id::text, finance_action_at, finance_notes, paid_at, created_at, updated_at
 	`
-	item, err := r.scanRow(ctx, r.db.QueryRow(
+	item, err := r.scanRow(ctx, repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		params.EmployeeID,
@@ -120,7 +119,7 @@ func (r *ReimbursementsRepository) List(ctx context.Context, params ListReimburs
 		INNER JOIN employees ON employees.id = reimbursements.employee_id
 		WHERE ` + whereClause
 	var total int64
-	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -155,7 +154,7 @@ func (r *ReimbursementsRepository) List(ctx context.Context, params ListReimburs
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -202,7 +201,7 @@ func (r *ReimbursementsRepository) GetByID(ctx context.Context, reimbursementID 
 		INNER JOIN employees ON employees.id = reimbursements.employee_id
 		WHERE reimbursements.id = $1::uuid
 	`
-	item, err := scanReimbursementRow(r.db.QueryRow(ctx, query, reimbursementID))
+	item, err := scanReimbursementRow(repository.DB(ctx, r.db).QueryRow(ctx, query, reimbursementID))
 	if err != nil {
 		return model.Reimbursement{}, err
 	}
@@ -243,7 +242,7 @@ func (r *ReimbursementsRepository) AddAttachments(ctx context.Context, reimburse
 		WHERE id = $1::uuid
 		RETURNING id::text, employee_id::text, title, category, amount, transaction_date, description, status, attachments, submitted_by::text, manager_id::text, manager_action_at, manager_notes, finance_id::text, finance_action_at, finance_notes, paid_at, created_at, updated_at
 	`
-	item, err := r.scanRow(ctx, r.db.QueryRow(ctx, query, reimbursementID, string(payload)))
+	item, err := r.scanRow(ctx, repository.DB(ctx, r.db).QueryRow(ctx, query, reimbursementID, string(payload)))
 	if err != nil {
 		return model.Reimbursement{}, err
 	}
@@ -268,7 +267,7 @@ func (r *ReimbursementsRepository) ApplyManagerReview(ctx context.Context, reimb
 		WHERE id = $1::uuid AND status = 'submitted'
 		RETURNING id::text, employee_id::text, title, category, amount, transaction_date, description, status, attachments, submitted_by::text, manager_id::text, manager_action_at, manager_notes, finance_id::text, finance_action_at, finance_notes, paid_at, created_at, updated_at
 	`
-	item, err := r.scanRow(ctx, r.db.QueryRow(ctx, query, reimbursementID, nextStatus, params.ActorID, nullableText(params.Notes)))
+	item, err := r.scanRow(ctx, repository.DB(ctx, r.db).QueryRow(ctx, query, reimbursementID, nextStatus, params.ActorID, nullableText(params.Notes)))
 	if err != nil {
 		return model.Reimbursement{}, err
 	}
@@ -297,7 +296,7 @@ func (r *ReimbursementsRepository) MarkPaid(ctx context.Context, reimbursementID
 		WHERE id = $1::uuid AND status = 'approved'
 		RETURNING id::text, employee_id::text, title, category, amount, transaction_date, description, status, attachments, submitted_by::text, manager_id::text, manager_action_at, manager_notes, finance_id::text, finance_action_at, finance_notes, paid_at, created_at, updated_at
 	`
-	item, err := r.scanRow(ctx, r.db.QueryRow(ctx, query, reimbursementID, actorID, nullableText(notes)))
+	item, err := r.scanRow(ctx, repository.DB(ctx, r.db).QueryRow(ctx, query, reimbursementID, actorID, nullableText(notes)))
 	if err != nil {
 		return model.Reimbursement{}, err
 	}
@@ -323,7 +322,7 @@ func (r *ReimbursementsRepository) Summary(ctx context.Context, month int, year 
 	}
 
 	whereClause := strings.Join(filters, " AND ")
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT reimbursements.status, COUNT(*)
 		FROM reimbursements
 		INNER JOIN employees ON employees.id = reimbursements.employee_id
@@ -361,7 +360,7 @@ func (r *ReimbursementsRepository) Summary(ctx context.Context, month int, year 
 		WHERE ` + whereClause + ` AND reimbursements.status IN ('approved', 'paid')
 	`
 	var approvedAmount int64
-	if err := r.db.QueryRow(ctx, approvedQuery, args...).Scan(&approvedAmount); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, approvedQuery, args...).Scan(&approvedAmount); err != nil {
 		return model.ReimbursementSummary{}, err
 	}
 
@@ -487,7 +486,7 @@ func scanReimbursementRow(row pgx.Row) (model.Reimbursement, error) {
 }
 
 func (r *ReimbursementsRepository) hydrateEmployeeName(ctx context.Context, item model.Reimbursement) (model.Reimbursement, error) {
-	if err := r.db.QueryRow(ctx, `SELECT full_name FROM employees WHERE id = $1::uuid`, item.EmployeeID).Scan(&item.EmployeeName); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT full_name FROM employees WHERE id = $1::uuid`, item.EmployeeID).Scan(&item.EmployeeName); err != nil {
 		return model.Reimbursement{}, err
 	}
 	return item, nil

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -16,7 +15,7 @@ import (
 var ErrNotificationNotFound = errors.New("notification not found")
 
 type Repository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type ListParams struct {
@@ -35,7 +34,7 @@ type CreateParams struct {
 	ReferenceID   *string
 }
 
-func New(db *pgxpool.Pool) *Repository {
+func New(db repository.DBTX) *Repository {
 	return &Repository{db: db}
 }
 
@@ -50,7 +49,7 @@ func (r *Repository) Create(ctx context.Context, params CreateParams) (model.Not
 	`
 
 	var item model.Notification
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		params.UserID,
@@ -99,7 +98,7 @@ func (r *Repository) CreateMany(ctx context.Context, params []CreateParams) erro
 		)
 	}
 
-	results := r.db.SendBatch(ctx, batch)
+	results := repository.DB(ctx, r.db).SendBatch(ctx, batch)
 	defer results.Close()
 
 	for range params {
@@ -126,7 +125,7 @@ func (r *Repository) List(ctx context.Context, params ListParams) ([]model.Notif
 	whereClause := strings.Join(filters, " AND ")
 
 	var total int64
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM notifications WHERE `+whereClause, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM notifications WHERE `+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -140,7 +139,7 @@ func (r *Repository) List(ctx context.Context, params ListParams) ([]model.Notif
 		LIMIT $` + strconv.Itoa(limitIndex) + ` OFFSET $` + strconv.Itoa(offsetIndex)
 	args = append(args, params.Limit, params.Offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -177,7 +176,7 @@ func (r *Repository) CountUnread(ctx context.Context, userID string) (int64, err
 	defer cancel()
 
 	var count int64
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`SELECT COUNT(*) FROM notifications WHERE user_id = $1::uuid AND is_read = FALSE`,
 		userID,
@@ -189,7 +188,7 @@ func (r *Repository) MarkRead(ctx context.Context, notificationID string, userID
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(
+	tag, err := repository.DB(ctx, r.db).Exec(
 		ctx,
 		`UPDATE notifications SET is_read = TRUE WHERE id = $1::uuid AND user_id = $2::uuid`,
 		notificationID,
@@ -208,7 +207,7 @@ func (r *Repository) MarkAllRead(ctx context.Context, userID string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	_, err := r.db.Exec(ctx, `UPDATE notifications SET is_read = TRUE WHERE user_id = $1::uuid AND is_read = FALSE`, userID)
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `UPDATE notifications SET is_read = TRUE WHERE user_id = $1::uuid AND is_read = FALSE`, userID)
 	return err
 }
 

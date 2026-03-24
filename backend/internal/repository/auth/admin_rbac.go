@@ -13,6 +13,7 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 )
 
@@ -109,7 +110,7 @@ type AutoCreateEmployeeSetting struct {
 }
 
 func (r *Repository) ListSettingsDepartments(ctx context.Context) ([]model.Department, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT id::text, name, description, head_id::text, NULL::text, created_at
 		FROM departments
 		ORDER BY name ASC
@@ -175,7 +176,7 @@ func (r *Repository) ListRoles(ctx context.Context, params RoleListParams) ([]Ro
 		ORDER BY roles.hierarchy_level DESC, roles.name ASC
 	`, strings.Join(filters, " AND "))
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +206,7 @@ func (r *Repository) ListRoles(ctx context.Context, params RoleListParams) ([]Ro
 
 func (r *Repository) GetRoleDetail(ctx context.Context, roleID string) (RoleDetail, error) {
 	var detail RoleDetail
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			roles.id::text,
 			roles.name,
@@ -236,7 +237,7 @@ func (r *Repository) GetRoleDetail(ctx context.Context, roleID string) (RoleDeta
 		return RoleDetail{}, err
 	}
 
-	rows, err := r.db.Query(ctx, `SELECT permission_id FROM role_permissions WHERE role_id = $1::uuid ORDER BY permission_id`, roleID)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT permission_id FROM role_permissions WHERE role_id = $1::uuid ORDER BY permission_id`, roleID)
 	if err != nil {
 		return RoleDetail{}, err
 	}
@@ -259,7 +260,7 @@ func (r *Repository) CreateRole(ctx context.Context, params UpsertRoleParams, cr
 		return RoleDetail{}, ErrReservedRoleSlug
 	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return RoleDetail{}, err
 	}
@@ -290,7 +291,7 @@ func (r *Repository) CreateRole(ctx context.Context, params UpsertRoleParams, cr
 }
 
 func (r *Repository) UpdateRole(ctx context.Context, roleID string, params UpsertRoleParams) (RoleDetail, error) {
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return RoleDetail{}, err
 	}
@@ -345,7 +346,7 @@ func (r *Repository) UpdateRole(ctx context.Context, roleID string, params Upser
 }
 
 func (r *Repository) DeleteRole(ctx context.Context, roleID string) error {
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -378,7 +379,7 @@ func (r *Repository) DeleteRole(ctx context.Context, roleID string) error {
 }
 
 func (r *Repository) ToggleRole(ctx context.Context, roleID string) (RoleDetail, error) {
-	tag, err := r.db.Exec(ctx, `UPDATE roles SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1::uuid`, roleID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `UPDATE roles SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1::uuid`, roleID)
 	if err != nil {
 		return RoleDetail{}, err
 	}
@@ -415,7 +416,7 @@ func (r *Repository) ListPermissionGroups(ctx context.Context) ([]PermissionGrou
 		LEFT JOIN permissions ON permissions.module_id = modules.id
 		ORDER BY modules.display_order ASC, permissions.resource ASC, permissions.action ASC
 	`
-	rows, err := r.db.Query(ctx, query)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +471,7 @@ func (r *Repository) ListPermissionGroups(ctx context.Context) ([]PermissionGrou
 }
 
 func (r *Repository) ListModules(ctx context.Context) ([]ModuleItem, error) {
-	rows, err := r.db.Query(ctx, `SELECT id, name, COALESCE(description, ''), display_order FROM modules ORDER BY display_order ASC, name ASC`)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT id, name, COALESCE(description, ''), display_order FROM modules ORDER BY display_order ASC, name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -515,7 +516,7 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 
 	whereClause := strings.Join(filters, " AND ")
 	var total int64
-	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE "+whereClause, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE "+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -537,7 +538,7 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 	`, whereClause, index, index+1)
 	args = append(args, perPage, (page-1)*perPage)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -604,7 +605,7 @@ func (r *Repository) GetAdminUserDetail(ctx context.Context, userID string) (Adm
 }
 
 func (r *Repository) ReplaceUserModuleRoles(ctx context.Context, userID string, moduleRoles []dto.SetUserModuleRoleRequest) error {
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -630,7 +631,7 @@ func (r *Repository) ReplaceUserModuleRoles(ctx context.Context, userID string, 
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO user_module_roles (user_id, module_id, role_id)
 			VALUES ($1::uuid, $2, $3::uuid)
-			ON CONFLICT (user_id, module_id)
+			ON CONFLICT (tenant_id, user_id, module_id)
 			DO UPDATE SET role_id = EXCLUDED.role_id, assigned_at = NOW()
 		`, userID, assignment.ModuleID, strings.TrimSpace(*assignment.RoleID)); err != nil {
 			return err
@@ -641,7 +642,7 @@ func (r *Repository) ReplaceUserModuleRoles(ctx context.Context, userID string, 
 }
 
 func (r *Repository) SetUserSuperAdmin(ctx context.Context, userID string, enabled bool) error {
-	tag, err := r.db.Exec(ctx, `UPDATE users SET is_super_admin = $2, updated_at = NOW() WHERE id = $1::uuid`, userID, enabled)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `UPDATE users SET is_super_admin = $2, updated_at = NOW() WHERE id = $1::uuid`, userID, enabled)
 	if err != nil {
 		return err
 	}
@@ -657,7 +658,7 @@ func (r *Repository) GetSettings(ctx context.Context) (SettingsResponse, error) 
 	}
 
 	var defaultRolesRaw []byte
-	if err := r.db.QueryRow(ctx, `SELECT value FROM system_settings WHERE key = 'default_roles'`).Scan(&defaultRolesRaw); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT value FROM system_settings WHERE key = 'default_roles'`).Scan(&defaultRolesRaw); err != nil {
 		return SettingsResponse{}, err
 	}
 
@@ -675,7 +676,7 @@ func (r *Repository) GetSettings(ctx context.Context) (SettingsResponse, error) 
 		ref := &RoleReference{RoleID: roleID}
 		var roleName string
 		var roleSlug string
-		if err := r.db.QueryRow(ctx, `SELECT name, slug FROM roles WHERE id = $1::uuid`, strings.TrimSpace(*roleID)).Scan(&roleName, &roleSlug); err == nil {
+		if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT name, slug FROM roles WHERE id = $1::uuid`, strings.TrimSpace(*roleID)).Scan(&roleName, &roleSlug); err == nil {
 			ref.RoleName = &roleName
 			ref.RoleSlug = &roleSlug
 		}
@@ -683,7 +684,7 @@ func (r *Repository) GetSettings(ctx context.Context) (SettingsResponse, error) 
 	}
 
 	var autoCreateRaw []byte
-	if err := r.db.QueryRow(ctx, `SELECT value FROM system_settings WHERE key = 'auto_create_employee'`).Scan(&autoCreateRaw); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT value FROM system_settings WHERE key = 'auto_create_employee'`).Scan(&autoCreateRaw); err != nil {
 		return SettingsResponse{}, err
 	}
 	if err := json.Unmarshal(autoCreateRaw, &settings.AutoCreateEmployee); err != nil {
@@ -703,7 +704,7 @@ func (r *Repository) UpdateDefaultRoles(ctx context.Context, updatedBy string, m
 
 		trimmedRoleID := strings.TrimSpace(*roleID)
 		var exists bool
-		if err := r.db.QueryRow(
+		if err := repository.DB(ctx, r.db).QueryRow(
 			ctx,
 			`SELECT EXISTS(SELECT 1 FROM roles WHERE id = $1::uuid AND is_active = TRUE)`,
 			trimmedRoleID,
@@ -722,7 +723,7 @@ func (r *Repository) UpdateDefaultRoles(ctx context.Context, updatedBy string, m
 	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec(ctx, `
+	_, err = repository.DB(ctx, r.db).Exec(ctx, `
 		UPDATE system_settings
 		SET value = $1::jsonb, updated_by = NULLIF($2, '')::uuid, updated_at = NOW()
 		WHERE key = 'default_roles'
@@ -735,7 +736,7 @@ func (r *Repository) UpdateAutoCreateEmployee(ctx context.Context, updatedBy str
 	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec(ctx, `
+	_, err = repository.DB(ctx, r.db).Exec(ctx, `
 		UPDATE system_settings
 		SET value = $1::jsonb, updated_by = NULLIF($2, '')::uuid, updated_at = NOW()
 		WHERE key = 'auto_create_employee'
@@ -771,7 +772,7 @@ func (r *Repository) nextRoleCopySlug(ctx context.Context, baseSlug string) (str
 
 	for {
 		var exists bool
-		if err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM roles WHERE slug = $1)`, candidate).Scan(&exists); err != nil {
+		if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM roles WHERE slug = $1)`, candidate).Scan(&exists); err != nil {
 			return "", err
 		}
 		if !exists {

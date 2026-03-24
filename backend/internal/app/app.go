@@ -24,6 +24,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
+	"github.com/kana-consultant/kantor/backend/internal/tenant"
 	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
@@ -59,6 +60,7 @@ type App struct {
 	router           http.Handler
 	backgroundCancel context.CancelFunc
 	permissionCache  *rbac.PermissionCache
+	tenantResolver   *tenant.Resolver
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -82,7 +84,22 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("prepare runtime directories: %w", err)
 	}
 
-	if err := rbac.SeedDefaults(ctx, pool); err != nil {
+	tenantResolver := tenant.NewResolver(pool)
+
+	// Seed all tenants from env (TENANTS=name|slug|domains;...).
+	// Runs as superuser — no RLS needed for global tables.
+	if err := seedTenants(ctx, pool, cfg.Tenants); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("seed tenants: %w", err)
+	}
+
+	// Seed RBAC defaults and users per-tenant.
+	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {
+		if err := rbac.SeedDefaults(tCtx, pool); err != nil {
+			return fmt.Errorf("seed rbac defaults for tenant %s: %w", t.Slug, err)
+		}
+		return nil
+	}); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("seed rbac defaults: %w", err)
 	}
@@ -95,58 +112,61 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
 	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache)
 
-	if cfg.SeedSuperAdmin.Enabled {
-		if err := authService.EnsureSeedSuperAdmin(
-			ctx,
-			cfg.SeedSuperAdmin.Email,
-			cfg.SeedSuperAdmin.Password,
-			cfg.SeedSuperAdmin.FullName,
-		); err != nil {
-			pool.Close()
-			return nil, fmt.Errorf("seed initial super admin: %w", err)
-		}
-	}
-
-	if cfg.SeedDemoUsers.Enabled {
-		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
-			Email:      cfg.SeedDemoUsers.Staff.Email,
-			FullName:   cfg.SeedDemoUsers.Staff.FullName,
-			Department: stringPointer(cfg.SeedDemoUsers.Staff.Department),
-			Skills:     cfg.SeedDemoUsers.Staff.Skills,
-		}, []rbac.RoleKey{{Name: "staff", Module: "operational"}}, cfg.SeedDemoUsers.Staff.Password); err != nil {
-			pool.Close()
-			return nil, fmt.Errorf("seed staff demo user: %w", err)
+	// Seed super admin and demo users per-tenant.
+	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {
+		if cfg.SeedSuperAdmin.Enabled {
+			if err := authService.EnsureSeedSuperAdmin(
+				tCtx,
+				cfg.SeedSuperAdmin.Email,
+				cfg.SeedSuperAdmin.Password,
+				cfg.SeedSuperAdmin.FullName,
+			); err != nil {
+				return fmt.Errorf("seed super admin for tenant %s: %w", t.Slug, err)
+			}
 		}
 
-		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
-			Email:      cfg.SeedDemoUsers.Viewer.Email,
-			FullName:   cfg.SeedDemoUsers.Viewer.FullName,
-			Department: stringPointer(cfg.SeedDemoUsers.Viewer.Department),
-			Skills:     cfg.SeedDemoUsers.Viewer.Skills,
-		}, []rbac.RoleKey{{Name: "viewer", Module: "operational"}}, cfg.SeedDemoUsers.Viewer.Password); err != nil {
-			pool.Close()
-			return nil, fmt.Errorf("seed viewer demo user: %w", err)
+		if cfg.SeedDemoUsers.Enabled {
+			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
+				Email:      cfg.SeedDemoUsers.Staff.Email,
+				FullName:   cfg.SeedDemoUsers.Staff.FullName,
+				Department: stringPointer(cfg.SeedDemoUsers.Staff.Department),
+				Skills:     cfg.SeedDemoUsers.Staff.Skills,
+			}, []rbac.RoleKey{{Name: "staff", Module: "operational"}}, cfg.SeedDemoUsers.Staff.Password); err != nil {
+				return fmt.Errorf("seed staff user for tenant %s: %w", t.Slug, err)
+			}
+
+			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
+				Email:      cfg.SeedDemoUsers.Viewer.Email,
+				FullName:   cfg.SeedDemoUsers.Viewer.FullName,
+				Department: stringPointer(cfg.SeedDemoUsers.Viewer.Department),
+				Skills:     cfg.SeedDemoUsers.Viewer.Skills,
+			}, []rbac.RoleKey{{Name: "viewer", Module: "operational"}}, cfg.SeedDemoUsers.Viewer.Password); err != nil {
+				return fmt.Errorf("seed viewer user for tenant %s: %w", t.Slug, err)
+			}
+
+			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
+				Email:      cfg.SeedDemoUsers.MarketingStaff.Email,
+				FullName:   cfg.SeedDemoUsers.MarketingStaff.FullName,
+				Department: stringPointer(cfg.SeedDemoUsers.MarketingStaff.Department),
+				Skills:     cfg.SeedDemoUsers.MarketingStaff.Skills,
+			}, []rbac.RoleKey{{Name: "staff", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingStaff.Password); err != nil {
+				return fmt.Errorf("seed marketing staff user for tenant %s: %w", t.Slug, err)
+			}
+
+			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
+				Email:      cfg.SeedDemoUsers.MarketingViewer.Email,
+				FullName:   cfg.SeedDemoUsers.MarketingViewer.FullName,
+				Department: stringPointer(cfg.SeedDemoUsers.MarketingViewer.Department),
+				Skills:     cfg.SeedDemoUsers.MarketingViewer.Skills,
+			}, []rbac.RoleKey{{Name: "viewer", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingViewer.Password); err != nil {
+				return fmt.Errorf("seed marketing viewer user for tenant %s: %w", t.Slug, err)
+			}
 		}
 
-		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
-			Email:      cfg.SeedDemoUsers.MarketingStaff.Email,
-			FullName:   cfg.SeedDemoUsers.MarketingStaff.FullName,
-			Department: stringPointer(cfg.SeedDemoUsers.MarketingStaff.Department),
-			Skills:     cfg.SeedDemoUsers.MarketingStaff.Skills,
-		}, []rbac.RoleKey{{Name: "staff", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingStaff.Password); err != nil {
-			pool.Close()
-			return nil, fmt.Errorf("seed marketing staff demo user: %w", err)
-		}
-
-		if err := authService.EnsureSeedUserWithRoles(ctx, authrepo.CreateUserParams{
-			Email:      cfg.SeedDemoUsers.MarketingViewer.Email,
-			FullName:   cfg.SeedDemoUsers.MarketingViewer.FullName,
-			Department: stringPointer(cfg.SeedDemoUsers.MarketingViewer.Department),
-			Skills:     cfg.SeedDemoUsers.MarketingViewer.Skills,
-		}, []rbac.RoleKey{{Name: "viewer", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingViewer.Password); err != nil {
-			pool.Close()
-			return nil, fmt.Errorf("seed marketing viewer demo user: %w", err)
-		}
+		return nil
+	}); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("seed users: %w", err)
 	}
 
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
@@ -193,16 +213,15 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	marketingOverviewService := marketingservice.NewOverviewService(marketingOverviewRepository)
 	filesService := filesservice.New(cfg.UploadsDir, reimbursementsRepository, campaignsRepository, employeesRepository)
 
-	// WhatsApp Broadcast
+	// WhatsApp Broadcast (per-tenant: client loaded from DB config on demand)
 	waRepository := warepo.New(pool)
-	waClient := waservice.NewWAHAClient(cfg.WAHA)
-	whatsappService := waservice.NewService(waRepository, waClient, cfg)
+	whatsappService := waservice.NewService(waRepository, cfg)
 
 	// Wire event triggers
 	kanbanService.SetTaskAssignNotifier(whatsappService)
 	reimbursementsService.SetWANotifier(whatsappService)
 
-	application := &App{cfg: cfg, db: pool, permissionCache: permissionCache}
+	application := &App{cfg: cfg, db: pool, permissionCache: permissionCache, tenantResolver: tenantResolver}
 	application.router = application.buildRouter(
 		auditService,
 		authService,
@@ -289,6 +308,7 @@ func (a *App) buildRouter(
 		MaxAge:           300,
 	}))
 
+	// Health checks are outside tenant middleware — no Host header required.
 	router.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, http.StatusOK, map[string]string{
 			"status": "ok",
@@ -305,7 +325,11 @@ func (a *App) buildRouter(
 			"status": "ok",
 		}, nil)
 	})
-	router.Route("/api/v1", func(r chi.Router) {
+
+	// All API routes require tenant resolution from the Host header.
+	router.Group(func(tenanted chi.Router) {
+		tenanted.Use(platformmiddleware.TenantMiddleware(a.db, a.tenantResolver))
+		tenanted.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", authHandler.RegisterRoutes)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			response.WriteJSON(w, http.StatusOK, map[string]string{
@@ -405,6 +429,7 @@ func (a *App) buildRouter(
 			})
 		})
 	})
+	})
 
 	return router
 }
@@ -412,6 +437,12 @@ func (a *App) buildRouter(
 func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, whatsappService *waservice.Service) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
+
+	runPerTenant := func(name string, fn func(ctx context.Context, t tenant.Info) error) {
+		if err := platformmiddleware.ForEachTenant(ctx, a.db, fn); err != nil {
+			slog.Error("per-tenant background job failed", "job", name, "error", err)
+		}
+	}
 
 	go func() {
 		defer func() {
@@ -423,19 +454,26 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, time.Now()); err != nil {
-			slog.Error("subscription alert generation failed", "error", err)
-		}
-		if _, err := trackerService.PurgeOldData(ctx, time.Now()); err != nil {
-			slog.Error("tracker retention cleanup failed", "error", err)
-		}
+		runPerTenant("subscription_alerts", func(tCtx context.Context, t tenant.Info) error {
+			return subscriptionsService.GenerateSubscriptionAlerts(tCtx, time.Now())
+		})
+		runPerTenant("tracker_retention", func(tCtx context.Context, t tenant.Info) error {
+			_, err := trackerService.PurgeOldData(tCtx, time.Now())
+			return err
+		})
 
 		// Run daily WA reminders on startup
-		go whatsappService.RunDailyReminders(ctx)
+		go runPerTenant("wa_daily_reminders", func(tCtx context.Context, t tenant.Info) error {
+			whatsappService.RunDailyReminders(tCtx)
+			return nil
+		})
 
 		// Check if today is Monday for weekly digest
 		if time.Now().Weekday() == time.Monday {
-			go whatsappService.RunWeeklyDigest(ctx)
+			go runPerTenant("wa_weekly_digest", func(tCtx context.Context, t tenant.Info) error {
+				whatsappService.RunWeeklyDigest(tCtx)
+				return nil
+			})
 		}
 
 		for {
@@ -443,21 +481,28 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			case <-ctx.Done():
 				return
 			case tickAt := <-ticker.C:
-				if err := subscriptionsService.GenerateSubscriptionAlerts(ctx, tickAt); err != nil {
-					slog.Error("subscription alert generation failed", "error", err, "tick", tickAt)
-				}
-				if _, err := trackerService.PurgeOldData(ctx, tickAt); err != nil {
-					slog.Error("tracker retention cleanup failed", "error", err, "tick", tickAt)
-				}
+				runPerTenant("subscription_alerts", func(tCtx context.Context, t tenant.Info) error {
+					return subscriptionsService.GenerateSubscriptionAlerts(tCtx, tickAt)
+				})
+				runPerTenant("tracker_retention", func(tCtx context.Context, t tenant.Info) error {
+					_, err := trackerService.PurgeOldData(tCtx, tickAt)
+					return err
+				})
 
 				// Daily WA reminders (weekdays only)
 				if tickAt.Weekday() >= time.Monday && tickAt.Weekday() <= time.Friday {
-					go whatsappService.RunDailyReminders(ctx)
+					go runPerTenant("wa_daily_reminders", func(tCtx context.Context, t tenant.Info) error {
+						whatsappService.RunDailyReminders(tCtx)
+						return nil
+					})
 				}
 
 				// Weekly digest on Mondays
 				if tickAt.Weekday() == time.Monday {
-					go whatsappService.RunWeeklyDigest(ctx)
+					go runPerTenant("wa_weekly_digest", func(tCtx context.Context, t tenant.Info) error {
+						whatsappService.RunWeeklyDigest(tCtx)
+						return nil
+					})
 				}
 			}
 		}
@@ -534,4 +579,71 @@ func stringPointer(value string) *string {
 		return nil
 	}
 	return &trimmed
+}
+
+const defaultTenantID = "00000000-0000-0000-0000-000000000001"
+
+// seedTenants ensures every tenant defined in the TENANTS env var exists in the
+// database with the correct name, slug, domains, and a WA config row.
+// The first tenant reuses the well-known UUID created by the migration
+// (existing data is backfilled to it). Additional tenants are upserted by slug.
+// Runs as superuser — no RLS.
+func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.TenantConfig) error {
+	for i, tc := range tenants {
+		var tenantID string
+
+		if i == 0 {
+			// First tenant: update the migration placeholder.
+			tenantID = defaultTenantID
+			_, err := pool.Exec(ctx,
+				`UPDATE tenants SET name = $1, slug = $2, updated_at = NOW()
+				 WHERE id = $3`,
+				tc.Name, tc.Slug, tenantID)
+			if err != nil {
+				return fmt.Errorf("update default tenant: %w", err)
+			}
+		} else {
+			// Additional tenants: insert or update by slug.
+			err := pool.QueryRow(ctx,
+				`INSERT INTO tenants (name, slug)
+				 VALUES ($1, $2)
+				 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
+				 RETURNING id::text`,
+				tc.Name, tc.Slug).Scan(&tenantID)
+			if err != nil {
+				return fmt.Errorf("upsert tenant %q: %w", tc.Slug, err)
+			}
+		}
+
+		// Upsert domains (first = primary).
+		for j, domain := range tc.Domains {
+			domain = strings.TrimSpace(domain)
+			if domain == "" {
+				continue
+			}
+			_, err := pool.Exec(ctx,
+				`INSERT INTO tenant_domains (tenant_id, domain, is_primary)
+				 VALUES ($1, $2, $3)
+				 ON CONFLICT (domain) DO UPDATE
+				   SET is_primary = EXCLUDED.is_primary,
+				       tenant_id  = EXCLUDED.tenant_id`,
+				tenantID, domain, j == 0)
+			if err != nil {
+				return fmt.Errorf("upsert domain %q for tenant %q: %w", domain, tc.Slug, err)
+			}
+		}
+
+		// Ensure WA config row exists (disabled by default, admin enables via UI).
+		_, err := pool.Exec(ctx,
+			`INSERT INTO tenant_wa_configs (tenant_id)
+			 VALUES ($1::uuid)
+			 ON CONFLICT (tenant_id) DO NOTHING`,
+			tenantID)
+		if err != nil {
+			return fmt.Errorf("seed wa config for tenant %q: %w", tc.Slug, err)
+		}
+
+		slog.Info("tenant seeded", "name", tc.Name, "slug", tc.Slug, "domains", tc.Domains)
+	}
+	return nil
 }

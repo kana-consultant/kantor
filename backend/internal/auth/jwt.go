@@ -12,7 +12,8 @@ import (
 )
 
 type AccessClaims struct {
-	Type string `json:"type"`
+	Type     string `json:"type"`
+	TenantID string `json:"tenant_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -30,10 +31,11 @@ func NewTokenManager(secret string, accessExpiry time.Duration, refreshExpiry ti
 	}
 }
 
-func (m *TokenManager) GenerateAccessToken(userID string, now time.Time) (string, time.Time, error) {
+func (m *TokenManager) GenerateAccessToken(userID string, tenantID string, now time.Time) (string, time.Time, error) {
 	expiresAt := now.Add(m.accessExpiry)
 	claims := AccessClaims{
-		Type: "access",
+		Type:     "access",
+		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),

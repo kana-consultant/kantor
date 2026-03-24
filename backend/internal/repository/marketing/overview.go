@@ -4,17 +4,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 type OverviewRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
-func NewOverviewRepository(db *pgxpool.Pool) *OverviewRepository {
+func NewOverviewRepository(db repository.DBTX) *OverviewRepository {
 	return &OverviewRepository{db: db}
 }
 
@@ -24,7 +22,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 
 	overview := model.MarketingOverview{}
 
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COUNT(*)
 		FROM campaigns
 		WHERE status IN ('ideation', 'planning', 'in_production', 'live')
@@ -36,7 +34,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 	nextMonthStart := currentMonthStart.AddDate(0, 1, 0)
 
 	var currentRevenue int64
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			COALESCE(SUM(amount_spent), 0)::bigint,
 			COALESCE(SUM(revenue), 0)::bigint
@@ -53,7 +51,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 	}
 
 	var wonLeads int64
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			COUNT(*)::bigint,
 			COUNT(*) FILTER (WHERE pipeline_status = 'won')::bigint
@@ -92,7 +90,7 @@ func (r *OverviewRepository) listRoasTrend(ctx context.Context, currentMonthStar
 	startMonth := currentMonthStart.AddDate(0, -5, 0)
 	endMonth := currentMonthStart.AddDate(0, 1, 0)
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			DATE_TRUNC('month', period_start)::date AS month_start,
 			COALESCE(SUM(amount_spent), 0)::bigint AS spent,
@@ -151,7 +149,7 @@ func (r *OverviewRepository) listRoasTrend(ctx context.Context, currentMonthStar
 }
 
 func (r *OverviewRepository) listLeadsByStage(ctx context.Context) ([]model.LeadSummaryRow, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT pipeline_status, COUNT(*)::bigint
 		FROM leads
 		GROUP BY pipeline_status
@@ -192,7 +190,7 @@ func (r *OverviewRepository) listLeadsByStage(ctx context.Context) ([]model.Lead
 }
 
 func (r *OverviewRepository) listTopCampaigns(ctx context.Context, startDate time.Time, endDate time.Time) ([]model.MarketingTopCampaign, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			campaigns.id::text,
 			campaigns.name,

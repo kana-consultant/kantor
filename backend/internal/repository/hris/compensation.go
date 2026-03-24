@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
@@ -17,7 +16,7 @@ var (
 )
 
 type CompensationRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type SalaryRow struct {
@@ -72,7 +71,7 @@ type UpdateBonusParams struct {
 	PeriodYear  int
 }
 
-func NewCompensationRepository(db *pgxpool.Pool) *CompensationRepository {
+func NewCompensationRepository(db repository.DBTX) *CompensationRepository {
 	return &CompensationRepository{db: db}
 }
 
@@ -86,7 +85,7 @@ func (r *CompensationRepository) CreateSalary(ctx context.Context, params Create
 	`
 
 	var row SalaryRow
-	err := r.db.QueryRow(ctx, query, params.EmployeeID, params.BaseSalary, params.Allowances, params.Deductions, params.NetSalary, params.EffectiveDate, params.CreatedBy).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, params.EmployeeID, params.BaseSalary, params.Allowances, params.Deductions, params.NetSalary, params.EffectiveDate, params.CreatedBy).Scan(
 		&row.ID,
 		&row.EmployeeID,
 		&row.BaseSalary,
@@ -103,7 +102,7 @@ func (r *CompensationRepository) CreateSalary(ctx context.Context, params Create
 func (r *CompensationRepository) ListSalaries(ctx context.Context, employeeID string) ([]SalaryRow, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT id::text, employee_id::text, base_salary, allowances, deductions, net_salary, effective_date, created_by::text, created_at
 		FROM salaries
 		WHERE employee_id = $1::uuid
@@ -139,7 +138,7 @@ func (r *CompensationRepository) GetCurrentSalary(ctx context.Context, employeeI
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	var row SalaryRow
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT id::text, employee_id::text, base_salary, allowances, deductions, net_salary, effective_date, created_by::text, created_at
 		FROM salaries
 		WHERE employee_id = $1::uuid
@@ -172,7 +171,7 @@ func (r *CompensationRepository) CreateBonus(ctx context.Context, params CreateB
 	`
 
 	var row BonusRow
-	err := r.db.QueryRow(ctx, query, params.EmployeeID, params.Amount, params.Reason, params.PeriodMonth, params.PeriodYear, params.CreatedBy).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, params.EmployeeID, params.Amount, params.Reason, params.PeriodMonth, params.PeriodYear, params.CreatedBy).Scan(
 		&row.ID,
 		&row.EmployeeID,
 		&row.Amount,
@@ -191,7 +190,7 @@ func (r *CompensationRepository) CreateBonus(ctx context.Context, params CreateB
 func (r *CompensationRepository) ListBonuses(ctx context.Context, employeeID string) ([]BonusRow, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT id::text, employee_id::text, amount, reason, period_month, period_year, approval_status, approved_by::text, approved_at, created_by::text, created_at
 		FROM bonuses
 		WHERE employee_id = $1::uuid
@@ -229,7 +228,7 @@ func (r *CompensationRepository) GetBonusByID(ctx context.Context, bonusID strin
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	var row BonusRow
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT id::text, employee_id::text, amount, reason, period_month, period_year, approval_status, approved_by::text, approved_at, created_by::text, created_at
 		FROM bonuses
 		WHERE id = $1::uuid
@@ -256,7 +255,7 @@ func (r *CompensationRepository) UpdateBonus(ctx context.Context, bonusID string
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	var row BonusRow
-	err := r.db.QueryRow(ctx, `
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		UPDATE bonuses
 		SET amount = $2, reason = $3, period_month = $4, period_year = $5
 		WHERE id = $1::uuid
@@ -289,7 +288,7 @@ func (r *CompensationRepository) UpdateBonusApprovalStatus(ctx context.Context, 
 	`
 
 	var row BonusRow
-	err := r.db.QueryRow(ctx, query, bonusID, status, approverID).Scan(
+	err := repository.DB(ctx, r.db).QueryRow(ctx, query, bonusID, status, approverID).Scan(
 		&row.ID,
 		&row.EmployeeID,
 		&row.Amount,
@@ -309,7 +308,7 @@ func (r *CompensationRepository) UpdateBonusApprovalStatus(ctx context.Context, 
 }
 
 func (r *CompensationRepository) DeleteBonus(ctx context.Context, bonusID string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM bonuses WHERE id = $1::uuid`, bonusID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM bonuses WHERE id = $1::uuid`, bonusID)
 	if err != nil {
 		return err
 	}
@@ -320,7 +319,7 @@ func (r *CompensationRepository) DeleteBonus(ctx context.Context, bonusID string
 }
 
 func (r *CompensationRepository) LogSalaryAccess(ctx context.Context, userID string, employeeID string, action string) error {
-	_, err := r.db.Exec(ctx, `
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `
 		INSERT INTO audit_logs (user_id, action, module, resource, resource_id, created_at)
 		VALUES ($1::uuid, $2, 'hris', 'salary', $3, NOW())
 	`, userID, action, employeeID)

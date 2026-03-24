@@ -4,16 +4,46 @@ let
   cfg = config.services.kantor;
   backend = pkgs.callPackage ./nix/backend.nix { };
   frontend = pkgs.callPackage ./nix/frontend.nix { };
-  fallbackOrigin = "http://kantor.perfect10.bot:${toString cfg.listenPort}";
+
+  # Derive values from tenants list
+  allDomains = lib.concatLists (map (t: t.domains) cfg.tenants);
+  hasDomains = allDomains != [];
+  primaryDomain = if hasDomains then builtins.head allDomains else null;
+
+  # TENANTS env: "name|slug|d1,d2;name2|slug2|d3"
+  tenantsEnv = lib.concatStringsSep ";" (map
+    (t: "${t.name}|${t.slug}|${lib.concatStringsSep "," t.domains}")
+    cfg.tenants
+  );
+
+  corsOrigins =
+    if hasDomains
+    then lib.concatStringsSep "," (map (d: "https://${d}") allDomains)
+    else "http://localhost:${toString cfg.listenPort}";
 in
 {
   options.services.kantor = {
     enable = lib.mkEnableOption "Kantor internal platform";
 
-    domain = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Domain name for the Kantor platform. If null, serves on IP with HTTP only.";
+    tenants = lib.mkOption {
+      type = lib.types.listOf (lib.types.submodule {
+        options = {
+          name = lib.mkOption {
+            type = lib.types.str;
+            description = "Display name for the tenant";
+          };
+          slug = lib.mkOption {
+            type = lib.types.str;
+            description = "URL-safe slug for the tenant";
+          };
+          domains = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            description = "Domain names for this tenant (first = primary)";
+          };
+        };
+      });
+      default = [];
+      description = "List of tenants to seed on startup. First tenant owns existing data.";
     };
 
     listenPort = lib.mkOption {
@@ -91,10 +121,7 @@ in
         PORT = toString cfg.port;
         DATABASE_URL = "postgres://${cfg.database.user}@localhost/${cfg.database.name}?sslmode=disable&host=/run/postgresql";
         UPLOADS_DIR = cfg.uploadsDir;
-        CORS_ORIGINS =
-          if cfg.domain != null
-          then "https://${cfg.domain}"
-          else fallbackOrigin;
+        CORS_ORIGINS = corsOrigins;
         JWT_ACCESS_EXPIRY = "15m";
         JWT_REFRESH_EXPIRY = "168h";
         TRACKER_RETENTION_DAYS = "90";
@@ -108,9 +135,10 @@ in
         WAHA_REMINDER_CRON = "0 8 * * 1-5";
         WAHA_WEEKLY_DIGEST_CRON = "0 9 * * 1";
         APP_URL =
-          if cfg.domain != null
-          then "https://${cfg.domain}"
-          else fallbackOrigin;
+          if primaryDomain != null
+          then "https://${primaryDomain}"
+          else "http://localhost:${toString cfg.listenPort}";
+        TENANTS = tenantsEnv;
       };
 
       preStart = ''
@@ -155,13 +183,13 @@ in
       "d ${cfg.uploadsDir} 0750 kantor kantor -"
     ];
 
-    # ACME (only when domain is set)
-    security.acme = lib.mkIf (cfg.domain != null && cfg.cloudflareTokenFile != null) {
+    # ACME (only when domains are set)
+    security.acme = lib.mkIf (hasDomains && cfg.cloudflareTokenFile != null) {
       acceptTerms = true;
       defaults.email = cfg.acmeEmail;
-      certs.${cfg.domain} = {
-        domain = cfg.domain;
-        extraDomainNames = [ "*.${cfg.domain}" ];
+      certs.${primaryDomain} = {
+        domain = primaryDomain;
+        extraDomainNames = builtins.tail allDomains;
         group = "nginx";
         dnsProvider = "cloudflare";
         dnsResolver = "1.1.1.1:53";
@@ -171,7 +199,7 @@ in
       };
     };
 
-    # Nginx
+    # Nginx — serves all tenant domains from a single vhost
     services.nginx = {
       enable = true;
       recommendedOptimisation = true;
@@ -180,9 +208,12 @@ in
 
       virtualHosts."kantor" = {
         listen = [{ addr = "0.0.0.0"; port = cfg.listenPort; }];
-        serverName = if cfg.domain != null then cfg.domain else "_";
-        forceSSL = cfg.domain != null;
-        useACMEHost = lib.mkIf (cfg.domain != null) cfg.domain;
+        serverName =
+          if hasDomains
+          then lib.concatStringsSep " " allDomains
+          else "_";
+        forceSSL = hasDomains;
+        useACMEHost = lib.mkIf hasDomains primaryDomain;
 
         root = "${frontend}";
 

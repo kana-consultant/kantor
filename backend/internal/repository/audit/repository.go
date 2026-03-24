@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
@@ -82,10 +80,10 @@ type ActorOption struct {
 }
 
 type Repository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db repository.DBTX) *Repository {
 	return &Repository{db: db}
 }
 
@@ -111,7 +109,7 @@ func (r *Repository) Insert(ctx context.Context, entry Entry) error {
 		}
 	}
 
-	_, err = r.db.Exec(ctx, `
+	_, err = repository.DB(ctx, r.db).Exec(ctx, `
 		INSERT INTO audit_logs (user_id, action, module, resource, resource_id, old_value, new_value, ip_address)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`, entry.UserID, entry.Action, entry.Module, entry.Resource, entry.ResourceID, oldJSON, newJSON, ipAddr)
@@ -129,7 +127,7 @@ func (r *Repository) List(ctx context.Context, params ListParams) ([]LogRecord, 
 	whereClause, args, nextArgIndex := buildWhereClause(params)
 
 	var total int64
-	if err := r.db.QueryRow(ctx, fmt.Sprintf(`
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, fmt.Sprintf(`
 		SELECT COUNT(*)
 		FROM audit_logs
 		LEFT JOIN users ON users.id = audit_logs.user_id
@@ -150,7 +148,7 @@ func (r *Repository) List(ctx context.Context, params ListParams) ([]LogRecord, 
 	listArgs := append([]any{}, args...)
 	listArgs = append(listArgs, perPage, (page-1)*perPage)
 
-	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+	rows, err := repository.DB(ctx, r.db).Query(ctx, fmt.Sprintf(`
 		SELECT
 			audit_logs.id::text,
 			audit_logs.user_id::text,
@@ -193,7 +191,7 @@ func (r *Repository) ListForExport(ctx context.Context, params ListParams) ([]Lo
 	defer cancel()
 
 	whereClause, args, _ := buildWhereClause(params)
-	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+	rows, err := repository.DB(ctx, r.db).Query(ctx, fmt.Sprintf(`
 		SELECT
 			audit_logs.id::text,
 			audit_logs.user_id::text,
@@ -235,7 +233,7 @@ func (r *Repository) Summary(ctx context.Context) (Summary, error) {
 	defer cancel()
 
 	var summary Summary
-	if err := r.db.QueryRow(ctx, `
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			COUNT(*) FILTER (WHERE created_at >= date_trunc('day', NOW()))::bigint AS total_today,
 			COUNT(*) FILTER (WHERE created_at >= date_trunc('week', NOW()))::bigint AS total_week
@@ -244,7 +242,7 @@ func (r *Repository) Summary(ctx context.Context) (Summary, error) {
 		return Summary{}, fmt.Errorf("load audit log totals: %w", err)
 	}
 
-	byModuleRows, err := r.db.Query(ctx, `
+	byModuleRows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT module, COUNT(*)::bigint
 		FROM audit_logs
 		GROUP BY module
@@ -267,7 +265,7 @@ func (r *Repository) Summary(ctx context.Context) (Summary, error) {
 		return Summary{}, fmt.Errorf("iterate audit log module summary: %w", err)
 	}
 
-	byActionRows, err := r.db.Query(ctx, `
+	byActionRows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT action, COUNT(*)::bigint
 		FROM audit_logs
 		GROUP BY action
@@ -290,7 +288,7 @@ func (r *Repository) Summary(ctx context.Context) (Summary, error) {
 		return Summary{}, fmt.Errorf("iterate audit log action summary: %w", err)
 	}
 
-	topUserRows, err := r.db.Query(ctx, `
+	topUserRows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			audit_logs.user_id::text,
 			COALESCE(users.full_name, 'System'),
@@ -338,7 +336,7 @@ func (r *Repository) ListActors(ctx context.Context, search string) ([]ActorOpti
 		where = "AND (users.full_name ILIKE $1 OR users.email ILIKE $1)"
 	}
 
-	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+	rows, err := repository.DB(ctx, r.db).Query(ctx, fmt.Sprintf(`
 		SELECT DISTINCT users.id::text, users.full_name, users.email, users.avatar_url
 		FROM audit_logs
 		INNER JOIN users ON users.id = audit_logs.user_id

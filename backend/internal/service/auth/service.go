@@ -13,6 +13,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
 
 const (
@@ -376,7 +377,7 @@ func (s *Service) UpdateUserRoles(ctx context.Context, userID string, roles []rb
 	if err := s.repo.ReplaceUserRoles(ctx, userID, roles); err != nil {
 		return err
 	}
-	s.permissionCache.Invalidate(userID)
+	s.permissionCache.Invalidate(ctx, userID)
 	return nil
 }
 
@@ -455,7 +456,7 @@ func (s *Service) UpdateUserModuleRoles(ctx context.Context, userID string, modu
 	if err := s.repo.ReplaceUserModuleRoles(ctx, userID, moduleRoles); err != nil {
 		return err
 	}
-	s.permissionCache.Invalidate(userID)
+	s.permissionCache.Invalidate(ctx, userID)
 	return nil
 }
 
@@ -466,7 +467,7 @@ func (s *Service) ToggleUserSuperAdmin(ctx context.Context, actorID string, targ
 	if err := s.repo.SetUserSuperAdmin(ctx, targetUserID, enabled); err != nil {
 		return err
 	}
-	s.permissionCache.Invalidate(targetUserID)
+	s.permissionCache.Invalidate(ctx, targetUserID)
 	return nil
 }
 
@@ -497,7 +498,11 @@ func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldToken
 	}
 
 	now := time.Now().UTC()
-	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(user.ID, now)
+	var tenantID string
+	if info, ok := tenant.FromContext(ctx); ok {
+		tenantID = info.ID
+	}
+	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(user.ID, tenantID, now)
 	if err != nil {
 		return AuthResult{}, err
 	}

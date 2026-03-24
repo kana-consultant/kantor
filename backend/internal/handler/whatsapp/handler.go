@@ -66,19 +66,20 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 // --------------- Connection ---------------
 
 func (h *Handler) getStatus(w http.ResponseWriter, r *http.Request) {
-	status, err := h.service.GetStatus()
+	ctx := r.Context()
+	status, err := h.service.GetStatus(ctx)
 	if err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"enabled": h.service.IsEnabled(),
+		"enabled": h.service.IsEnabled(ctx),
 		"session": status,
 	}, nil)
 }
 
 func (h *Handler) getQR(w http.ResponseWriter, r *http.Request) {
-	qr, err := h.service.GetQR()
+	qr, err := h.service.GetQR(r.Context())
 	if err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
@@ -93,7 +94,7 @@ func (h *Handler) startSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.StartSession(); err != nil {
+	if err := h.service.StartSession(r.Context()); err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
@@ -108,7 +109,7 @@ func (h *Handler) stopSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.StopSession(); err != nil {
+	if err := h.service.StopSession(r.Context()); err != nil {
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
@@ -117,10 +118,11 @@ func (h *Handler) stopSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
-	stats := h.service.GetDailyStats()
-	info, _ := h.service.GetAccountInfo()
+	ctx := r.Context()
+	stats := h.service.GetDailyStats(ctx)
+	info, _ := h.service.GetAccountInfo(ctx)
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"enabled":     h.service.IsEnabled(),
+		"enabled":     h.service.IsEnabled(ctx),
 		"daily_stats": stats,
 		"account":     info,
 	}, nil)

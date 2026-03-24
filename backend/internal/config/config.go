@@ -28,6 +28,7 @@ type Config struct {
 	SeedDemoUsers             SeedDemoUsersConfig
 	WAHA                      WAHAConfig
 	AppURL                    string
+	Tenants                   []TenantConfig
 }
 
 type SeedSuperAdminConfig struct {
@@ -63,6 +64,13 @@ type WAHAConfig struct {
 	MaxDelayMS       int
 	ReminderCron     string
 	WeeklyDigestCron string
+}
+
+// TenantConfig describes one tenant seeded at startup.
+type TenantConfig struct {
+	Name    string
+	Slug    string
+	Domains []string // first domain = primary
 }
 
 func Load() (Config, error) {
@@ -111,6 +119,7 @@ func Load() (Config, error) {
 		CORSOrigins:               splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),
 		TrackerRetentionDays:      parseIntEnv("TRACKER_RETENTION_DAYS", 90),
 		AppURL:                    getEnv("APP_URL", "http://localhost:3000"),
+		Tenants:                   parseTenants(getEnv("TENANTS", "Default|default|localhost")),
 		WAHA: WAHAConfig{
 			APIURL:           getEnv("WAHA_API_URL", "http://localhost:3000"),
 			APIKey:           os.Getenv("WAHA_API_KEY"),
@@ -287,4 +296,26 @@ func getEnv(key string, fallback string) string {
 	}
 
 	return fallback
+}
+
+// parseTenants parses the TENANTS env var.
+// Format: "name|slug|domain1,domain2;name2|slug2|domain3,domain4"
+func parseTenants(raw string) []TenantConfig {
+	var tenants []TenantConfig
+	for _, entry := range strings.Split(raw, ";") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		parts := strings.SplitN(entry, "|", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		tenants = append(tenants, TenantConfig{
+			Name:    strings.TrimSpace(parts[0]),
+			Slug:    strings.TrimSpace(parts[1]),
+			Domains: splitCSV(parts[2]),
+		})
+	}
+	return tenants
 }

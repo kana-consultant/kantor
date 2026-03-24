@@ -12,7 +12,6 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -27,7 +26,7 @@ var (
 )
 
 type CampaignsRepository struct {
-	db *pgxpool.Pool
+	db repository.DBTX
 }
 
 type ListCampaignsParams struct {
@@ -80,7 +79,7 @@ type queryExecutor interface {
 	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
 }
 
-func NewCampaignsRepository(db *pgxpool.Pool) *CampaignsRepository {
+func NewCampaignsRepository(db repository.DBTX) *CampaignsRepository {
 	return &CampaignsRepository{db: db}
 }
 
@@ -92,7 +91,7 @@ func (r *CampaignsRepository) CreateCampaign(ctx context.Context, params UpsertC
 		return model.Campaign{}, err
 	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return model.Campaign{}, err
 	}
@@ -207,7 +206,7 @@ func (r *CampaignsRepository) ListCampaigns(ctx context.Context, params ListCamp
 	whereClause := strings.Join(filters, " AND ")
 
 	var total int64
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM campaigns WHERE `+whereClause, args...).Scan(&total); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM campaigns WHERE `+whereClause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -247,7 +246,7 @@ func (r *CampaignsRepository) ListCampaigns(ctx context.Context, params ListCamp
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -269,7 +268,7 @@ func (r *CampaignsRepository) GetCampaignByID(ctx context.Context, campaignID st
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	row := r.db.QueryRow(ctx, `
+	row := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			campaigns.id::text,
 			campaigns.name,
@@ -320,7 +319,7 @@ func (r *CampaignsRepository) UpdateCampaign(ctx context.Context, campaignID str
 		return model.Campaign{}, err
 	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return model.Campaign{}, err
 	}
@@ -386,7 +385,7 @@ func (r *CampaignsRepository) DeleteCampaign(ctx context.Context, campaignID str
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tag, err := r.db.Exec(ctx, `DELETE FROM campaigns WHERE id = $1::uuid`, campaignID)
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM campaigns WHERE id = $1::uuid`, campaignID)
 	if err != nil {
 		return err
 	}
@@ -405,7 +404,7 @@ func (r *CampaignsRepository) ListKanban(ctx context.Context) ([]model.CampaignC
 		return nil, err
 	}
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			campaigns.id::text,
 			campaigns.name,
@@ -470,7 +469,7 @@ func (r *CampaignsRepository) MoveCampaign(ctx context.Context, campaignID strin
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return model.Campaign{}, err
 	}
@@ -500,7 +499,7 @@ func (r *CampaignsRepository) ListColumns(ctx context.Context) ([]model.Campaign
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT id::text, name, position, color, created_at
 		FROM campaign_columns
 		ORDER BY position ASC, created_at ASC
@@ -526,7 +525,7 @@ func (r *CampaignsRepository) CreateColumn(ctx context.Context, params CreateCam
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return model.CampaignColumn{}, err
 	}
@@ -573,7 +572,7 @@ func (r *CampaignsRepository) UpdateColumn(ctx context.Context, columnID string,
 	defer cancel()
 
 	var item model.CampaignColumn
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`
 			UPDATE campaign_columns
@@ -600,14 +599,14 @@ func (r *CampaignsRepository) DeleteColumn(ctx context.Context, columnID string)
 	defer cancel()
 
 	var campaignCount int
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM campaign_column_assignments WHERE column_id = $1::uuid`, columnID).Scan(&campaignCount); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM campaign_column_assignments WHERE column_id = $1::uuid`, columnID).Scan(&campaignCount); err != nil {
 		return err
 	}
 	if campaignCount > 0 {
 		return ErrCampaignColumnInUse
 	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -637,7 +636,7 @@ func (r *CampaignsRepository) ReorderColumns(ctx context.Context, columnIDs []st
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -673,7 +672,7 @@ func (r *CampaignsRepository) CreateAttachment(ctx context.Context, params Creat
 	defer cancel()
 
 	var item model.CampaignAttachment
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`
 			INSERT INTO campaign_attachments (campaign_id, file_name, file_path, file_type, file_size, uploaded_by)
@@ -704,7 +703,7 @@ func (r *CampaignsRepository) ListAttachments(ctx context.Context, campaignID st
 		return nil, err
 	}
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT id::text, campaign_id::text, file_name, file_path, file_type, file_size, uploaded_by::text, created_at
 		FROM campaign_attachments
 		WHERE campaign_id = $1::uuid
@@ -732,7 +731,7 @@ func (r *CampaignsRepository) DeleteAttachment(ctx context.Context, campaignID s
 	defer cancel()
 
 	var item model.CampaignAttachment
-	err := r.db.QueryRow(
+	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`
 			DELETE FROM campaign_attachments
@@ -759,7 +758,7 @@ func (r *CampaignsRepository) ListActivities(ctx context.Context, campaignID str
 		return nil, err
 	}
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			audit_logs.id::text,
 			audit_logs.resource_id,
@@ -811,7 +810,7 @@ func (r *CampaignsRepository) LogActivity(ctx context.Context, campaignID string
 		return err
 	}
 
-	_, err = r.db.Exec(ctx, `
+	_, err = repository.DB(ctx, r.db).Exec(ctx, `
 		INSERT INTO audit_logs (user_id, action, module, resource, resource_id, new_value, created_at)
 		VALUES ($1::uuid, $2, 'marketing', 'campaign', $3, $4::jsonb, NOW())
 	`, actorID, action, campaignID, newValue)
@@ -826,7 +825,7 @@ func (r *CampaignsRepository) FindAttachmentPath(ctx context.Context, campaignID
 		return "", err
 	}
 
-	rows, err := r.db.Query(ctx, `
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT file_path
 		FROM campaign_attachments
 		WHERE campaign_id = $1::uuid
@@ -962,7 +961,7 @@ func (r *CampaignsRepository) ensureEmployeeExists(ctx context.Context, employee
 		return nil
 	}
 	var exists bool
-	if err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM employees WHERE id = $1::uuid)`, strings.TrimSpace(*employeeID)).Scan(&exists); err != nil {
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM employees WHERE id = $1::uuid)`, strings.TrimSpace(*employeeID)).Scan(&exists); err != nil {
 		return err
 	}
 	if !exists {

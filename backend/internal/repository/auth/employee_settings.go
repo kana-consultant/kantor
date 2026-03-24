@@ -58,7 +58,7 @@ func (r *Repository) ensureEmployeeForUserForNewAccount(ctx context.Context, tx 
 	createQuery := `
 		INSERT INTO employees (user_id, full_name, email, position, department, date_joined, employment_status)
 		VALUES ($1::uuid, $2, $3, 'Belum Ditentukan', NULLIF($4, ''), NOW()::date, 'active')
-		ON CONFLICT (user_id) DO NOTHING
+		ON CONFLICT (tenant_id, user_id) DO NOTHING
 	`
 	if _, err = tx.Exec(ctx, createQuery, user.ID, user.FullName, user.Email, nullableText(defaultDepartmentName)); err != nil {
 		return fmt.Errorf("create employee for user: %w", err)

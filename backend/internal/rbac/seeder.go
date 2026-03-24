@@ -7,11 +7,12 @@ import (
 	"slices"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
-func SeedDefaults(ctx context.Context, db *pgxpool.Pool) error {
-	tx, err := db.Begin(ctx)
+func SeedDefaults(ctx context.Context, db repository.DBTX) error {
+	tx, err := repository.DB(ctx, db).Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin rbac seed transaction: %w", err)
 	}
@@ -108,7 +109,7 @@ func seedRoles(ctx context.Context, tx pgx.Tx) (map[string]string, error) {
 	query := `
 		INSERT INTO roles (name, slug, description, is_system, hierarchy_level)
 		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (slug)
+		ON CONFLICT (tenant_id, slug)
 		DO UPDATE SET
 			description = EXCLUDED.description,
 			is_system = EXCLUDED.is_system,
@@ -188,7 +189,7 @@ func seedSettings(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) err
 	query := `
 		INSERT INTO system_settings (key, value, description)
 		VALUES ($1, $2::jsonb, $3)
-		ON CONFLICT (key) DO NOTHING
+		ON CONFLICT (tenant_id, key) DO NOTHING
 	`
 
 	if _, err := tx.Exec(
@@ -250,7 +251,7 @@ func migrateDeprecatedAssignments(ctx context.Context, tx pgx.Tx, roleIDs map[st
 		INNER JOIN roles r_new ON r_new.slug = r_old.name
 		WHERE COALESCE(r_old.module, '') <> ''
 			AND r_old.name = ANY($1::text[])
-		ON CONFLICT (user_id, module_id) DO NOTHING
+		ON CONFLICT (tenant_id, user_id, module_id) DO NOTHING
 	`
 
 	if _, err := tx.Exec(ctx, insertQuery, supportedSlugs); err != nil {
