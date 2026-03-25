@@ -308,9 +308,9 @@ func (r *TrackerRepository) GetActivityOverview(ctx context.Context, userID stri
 	}
 
 	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
-		SELECT full_name FROM users WHERE id = $1::uuid
+		SELECT COALESCE(full_name, email) FROM users WHERE id = $1::uuid
 	`, userID).Scan(&overview.UserName); err != nil {
-		return model.TrackerActivityOverview{}, err
+		return model.TrackerActivityOverview{}, fmt.Errorf("load user name: %w", err)
 	}
 
 	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
@@ -917,6 +917,18 @@ func (r *TrackerRepository) listHourlyBreakdown(ctx context.Context, userID stri
 }
 
 func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, activityRange TrackerActivityRange, limit int) ([]model.TrackerTopDomain, error) {
+	// Query totalActive BEFORE opening the rows cursor — using a single
+	// *pgxpool.Conn (from tenant middleware context), a second query while
+	// rows are open causes "conn busy".
+	var totalActive int64
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT COALESCE(SUM(total_active_seconds), 0)::bigint
+		FROM activity_sessions
+		WHERE user_id = $1::uuid AND date BETWEEN $2::date AND $3::date
+	`, userID, activityRange.DateFrom, activityRange.DateTo).Scan(&totalActive); err != nil {
+		return nil, err
+	}
+
 	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			e.domain,
@@ -941,15 +953,6 @@ func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, a
 		return nil, err
 	}
 	defer rows.Close()
-
-	var totalActive int64
-	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
-		SELECT COALESCE(SUM(total_active_seconds), 0)::bigint
-		FROM activity_sessions
-		WHERE user_id = $1::uuid AND date BETWEEN $2::date AND $3::date
-	`, userID, activityRange.DateFrom, activityRange.DateTo).Scan(&totalActive); err != nil {
-		return nil, err
-	}
 
 	items := make([]model.TrackerTopDomain, 0)
 	for rows.Next() {

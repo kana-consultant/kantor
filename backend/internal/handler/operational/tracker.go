@@ -202,6 +202,7 @@ func (h *TrackerHandler) getMyActivity(w http.ResponseWriter, r *http.Request) {
 
 	activity, err := h.service.GetMyActivity(r.Context(), principal.UserID, dateFrom, dateTo)
 	if err != nil {
+		slog.Error("failed to load tracker activity", "error", err, "userID", principal.UserID)
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load tracker activity", nil)
 		return
 	}

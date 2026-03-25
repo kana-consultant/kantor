@@ -13,24 +13,43 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
 
-// tenantSetSQL returns the SET statements for RLS context with a validated UUID.
-// SET does not support $1 parameters, so we interpolate after validation.
-// When running as superuser (Docker dev), it also does SET ROLE kantor_app so
-// that RLS is enforced. In production (NixOS), the DB user is already
-// non-superuser, so only the GUC is needed.
-func tenantSetSQL(tenantID string) (string, error) {
+// setupTenantConn configures a pooled connection for RLS.
+// It sets the app.current_tenant GUC using a parameterized query (guaranteed
+// clean pgx protocol) and, when running as superuser (Docker dev), also sets
+// the session role to kantor_app so that RLS policies are enforced.
+func setupTenantConn(ctx context.Context, conn *pgxpool.Conn, tenantID string) error {
 	if _, err := uuid.Parse(tenantID); err != nil {
-		return "", fmt.Errorf("invalid tenant id: %w", err)
+		return fmt.Errorf("invalid tenant id: %w", err)
 	}
-	return fmt.Sprintf(
-		"DO $$ BEGIN IF current_setting('is_superuser')='on' THEN EXECUTE 'SET ROLE kantor_app'; END IF; END $$; SET app.current_tenant = '%s'",
-		tenantID,
-	), nil
+
+	// set_config via parameterized QueryRow — fully consumes the response.
+	var ignored string
+	if err := conn.QueryRow(ctx,
+		"SELECT set_config('app.current_tenant', $1, false)", tenantID,
+	).Scan(&ignored); err != nil {
+		return fmt.Errorf("set tenant guc: %w", err)
+	}
+
+	// In Docker dev the DB user is superuser; SET ROLE so RLS applies.
+	// In production (NixOS) the user is already non-superuser, so this is a no-op.
+	var isSuperuser bool
+	if err := conn.QueryRow(ctx,
+		"SELECT current_setting('is_superuser') = 'on'",
+	).Scan(&isSuperuser); err != nil {
+		return fmt.Errorf("check superuser: %w", err)
+	}
+	if isSuperuser {
+		if _, err := conn.Exec(ctx, "SET ROLE kantor_app"); err != nil {
+			return fmt.Errorf("set role: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // TenantMiddleware resolves the tenant from the Host header, acquires a
 // dedicated connection from the pool, and configures RLS by setting the
-// app.current_tenant GUC and downgrading to the non-superuser kantor_app role.
+// app.current_tenant GUC and (when superuser) downgrading to kantor_app.
 func TenantMiddleware(pool *pgxpool.Pool, resolver *tenant.Resolver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,16 +65,7 @@ func TenantMiddleware(pool *pgxpool.Pool, resolver *tenant.Resolver) func(http.H
 				return
 			}
 
-			// SET ROLE to non-superuser so RLS policies are enforced.
-			// SET app.current_tenant so RLS knows which tenant's data to expose.
-			setSQL, err := tenantSetSQL(info.ID)
-			if err != nil {
-				conn.Release()
-				response.WriteError(w, http.StatusInternalServerError, "TENANT_SETUP_FAILED", "Invalid tenant ID", nil)
-				return
-			}
-			_, err = conn.Exec(r.Context(), setSQL)
-			if err != nil {
+			if err := setupTenantConn(r.Context(), conn, info.ID); err != nil {
 				conn.Release()
 				response.WriteError(w, http.StatusInternalServerError, "TENANT_SETUP_FAILED", "Failed to configure tenant context", nil)
 				return
@@ -67,7 +77,6 @@ func TenantMiddleware(pool *pgxpool.Pool, resolver *tenant.Resolver) func(http.H
 
 			// Ensure we clean up the connection regardless of outcome.
 			defer func() {
-				// RESET ALL restores the session role and clears all GUC variables.
 				_, _ = conn.Exec(context.Background(), "RESET ALL")
 				conn.Release()
 			}()
@@ -104,13 +113,7 @@ func ForEachTenant(ctx context.Context, pool *pgxpool.Pool, fn func(ctx context.
 			return err
 		}
 
-		setSQL, err := tenantSetSQL(t.ID)
-		if err != nil {
-			conn.Release()
-			return err
-		}
-		_, err = conn.Exec(ctx, setSQL)
-		if err != nil {
+		if err := setupTenantConn(ctx, conn, t.ID); err != nil {
 			conn.Release()
 			return err
 		}
