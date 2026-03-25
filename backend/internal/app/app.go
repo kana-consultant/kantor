@@ -640,11 +640,23 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 		}
 
 		// Ensure WA config row exists (disabled by default, admin enables via UI).
-		_, err := pool.Exec(ctx,
+		// tenant_wa_configs has RLS, so we must SET the GUC on a dedicated connection.
+		waConn, err := pool.Acquire(ctx)
+		if err != nil {
+			return fmt.Errorf("acquire conn for wa config seed: %w", err)
+		}
+		_, err = waConn.Exec(ctx, fmt.Sprintf("SET app.current_tenant = '%s'", tenantID))
+		if err != nil {
+			waConn.Release()
+			return fmt.Errorf("set tenant guc for wa config seed: %w", err)
+		}
+		_, err = waConn.Exec(ctx,
 			`INSERT INTO tenant_wa_configs (tenant_id)
 			 VALUES ($1::uuid)
 			 ON CONFLICT (tenant_id) DO NOTHING`,
 			tenantID)
+		_, _ = waConn.Exec(ctx, "RESET ALL")
+		waConn.Release()
 		if err != nil {
 			return fmt.Errorf("seed wa config for tenant %q: %w", tc.Slug, err)
 		}
