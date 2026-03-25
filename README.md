@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="logo.svg" alt="KANTOR" width="120" />
+
 # KANTOR
 
 ### All-in-One Internal Company Platform
@@ -12,9 +14,25 @@
 
 **KANTOR** is an open-source internal company platform that combines operational workflow, HRIS (Human Resources), and marketing management into a single unified application. Built for small to mid-size teams that need project management, employee data, finance tracking, and marketing campaigns — all in one place.
 
-[Features](#-features) &bull; [Quick Start](#-quick-start) &bull; [Documentation](#-documentation) &bull; [Contributing](#-contributing) &bull; [Custom Support](#-custom-support)
+[Features](#features) &bull; [Demo](#demo) &bull; [Quick Start](#quick-start) &bull; [Documentation](#documentation) &bull; [Contributing](#contributing) &bull; [Custom Support](#custom-support)
 
 </div>
+
+---
+
+## Demo
+
+<!-- TODO: Replace with actual demo video/gif -->
+<!--
+<div align="center">
+  <a href="https://youtu.be/YOUR_VIDEO_ID">
+    <img src="docs/demo-thumbnail.png" alt="KANTOR Demo" width="720" />
+  </a>
+  <p><em>Click to watch the full demo on YouTube</em></p>
+</div>
+-->
+
+> **Coming soon** — A short walkthrough video showcasing KANTOR's key features.
 
 ---
 
