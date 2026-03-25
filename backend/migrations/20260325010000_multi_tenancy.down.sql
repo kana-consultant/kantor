@@ -101,7 +101,11 @@ DROP TABLE IF EXISTS tenant_wa_configs CASCADE;
 DROP TABLE IF EXISTS tenant_domains CASCADE;
 DROP TABLE IF EXISTS tenants CASCADE;
 
--- 6. Drop app role
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM kantor_app;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM kantor_app;
+-- 6. Drop app role (if exists)
+DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'kantor_app') THEN
+        EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA public FROM kantor_app';
+        EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM kantor_app';
+    END IF;
+END $$;
 DROP ROLE IF EXISTS kantor_app;

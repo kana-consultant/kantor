@@ -15,11 +15,17 @@ import (
 
 // tenantSetSQL returns the SET statements for RLS context with a validated UUID.
 // SET does not support $1 parameters, so we interpolate after validation.
+// When running as superuser (Docker dev), it also does SET ROLE kantor_app so
+// that RLS is enforced. In production (NixOS), the DB user is already
+// non-superuser, so only the GUC is needed.
 func tenantSetSQL(tenantID string) (string, error) {
 	if _, err := uuid.Parse(tenantID); err != nil {
 		return "", fmt.Errorf("invalid tenant id: %w", err)
 	}
-	return fmt.Sprintf("SET ROLE kantor_app; SET app.current_tenant = '%s'", tenantID), nil
+	return fmt.Sprintf(
+		"DO $$ BEGIN IF current_setting('is_superuser')='on' THEN EXECUTE 'SET ROLE kantor_app'; END IF; END $$; SET app.current_tenant = '%s'",
+		tenantID,
+	), nil
 }
 
 // TenantMiddleware resolves the tenant from the Host header, acquires a

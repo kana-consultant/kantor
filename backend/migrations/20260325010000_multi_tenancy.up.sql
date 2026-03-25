@@ -35,10 +35,14 @@ VALUES ('00000000-0000-0000-0000-000000000001', 'Default', 'default');
 
 -- ---------------------------------------------------------------------------
 -- 3. Non-superuser role for RLS enforcement
+--    Only created when running as superuser (Docker dev).
+--    In NixOS production the DB user is already non-superuser, so RLS applies.
 -- ---------------------------------------------------------------------------
 DO $$ BEGIN
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'kantor_app') THEN
-        CREATE ROLE kantor_app NOLOGIN;
+    IF current_setting('is_superuser') = 'on' THEN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'kantor_app') THEN
+            CREATE ROLE kantor_app NOLOGIN;
+        END IF;
     END IF;
 END $$;
 
@@ -174,13 +178,17 @@ ALTER TABLE user_module_roles DROP CONSTRAINT user_module_roles_user_id_module_i
 ALTER TABLE user_module_roles ADD CONSTRAINT uq_user_module_roles_tenant_user_mod UNIQUE (tenant_id, user_id, module_id);
 
 -- ---------------------------------------------------------------------------
--- 7. Grant kantor_app access to all tables
+-- 7. Grant kantor_app access to all tables (only if role exists)
 -- ---------------------------------------------------------------------------
-GRANT USAGE ON SCHEMA public TO kantor_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO kantor_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO kantor_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO kantor_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO kantor_app;
+DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'kantor_app') THEN
+        EXECUTE 'GRANT USAGE ON SCHEMA public TO kantor_app';
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO kantor_app';
+        EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO kantor_app';
+        EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO kantor_app';
+        EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO kantor_app';
+    END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 8. Per-tenant WhatsApp (WAHA) configuration
