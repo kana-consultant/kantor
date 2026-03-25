@@ -20,17 +20,29 @@
 
 ## Demo
 
-<!-- TODO: Replace with actual demo video/gif -->
-<!--
-<div align="center">
-  <a href="https://youtu.be/YOUR_VIDEO_ID">
-    <img src="docs/demo-thumbnail.png" alt="KANTOR Demo" width="720" />
-  </a>
-  <p><em>Click to watch the full demo on YouTube</em></p>
-</div>
--->
+### Kanban Board & Project Management
 
-> **Coming soon** — A short walkthrough video showcasing KANTOR's key features.
+<div align="center">
+  <img src="assets/demo-kanban.gif" alt="Kanban Board Demo" width="720" />
+</div>
+
+### Activity Tracker
+
+<div align="center">
+  <img src="assets/demo-tracker.gif" alt="Activity Tracker Demo" width="720" />
+</div>
+
+### HRIS — Employees & Finance
+
+<div align="center">
+  <img src="assets/demo-hris.gif" alt="HRIS Demo" width="720" />
+</div>
+
+### Marketing — Leads & Campaigns
+
+<div align="center">
+  <img src="assets/demo-marketing.gif" alt="Marketing Demo" width="720" />
+</div>
 
 ---
 
@@ -237,6 +249,7 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `TENANTS`                | No       | Tenant definitions: `name\|slug\|domain1,domain2`      |
 | `WAHA_API_URL`           | No       | WAHA WhatsApp API endpoint                             |
 | `WAHA_ENABLED`           | No       | Enable WhatsApp broadcast features                     |
+| `APP_URL`                | No       | Public URL for SEO/OG meta tags (e.g. `https://kantor.example.com`) |
 | `TRACKER_RETENTION_DAYS` | No       | Activity tracker data retention (default: 90)          |
 
 ### Multi-Tenancy
