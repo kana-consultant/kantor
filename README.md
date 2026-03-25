@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="logo.svg" alt="KANTOR" width="120" />
-
-# KANTOR
+<img src="logo.svg" alt="KANTOR" width="360" />
 
 ### All-in-One Internal Company Platform
 
@@ -72,18 +70,18 @@
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Backend** | Go 1.25, Chi router, pgx v5, golang-migrate |
-| **Frontend** | React 19, Vite, TanStack Router & Query, Tailwind CSS, shadcn/ui |
-| **Database** | PostgreSQL 16 with Row-Level Security |
-| **State** | Zustand (client), TanStack Query (server) |
-| **Forms** | React Hook Form + Zod validation |
-| **Charts** | Recharts |
-| **Export** | excelize (Excel), gofpdf (PDF) |
-| **Drag & Drop** | @dnd-kit |
-| **Extension** | Chrome Manifest V3 |
-| **Deployment** | Docker Compose, nginx reverse proxy |
+| Layer           | Technology                                                       |
+| --------------- | ---------------------------------------------------------------- |
+| **Backend**     | Go 1.25, Chi router, pgx v5, golang-migrate                      |
+| **Frontend**    | React 19, Vite, TanStack Router & Query, Tailwind CSS, shadcn/ui |
+| **Database**    | PostgreSQL 16 with Row-Level Security                            |
+| **State**       | Zustand (client), TanStack Query (server)                        |
+| **Forms**       | React Hook Form + Zod validation                                 |
+| **Charts**      | Recharts                                                         |
+| **Export**      | excelize (Excel), gofpdf (PDF)                                   |
+| **Drag & Drop** | @dnd-kit                                                         |
+| **Extension**   | Chrome Manifest V3                                               |
+| **Deployment**  | Docker Compose, nginx reverse proxy                              |
 
 ---
 
@@ -123,12 +121,12 @@ http://localhost:3000
 
 Default credentials (when seed is enabled):
 
-| Role | Email | Password |
-|------|-------|----------|
-| Super Admin | `superadmin@kantor.local` | `Password123!` |
-| Ops Staff | `staff.ops@kantor.local` | `Password123!` |
-| Ops Viewer | `viewer.ops@kantor.local` | `Password123!` |
-| Marketing Staff | `staff.marketing@kantor.local` | `Password123!` |
+| Role             | Email                           | Password       |
+| ---------------- | ------------------------------- | -------------- |
+| Super Admin      | `superadmin@kantor.local`       | `Password123!` |
+| Ops Staff        | `staff.ops@kantor.local`        | `Password123!` |
+| Ops Viewer       | `viewer.ops@kantor.local`       | `Password123!` |
+| Marketing Staff  | `staff.marketing@kantor.local`  | `Password123!` |
 | Marketing Viewer | `viewer.marketing@kantor.local` | `Password123!` |
 
 > **Note:** Disable seed users in production by setting `SEED_SUPERADMIN_ENABLED=false` and `SEED_DEMO_USERS_ENABLED=false`.
@@ -230,16 +228,16 @@ RBAC is enforced at both the API middleware level and the frontend via permissio
 
 See [`.env.example`](.env.example) for the full list. Key variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `JWT_SECRET` | Yes | HMAC signing key for JWTs (min 32 chars in production) |
-| `DATA_ENCRYPTION_KEY` | Yes | AES-256-GCM key for sensitive data encryption |
-| `CORS_ORIGINS` | No | Comma-separated allowed origins |
-| `TENANTS` | No | Tenant definitions: `name\|slug\|domain1,domain2` |
-| `WAHA_API_URL` | No | WAHA WhatsApp API endpoint |
-| `WAHA_ENABLED` | No | Enable WhatsApp broadcast features |
-| `TRACKER_RETENTION_DAYS` | No | Activity tracker data retention (default: 90) |
+| Variable                 | Required | Description                                            |
+| ------------------------ | -------- | ------------------------------------------------------ |
+| `DATABASE_URL`           | Yes      | PostgreSQL connection string                           |
+| `JWT_SECRET`             | Yes      | HMAC signing key for JWTs (min 32 chars in production) |
+| `DATA_ENCRYPTION_KEY`    | Yes      | AES-256-GCM key for sensitive data encryption          |
+| `CORS_ORIGINS`           | No       | Comma-separated allowed origins                        |
+| `TENANTS`                | No       | Tenant definitions: `name\|slug\|domain1,domain2`      |
+| `WAHA_API_URL`           | No       | WAHA WhatsApp API endpoint                             |
+| `WAHA_ENABLED`           | No       | Enable WhatsApp broadcast features                     |
+| `TRACKER_RETENTION_DAYS` | No       | Activity tracker data retention (default: 90)          |
 
 ### Multi-Tenancy
 
@@ -255,22 +253,22 @@ TENANTS=Company A|company-a|kantor.company-a.com;Company B|company-b|kantor.comp
 
 ### Health Checks
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /healthz` | Liveness check — always returns 200 |
-| `GET /readyz` | Readiness check — verifies DB connectivity |
+| Endpoint       | Purpose                                    |
+| -------------- | ------------------------------------------ |
+| `GET /healthz` | Liveness check — always returns 200        |
+| `GET /readyz`  | Readiness check — verifies DB connectivity |
 
 ---
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
+| Document                               | Description                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------- |
 | [Deployment Guide](docs/deployment.md) | Production deployment with Docker, TLS, backups, and security checklist |
-| [Contributing](CONTRIBUTING.md) | Development setup, project rules, PR guidelines, and commit style |
-| [Security Policy](SECURITY.md) | Vulnerability reporting instructions |
-| [Code of Conduct](CODE_OF_CONDUCT.md) | Community standards (Contributor Covenant v2.1) |
-| [License](LICENSE) | MIT License |
+| [Contributing](CONTRIBUTING.md)        | Development setup, project rules, PR guidelines, and commit style       |
+| [Security Policy](SECURITY.md)         | Vulnerability reporting instructions                                    |
+| [Code of Conduct](CODE_OF_CONDUCT.md)  | Community standards (Contributor Covenant v2.1)                         |
+| [License](LICENSE)                     | MIT License                                                             |
 
 ---
 
@@ -341,6 +339,7 @@ Reach out via WhatsApp for inquiries:
 **PERFECT10 Official** &mdash; [Chat on WhatsApp](https://wa.me/628216957827?text=Hai%20saya%20...%2C%20dari%20...%2C%20mau%20informasi%20lebih%20lanjut%20tentang%20custom%20support%20dari%20KANTOR)
 
 > Template message:
+>
 > ```
 > Hai saya ..., dari ..., mau informasi lebih lanjut tentang custom support dari KANTOR
 > ```
