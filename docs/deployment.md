@@ -1,6 +1,8 @@
 # Production Deployment Guide
 
-This guide covers deploying Kantor to a production environment using Docker Compose.
+This guide covers deploying KANTOR to a production environment using Docker Compose.
+
+> See also: [Architecture Overview](architecture.md) | [Contributing](../CONTRIBUTING.md)
 
 ## Prerequisites
 
