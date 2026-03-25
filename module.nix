@@ -210,7 +210,7 @@ in
       recommendedProxySettings = true;
 
       virtualHosts."kantor" = {
-        listen = [{ addr = "0.0.0.0"; port = cfg.listenPort; }];
+        listen = lib.mkIf (!hasDomains) [{ addr = "0.0.0.0"; port = cfg.listenPort; }];
         serverName =
           if hasDomains
           then lib.concatStringsSep " " allDomains
