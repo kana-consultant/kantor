@@ -380,6 +380,7 @@ func (a *App) buildRouter(
 				admin.With(platformmiddleware.RequirePermission("admin:users:view")).Get("/users/{userID}", authHandler.GetUser)
 				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Put("/users/{userID}/roles", authHandler.UpdateUserRoles)
 				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Patch("/users/{userID}/active", authHandler.ToggleUserActive)
+				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Post("/users/{userID}/ensure-employee-profile", authHandler.EnsureUserEmployeeProfile)
 				admin.With(platformmiddleware.SuperAdminMiddleware()).Post("/users/{userID}/toggle-super-admin", authHandler.ToggleUserSuperAdmin)
 
 				admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings", authHandler.GetSettings)

@@ -75,6 +75,7 @@ type authRepository interface {
 	UpdateAutoCreateEmployee(ctx context.Context, updatedBy string, setting authrepo.AutoCreateEmployeeSetting) error
 	ListModules(ctx context.Context) ([]authrepo.ModuleItem, error)
 	ListSettingsDepartments(ctx context.Context) ([]model.Department, error)
+	EnsureEmployeeProfileForUser(ctx context.Context, userID string) (model.Employee, error)
 }
 
 type authEmployeesRepository interface {
@@ -489,6 +490,13 @@ func (s *Service) ListAdminUsers(ctx context.Context, params dto.ListUsersQuery)
 }
 
 func (s *Service) GetAdminUserDetail(ctx context.Context, userID string) (authrepo.AdminUserDetail, error) {
+	return s.repo.GetAdminUserDetail(ctx, userID)
+}
+
+func (s *Service) EnsureEmployeeProfileForUser(ctx context.Context, userID string) (authrepo.AdminUserDetail, error) {
+	if _, err := s.repo.EnsureEmployeeProfileForUser(ctx, userID); err != nil {
+		return authrepo.AdminUserDetail{}, err
+	}
 	return s.repo.GetAdminUserDetail(ctx, userID)
 }
 

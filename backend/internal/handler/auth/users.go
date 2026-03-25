@@ -56,7 +56,11 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
+	userID := strings.TrimSpace(chi.URLParam(r, "userID"))
+	if userID == "" {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userID is required", map[string]string{"userID": "required"})
+		return
+	}
 
 	result, err := h.service.GetAdminUserDetail(r.Context(), userID)
 	if err != nil {
@@ -68,7 +72,11 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateUserRoles(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
+	userID := strings.TrimSpace(chi.URLParam(r, "userID"))
+	if userID == "" {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userID is required", map[string]string{"userID": "required"})
+		return
+	}
 	previous, previousErr := h.service.GetAdminUserDetail(r.Context(), userID)
 	if previousErr != nil {
 		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
@@ -107,7 +115,11 @@ func (h *Handler) UpdateUserRoles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ToggleUserActive(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
+	userID := strings.TrimSpace(chi.URLParam(r, "userID"))
+	if userID == "" {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userID is required", map[string]string{"userID": "required"})
+		return
+	}
 	previous, previousErr := h.service.GetAdminUserDetail(r.Context(), userID)
 	if previousErr != nil {
 		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
@@ -144,7 +156,11 @@ func (h *Handler) ToggleUserSuperAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := chi.URLParam(r, "userID")
+	userID := strings.TrimSpace(chi.URLParam(r, "userID"))
+	if userID == "" {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userID is required", map[string]string{"userID": "required"})
+		return
+	}
 	previous, previousErr := h.service.GetAdminUserDetail(r.Context(), userID)
 	if previousErr != nil {
 		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
@@ -178,6 +194,28 @@ func (h *Handler) ToggleUserSuperAdmin(w http.ResponseWriter, r *http.Request) {
 	}, map[string]any{
 		"is_super_admin": result.IsSuperAdmin,
 	})
+	response.WriteJSON(w, http.StatusOK, result, nil)
+}
+
+func (h *Handler) EnsureUserEmployeeProfile(w http.ResponseWriter, r *http.Request) {
+	userID := strings.TrimSpace(chi.URLParam(r, "userID"))
+	if userID == "" {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userID is required", map[string]string{"userID": "required"})
+		return
+	}
+	previous, previousErr := h.service.GetAdminUserDetail(r.Context(), userID)
+	if previousErr != nil {
+		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
+		return
+	}
+
+	result, err := h.service.EnsureEmployeeProfileForUser(r.Context(), previous.User.ID)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create employee profile", nil)
+		return
+	}
+
+	platformmiddleware.AuditLog(r.Context(), "create", "admin", "employee_profile", userID, previous, result)
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 

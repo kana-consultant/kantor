@@ -81,9 +81,11 @@ type ModuleItem struct {
 }
 
 type AdminUserSummary struct {
-	User         model.User                 `json:"user"`
-	ModuleRoles  map[string]rbac.ModuleRole `json:"module_roles"`
-	IsSuperAdmin bool                       `json:"is_super_admin"`
+	User               model.User                 `json:"user"`
+	ModuleRoles        map[string]rbac.ModuleRole `json:"module_roles"`
+	IsSuperAdmin       bool                       `json:"is_super_admin"`
+	HasEmployeeProfile bool                       `json:"has_employee_profile"`
+	EmployeeID         *string                    `json:"employee_id,omitempty"`
 }
 
 type AdminUserDetail struct {
@@ -91,6 +93,8 @@ type AdminUserDetail struct {
 	ModuleRoles          map[string]rbac.ModuleRole `json:"module_roles"`
 	EffectivePermissions []string                   `json:"effective_permissions"`
 	IsSuperAdmin         bool                       `json:"is_super_admin"`
+	HasEmployeeProfile   bool                       `json:"has_employee_profile"`
+	EmployeeID           *string                    `json:"employee_id,omitempty"`
 }
 
 type SettingsResponse struct {
@@ -579,10 +583,16 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 		if err != nil {
 			return nil, 0, err
 		}
+		employeeID, err := r.getEmployeeIDByUserID(ctx, user.ID)
+		if err != nil {
+			return nil, 0, err
+		}
 		items = append(items, AdminUserSummary{
-			User:         user,
-			ModuleRoles:  moduleRoles,
-			IsSuperAdmin: user.IsSuperAdmin,
+			User:               user,
+			ModuleRoles:        moduleRoles,
+			IsSuperAdmin:       user.IsSuperAdmin,
+			HasEmployeeProfile: employeeID != nil,
+			EmployeeID:         employeeID,
 		})
 	}
 
@@ -604,13 +614,34 @@ func (r *Repository) GetAdminUserDetail(ctx context.Context, userID string) (Adm
 	if err != nil {
 		return AdminUserDetail{}, err
 	}
+	employeeID, err := r.getEmployeeIDByUserID(ctx, userID)
+	if err != nil {
+		return AdminUserDetail{}, err
+	}
 
 	return AdminUserDetail{
 		User:                 user,
 		ModuleRoles:          moduleRoles,
 		EffectivePermissions: permissions,
 		IsSuperAdmin:         user.IsSuperAdmin,
+		HasEmployeeProfile:   employeeID != nil,
+		EmployeeID:           employeeID,
 	}, nil
+}
+
+func (r *Repository) getEmployeeIDByUserID(ctx context.Context, userID string) (*string, error) {
+	var employeeID string
+	err := repository.DB(ctx, r.db).QueryRow(ctx,
+		`SELECT id::text FROM employees WHERE user_id = $1::uuid LIMIT 1`,
+		userID,
+	).Scan(&employeeID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &employeeID, nil
 }
 
 func (r *Repository) ReplaceUserModuleRoles(ctx context.Context, userID string, moduleRoles []dto.SetUserModuleRoleRequest) error {

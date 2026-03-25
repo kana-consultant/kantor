@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   ShieldOff,
   UserCog,
+  UserPlus,
 } from "lucide-react";
 
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -32,6 +33,7 @@ import {
   listAdminUsers,
   listModules,
   listRoles,
+  ensureAdminUserEmployeeProfile,
   toggleAdminUserActive,
   toggleAdminUserSuperAdmin,
   updateAdminUserModuleRoles,
@@ -188,6 +190,21 @@ function AdminUsersPage() {
     },
   });
 
+  const ensureEmployeeMutation = useMutation({
+    mutationFn: (userID: string) => ensureAdminUserEmployeeProfile(userID),
+    onSuccess: (_, userID) => {
+      toast.success("Profil employee berhasil dibuat ulang");
+      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.users() });
+      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.userDetail(userID) });
+    },
+    onError: (error) => {
+      toast.error(
+        "Gagal membuat ulang profil employee",
+        error instanceof Error ? error.message : undefined,
+      );
+    },
+  });
+
   const columns: Array<DataTableColumn<AdminUserSummary>> = [
     {
       id: "user",
@@ -223,6 +240,20 @@ function AdminUsersPage() {
         <StatusBadge status={item.user.is_active ? "active" : "inactive"} />
       ),
     },
+    {
+      id: "employee_profile",
+      header: "Employee",
+      cell: (item) =>
+        item.has_employee_profile ? (
+          <span className="inline-flex rounded-full bg-success-light px-2 py-0.5 text-[11px] font-semibold text-success-dark">
+            Tersambung
+          </span>
+        ) : (
+          <span className="inline-flex rounded-full bg-warning-light px-2 py-0.5 text-[11px] font-semibold text-warning-dark">
+            Belum ada profil
+          </span>
+        ),
+    },
   ];
 
   if (canManageUsers) {
@@ -232,6 +263,17 @@ function AdminUsersPage() {
       align: "right",
       cell: (item) => (
         <div className="flex items-center justify-end gap-1">
+          {!item.has_employee_profile ? (
+            <Button
+              disabled={ensureEmployeeMutation.isPending}
+              onClick={() => ensureEmployeeMutation.mutate(item.user.id)}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              <UserPlus className="h-4 w-4 text-warning-dark" />
+            </Button>
+          ) : null}
           <Button
             onClick={() => setEditingUserID(item.user.id)}
             size="xs"
@@ -456,6 +498,33 @@ function AdminUsersPage() {
                     {userDetailQuery.data.user.email}
                   </p>
                 </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {userDetailQuery.data.has_employee_profile ? (
+                  <span className="inline-flex rounded-full bg-success-light px-2 py-0.5 text-[11px] font-semibold text-success-dark">
+                    Profil employee tersambung
+                  </span>
+                ) : (
+                  <span className="inline-flex rounded-full bg-warning-light px-2 py-0.5 text-[11px] font-semibold text-warning-dark">
+                    User ini belum punya profil employee
+                  </span>
+                )}
+                {!userDetailQuery.data.has_employee_profile ? (
+                  <Button
+                    disabled={ensureEmployeeMutation.isPending}
+                    onClick={() => {
+                      if (editingUserID) {
+                        ensureEmployeeMutation.mutate(editingUserID);
+                      }
+                    }}
+                    size="xs"
+                    type="button"
+                    variant="secondary"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Buat Profil Employee
+                  </Button>
+                ) : null}
               </div>
             </div>
 

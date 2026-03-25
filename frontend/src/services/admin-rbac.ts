@@ -165,6 +165,19 @@ export function toggleAdminUserSuperAdmin(userID: string, enabled: boolean) {
   );
 }
 
+export function ensureAdminUserEmployeeProfile(userID: string) {
+  const normalizedUserID = userID.trim();
+  if (!normalizedUserID) {
+    throw new Error("User ID tidak valid");
+  }
+  return authRequestJSON<AdminUserDetail>(
+    `/admin/users/${normalizedUserID}/ensure-employee-profile`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export function getAdminSettings() {
   return authGetJSON<AdminSettings>("/admin/settings");
 }

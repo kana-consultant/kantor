@@ -43,6 +43,8 @@ export interface AdminUserSummary {
   user: AuthUser;
   module_roles: Record<string, AuthModuleRole>;
   is_super_admin: boolean;
+  has_employee_profile: boolean;
+  employee_id?: string | null;
 }
 
 export interface AdminUserDetail extends AdminUserSummary {
