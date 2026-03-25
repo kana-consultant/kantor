@@ -9,18 +9,21 @@ export function KantorLogo({ compact = false, className }: KantorLogoProps) {
   return (
     <div
       aria-label="KANTOR"
-      className={cn(
-        "flex items-start font-display text-[20px] font-[800] leading-none tracking-[-0.03em] text-text-primary",
-        compact && "text-[18px]",
-        className,
-      )}
+      className={cn("flex items-center gap-2.5", className)}
     >
-      K
-      <span className="relative">
-        A
-        <span className="absolute -top-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-module" />
-      </span>
-      {!compact ? "NTOR" : null}
+      <img
+        src="/logo-dark.png"
+        alt=""
+        className={cn(
+          "shrink-0 rounded-lg object-contain",
+          compact ? "h-8 w-8" : "h-9 w-9",
+        )}
+      />
+      {!compact && (
+        <span className="font-display text-[18px] font-[800] leading-none tracking-[-0.03em] text-text-primary">
+          KANTOR
+        </span>
+      )}
     </div>
   );
 }
