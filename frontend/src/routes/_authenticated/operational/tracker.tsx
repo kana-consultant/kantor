@@ -64,7 +64,7 @@ import {
   revokeTrackerConsent,
   updateTrackerDomain,
 } from "@/services/operational-tracker";
-import { connectExtension, pingExtension } from "@/services/extension";
+import { connectExtension, enableExtension, pingExtension } from "@/services/extension";
 import { toast } from "@/stores/toast-store";
 import type { DomainCategory, TrackerActivityOverview, TrackerConsentAudit, TrackerDailySummary, TrackerTeamOverview, TrackerUserSummary } from "@/types/tracker";
 
@@ -224,7 +224,11 @@ function OperationalTrackerPage() {
   async function handleExtensionConnect(enableTracking: boolean) {
     setIsConnectingExtension(true);
     try {
-      await connectExtension(trackerApiBaseUrl, window.location.href);
+      if (enableTracking) {
+        await enableExtension(trackerApiBaseUrl, window.location.href);
+      } else {
+        await connectExtension(trackerApiBaseUrl, window.location.href);
+      }
       setExtensionInstalled(true);
       if (enableTracking) {
         toast.success("Tracker aktif di browser ini", "Extension sudah terhubung dan consent tracker langsung diaktifkan.");

@@ -174,16 +174,24 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 		h.writeAuthError(w, err)
 		return
 	}
-	if !usedBody {
+	if usedBody {
+		// Extension clients receive refresh token in body (can't use cookies).
+		response.WriteJSON(w, http.StatusOK, dto.ExtensionTokenResponse{
+			AccessToken:  result.Tokens.AccessToken,
+			RefreshToken: result.Tokens.RefreshToken,
+			TokenType:    result.Tokens.TokenType,
+			ExpiresIn:    result.Tokens.ExpiresIn,
+		}, nil)
+	} else {
 		h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
+		response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
+			User:         result.User,
+			ModuleRoles:  result.ModuleRoles,
+			Permissions:  result.Permissions,
+			IsSuperAdmin: result.IsSuperAdmin,
+			Tokens:       result.Tokens,
+		}, nil)
 	}
-	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
-		User:         result.User,
-		ModuleRoles:  result.ModuleRoles,
-		Permissions:  result.Permissions,
-		IsSuperAdmin: result.IsSuperAdmin,
-		Tokens:       result.Tokens,
-	}, nil)
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {

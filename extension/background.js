@@ -158,6 +158,24 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
           sendResponse({ ok: true });
           break;
         }
+        case "KANTOR_TRACKER_ENABLE": {
+          const { accessToken: enableAccessToken, refreshToken: enableRefreshToken, apiBaseUrl: enableApiBaseUrl, dashboardUrl: enableDashboardUrl } = message;
+          if (!enableAccessToken || !enableRefreshToken || !enableApiBaseUrl) {
+            sendResponse({ ok: false, error: "Missing required fields" });
+            return;
+          }
+          await updateState({
+            accessToken: enableAccessToken,
+            refreshToken: enableRefreshToken,
+            apiBaseUrl: sanitizeApiBaseUrl(enableApiBaseUrl),
+            dashboardUrl: sanitizeDashboardUrl(enableDashboardUrl || ""),
+            lastError: "",
+          });
+          await grantConsent();
+          await fetchTodaySummary();
+          sendResponse({ ok: true });
+          break;
+        }
         case "KANTOR_TRACKER_DISCONNECT": {
           await stopTracking({ revokeConsent: false });
           await updateState({

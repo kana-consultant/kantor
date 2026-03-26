@@ -99,6 +99,25 @@ export async function connectExtension(apiBaseUrl: string, dashboardUrl: string)
   }
 }
 
+export async function enableExtension(apiBaseUrl: string, dashboardUrl: string): Promise<void> {
+  const tokens = await authPostJSON<ExtensionTokenResponse, Record<string, never>>(
+    "/auth/extension-token",
+    {},
+  );
+
+  const response = await sendToExtension<ExtensionActionResponse>({
+    type: "KANTOR_TRACKER_ENABLE",
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    apiBaseUrl,
+    dashboardUrl: dashboardUrl || window.location.origin,
+  });
+
+  if (!response?.ok) {
+    throw new Error(response?.error ?? "Failed to enable extension tracking");
+  }
+}
+
 export async function disconnectExtension(): Promise<void> {
   try {
     await sendToExtension<ExtensionActionResponse>({

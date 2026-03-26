@@ -546,6 +546,11 @@ func (s *Service) ListSettingsDepartments(ctx context.Context) ([]model.Departme
 const extensionRefreshExpiry = 30 * 24 * time.Hour
 
 func (s *Service) GenerateExtensionToken(ctx context.Context, userID string, userAgent string, ipAddress string) (dto.ExtensionTokenResponse, error) {
+	// Revoke any existing extension tokens before issuing a new pair.
+	if err := s.repo.RevokeExtensionTokens(ctx, userID); err != nil {
+		return dto.ExtensionTokenResponse{}, err
+	}
+
 	var tenantID string
 	if info, ok := tenant.FromContext(ctx); ok {
 		tenantID = info.ID
