@@ -54,7 +54,7 @@ const roleSchema = z.object({
     .min(3, "Slug minimal 3 karakter")
     .max(50)
     .regex(/^[a-z0-9_-]+$/, "Slug hanya boleh huruf kecil, angka, dash, dan underscore"),
-  description: z.string().max(500).optional().default(""),
+  description: z.string().max(500).default(""),
 });
 
 type RoleFormValues = z.infer<typeof roleSchema>;
@@ -458,7 +458,7 @@ function AdminRolesPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-[13px] font-[600] text-text-primary" htmlFor="role-name">
-              Nama Role
+              Nama Role<span className="ml-0.5 text-priority-high">*</span>
             </label>
             <Input
               id="role-name"
@@ -473,7 +473,7 @@ function AdminRolesPage() {
 
           <div className="space-y-1.5">
             <label className="text-[13px] font-[600] text-text-primary" htmlFor="role-slug">
-              Slug
+              Slug<span className="ml-0.5 text-priority-high">*</span>
             </label>
             <Input
               id="role-slug"

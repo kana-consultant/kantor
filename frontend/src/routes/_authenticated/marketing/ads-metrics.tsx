@@ -51,19 +51,19 @@ import type { AdsMetric, AdsMetricFilters, AdsMetricFormValues } from "@/types/m
 
 const metricSchema = z
   .object({
-    campaign_id: z.string().min(1, "Campaign is required"),
+    campaign_id: z.string().min(1, "Kampanye wajib dipilih"),
     platform: z.enum(["instagram", "facebook", "google_ads", "tiktok", "youtube", "other"]),
-    period_start: z.string().min(1, "Start date is required"),
-    period_end: z.string().min(1, "End date is required"),
-    amount_spent: z.number().min(0),
-    impressions: z.number().min(0),
-    clicks: z.number().min(0),
-    conversions: z.number().min(0),
-    revenue: z.number().min(0),
+    period_start: z.string().min(1, "Tanggal mulai wajib diisi"),
+    period_end: z.string().min(1, "Tanggal akhir wajib diisi"),
+    amount_spent: z.number().min(0, "Amount spent minimal 0"),
+    impressions: z.number().min(0, "Impressions minimal 0"),
+    clicks: z.number().min(0, "Clicks minimal 0"),
+    conversions: z.number().min(0, "Conversions minimal 0"),
+    revenue: z.number().min(0, "Revenue minimal 0"),
     notes: z.string(),
   })
   .refine((value) => value.period_end >= value.period_start, {
-    message: "Period end must be on or after period start",
+    message: "Tanggal akhir harus sama atau setelah tanggal mulai",
     path: ["period_end"],
   });
 
@@ -516,14 +516,20 @@ function AdsMetricsPage() {
             subtitle="Capture platform performance for a single campaign entry without shifting the metrics table below."
           >
             <div className="grid gap-4 lg:grid-cols-2">
-              <select className="field-select" {...form.register("campaign_id")}>
-                <option value="">Select campaign</option>
-                {campaigns.map((campaign) => (
-                  <option key={campaign.id} value={campaign.id}>
-                    {campaign.name}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">
+                  Kampanye<span className="ml-0.5 text-priority-high">*</span>
+                </label>
+                <select className="field-select" {...form.register("campaign_id")}>
+                  <option value="">Pilih kampanye</option>
+                  {campaigns.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.name}
+                    </option>
+                  ))}
+                </select>
+                {form.formState.errors.campaign_id ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.campaign_id.message}</p> : null}
+              </div>
               <select className="field-select" {...form.register("platform")}>
                 {adsMetricPlatformOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -531,25 +537,57 @@ function AdsMetricsPage() {
                   </option>
                 ))}
               </select>
-              <Input {...form.register("period_start")} type="date" />
-              <Input {...form.register("period_end")} type="date" />
-              <Controller
-                control={form.control}
-                name="amount_spent"
-                render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
-              />
-              <Controller
-                control={form.control}
-                name="revenue"
-                render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
-              />
-              <Input {...form.register("impressions", { valueAsNumber: true })} min={0} placeholder="Impressions" type="number" />
-              <Input {...form.register("clicks", { valueAsNumber: true })} min={0} placeholder="Clicks" type="number" />
-              <Input {...form.register("conversions", { valueAsNumber: true })} min={0} placeholder="Conversions" type="number" />
-              <Input className="lg:col-span-2" {...form.register("notes")} placeholder="Notes" />
-              {form.formState.errors.period_end ? (
-                <p className="text-sm text-error lg:col-span-2">{form.formState.errors.period_end.message}</p>
-              ) : null}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">
+                  Periode mulai<span className="ml-0.5 text-priority-high">*</span>
+                </label>
+                <Input {...form.register("period_start")} type="date" />
+                {form.formState.errors.period_start ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.period_start.message}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">
+                  Periode akhir<span className="ml-0.5 text-priority-high">*</span>
+                </label>
+                <Input {...form.register("period_end")} type="date" />
+                {form.formState.errors.period_end ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.period_end.message}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Jumlah belanja</label>
+                <Controller
+                  control={form.control}
+                  name="amount_spent"
+                  render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
+                />
+                {form.formState.errors.amount_spent ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.amount_spent.message}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Pendapatan</label>
+                <Controller
+                  control={form.control}
+                  name="revenue"
+                  render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
+                />
+                {form.formState.errors.revenue ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.revenue.message}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Impressions</label>
+                <Input {...form.register("impressions", { valueAsNumber: true })} min={0} placeholder="0" type="number" />
+                {form.formState.errors.impressions ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.impressions.message}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Clicks</label>
+                <Input {...form.register("clicks", { valueAsNumber: true })} min={0} placeholder="0" type="number" />
+                {form.formState.errors.clicks ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.clicks.message}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Conversions</label>
+                <Input {...form.register("conversions", { valueAsNumber: true })} min={0} placeholder="0" type="number" />
+                {form.formState.errors.conversions ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.conversions.message}</p> : null}
+              </div>
+              <div className="lg:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-text-primary">Catatan</label>
+                <Input {...form.register("notes")} placeholder="Catatan" />
+              </div>
             </div>
           </FormModal>
 

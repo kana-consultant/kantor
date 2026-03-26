@@ -448,7 +448,7 @@ function ProfilePage() {
       >
         <div className="space-y-1.5">
           <label className="text-[13px] font-[600] text-text-primary" htmlFor="current_password">
-            Password Saat Ini
+            Password Saat Ini<span className="ml-0.5 text-priority-high">*</span>
           </label>
           <Input
             id="current_password"
@@ -464,7 +464,7 @@ function ProfilePage() {
 
         <div className="space-y-1.5">
           <label className="text-[13px] font-[600] text-text-primary" htmlFor="new_password">
-            Password Baru
+            Password Baru<span className="ml-0.5 text-priority-high">*</span>
           </label>
           <Input
             id="new_password"
@@ -480,7 +480,7 @@ function ProfilePage() {
 
         <div className="space-y-1.5">
           <label className="text-[13px] font-[600] text-text-primary" htmlFor="confirm_password">
-            Konfirmasi Password Baru
+            Konfirmasi Password Baru<span className="ml-0.5 text-priority-high">*</span>
           </label>
           <Input
             id="confirm_password"
@@ -508,7 +508,7 @@ function ProfilePage() {
       >
         <div className="space-y-1.5">
           <label className="text-[13px] font-[600] text-text-primary" htmlFor="change_email">
-            Email Baru
+            Email Baru<span className="ml-0.5 text-priority-high">*</span>
           </label>
           <Input
             id="change_email"
@@ -524,7 +524,7 @@ function ProfilePage() {
 
         <div className="space-y-1.5">
           <label className="text-[13px] font-[600] text-text-primary" htmlFor="email_confirm_password">
-            Password
+            Password<span className="ml-0.5 text-priority-high">*</span>
           </label>
           <Input
             id="email_confirm_password"

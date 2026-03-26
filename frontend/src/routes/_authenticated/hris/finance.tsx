@@ -57,15 +57,15 @@ import type {
 } from "@/types/hris";
 
 const recordSchema = z.object({
-  category_id: z.string().min(1),
+  category_id: z.string().min(1, "Kategori wajib dipilih"),
   type: z.enum(["income", "outcome"]),
-  amount: z.coerce.number().min(0),
-  description: z.string().min(2).max(2000),
-  record_date: z.string().min(1),
+  amount: z.coerce.number().min(1, "Jumlah wajib diisi"),
+  description: z.string().min(2, "Deskripsi minimal 2 karakter").max(2000),
+  record_date: z.string().min(1, "Tanggal wajib diisi"),
 });
 
 const categorySchema = z.object({
-  name: z.string().min(2).max(120),
+  name: z.string().min(2, "Nama kategori minimal 2 karakter").max(120),
   type: z.enum(["income", "outcome"]),
 });
 
@@ -655,32 +655,62 @@ function FinancePage() {
         subtitle="Capture the category, amount, and posting date without pushing the records table down."
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <select className="field-select" {...recordForm.register("type")}>
-            <option value="income">Income</option>
-            <option value="outcome">Outcome</option>
-          </select>
-          <select className="field-select" {...recordForm.register("category_id")}>
-            <option value="">Select category</option>
-            {visibleCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <Controller
-            control={recordForm.control}
-            name="amount"
-            render={({ field }) => (
-              <CurrencyInput
-                onBlur={field.onBlur}
-                onValueChange={field.onChange}
-                ref={field.ref}
-                value={field.value}
-              />
-            )}
-          />
-          <Input {...recordForm.register("record_date")} type="date" />
-          <Input className="lg:col-span-2" {...recordForm.register("description")} placeholder="Description" />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Tipe<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <select className="field-select" {...recordForm.register("type")}>
+              <option value="income">Pemasukan</option>
+              <option value="outcome">Pengeluaran</option>
+            </select>
+            {recordForm.formState.errors.type ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{recordForm.formState.errors.type.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Kategori<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <select className="field-select" {...recordForm.register("category_id")}>
+              <option value="">Pilih kategori</option>
+              {visibleCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            {recordForm.formState.errors.category_id ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{recordForm.formState.errors.category_id.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Jumlah<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Controller
+              control={recordForm.control}
+              name="amount"
+              render={({ field }) => (
+                <CurrencyInput
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  ref={field.ref}
+                  value={field.value}
+                />
+              )}
+            />
+            {recordForm.formState.errors.amount ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{recordForm.formState.errors.amount.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Tanggal<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...recordForm.register("record_date")} type="date" />
+            {recordForm.formState.errors.record_date ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{recordForm.formState.errors.record_date.message}</p> : null}
+          </div>
+          <div className="lg:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Deskripsi<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...recordForm.register("description")} placeholder="Deskripsi" />
+            {recordForm.formState.errors.description ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{recordForm.formState.errors.description.message}</p> : null}
+          </div>
         </div>
       </FormModal>
 
@@ -699,11 +729,23 @@ function FinancePage() {
         subtitle="Keep income and outcome categories tidy so records stay easy to classify."
       >
         <div className="grid gap-4">
-          <Input {...categoryForm.register("name")} placeholder="Category name" />
-          <select className="field-select" {...categoryForm.register("type")}>
-            <option value="income">Income</option>
-            <option value="outcome">Outcome</option>
-          </select>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Nama<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...categoryForm.register("name")} placeholder="Nama kategori" />
+            {categoryForm.formState.errors.name ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{categoryForm.formState.errors.name.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Tipe<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <select className="field-select" {...categoryForm.register("type")}>
+              <option value="income">Pemasukan</option>
+              <option value="outcome">Pengeluaran</option>
+            </select>
+            {categoryForm.formState.errors.type ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{categoryForm.formState.errors.type.message}</p> : null}
+          </div>
         </div>
       </FormModal>
 

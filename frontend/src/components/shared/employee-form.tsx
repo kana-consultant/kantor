@@ -17,7 +17,7 @@ const employeeFormSchema = z.object({
   full_name: z.string().min(3, "Nama minimal 3 karakter"),
   email: z.string().email("Email tidak valid"),
   phone: z.string(),
-  position: z.string().min(1, "Role wajib dipilih"),
+  position: z.string().min(1, "Tipe kepegawaian wajib dipilih"),
   department: z.string(),
   date_joined: z.string().min(1, "Tanggal join wajib diisi"),
   employment_status: z.enum(["active", "probation", "resigned", "terminated"]),
@@ -171,17 +171,17 @@ export function EmployeeForm({
     })),
   ];
   const departmentOptions = [
-    { value: "", label: "Pilih department" },
+    { value: "", label: "Pilih departemen" },
     ...departments.map((department) => ({
       value: department.name,
       label: department.name,
     })),
   ];
   const employmentStatusOptions = [
-    { value: "active", label: "Active" },
+    { value: "active", label: "Aktif" },
     { value: "probation", label: "Probation" },
-    { value: "resigned", label: "Resigned" },
-    { value: "terminated", label: "Terminated" },
+    { value: "resigned", label: "Resign" },
+    { value: "terminated", label: "Diberhentikan" },
   ];
   const avatarInputKey = avatarFile?.name ?? existingAvatarPath ?? "empty-avatar";
 
@@ -197,16 +197,16 @@ export function EmployeeForm({
       subtitle={description}
     >
         <div className="grid gap-5 md:grid-cols-2">
-          <Field error={errors.full_name?.message} label="Nama lengkap">
+          <Field error={errors.full_name?.message} label="Nama lengkap" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("full_name")} placeholder="Safri Ahmad" />
           </Field>
-          <Field error={errors.email?.message} label="Email">
+          <Field error={errors.email?.message} label="Email" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("email")} placeholder="staff@kantor.local" type="email" />
           </Field>
         </div>
 
         <div className="grid gap-5 md:grid-cols-3">
-          <Field error={errors.position?.message} label="Role">
+          <Field error={errors.position?.message} label="Tipe kepegawaian" required>
             <Controller
               control={control}
               name="position"
@@ -221,7 +221,7 @@ export function EmployeeForm({
               )}
             />
           </Field>
-          <Field error={errors.department?.message} label="Department">
+          <Field error={errors.department?.message} label="Departemen">
             <Controller
               control={control}
               name="department"
@@ -236,7 +236,7 @@ export function EmployeeForm({
               )}
             />
           </Field>
-          <Field error={errors.employment_status?.message} label="Status">
+          <Field error={errors.employment_status?.message} label="Status kepegawaian">
             <Controller
               control={control}
               name="employment_status"
@@ -254,10 +254,10 @@ export function EmployeeForm({
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
-          <Field error={errors.phone?.message} label="Phone">
+          <Field error={errors.phone?.message} label="Telepon">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("phone")} placeholder="+62..." />
           </Field>
-          <Field error={errors.date_joined?.message} label="Tanggal join">
+          <Field error={errors.date_joined?.message} label="Tanggal join" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("date_joined")} type="date" />
           </Field>
         </div>
@@ -271,10 +271,10 @@ export function EmployeeForm({
         </Field>
 
         <div className="grid gap-5 md:grid-cols-2">
-          <Field error={errors.emergency_contact?.message} label="Emergency contact">
+          <Field error={errors.emergency_contact?.message} label="Kontak darurat">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("emergency_contact")} placeholder="Nama - nomor telepon" />
           </Field>
-          <Field label="Avatar">
+          <Field label="Foto profil">
             <div className="space-y-2">
               <div className="flex items-center gap-3 rounded-[12px] border border-border/70 bg-background/70 p-3">
                 <ProtectedAvatar
@@ -316,16 +316,16 @@ export function EmployeeForm({
           <Field error={errors.bank_account_number?.message} label="Nomor Rekening">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("bank_account_number")} placeholder="Nomor rekening atau akun e-wallet" />
           </Field>
-          <Field error={errors.bank_name?.message} label="Bank / E-Wallet">
+          <Field error={errors.bank_name?.message} label="Nama bank / E-Wallet">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("bank_name")} placeholder="BCA, BRI, OVO, GoPay, DANA" />
           </Field>
         </div>
 
-        <Field error={errors.linkedin_profile?.message} label="LinkedIn Profile">
+        <Field error={errors.linkedin_profile?.message} label="Profil LinkedIn">
           <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("linkedin_profile")} placeholder="https://linkedin.com/in/username" />
         </Field>
 
-        <Field error={errors.ssh_keys?.message} label="SSH Keys">
+        <Field error={errors.ssh_keys?.message} label="Kunci SSH">
           <textarea
             className={cn(richTextareaClass, "min-h-[120px] font-mono text-[13px]")}
             {...register("ssh_keys")}
@@ -339,15 +339,20 @@ export function EmployeeForm({
 function Field({
   label,
   error,
+  required,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="space-y-1.5 flex flex-col">
-      <label className="text-[13px] font-[500] text-text-secondary">{label}</label>
+      <label className="text-[13px] font-[500] text-text-secondary">
+        {label}
+        {required ? <span className="ml-0.5 text-priority-high">*</span> : null}
+      </label>
       {children}
       {error ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{error}</p> : null}
     </div>

@@ -85,7 +85,7 @@ export function DepartmentForm({
       title={title}
       subtitle={description}
     >
-        <Field error={errors.name?.message} label="Nama department">
+        <Field error={errors.name?.message} label="Nama department" required>
           <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("name")} placeholder="Engineering" />
         </Field>
 
@@ -117,15 +117,20 @@ export function DepartmentForm({
 function Field({
   label,
   error,
+  required,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="space-y-1.5 flex flex-col">
-      <label className="text-[13px] font-[500] text-text-secondary">{label}</label>
+      <label className="text-[13px] font-[500] text-text-secondary">
+        {label}
+        {required ? <span className="ml-0.5 text-priority-high">*</span> : null}
+      </label>
       {children}
       {error ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{error}</p> : null}
     </div>

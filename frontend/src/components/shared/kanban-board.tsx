@@ -1026,7 +1026,7 @@ function TaskModal({
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-2">
               <label className="text-[13px] font-[600] text-text-primary" htmlFor="task-title">
-                Judul
+                Judul<span className="ml-0.5 text-priority-high">*</span>
               </label>
             <Input className="focus-visible:border-ops focus-visible:ring-ops/10" id="task-title" {...register("title")} />
             {errors.title ? <p className="text-[13px] font-[500] text-priority-high">{errors.title.message}</p> : null}

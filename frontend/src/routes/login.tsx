@@ -79,7 +79,7 @@ function LoginPage() {
         <form className="space-y-4" onSubmit={submitForm}>
           <div className="space-y-1.5">
             <label className="text-[13px] font-[600] text-text-primary" htmlFor="email">
-              Email
+              Email<span className="ml-0.5 text-priority-high">*</span>
             </label>
             <Input
               id="email"
@@ -96,7 +96,7 @@ function LoginPage() {
 
           <div className="space-y-1.5">
             <label className="text-[13px] font-[600] text-text-primary" htmlFor="password">
-              Kata Sandi
+              Kata Sandi<span className="ml-0.5 text-priority-high">*</span>
             </label>
             <Input
               id="password"

@@ -32,12 +32,12 @@ import {
 import type { Reimbursement, ReimbursementFilters, ReimbursementFormValues } from "@/types/hris";
 
 const reimbursementSchema = z.object({
-  employee_id: z.string().min(1),
-  title: z.string().min(2).max(200),
-  category: z.string().min(2).max(120),
-  amount: z.coerce.number().min(0),
-  transaction_date: z.string().min(1),
-  description: z.string().min(2).max(2000),
+  employee_id: z.string().min(1, "Karyawan wajib dipilih"),
+  title: z.string().min(2, "Judul minimal 2 karakter").max(200),
+  category: z.string().min(2, "Kategori wajib diisi").max(120),
+  amount: z.coerce.number().min(1, "Jumlah wajib diisi"),
+  transaction_date: z.string().min(1, "Tanggal transaksi wajib diisi"),
+  description: z.string().max(2000),
 });
 
 const defaultFilters: ReimbursementFilters = {
@@ -312,30 +312,66 @@ function ReimbursementsPage() {
         subtitle="Capture the expense detail, transaction date, and supporting evidence in one focused dialog."
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <select className="field-select" {...form.register("employee_id")}>
-            <option value="">Select employee</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.full_name}
-              </option>
-            ))}
-          </select>
-          <Input {...form.register("category")} placeholder="Category" />
-          <Input {...form.register("title")} placeholder="Title" />
-          <Controller
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <CurrencyInput
-                onBlur={field.onBlur}
-                onValueChange={field.onChange}
-                ref={field.ref}
-                value={field.value}
-              />
-            )}
-          />
-          <Input {...form.register("transaction_date")} type="date" />
-          <Input className="lg:col-span-2" {...form.register("description")} placeholder="Description" />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Karyawan<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <select className="field-select" {...form.register("employee_id")}>
+              <option value="">Pilih karyawan</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.full_name}
+                </option>
+              ))}
+            </select>
+            {form.formState.errors.employee_id ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.employee_id.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Kategori<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...form.register("category")} placeholder="Kategori" />
+            {form.formState.errors.category ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.category.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Judul<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...form.register("title")} placeholder="Judul" />
+            {form.formState.errors.title ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.title.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Jumlah<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Controller
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <CurrencyInput
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  ref={field.ref}
+                  value={field.value}
+                />
+              )}
+            />
+            {form.formState.errors.amount ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.amount.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Tanggal transaksi<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...form.register("transaction_date")} type="date" />
+            {form.formState.errors.transaction_date ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.transaction_date.message}</p> : null}
+          </div>
+          <div className="lg:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Deskripsi
+            </label>
+            <Input {...form.register("description")} placeholder="Deskripsi (opsional)" />
+            {form.formState.errors.description ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.description.message}</p> : null}
+          </div>
           <div
             className="lg:col-span-2 rounded-md border border-dashed border-border bg-surface-muted p-6"
             onDragOver={(event) => event.preventDefault()}

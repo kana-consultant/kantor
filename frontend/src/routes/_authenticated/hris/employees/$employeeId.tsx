@@ -51,17 +51,17 @@ import type {
 } from "@/types/hris";
 
 const salarySchema = z.object({
-  base_salary: z.coerce.number().min(0, "Base salary harus 0 atau lebih"),
+  base_salary: z.coerce.number().min(1, "Gaji pokok wajib diisi"),
   allowances: z.string(),
   deductions: z.string(),
-  effective_date: z.string().min(1, "Effective date wajib diisi"),
+  effective_date: z.string().min(1, "Tanggal efektif wajib diisi"),
 });
 
 const bonusSchema = z.object({
-  amount: z.coerce.number().min(0, "Bonus harus 0 atau lebih"),
-  reason: z.string().min(3, "Reason minimal 3 karakter"),
-  period_month: z.coerce.number().min(1).max(12),
-  period_year: z.coerce.number().min(2000).max(2100),
+  amount: z.coerce.number().min(1, "Jumlah bonus wajib diisi"),
+  reason: z.string().min(3, "Alasan minimal 3 karakter"),
+  period_month: z.coerce.number().min(1, "Bulan wajib diisi (1-12)").max(12, "Bulan maksimal 12"),
+  period_year: z.coerce.number().min(2000, "Tahun minimal 2000").max(2100, "Tahun maksimal 2100"),
 });
 
 export const Route = createFileRoute("/_authenticated/hris/employees/$employeeId")({
@@ -358,15 +358,15 @@ function EmployeeDetailPage() {
 
 function ProfileTab({ employee }: { employee: Employee }) {
   const items = [
-    { label: "Role", value: employee.position || "-" },
-    { label: "Phone", value: employee.phone || "-" },
-    { label: "Department", value: employee.department || "-" },
+    { label: "Tipe kepegawaian", value: employee.position || "-" },
+    { label: "Telepon", value: employee.phone || "-" },
+    { label: "Departemen", value: employee.department || "-" },
     { label: "Status", value: employee.employment_status },
-    { label: "Date joined", value: new Date(employee.date_joined).toLocaleDateString() },
-    { label: "Emergency contact", value: employee.emergency_contact || "-" },
+    { label: "Tanggal bergabung", value: new Date(employee.date_joined).toLocaleDateString() },
+    { label: "Kontak darurat", value: employee.emergency_contact || "-" },
     { label: "Nomor rekening", value: employee.bank_account_number || "-" },
-    { label: "Bank / E-Wallet", value: employee.bank_name || "-" },
-    { label: "LinkedIn Profile", value: employee.linkedin_profile || "-" },
+    { label: "Nama bank / E-Wallet", value: employee.bank_name || "-" },
+    { label: "Profil LinkedIn", value: employee.linkedin_profile || "-" },
   ];
 
   return (
@@ -506,7 +506,7 @@ function SalaryTab({
         subtitle="Store the latest salary composition and effective date for this employee."
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <Field error={errors.base_salary?.message} label="Base salary">
+          <Field error={errors.base_salary?.message} label="Gaji pokok" required>
             <Controller
               control={control}
               name="base_salary"
@@ -520,7 +520,7 @@ function SalaryTab({
               )}
             />
           </Field>
-          <Field error={errors.effective_date?.message} label="Effective date">
+          <Field error={errors.effective_date?.message} label="Tanggal efektif" required>
             <Input {...register("effective_date")} type="date" />
           </Field>
         </div>
@@ -528,7 +528,7 @@ function SalaryTab({
           <Field
             error={errors.allowances?.message}
             hint="Format per baris: Transport: Rp 500.000"
-            label="Allowances"
+            label="Tunjangan"
           >
             <textarea
               className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
@@ -538,7 +538,7 @@ function SalaryTab({
           <Field
             error={errors.deductions?.message}
             hint="Format per baris: BPJS: Rp 250.000"
-            label="Deductions"
+            label="Potongan"
           >
             <textarea
               className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
@@ -728,7 +728,7 @@ function BonusTab({
         subtitle="Capture the amount, reason, and payout period before approval."
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <Field error={errors.amount?.message} label="Amount">
+          <Field error={errors.amount?.message} label="Jumlah" required>
             <Controller
               control={control}
               name="amount"
@@ -742,15 +742,15 @@ function BonusTab({
               )}
             />
           </Field>
-          <Field error={errors.reason?.message} label="Reason">
+          <Field error={errors.reason?.message} label="Alasan" required>
             <Input {...register("reason")} placeholder="Project launch performance" />
           </Field>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field error={errors.period_month?.message} label="Period month">
+          <Field error={errors.period_month?.message} label="Bulan periode">
             <Input {...register("period_month", { valueAsNumber: true })} max={12} min={1} type="number" />
           </Field>
-          <Field error={errors.period_year?.message} label="Period year">
+          <Field error={errors.period_year?.message} label="Tahun periode">
             <Input {...register("period_year", { valueAsNumber: true })} max={2100} min={2000} type="number" />
           </Field>
         </div>
@@ -881,16 +881,21 @@ function Field({
   label,
   error,
   hint,
+  required,
   children,
 }: {
   label: string;
   error?: string;
   hint?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+      <label className="text-sm font-medium">
+        {label}
+        {required ? <span className="ml-0.5 text-priority-high">*</span> : null}
+      </label>
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {error ? <p className="text-sm text-error">{error}</p> : null}

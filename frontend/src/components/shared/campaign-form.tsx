@@ -14,19 +14,19 @@ import { cn } from "@/lib/utils";
 
 const campaignFormSchema = z
   .object({
-    name: z.string().trim().min(3, "Name must be at least 3 characters").max(180),
+    name: z.string().trim().min(3, "Nama campaign minimal 3 karakter").max(180),
     description: z.string(),
     channel: z.enum(["instagram", "facebook", "google_ads", "tiktok", "youtube", "email", "other"]),
-    budget_amount: z.number().min(0, "Budget must be zero or higher"),
+    budget_amount: z.number().min(0, "Budget tidak boleh negatif"),
     budget_currency: z.string().trim().min(3).max(8),
     pic_employee_id: z.string(),
-    start_date: z.string().min(1, "Start date is required"),
-    end_date: z.string().min(1, "End date is required"),
+    start_date: z.string().min(1, "Tanggal mulai wajib diisi"),
+    end_date: z.string().min(1, "Tanggal selesai wajib diisi"),
     brief_text: z.string(),
     status: z.enum(["ideation", "planning", "in_production", "live", "completed", "archived"]),
   })
   .refine((value) => value.end_date >= value.start_date, {
-    message: "End date must be after start date",
+    message: "Tanggal selesai harus setelah tanggal mulai",
     path: ["end_date"],
   });
 
@@ -111,7 +111,7 @@ export function CampaignForm({
     >
       <div className="flex flex-col gap-1.5">
         <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-name">
-          Campaign name
+          Nama campaign<span className="ml-0.5 text-priority-high">*</span>
         </label>
         <Input className="focus-visible:border-marketing focus-visible:ring-marketing/10" id="campaign-name" placeholder="Q2 retargeting push" {...register("name")} />
         {errors.name ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{errors.name.message}</p> : null}
@@ -119,7 +119,7 @@ export function CampaignForm({
 
       <div className="grid gap-5 md:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-[500] text-text-secondary">Channel</label>
+          <label className="text-[13px] font-[500] text-text-secondary">Kanal<span className="ml-0.5 text-priority-high">*</span></label>
           <Controller
             control={control}
             name="channel"
@@ -134,10 +134,11 @@ export function CampaignForm({
               />
             )}
           />
+          {errors.channel ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{errors.channel.message}</p> : null}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-[500] text-text-secondary">Stage</label>
+          <label className="text-[13px] font-[500] text-text-secondary">Tahap<span className="ml-0.5 text-priority-high">*</span></label>
           <Controller
             control={control}
             name="status"
@@ -152,12 +153,13 @@ export function CampaignForm({
               />
             )}
           />
+          {errors.status ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{errors.status.message}</p> : null}
         </div>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-[500] text-text-secondary">Budget</label>
+          <label className="text-[13px] font-[500] text-text-secondary">Anggaran<span className="ml-0.5 text-priority-high">*</span></label>
           <Controller
             control={control}
             name="budget_amount"
@@ -167,6 +169,7 @@ export function CampaignForm({
               </div>
             )}
           />
+          {errors.budget_amount ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{errors.budget_amount.message}</p> : null}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -191,13 +194,14 @@ export function CampaignForm({
       <div className="grid gap-5 md:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-start-date">
-            Start date
+            Tanggal mulai<span className="ml-0.5 text-priority-high">*</span>
           </label>
           <Input className="focus-visible:border-marketing focus-visible:ring-marketing/10" id="campaign-start-date" type="date" {...register("start_date")} />
+          {errors.start_date ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{errors.start_date.message}</p> : null}
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-end-date">
-            End date
+            Tanggal selesai<span className="ml-0.5 text-priority-high">*</span>
           </label>
           <Input className="focus-visible:border-marketing focus-visible:ring-marketing/10" id="campaign-end-date" type="date" {...register("end_date")} />
           {errors.end_date ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{errors.end_date.message}</p> : null}
@@ -206,7 +210,7 @@ export function CampaignForm({
 
       <div className="flex flex-col gap-1.5">
         <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-description">
-          Description
+          Deskripsi
         </label>
         <textarea
           className={cn(textareaClass, "min-h-[96px]")}
@@ -218,7 +222,7 @@ export function CampaignForm({
 
       <div className="flex flex-col gap-1.5">
         <label className="text-[13px] font-[500] text-text-secondary" htmlFor="campaign-brief">
-          Brief text
+          Teks brief
         </label>
         <textarea
           className={cn(textareaClass, "min-h-[128px]")}

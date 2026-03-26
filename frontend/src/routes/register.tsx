@@ -92,7 +92,7 @@ function RegisterPage() {
         </div>
 
         <form className="space-y-4" onSubmit={submitForm}>
-          <Field label="Nama Lengkap" error={errors.full_name?.message}>
+          <Field label="Nama Lengkap" error={errors.full_name?.message} required>
             <Input
               {...registerField("full_name")}
               autoComplete="name"
@@ -100,7 +100,7 @@ function RegisterPage() {
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
           </Field>
-          <Field label="Email" error={errors.email?.message}>
+          <Field label="Email" error={errors.email?.message} required>
             <Input
               {...registerField("email")}
               autoComplete="email"
@@ -109,7 +109,7 @@ function RegisterPage() {
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
           </Field>
-          <Field label="Kata Sandi" error={errors.password?.message}>
+          <Field label="Kata Sandi" error={errors.password?.message} required>
             <Input
               {...registerField("password")}
               autoComplete="new-password"
@@ -118,7 +118,7 @@ function RegisterPage() {
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
           </Field>
-          <Field label="Konfirmasi Kata Sandi" error={errors.confirmPassword?.message}>
+          <Field label="Konfirmasi Kata Sandi" error={errors.confirmPassword?.message} required>
             <Input
               {...registerField("confirmPassword")}
               autoComplete="new-password"
@@ -161,13 +161,17 @@ function RegisterPage() {
 interface FieldProps {
   label: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
 }
 
-function Field({ label, error, children }: FieldProps) {
+function Field({ label, error, required, children }: FieldProps) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[13px] font-[600] text-text-primary">{label}</label>
+      <label className="text-[13px] font-[600] text-text-primary">
+        {label}
+        {required ? <span className="ml-0.5 text-priority-high">*</span> : null}
+      </label>
       {children}
       {error ? <p className="mt-1 text-[12px] text-error">{error}</p> : null}
     </div>

@@ -56,19 +56,19 @@ import type { Lead, LeadFilters, LeadFormValues, LeadImportSummary } from "@/typ
 
 const leadSchema = z
   .object({
-    name: z.string().trim().min(2).max(180),
-    phone: z.string().trim().regex(/^(\+62|08)\d{8,13}$/).or(z.literal("")),
-    email: z.string().trim().email().or(z.literal("")),
+    name: z.string().trim().min(2, "Nama minimal 2 karakter").max(180),
+    phone: z.string().trim(),
+    email: z.string().trim().email("Format email tidak valid").or(z.literal("")),
     source_channel: z.enum(["whatsapp", "email", "instagram", "facebook", "website", "referral", "other"]),
     pipeline_status: z.enum(["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"]),
     campaign_id: z.string(),
     assigned_to: z.string(),
     notes: z.string(),
     company_name: z.string(),
-    estimated_value: z.number().min(0),
+    estimated_value: z.number().min(0, "Estimated value minimal 0"),
   })
   .refine((value) => value.phone !== "" || value.email !== "", {
-    message: "Phone or email is required",
+    message: "Phone atau email wajib diisi salah satu",
     path: ["phone"],
   });
 
@@ -664,50 +664,96 @@ function MarketingLeadsPage() {
         subtitle="Capture the lead profile, contact details, assignment, and estimated value without pushing the pipeline down."
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <Input {...form.register("name")} placeholder="Lead name" />
-          <Controller
-            control={form.control}
-            name="estimated_value"
-            render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
-          />
-          <Input {...form.register("phone")} placeholder="+628123456789" />
-          <Input {...form.register("email")} placeholder="lead@example.com" />
-          <select className="field-select" {...form.register("source_channel")}>
-            {leadSourceOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <select className="field-select" {...form.register("pipeline_status")}>
-            {leadStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <select className="field-select" {...form.register("campaign_id")}>
-            <option value="">No linked campaign</option>
-            {campaigns.map((campaign) => (
-              <option key={campaign.id} value={campaign.id}>
-                {campaign.name}
-              </option>
-            ))}
-          </select>
-          <select className="field-select" {...form.register("assigned_to")}>
-            <option value="">Unassigned</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.full_name}
-              </option>
-            ))}
-          </select>
-          <Input {...form.register("company_name")} placeholder="Company name" />
-          <textarea
-            className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus lg:col-span-2"
-            {...form.register("notes")}
-            placeholder="Lead notes or qualification summary"
-          />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Nama lead<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...form.register("name")} placeholder="Nama lead" />
+            {form.formState.errors.name ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.name.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">Estimasi nilai</label>
+            <Controller
+              control={form.control}
+              name="estimated_value"
+              render={({ field }) => <CurrencyInput onValueChange={field.onChange} value={field.value} />}
+            />
+            {form.formState.errors.estimated_value ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.estimated_value.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Telepon<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...form.register("phone")} placeholder="+628123456789" />
+            {form.formState.errors.phone ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.phone.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Email<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...form.register("email")} placeholder="lead@example.com" />
+            {form.formState.errors.email ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.email.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Sumber kanal<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <select className="field-select" {...form.register("source_channel")}>
+              {leadSourceOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {form.formState.errors.source_channel ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.source_channel.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Status pipeline<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <select className="field-select" {...form.register("pipeline_status")}>
+              {leadStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {form.formState.errors.pipeline_status ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.pipeline_status.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">Kampanye</label>
+            <select className="field-select" {...form.register("campaign_id")}>
+              <option value="">Belum terhubung kampanye</option>
+              {campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">Ditugaskan ke</label>
+            <select className="field-select" {...form.register("assigned_to")}>
+              <option value="">Belum ditugaskan</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">Nama perusahaan</label>
+            <Input {...form.register("company_name")} placeholder="Nama perusahaan" />
+          </div>
+          <div className="lg:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-text-primary">Catatan</label>
+            <textarea
+              className="min-h-28 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 py-2 text-sm outline-none transition-all duration-150 placeholder:text-text-tertiary focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
+              {...form.register("notes")}
+              placeholder="Catatan lead atau ringkasan kualifikasi"
+            />
+          </div>
         </div>
       </FormModal>
 

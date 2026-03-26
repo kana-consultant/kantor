@@ -12,17 +12,17 @@ import type { Employee, SubscriptionFormValues } from "@/types/hris";
 import { cn } from "@/lib/utils";
 
 const subscriptionSchema = z.object({
-  name: z.string().min(2, "Nama subscription minimal 2 karakter"),
-  vendor: z.string().min(2, "Vendor wajib diisi"),
+  name: z.string().min(2, "Nama langganan minimal 2 karakter"),
+  vendor: z.string().min(2, "Vendor minimal 2 karakter"),
   description: z.string(),
-  cost_amount: z.coerce.number().min(0, "Biaya minimal 0"),
+  cost_amount: z.coerce.number().min(1, "Biaya wajib diisi"),
   cost_currency: z.string().length(3, "Currency harus 3 karakter"),
   billing_cycle: z.enum(["monthly", "quarterly", "yearly"]),
-  start_date: z.string().min(1, "Start date wajib diisi"),
-  renewal_date: z.string().min(1, "Renewal date wajib diisi"),
+  start_date: z.string().min(1, "Tanggal mulai wajib diisi"),
+  renewal_date: z.string().min(1, "Tanggal perpanjangan wajib diisi"),
   status: z.enum(["active", "cancelled", "expired"]),
   pic_employee_id: z.string(),
-  category: z.string().min(2, "Category wajib diisi"),
+  category: z.string().min(2, "Kategori wajib diisi"),
   login_credentials: z.string(),
   notes: z.string(),
 });
@@ -118,16 +118,16 @@ export function SubscriptionForm({
       subtitle={description}
     >
         <div className="grid gap-5 md:grid-cols-2">
-          <Field error={errors.name?.message} label="Name">
+          <Field error={errors.name?.message} label="Nama" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("name")} placeholder="Notion" />
           </Field>
-          <Field error={errors.vendor?.message} label="Vendor">
+          <Field error={errors.vendor?.message} label="Vendor" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("vendor")} placeholder="Notion Labs" />
           </Field>
         </div>
 
         <div className="grid gap-5 md:grid-cols-3">
-          <Field error={errors.cost_amount?.message} label="Cost amount">
+          <Field error={errors.cost_amount?.message} label="Biaya" required>
             <Controller
               control={control}
               name="cost_amount"
@@ -141,16 +141,16 @@ export function SubscriptionForm({
               )}
             />
           </Field>
-          <Field error={errors.cost_currency?.message} label="Currency">
+          <Field error={errors.cost_currency?.message} label="Mata uang">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("cost_currency")} />
           </Field>
-          <Field error={errors.category?.message} label="Category">
+          <Field error={errors.category?.message} label="Kategori" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("category")} placeholder="Project management" />
           </Field>
         </div>
 
         <div className="grid gap-5 md:grid-cols-3">
-          <Field error={errors.billing_cycle?.message} label="Billing cycle">
+          <Field error={errors.billing_cycle?.message} label="Siklus tagihan">
             <Controller
               control={control}
               name="billing_cycle"
@@ -165,10 +165,10 @@ export function SubscriptionForm({
               )}
             />
           </Field>
-          <Field error={errors.start_date?.message} label="Start date">
+          <Field error={errors.start_date?.message} label="Tanggal mulai" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("start_date")} type="date" />
           </Field>
-          <Field error={errors.renewal_date?.message} label="Renewal date">
+          <Field error={errors.renewal_date?.message} label="Tanggal perpanjangan" required>
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("renewal_date")} type="date" />
           </Field>
         </div>
@@ -189,7 +189,7 @@ export function SubscriptionForm({
               )}
             />
           </Field>
-          <Field error={errors.pic_employee_id?.message} label="PIC employee">
+          <Field error={errors.pic_employee_id?.message} label="PIC karyawan">
             <Controller
               control={control}
               name="pic_employee_id"
@@ -206,7 +206,7 @@ export function SubscriptionForm({
           </Field>
         </div>
 
-        <Field error={errors.description?.message} label="Description">
+        <Field error={errors.description?.message} label="Deskripsi">
           <textarea
             className={textareaClass}
             {...register("description")}
@@ -214,14 +214,14 @@ export function SubscriptionForm({
         </Field>
 
         <div className="grid gap-5 md:grid-cols-2">
-          <Field error={errors.login_credentials?.message} label="Encrypted login credentials">
+          <Field error={errors.login_credentials?.message} label="Kredensial login (terenkripsi)">
             <textarea
                className={cn(textareaClass, "font-mono text-[13px]")}
               {...register("login_credentials")}
               placeholder="email: ops@company.com | password: ********"
             />
           </Field>
-          <Field error={errors.notes?.message} label="Notes">
+          <Field error={errors.notes?.message} label="Catatan">
             <textarea
               className={textareaClass}
               {...register("notes")}
@@ -235,15 +235,20 @@ export function SubscriptionForm({
 function Field({
   label,
   error,
+  required,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="space-y-1.5 flex flex-col">
-      <label className="text-[13px] font-[500] text-text-secondary">{label}</label>
+      <label className="text-[13px] font-[500] text-text-secondary">
+        {label}
+        {required ? <span className="ml-0.5 text-priority-high">*</span> : null}
+      </label>
       {children}
       {error ? <p className="text-[12px] text-priority-high mt-1 font-[500]">{error}</p> : null}
     </div>
