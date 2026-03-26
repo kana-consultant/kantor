@@ -154,11 +154,13 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	var refreshToken string
+	var usedBody bool
 	var bodyReq struct {
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&bodyReq); err == nil && bodyReq.RefreshToken != "" {
 		refreshToken = bodyReq.RefreshToken
+		usedBody = true
 	} else {
 		var cookieErr error
 		refreshToken, cookieErr = h.readRefreshTokenCookie(r)
@@ -172,7 +174,9 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 		h.writeAuthError(w, err)
 		return
 	}
-	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
+	if !usedBody {
+		h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
+	}
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
 		User:         result.User,
 		ModuleRoles:  result.ModuleRoles,

@@ -545,7 +545,7 @@ func (s *Service) ListSettingsDepartments(ctx context.Context) ([]model.Departme
 
 const extensionRefreshExpiry = 30 * 24 * time.Hour
 
-func (s *Service) GenerateExtensionToken(ctx context.Context, userID string, userAgent string, ipAddress string) (dto.TokenPair, error) {
+func (s *Service) GenerateExtensionToken(ctx context.Context, userID string, userAgent string, ipAddress string) (dto.ExtensionTokenResponse, error) {
 	var tenantID string
 	if info, ok := tenant.FromContext(ctx); ok {
 		tenantID = info.ID
@@ -553,11 +553,11 @@ func (s *Service) GenerateExtensionToken(ctx context.Context, userID string, use
 	now := time.Now().UTC()
 	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(userID, tenantID, "extension", now)
 	if err != nil {
-		return dto.TokenPair{}, err
+		return dto.ExtensionTokenResponse{}, err
 	}
 	refreshToken, refreshExpiresAt, err := s.tokenManager.GenerateRefreshTokenWithExpiry(extensionRefreshExpiry)
 	if err != nil {
-		return dto.TokenPair{}, err
+		return dto.ExtensionTokenResponse{}, err
 	}
 	if err := s.repo.CreateRefreshToken(ctx, authrepo.CreateRefreshTokenParams{
 		UserID:    userID,
@@ -567,9 +567,9 @@ func (s *Service) GenerateExtensionToken(ctx context.Context, userID string, use
 		IPAddress: ipAddress,
 		Source:    "extension",
 	}); err != nil {
-		return dto.TokenPair{}, err
+		return dto.ExtensionTokenResponse{}, err
 	}
-	return dto.TokenPair{
+	return dto.ExtensionTokenResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		TokenType:    "Bearer",
