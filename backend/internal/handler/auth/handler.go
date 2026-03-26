@@ -153,18 +153,25 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
-	refreshToken, err := h.readRefreshTokenCookie(r)
-	if err != nil {
-		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Cookie refresh token tidak ditemukan", nil)
-		return
+	var refreshToken string
+	var bodyReq struct {
+		RefreshToken string `json:"refresh_token"`
 	}
-
+	if err := json.NewDecoder(r.Body).Decode(&bodyReq); err == nil && bodyReq.RefreshToken != "" {
+		refreshToken = bodyReq.RefreshToken
+	} else {
+		var cookieErr error
+		refreshToken, cookieErr = h.readRefreshTokenCookie(r)
+		if cookieErr != nil {
+			response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Refresh token tidak ditemukan", nil)
+			return
+		}
+	}
 	result, err := h.service.Refresh(r.Context(), refreshToken, r.UserAgent(), clientIP(r))
 	if err != nil {
 		h.writeAuthError(w, err)
 		return
 	}
-
 	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
 		User:         result.User,
@@ -187,6 +194,33 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 
 	h.clearRefreshTokenCookie(w)
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"revoked": true}, nil)
+}
+
+func (h *Handler) ExtensionToken(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Sesi login tidak ditemukan", nil)
+		return
+	}
+	tokens, err := h.service.GenerateExtensionToken(r.Context(), principal.UserID, r.UserAgent(), clientIP(r))
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal membuat token extension", nil)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, tokens, nil)
+}
+
+func (h *Handler) ExtensionDisconnect(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Sesi login tidak ditemukan", nil)
+		return
+	}
+	if err := h.service.RevokeExtensionTokens(r.Context(), principal.UserID); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memutuskan koneksi extension", nil)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "disconnected"}, nil)
 }
 
 func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {

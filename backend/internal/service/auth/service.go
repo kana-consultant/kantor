@@ -46,6 +46,7 @@ type authRepository interface {
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (model.RefreshToken, error)
 	RotateRefreshToken(ctx context.Context, oldTokenHash string, params authrepo.CreateRefreshTokenParams) error
 	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+	RevokeExtensionTokens(ctx context.Context, userID string) error
 	IsUniqueViolation(err error) bool
 	IncrementFailedLoginAttempts(ctx context.Context, userID string, maxAttempts int, lockDuration time.Duration) error
 	ResetFailedLoginAttempts(ctx context.Context, userID string) error
@@ -170,7 +171,7 @@ func (s *Service) Register(ctx context.Context, input dto.RegisterRequest, userA
 		return AuthResult{}, err
 	}
 
-	return s.issueAuthResult(ctx, user, "", userAgent, ipAddress)
+	return s.issueAuthResult(ctx, user, "", "", userAgent, ipAddress)
 }
 
 func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent string, ipAddress string) (AuthResult, error) {
@@ -206,7 +207,7 @@ func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent s
 		_ = s.repo.ResetFailedLoginAttempts(ctx, user.ID)
 	}
 
-	return s.issueAuthResult(ctx, user, "", userAgent, ipAddress)
+	return s.issueAuthResult(ctx, user, "", "", userAgent, ipAddress)
 }
 
 func (s *Service) Refresh(ctx context.Context, refreshToken string, userAgent string, ipAddress string) (AuthResult, error) {
@@ -242,7 +243,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, userAgent st
 		return AuthResult{}, ErrInactiveUser
 	}
 
-	return s.issueAuthResult(ctx, user, tokenHash, userAgent, ipAddress)
+	return s.issueAuthResult(ctx, user, tokenHash, storedToken.Source, userAgent, ipAddress)
 }
 
 func (s *Service) ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error {
@@ -542,7 +543,45 @@ func (s *Service) ListSettingsDepartments(ctx context.Context) ([]model.Departme
 	return s.repo.ListSettingsDepartments(ctx)
 }
 
-func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldTokenHash string, userAgent string, ipAddress string) (AuthResult, error) {
+const extensionRefreshExpiry = 30 * 24 * time.Hour
+
+func (s *Service) GenerateExtensionToken(ctx context.Context, userID string, userAgent string, ipAddress string) (dto.TokenPair, error) {
+	var tenantID string
+	if info, ok := tenant.FromContext(ctx); ok {
+		tenantID = info.ID
+	}
+	now := time.Now().UTC()
+	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(userID, tenantID, "extension", now)
+	if err != nil {
+		return dto.TokenPair{}, err
+	}
+	refreshToken, refreshExpiresAt, err := s.tokenManager.GenerateRefreshTokenWithExpiry(extensionRefreshExpiry)
+	if err != nil {
+		return dto.TokenPair{}, err
+	}
+	if err := s.repo.CreateRefreshToken(ctx, authrepo.CreateRefreshTokenParams{
+		UserID:    userID,
+		TokenHash: backendauth.HashRefreshToken(refreshToken),
+		ExpiresAt: refreshExpiresAt,
+		UserAgent: userAgent,
+		IPAddress: ipAddress,
+		Source:    "extension",
+	}); err != nil {
+		return dto.TokenPair{}, err
+	}
+	return dto.TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    int64(time.Until(expiresAt).Seconds()),
+	}, nil
+}
+
+func (s *Service) RevokeExtensionTokens(ctx context.Context, userID string) error {
+	return s.repo.RevokeExtensionTokens(ctx, userID)
+}
+
+func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldTokenHash string, source string, userAgent string, ipAddress string) (AuthResult, error) {
 	cachedPermissions, err := s.permissionCache.Load(ctx, user.ID)
 	if err != nil {
 		return AuthResult{}, err
@@ -553,12 +592,18 @@ func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldToken
 	if info, ok := tenant.FromContext(ctx); ok {
 		tenantID = info.ID
 	}
-	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(user.ID, tenantID, now)
+	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(user.ID, tenantID, source, now)
 	if err != nil {
 		return AuthResult{}, err
 	}
 
-	refreshToken, refreshExpiresAt, err := s.tokenManager.GenerateRefreshToken()
+	var refreshToken string
+	var refreshExpiresAt time.Time
+	if source == "extension" {
+		refreshToken, refreshExpiresAt, err = s.tokenManager.GenerateRefreshTokenWithExpiry(extensionRefreshExpiry)
+	} else {
+		refreshToken, refreshExpiresAt, err = s.tokenManager.GenerateRefreshToken()
+	}
 	if err != nil {
 		return AuthResult{}, err
 	}
@@ -569,6 +614,7 @@ func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldToken
 		ExpiresAt: refreshExpiresAt,
 		UserAgent: userAgent,
 		IPAddress: ipAddress,
+		Source:    source,
 	}
 
 	if oldTokenHash == "" {

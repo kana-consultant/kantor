@@ -14,6 +14,7 @@ import (
 type AccessClaims struct {
 	Type     string `json:"type"`
 	TenantID string `json:"tenant_id,omitempty"`
+	Source   string `json:"source,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -31,11 +32,12 @@ func NewTokenManager(secret string, accessExpiry time.Duration, refreshExpiry ti
 	}
 }
 
-func (m *TokenManager) GenerateAccessToken(userID string, tenantID string, now time.Time) (string, time.Time, error) {
+func (m *TokenManager) GenerateAccessToken(userID string, tenantID string, source string, now time.Time) (string, time.Time, error) {
 	expiresAt := now.Add(m.accessExpiry)
 	claims := AccessClaims{
 		Type:     "access",
 		TenantID: tenantID,
+		Source:   source,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -75,13 +77,17 @@ func (m *TokenManager) ParseAccessToken(token string) (*AccessClaims, error) {
 }
 
 func (m *TokenManager) GenerateRefreshToken() (string, time.Time, error) {
+	return m.GenerateRefreshTokenWithExpiry(m.refreshExpiry)
+}
+
+func (m *TokenManager) GenerateRefreshTokenWithExpiry(expiry time.Duration) (string, time.Time, error) {
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", time.Time{}, err
 	}
 
 	token := base64.RawURLEncoding.EncodeToString(bytes)
-	return token, time.Now().UTC().Add(m.refreshExpiry), nil
+	return token, time.Now().UTC().Add(expiry), nil
 }
 
 func HashRefreshToken(token string) string {

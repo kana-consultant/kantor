@@ -349,6 +349,8 @@ func (a *App) buildRouter(
 			protected.Put("/auth/profile/email", authHandler.ChangeEmail)
 			protected.Post("/auth/profile/avatar", authHandler.UploadProfileAvatar)
 			protected.Post("/auth/change-password", authHandler.ChangePassword)
+			protected.Post("/auth/extension-token", authHandler.ExtensionToken)
+			protected.Post("/auth/extension-disconnect", authHandler.ExtensionDisconnect)
 			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
 			protected.With(platformmiddleware.RequireAnyPermission(
 				"admin:roles:view",

@@ -35,6 +35,7 @@ type CreateRefreshTokenParams struct {
 	ExpiresAt time.Time
 	UserAgent string
 	IPAddress string
+	Source    string
 }
 
 func New(db repository.DBTX) *Repository {
@@ -332,11 +333,11 @@ func (r *Repository) CreateRefreshToken(ctx context.Context, params CreateRefres
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address)
-		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, '')::inet)
+		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address, source)
+		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, '')::inet, COALESCE(NULLIF($6, ''), 'dashboard'))
 	`
 
-	_, err := repository.DB(ctx, r.db).Exec(ctx, query, params.UserID, params.TokenHash, params.ExpiresAt, params.UserAgent, params.IPAddress)
+	_, err := repository.DB(ctx, r.db).Exec(ctx, query, params.UserID, params.TokenHash, params.ExpiresAt, params.UserAgent, params.IPAddress, params.Source)
 	return err
 }
 
@@ -344,7 +345,7 @@ func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, user_id::text, token_hash, expires_at, revoked_at, created_at, last_used_at
+		SELECT id::text, user_id::text, token_hash, expires_at, revoked_at, created_at, last_used_at, source
 		FROM refresh_tokens
 		WHERE token_hash = $1
 	`
@@ -358,6 +359,7 @@ func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string
 		&refreshToken.RevokedAt,
 		&refreshToken.CreatedAt,
 		&refreshToken.LastUsedAt,
+		&refreshToken.Source,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -394,11 +396,11 @@ func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string
 	}
 
 	insertQuery := `
-		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address)
-		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, '')::inet)
+		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address, source)
+		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, '')::inet, COALESCE(NULLIF($6, ''), 'dashboard'))
 	`
 
-	if _, err = tx.Exec(ctx, insertQuery, params.UserID, params.TokenHash, params.ExpiresAt, params.UserAgent, params.IPAddress); err != nil {
+	if _, err = tx.Exec(ctx, insertQuery, params.UserID, params.TokenHash, params.ExpiresAt, params.UserAgent, params.IPAddress, params.Source); err != nil {
 		return err
 	}
 
@@ -409,6 +411,15 @@ func (r *Repository) RevokeAllUserTokens(ctx context.Context, userID string) err
 	_, err := repository.DB(ctx, r.db).Exec(
 		ctx,
 		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+		userID,
+	)
+	return err
+}
+
+func (r *Repository) RevokeExtensionTokens(ctx context.Context, userID string) error {
+	_, err := repository.DB(ctx, r.db).Exec(
+		ctx,
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND source = 'extension' AND revoked_at IS NULL`,
 		userID,
 	)
 	return err
