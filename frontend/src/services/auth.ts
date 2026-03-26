@@ -74,6 +74,14 @@ export async function logout() {
 
   try {
     if (store.session) {
+      // Disconnect extension (fire-and-forget)
+      try {
+        const { disconnectExtension } = await import("@/services/extension");
+        await disconnectExtension();
+      } catch {
+        // Extension may not be installed — don't block logout
+      }
+
       await revokeRefreshToken();
     }
   } finally {

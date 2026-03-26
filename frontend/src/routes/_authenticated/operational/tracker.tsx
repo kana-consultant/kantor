@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -44,7 +44,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
 import { useRBAC } from "@/hooks/use-rbac";
 import { env } from "@/lib/env";
 import { permissions } from "@/lib/permissions";
@@ -65,12 +64,11 @@ import {
   revokeTrackerConsent,
   updateTrackerDomain,
 } from "@/services/operational-tracker";
+import { connectExtension, pingExtension } from "@/services/extension";
 import { toast } from "@/stores/toast-store";
 import type { DomainCategory, TrackerActivityOverview, TrackerConsentAudit, TrackerDailySummary, TrackerTeamOverview, TrackerUserSummary } from "@/types/tracker";
 
 const CATEGORY_COLORS = ["#0065FF", "#4C9AFF", "#6554C0", "#FF5630", "#FF8B00", "#36B37E", "#00B8D9", "#97A0AF"];
-const TRACKER_WEB_SOURCE = "KANTOR_WEB_APP";
-const TRACKER_EXTENSION_SOURCE = "KANTOR_TRACKER_EXTENSION";
 
 export const Route = createFileRoute("/_authenticated/operational/tracker")({
   beforeLoad: async () => {
@@ -82,7 +80,6 @@ export const Route = createFileRoute("/_authenticated/operational/tracker")({
 
 function OperationalTrackerPage() {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
   const { hasPermission } = useRBAC();
   const canViewTeam = hasPermission(permissions.operationalTrackerViewTeam);
   const canAuditConsent = hasPermission(permissions.operationalTrackerViewTeam);
@@ -106,10 +103,6 @@ function OperationalTrackerPage() {
     category: "development",
     isProductive: true,
   });
-  const pendingExtensionRequests = useRef<
-    Map<string, { resolve: (value: unknown) => void; reject: (reason?: unknown) => void; timeoutId: number }>
-  >(new Map());
-
   const consentQuery = useQuery({
     queryKey: trackerKeys.consent(),
     queryFn: getTrackerConsent,
@@ -199,60 +192,9 @@ function OperationalTrackerPage() {
   });
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.source !== window || !event.data || typeof event.data !== "object") {
-        return;
-      }
-
-      const data = event.data as {
-        source?: string;
-        type?: string;
-        requestId?: string;
-        success?: boolean;
-        error?: string;
-        payload?: unknown;
-      };
-
-      if (data.source !== TRACKER_EXTENSION_SOURCE) {
-        return;
-      }
-
-      if (data.type === "KANTOR_TRACKER_READY") {
-        setExtensionInstalled(true);
-        return;
-      }
-
-      if (data.type === "KANTOR_TRACKER_RESULT" && data.requestId) {
-        const pending = pendingExtensionRequests.current.get(data.requestId);
-        if (!pending) {
-          return;
-        }
-
-        window.clearTimeout(pending.timeoutId);
-        pendingExtensionRequests.current.delete(data.requestId);
-
-        if (data.success) {
-          pending.resolve(data.payload);
-        } else {
-          pending.reject(new Error(data.error || "Extension action failed"));
-        }
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    const pingTimeout = window.setTimeout(() => {
-      setExtensionInstalled((current) => current ?? false);
-    }, 1500);
-    window.postMessage({ source: TRACKER_WEB_SOURCE, type: "KANTOR_TRACKER_PING" }, window.location.origin);
-
-    return () => {
-      window.removeEventListener("message", handleMessage);
-      window.clearTimeout(pingTimeout);
-      for (const pending of pendingExtensionRequests.current.values()) {
-        window.clearTimeout(pending.timeoutId);
-      }
-      pendingExtensionRequests.current.clear();
-    };
+    pingExtension().then((status) => {
+      setExtensionInstalled(status !== "not_installed");
+    });
   }, []);
 
   const trackerApiBaseUrl = useMemo(() => {
@@ -279,41 +221,10 @@ function OperationalTrackerPage() {
     ...user.category_breakdown,
   }));
 
-  async function requestExtensionAction(type: string) {
-    if (!session?.tokens.access_token) {
-      throw new Error("Session web KANTOR tidak ditemukan. Login ulang lalu coba lagi.");
-    }
-
-    const requestId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    return new Promise<unknown>((resolve, reject) => {
-      const timeoutId = window.setTimeout(() => {
-        pendingExtensionRequests.current.delete(requestId);
-        setExtensionInstalled(false);
-        reject(new Error("Extension belum terdeteksi. Buka tab Setup Tracker untuk langkah pemasangan, lalu coba lagi."));
-      }, 2500);
-
-      pendingExtensionRequests.current.set(requestId, { resolve, reject, timeoutId });
-      window.postMessage(
-        {
-          source: TRACKER_WEB_SOURCE,
-          type,
-          requestId,
-          payload: {
-            apiBaseUrl: trackerApiBaseUrl,
-            dashboardUrl: window.location.href,
-            token: session.tokens.access_token,
-          },
-        },
-        window.location.origin,
-      );
-    });
-  }
-
   async function handleExtensionConnect(enableTracking: boolean) {
     setIsConnectingExtension(true);
     try {
-      await requestExtensionAction(enableTracking ? "KANTOR_TRACKER_ENABLE" : "KANTOR_TRACKER_CONNECT");
+      await connectExtension(trackerApiBaseUrl, window.location.href);
       setExtensionInstalled(true);
       if (enableTracking) {
         toast.success("Tracker aktif di browser ini", "Extension sudah terhubung dan consent tracker langsung diaktifkan.");

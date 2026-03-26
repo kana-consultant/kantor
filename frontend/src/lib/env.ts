@@ -24,6 +24,7 @@ const apiBaseUrlSchema = z
 
 const envSchema = z.object({
   VITE_API_BASE_URL: apiBaseUrlSchema,
+  VITE_EXTENSION_ID: z.string().optional().default(""),
 });
 
 const parsed = envSchema.safeParse(import.meta.env);

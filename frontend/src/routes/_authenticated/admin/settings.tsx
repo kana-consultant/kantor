@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, Settings2, UserRoundPlus } from "lucide-react";
 
+import { ExtensionConnector } from "@/components/settings/extension-connector";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -349,6 +351,8 @@ function AdminSettingsPage() {
           </div>
         </Card>
       </div>
+
+      <ExtensionConnector />
     </div>
   );
 }
