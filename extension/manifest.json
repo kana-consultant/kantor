@@ -5,6 +5,9 @@
   "description": "Track work activity for KANTOR platform",
   "permissions": ["tabs", "activeTab", "idle", "storage", "alarms"],
   "host_permissions": ["<all_urls>"],
+  "externally_connectable": {
+    "matches": ["http://localhost:*/*", "https://*.localhost:*/*"]
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

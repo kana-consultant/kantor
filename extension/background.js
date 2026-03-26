@@ -1,7 +1,8 @@
 const DEFAULT_STATE = {
   apiBaseUrl: "",
   dashboardUrl: "",
-  token: "",
+  accessToken: "",
+  refreshToken: "",
   sessionId: "",
   consented: false,
   paused: false,
@@ -61,7 +62,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           await updateState({
             apiBaseUrl: sanitizeApiBaseUrl(message.payload.apiBaseUrl),
             dashboardUrl: sanitizeDashboardUrl(message.payload.dashboardUrl),
-            token: String(message.payload.token || "").trim(),
+            accessToken: String(message.payload.token || message.payload.accessToken || "").trim(),
+            refreshToken: String(message.payload.refreshToken || "").trim(),
           });
           await refreshConsent();
           await fetchTodaySummary();
@@ -111,6 +113,74 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  void (async () => {
+    try {
+      const state = await loadState();
+      const dashboardUrl = state.dashboardUrl || state.apiBaseUrl;
+      if (dashboardUrl && sender.origin) {
+        try {
+          const expectedOrigin = new URL(dashboardUrl).origin;
+          if (sender.origin !== expectedOrigin) {
+            sendResponse({ ok: false, error: "Origin not allowed" });
+            return;
+          }
+        } catch {
+          // Invalid URL in state, skip origin check on first connect
+        }
+      }
+
+      switch (message?.type) {
+        case "KANTOR_TRACKER_PING": {
+          const currentState = await loadState();
+          sendResponse({
+            ok: true,
+            connected: Boolean(currentState.accessToken),
+            consented: currentState.consented,
+          });
+          break;
+        }
+        case "KANTOR_TRACKER_CONNECT": {
+          const { accessToken, refreshToken, apiBaseUrl, dashboardUrl: newDashboardUrl } = message;
+          if (!accessToken || !refreshToken || !apiBaseUrl) {
+            sendResponse({ ok: false, error: "Missing required fields" });
+            return;
+          }
+          await updateState({
+            accessToken,
+            refreshToken,
+            apiBaseUrl: sanitizeApiBaseUrl(apiBaseUrl),
+            dashboardUrl: sanitizeDashboardUrl(newDashboardUrl || ""),
+            lastError: "",
+          });
+          await refreshConsent();
+          await fetchTodaySummary();
+          sendResponse({ ok: true });
+          break;
+        }
+        case "KANTOR_TRACKER_DISCONNECT": {
+          await stopTracking({ revokeConsent: false });
+          await updateState({
+            accessToken: "",
+            refreshToken: "",
+            sessionId: "",
+            consented: false,
+            trackerState: "stopped",
+            lastError: "",
+          });
+          sendResponse({ ok: true });
+          break;
+        }
+        default:
+          sendResponse({ ok: false, error: "Unsupported action" });
+      }
+    } catch (error) {
+      sendResponse({ ok: false, error: error instanceof Error ? error.message : "Extension error" });
+    }
+  })();
+  return true;
+});
+
 async function initializeState() {
   const state = await loadState();
   await saveState({ ...DEFAULT_STATE, ...state });
@@ -134,7 +204,7 @@ async function getExtensionState() {
 
 async function handleHeartbeatTick() {
   const state = await loadState();
-  if (!state.apiBaseUrl || !state.token || state.paused) {
+  if (!state.apiBaseUrl || !state.accessToken || state.paused) {
     await updateState({ trackerState: state.paused ? "paused" : "stopped" });
     return;
   }
@@ -234,7 +304,7 @@ async function flushQueue() {
 
 async function ensureActiveSession(forceRestart = false) {
   const state = await loadState();
-  if (!state.consented || state.paused || !state.token) {
+  if (!state.consented || state.paused || !state.accessToken) {
     return "";
   }
   if (state.sessionId && !forceRestart) {
@@ -300,7 +370,7 @@ async function stopTracking(options = {}) {
 
 async function bestEffortEndSession() {
   const state = await loadState();
-  if (!state.sessionId || !state.token) {
+  if (!state.sessionId || !state.accessToken) {
     return;
   }
   try {
@@ -339,7 +409,7 @@ async function revokeConsent() {
 
 async function refreshConsent() {
   const state = await loadState();
-  if (!state.apiBaseUrl || !state.token) {
+  if (!state.apiBaseUrl || !state.accessToken) {
     return;
   }
   try {
@@ -358,7 +428,7 @@ async function refreshConsent() {
 
 async function fetchTodaySummary() {
   const state = await loadState();
-  if (!state.apiBaseUrl || !state.token || !state.consented) {
+  if (!state.apiBaseUrl || !state.accessToken || !state.consented) {
     return;
   }
   const date = new Date().toISOString().slice(0, 10);
@@ -379,7 +449,7 @@ async function fetchTodaySummary() {
 
 async function authorizedRequest(path, init) {
   const state = await loadState();
-  if (!state.apiBaseUrl || !state.token) {
+  if (!state.apiBaseUrl || !state.accessToken) {
     throw new Error("Extension belum terhubung. Hubungkan dari dashboard KANTOR atau gunakan setup manual.");
   }
 
@@ -387,15 +457,14 @@ async function authorizedRequest(path, init) {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${state.token}`,
+      Authorization: `Bearer ${state.accessToken}`,
       ...(init?.headers || {}),
     },
-    credentials: "include",
   });
 
   const payload = await response.json().catch(() => null);
   if (response.status === 401) {
-    const refreshed = await refreshAccessToken(state.apiBaseUrl);
+    const refreshed = await refreshAccessToken();
     if (refreshed) {
       return authorizedRequest(path, init);
     }
@@ -410,26 +479,41 @@ async function authorizedRequest(path, init) {
   return payload;
 }
 
-async function refreshAccessToken(apiBaseUrl) {
-  const response = await fetch(`${sanitizeApiBaseUrl(apiBaseUrl)}/auth/refresh`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({}),
-    credentials: "include",
-  });
-
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload?.success || !payload?.data?.tokens?.access_token) {
+async function refreshAccessToken() {
+  const state = await loadState();
+  if (!state.refreshToken || !state.apiBaseUrl) {
     return false;
   }
 
-  await updateState({
-    token: payload.data.tokens.access_token,
-  });
+  try {
+    const response = await fetch(`${sanitizeApiBaseUrl(state.apiBaseUrl)}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: state.refreshToken }),
+    });
 
-  return true;
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success || !payload?.data?.tokens?.access_token) {
+      await updateState({
+        accessToken: "",
+        refreshToken: "",
+        trackerState: "stopped",
+        lastError: "Sesi extension kedaluwarsa. Hubungkan ulang dari dashboard.",
+      });
+      return false;
+    }
+
+    await updateState({
+      accessToken: payload.data.tokens.access_token,
+      refreshToken: payload.data.tokens.refresh_token || state.refreshToken,
+    });
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function getCurrentTabInfo(excludedDomains) {

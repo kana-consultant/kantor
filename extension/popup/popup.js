@@ -105,7 +105,7 @@ async function refreshState() {
 
 function render(state) {
   lastState = state;
-  const hasSetup = Boolean(state.apiBaseUrl && state.token);
+  const hasSetup = Boolean(state.apiBaseUrl && state.accessToken);
   const hasConsent = Boolean(state.consented);
   const dashboardUrl = resolveDashboardUrl(state);
 
@@ -114,7 +114,7 @@ function render(state) {
   elements.trackerState.classList.toggle("hidden", !hasSetup || !hasConsent);
 
   elements.apiUrlInput.value = state.apiBaseUrl || "";
-  elements.tokenInput.value = state.token || "";
+  elements.tokenInput.value = state.accessToken || "";
   elements.dashboardLink.href = dashboardUrl || "#";
   elements.loginLink.href = dashboardUrl || "#";
   elements.loginLink.classList.toggle("is-disabled", !dashboardUrl);

@@ -63,7 +63,7 @@ async function renderState(message = "") {
   const state = await sendMessage("tracker:refresh");
 
   elements.apiUrl.value = state.apiBaseUrl || "";
-  elements.token.value = state.token || "";
+  elements.token.value = state.accessToken || "";
   elements.idleTimeout.value = String(state.idleTimeoutSeconds || 300);
   elements.consentStatus.textContent = state.consented
     ? "Consent aktif. Extension boleh mengirim heartbeat ke platform."
