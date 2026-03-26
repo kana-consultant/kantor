@@ -53,18 +53,44 @@ Add `source` column to `refresh_tokens` table:
 ALTER TABLE refresh_tokens ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'dashboard';
 ```
 
+### Refresh Endpoint Changes
+
+The existing `POST /api/v1/auth/refresh` endpoint reads the refresh token from an httpOnly cookie (`readRefreshTokenCookie`). The extension cannot use cookies — it stores tokens in `chrome.storage.local` and makes cross-origin requests.
+
+**Solution:** Modify the refresh handler to accept the refresh token from **either** the cookie (dashboard) **or** the request body (extension). The handler checks the request body first; if empty, falls back to the cookie. This keeps dashboard behavior unchanged while enabling extension refresh.
+
+```go
+// Refresh handler pseudocode:
+// 1. Try reading refresh_token from JSON body
+// 2. If not present, fall back to readRefreshTokenCookie()
+// 3. Proceed with existing refresh logic
+```
+
+On refresh, the `source` is read from the `refresh_tokens` table row being rotated and carried forward to the new access token and refresh token record.
+
 ### Auth Service Changes
 
-- `GenerateExtensionToken(userID, tenantID)` — new method, issues token pair with `source: "extension"` claim and 30-day refresh expiry
+- `GenerateExtensionToken(userID, tenantID)` — new method, issues token pair with `source: "extension"` claim and 30-day refresh expiry. Uses a custom expiry parameter rather than the default `TokenManager.refreshExpiry` (which is 7 days for dashboard tokens). Implementation: call `GenerateAccessToken` with source claim, then `GenerateRefreshToken` with explicit 30-day duration.
 - `RevokeExtensionTokens(userID)` — new method, revokes all extension refresh tokens for a user
-- Existing `Login`, `Refresh` methods remain unchanged — the `source` claim propagates through refresh rotation automatically
+- `Refresh` method updated to: read `source` from the existing refresh token's DB row, propagate it to the new access token claims and the new refresh token record
+
+### TokenManager Changes
+
+`GenerateRefreshToken` currently uses a single `m.refreshExpiry` field unconditionally. Add an overload or parameter to accept a custom expiry duration:
+
+```go
+// Option: add GenerateRefreshTokenWithExpiry(userID, tenantID string, expiry time.Duration)
+// Or: modify GenerateRefreshToken to accept an optional expiry override
+```
+
+This allows `GenerateExtensionToken` to issue 30-day refresh tokens without changing the default 7-day dashboard behavior.
 
 ### JWT Claims Update
 
-Add `source` field to custom claims:
+Add `source` field to `AccessClaims` (the existing struct name in `jwt.go`):
 
 ```go
-type Claims struct {
+type AccessClaims struct {
     Type     string `json:"type"`
     TenantID string `json:"tenant_id"`
     Source   string `json:"source,omitempty"` // "dashboard" or "extension"
@@ -90,13 +116,15 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 
 ### Token Storage
 
+- The current `DEFAULT_STATE` uses a single `token` field. This changes to `accessToken` + `refreshToken` as separate fields.
+- All functions referencing `state.token` (`authorizedRequest()`, `refreshAccessToken()`, `ensureActiveSession()`, etc.) must be updated to use `state.accessToken`.
 - Store `accessToken`, `refreshToken`, `apiBaseUrl`, `dashboardUrl` in `chrome.storage.local`
 - Remove manual token entry from options page (keep apiBaseUrl/dashboardUrl config as fallback)
 
 ### Token Refresh
 
-- Existing 401 → refresh logic stays the same
-- Update to use stored refresh token and persist new token pair on success
+- The current `refreshAccessToken()` sends an empty body with `credentials: "include"` (relies on httpOnly cookie). This must change to send the refresh token in the request body as JSON: `{ "refresh_token": state.refreshToken }`.
+- On success: store new `accessToken` and `refreshToken` from response body, retry original request
 - On refresh failure (token revoked/expired): clear tokens, set state to disconnected
 
 ### Popup UI State
@@ -117,7 +145,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 }
 ```
 
-This restricts which origins can send messages to the extension.
+This restricts which origins can send messages to the extension. The `matches` pattern must be configured per deployment (replace `yourdomain.com` with the actual dashboard domain).
 
 ## Dashboard (Frontend) Changes
 
@@ -207,11 +235,12 @@ User clicks "Disconnect" on Dashboard settings
 ## Files to Modify
 
 ### Backend
-- `backend/internal/auth/jwt.go` — add `Source` field to Claims
-- `backend/internal/service/auth/service.go` — add `GenerateExtensionToken`, `RevokeExtensionTokens` methods
-- `backend/internal/handler/auth/` — add extension-token and extension-disconnect handlers
+- `backend/internal/auth/jwt.go` — add `Source` field to `AccessClaims`, add `GenerateRefreshTokenWithExpiry` method to `TokenManager`
+- `backend/internal/service/auth/service.go` — add `GenerateExtensionToken`, `RevokeExtensionTokens` methods, update `Refresh` to propagate source
+- `backend/internal/handler/auth/handler.go` — add extension-token and extension-disconnect handlers, modify refresh handler to accept body-based refresh token
 - `backend/internal/app/app.go` — register new routes
-- `backend/internal/repository/` — add source-aware refresh token queries
+- `backend/internal/repository/auth/repository.go` — add source-aware refresh token queries, update `CreateRefreshTokenParams` with `Source` field
+- `backend/internal/model/user.go` — add `Source` field to `RefreshToken` model
 - `backend/migrations/` — new migration for `source` column
 
 ### Extension
