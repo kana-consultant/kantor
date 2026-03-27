@@ -123,9 +123,9 @@ function AdminSettingsPage() {
       }
       return updateDefaultRoles(moduleRoles);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Default role berhasil diperbarui");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.settings() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.settings() });
     },
     onError: (error) => {
       toast.error(
@@ -137,9 +137,9 @@ function AdminSettingsPage() {
 
   const autoCreateMutation = useMutation({
     mutationFn: updateAutoCreateEmployee,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Pengaturan auto-create employee berhasil diperbarui");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.settings() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.settings() });
     },
     onError: (error) => {
       toast.error(

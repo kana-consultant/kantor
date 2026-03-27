@@ -102,8 +102,8 @@ function ProfilePage() {
         linkedin_profile: values.linkedin_profile || null,
         ssh_keys: values.ssh_keys || null,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: profileKeys.me });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: profileKeys.me });
       setIsEditing(false);
     },
   });
@@ -152,21 +152,21 @@ function ProfilePage() {
 
   const changeEmailMutation = useMutation({
     mutationFn: (values: ChangeEmailFormValues) => changeEmail(values),
-    onSuccess: () => {
+    onSuccess: async () => {
       setIsEmailModalOpen(false);
       resetEmailForm();
       toast.success("Email berhasil diubah");
-      queryClient.invalidateQueries({ queryKey: profileKeys.me });
-      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      await queryClient.invalidateQueries({ queryKey: profileKeys.me });
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     },
   });
 
   const avatarMutation = useMutation({
     mutationFn: (file: File) => uploadProfileAvatar(file),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Foto profil berhasil diubah");
-      queryClient.invalidateQueries({ queryKey: profileKeys.me });
-      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      await queryClient.invalidateQueries({ queryKey: profileKeys.me });
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     },
     onError: (err) => {
       toast.error(err instanceof ApiError ? err.message : "Gagal mengupload foto");

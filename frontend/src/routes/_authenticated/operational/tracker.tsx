@@ -156,10 +156,10 @@ function OperationalTrackerPage() {
 
   const revokeConsentMutation = useMutation({
     mutationFn: revokeTrackerConsent,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.warning("Consent dicabut", "Extension tracker harus meminta izin lagi sebelum mengirim heartbeat.");
-      void queryClient.invalidateQueries({ queryKey: trackerKeys.consent() });
-      void queryClient.invalidateQueries({ queryKey: trackerKeys.consents() });
+      await queryClient.invalidateQueries({ queryKey: trackerKeys.consent() });
+      await queryClient.invalidateQueries({ queryKey: trackerKeys.consents() });
     },
   });
   const saveDomainMutation = useMutation({
@@ -175,12 +175,12 @@ function OperationalTrackerPage() {
             category: domainForm.category,
             is_productive: domainForm.isProductive,
           }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(editingDomain ? "Domain diperbarui" : "Domain ditambahkan");
       setDomainModalOpen(false);
       setEditingDomain(null);
       resetDomainForm();
-      void queryClient.invalidateQueries({ queryKey: trackerKeys.domains() });
+      await queryClient.invalidateQueries({ queryKey: trackerKeys.domains() });
     },
     onError: () => {
       toast.error("Gagal menyimpan domain tracker");
@@ -188,10 +188,10 @@ function OperationalTrackerPage() {
   });
   const deleteDomainMutation = useMutation({
     mutationFn: (domainId: string) => deleteTrackerDomain(domainId),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Domain tracker dihapus");
       setDeletingDomain(null);
-      void queryClient.invalidateQueries({ queryKey: trackerKeys.domains() });
+      await queryClient.invalidateQueries({ queryKey: trackerKeys.domains() });
     },
     onError: () => {
       toast.error("Gagal menghapus domain tracker");

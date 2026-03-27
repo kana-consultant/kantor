@@ -121,9 +121,9 @@ function AdminRolesPage() {
 
   const createMutation = useMutation({
     mutationFn: createRole,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Role berhasil dibuat");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
       setModalState(null);
     },
     onError: (error) => {
@@ -134,10 +134,10 @@ function AdminRolesPage() {
   const updateMutation = useMutation({
     mutationFn: ({ roleId, payload }: { roleId: string; payload: UpsertRolePayload }) =>
       updateRole(roleId, payload),
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       toast.success("Role berhasil diperbarui");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
-      void queryClient.invalidateQueries({
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
+      await queryClient.invalidateQueries({
         queryKey: adminRbacKeys.roleDetail(variables.roleId),
       });
       setModalState(null);
@@ -149,9 +149,9 @@ function AdminRolesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteRole,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Role berhasil dihapus");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
       setDeleteTarget(null);
     },
     onError: (error) => {
@@ -161,9 +161,9 @@ function AdminRolesPage() {
 
   const toggleMutation = useMutation({
     mutationFn: toggleRole,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Status role diperbarui");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
     },
     onError: (error) => {
       toast.error("Gagal mengubah status role", error instanceof Error ? error.message : undefined);
@@ -172,9 +172,9 @@ function AdminRolesPage() {
 
   const duplicateMutation = useMutation({
     mutationFn: duplicateRole,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Role berhasil diduplikasi");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.roles() });
     },
     onError: (error) => {
       toast.error("Gagal menduplikasi role", error instanceof Error ? error.message : undefined);

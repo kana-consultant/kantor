@@ -164,7 +164,7 @@ function AdminUsersPage() {
         }
       }
       toast.success("Role pengguna berhasil diperbarui");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.users() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.users() });
       setEditingUserID(null);
     },
     onError: (error) => {
@@ -178,9 +178,9 @@ function AdminUsersPage() {
   const toggleActiveMutation = useMutation({
     mutationFn: ({ userID, active }: { userID: string; active: boolean }) =>
       toggleAdminUserActive(userID, active),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Status pengguna berhasil diperbarui");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.users() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.users() });
     },
     onError: (error) => {
       toast.error(
@@ -192,10 +192,10 @@ function AdminUsersPage() {
 
   const ensureEmployeeMutation = useMutation({
     mutationFn: (userID: string) => ensureAdminUserEmployeeProfile(userID),
-    onSuccess: (_, userID) => {
+    onSuccess: async (_, userID) => {
       toast.success("Profil employee berhasil dibuat ulang");
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.users() });
-      void queryClient.invalidateQueries({ queryKey: adminRbacKeys.userDetail(userID) });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.users() });
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.userDetail(userID) });
     },
     onError: (error) => {
       toast.error(

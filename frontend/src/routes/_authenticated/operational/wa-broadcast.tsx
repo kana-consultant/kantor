@@ -143,14 +143,14 @@ function DashboardTab() {
 
   const startMutation = useMutation({
     mutationFn: startWASession,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: waKeys.status() });
-      queryClient.invalidateQueries({ queryKey: [...waKeys.status(), "qr"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: waKeys.status() });
+      await queryClient.invalidateQueries({ queryKey: [...waKeys.status(), "qr"] });
     },
   });
   const stopMutation = useMutation({
     mutationFn: stopWASession,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: waKeys.status() }); },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.status() }); },
   });
 
   // Only fetch QR when WAHA is actually in SCAN_QR_CODE state
@@ -436,7 +436,7 @@ function TemplatesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteTemplate,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: waKeys.all }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.all }); },
   });
 
   const previewMutation = useMutation({
@@ -607,7 +607,7 @@ function TemplateFormDialog({ template, onClose }: { template: WATemplate | null
       };
       return isEdit ? updateTemplate(template!.id, data) : createTemplate(data);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: waKeys.all }); onClose(); },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.all }); onClose(); },
   });
 
   // Determine available variables based on slug
@@ -779,7 +779,7 @@ function SchedulesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteSchedule,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: waKeys.all }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.all }); },
   });
 
   const triggerMutation = useMutation({
@@ -788,7 +788,7 @@ function SchedulesTab() {
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => toggleSchedule(id, active),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: waKeys.all }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.all }); },
   });
 
   return (
@@ -913,7 +913,7 @@ function ScheduleFormDialog({ schedule, onClose }: { schedule: WASchedule | null
       };
       return isEdit ? updateSchedule(schedule!.id, data) : createSchedule(data);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: waKeys.all }); onClose(); },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.all }); onClose(); },
   });
 
   return (
@@ -1181,10 +1181,10 @@ function SettingsTab() {
 
   const saveMutation = useMutation({
     mutationFn: () => updateWAConfig(form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: waKeys.config() });
-      queryClient.invalidateQueries({ queryKey: waKeys.status() });
-      queryClient.invalidateQueries({ queryKey: waKeys.stats() });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: waKeys.config() });
+      await queryClient.invalidateQueries({ queryKey: waKeys.status() });
+      await queryClient.invalidateQueries({ queryKey: waKeys.stats() });
     },
   });
 
