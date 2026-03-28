@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
@@ -16,7 +18,7 @@ func NewOverviewRepository(db repository.DBTX) *OverviewRepository {
 	return &OverviewRepository{db: db}
 }
 
-func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (model.HrisOverview, error) {
+func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time, employeeFilter string) (model.HrisOverview, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
@@ -50,9 +52,11 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 	overview.IncomeVsOutcome = financeSeries
 	overview.MonthlyNet = monthlyNet
 
-	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM reimbursements WHERE status = 'submitted'`).Scan(&overview.PendingReimbursements); err != nil {
+	pendingCount, err := r.countPendingReimbursements(ctx, employeeFilter)
+	if err != nil {
 		return model.HrisOverview{}, err
 	}
+	overview.PendingReimbursements = pendingCount
 
 	upcomingRenewals, err := r.listUpcomingRenewals(ctx, now)
 	if err != nil {
@@ -60,7 +64,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 	}
 	overview.UpcomingRenewals = upcomingRenewals
 
-	recentReimbursements, err := r.listRecentReimbursements(ctx)
+	recentReimbursements, err := r.listRecentReimbursements(ctx, employeeFilter)
 	if err != nil {
 		return model.HrisOverview{}, err
 	}
@@ -175,34 +179,85 @@ func (r *OverviewRepository) listUpcomingRenewals(ctx context.Context, now time.
 	return items, rows.Err()
 }
 
-func (r *OverviewRepository) listRecentReimbursements(ctx context.Context) ([]model.Reimbursement, error) {
-	rows, err := repository.DB(ctx, r.db).Query(ctx, `
-		SELECT
-			reimbursements.id::text,
-			reimbursements.employee_id::text,
-			employees.full_name,
-			reimbursements.title,
-			reimbursements.category,
-			reimbursements.amount,
-			reimbursements.transaction_date,
-			reimbursements.description,
-			reimbursements.status,
-			reimbursements.attachments,
-			reimbursements.submitted_by::text,
-			reimbursements.manager_id::text,
-			reimbursements.manager_action_at,
-			reimbursements.manager_notes,
-			reimbursements.finance_id::text,
-			reimbursements.finance_action_at,
-			reimbursements.finance_notes,
-			reimbursements.paid_at,
-			reimbursements.created_at,
-			reimbursements.updated_at
-		FROM reimbursements
-		INNER JOIN employees ON employees.id = reimbursements.employee_id
-		ORDER BY reimbursements.created_at DESC
-		LIMIT 5
-	`)
+func (r *OverviewRepository) countPendingReimbursements(ctx context.Context, employeeFilter string) (int64, error) {
+	var count int64
+	var err error
+	if employeeFilter != "" {
+		err = repository.DB(ctx, r.db).QueryRow(ctx,
+			`SELECT COUNT(*) FROM reimbursements WHERE status = 'submitted' AND employee_id = $1::uuid`,
+			employeeFilter,
+		).Scan(&count)
+	} else {
+		err = repository.DB(ctx, r.db).QueryRow(ctx,
+			`SELECT COUNT(*) FROM reimbursements WHERE status = 'submitted'`,
+		).Scan(&count)
+	}
+	return count, err
+}
+
+func (r *OverviewRepository) listRecentReimbursements(ctx context.Context, employeeFilter string) ([]model.Reimbursement, error) {
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if employeeFilter != "" {
+		rows, err = repository.DB(ctx, r.db).Query(ctx, `
+			SELECT
+				reimbursements.id::text,
+				reimbursements.employee_id::text,
+				employees.full_name,
+				reimbursements.title,
+				reimbursements.category,
+				reimbursements.amount,
+				reimbursements.transaction_date,
+				reimbursements.description,
+				reimbursements.status,
+				reimbursements.attachments,
+				reimbursements.submitted_by::text,
+				reimbursements.manager_id::text,
+				reimbursements.manager_action_at,
+				reimbursements.manager_notes,
+				reimbursements.finance_id::text,
+				reimbursements.finance_action_at,
+				reimbursements.finance_notes,
+				reimbursements.paid_at,
+				reimbursements.created_at,
+				reimbursements.updated_at
+			FROM reimbursements
+			INNER JOIN employees ON employees.id = reimbursements.employee_id
+			WHERE reimbursements.employee_id = $1::uuid
+			ORDER BY reimbursements.created_at DESC
+			LIMIT 5
+		`, employeeFilter)
+	} else {
+		rows, err = repository.DB(ctx, r.db).Query(ctx, `
+			SELECT
+				reimbursements.id::text,
+				reimbursements.employee_id::text,
+				employees.full_name,
+				reimbursements.title,
+				reimbursements.category,
+				reimbursements.amount,
+				reimbursements.transaction_date,
+				reimbursements.description,
+				reimbursements.status,
+				reimbursements.attachments,
+				reimbursements.submitted_by::text,
+				reimbursements.manager_id::text,
+				reimbursements.manager_action_at,
+				reimbursements.manager_notes,
+				reimbursements.finance_id::text,
+				reimbursements.finance_action_at,
+				reimbursements.finance_notes,
+				reimbursements.paid_at,
+				reimbursements.created_at,
+				reimbursements.updated_at
+			FROM reimbursements
+			INNER JOIN employees ON employees.id = reimbursements.employee_id
+			ORDER BY reimbursements.created_at DESC
+			LIMIT 5
+		`)
+	}
 	if err != nil {
 		return nil, err
 	}

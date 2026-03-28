@@ -210,7 +210,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	notificationsService := notificationsservice.New(notificationsRepository)
 	reimbursementsService := hrisservice.NewReimbursementsService(reimbursementsRepository, employeesRepository, authRepository, notificationsService, financeService)
 	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter, financeService)
-	hrisOverviewService := hrisservice.NewOverviewService(hrisOverviewRepository)
+	hrisOverviewService := hrisservice.NewOverviewService(hrisOverviewRepository, employeesRepository)
 	campaignsService := marketingservice.NewCampaignsService(campaignsRepository, authRepository, notificationsService)
 	adsMetricsService := marketingservice.NewAdsMetricsService(adsMetricsRepository)
 	leadsService := marketingservice.NewLeadsService(leadsRepository, authRepository, notificationsService)
