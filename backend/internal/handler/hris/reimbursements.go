@@ -45,6 +45,8 @@ func (h *ReimbursementsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/export", h.export)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/summary", h.summary)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:view")).Get("/{reimbursementID}", h.get)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:edit")).Put("/{reimbursementID}", h.update)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:edit")).Delete("/{reimbursementID}", h.deleteReimbursement)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:edit")).Post("/{reimbursementID}/attachments", h.uploadAttachments)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:approve")).Patch("/{reimbursementID}/review", h.review)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:mark_paid")).Patch("/{reimbursementID}/mark-paid", h.markPaid)
@@ -107,6 +109,44 @@ func (h *ReimbursementsHandler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
+}
+
+func (h *ReimbursementsHandler) update(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+
+	var input hrisdto.UpdateReimbursementRequest
+	if !decodeAndValidate(h.validator, w, r, &input) {
+		return
+	}
+
+	reimbursementID := chi.URLParam(r, "reimbursementID")
+	item, err := h.service.Update(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "reimbursement", reimbursementID, nil, input)
+	response.WriteJSON(w, http.StatusOK, item, nil)
+}
+
+func (h *ReimbursementsHandler) deleteReimbursement(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+
+	reimbursementID := chi.URLParam(r, "reimbursementID")
+	if err := h.service.Delete(r.Context(), reimbursementID, principal.UserID, principal.Cached); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "reimbursement", reimbursementID, nil, nil)
+	response.WriteJSON(w, http.StatusOK, map[string]bool{"deleted": true}, nil)
 }
 
 func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http.Request) {
@@ -259,6 +299,8 @@ func (h *ReimbursementsHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusNotFound, "REIMBURSEMENT_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrReimbursementForbidden):
 		response.WriteError(w, http.StatusForbidden, "FORBIDDEN", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrReimbursementInvalidState):
+		response.WriteError(w, http.StatusConflict, "INVALID_STATE", "Only submitted reimbursements can be modified", nil)
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"employee_id": "not found"})
 	default:

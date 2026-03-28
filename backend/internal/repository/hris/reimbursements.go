@@ -42,6 +42,14 @@ type ListReimbursementsParams struct {
 	Year       int
 }
 
+type UpdateReimbursementParams struct {
+	Title           string
+	Category        string
+	Amount          int64
+	TransactionDate time.Time
+	Description     string
+}
+
 type ReviewReimbursementParams struct {
 	Decision string
 	ActorID  string
@@ -247,6 +255,51 @@ func (r *ReimbursementsRepository) AddAttachments(ctx context.Context, reimburse
 		return model.Reimbursement{}, err
 	}
 	return r.hydrateEmployeeName(ctx, item)
+}
+
+func (r *ReimbursementsRepository) Update(ctx context.Context, reimbursementID string, params UpdateReimbursementParams) (model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	query := `
+		UPDATE reimbursements
+		SET title = $2,
+			category = $3,
+			amount = $4,
+			transaction_date = $5::date,
+			description = $6,
+			updated_at = NOW()
+		WHERE id = $1::uuid
+		RETURNING id::text, employee_id::text, title, category, amount, transaction_date, description, status, attachments, submitted_by::text, manager_id::text, manager_action_at, manager_notes, finance_id::text, finance_action_at, finance_notes, paid_at, created_at, updated_at
+	`
+	item, err := r.scanRow(ctx, repository.DB(ctx, r.db).QueryRow(
+		ctx,
+		query,
+		reimbursementID,
+		params.Title,
+		params.Category,
+		params.Amount,
+		params.TransactionDate,
+		params.Description,
+	))
+	if err != nil {
+		return model.Reimbursement{}, err
+	}
+	return r.hydrateEmployeeName(ctx, item)
+}
+
+func (r *ReimbursementsRepository) Delete(ctx context.Context, reimbursementID string) error {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	tag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM reimbursements WHERE id = $1::uuid`, reimbursementID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrReimbursementNotFound
+	}
+	return nil
 }
 
 func (r *ReimbursementsRepository) ApplyManagerReview(ctx context.Context, reimbursementID string, params ReviewReimbursementParams) (model.Reimbursement, error) {

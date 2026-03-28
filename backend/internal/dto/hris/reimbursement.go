@@ -8,7 +8,15 @@ type CreateReimbursementRequest struct {
 	Category        string    `json:"category" validate:"required,min=2,max=120"`
 	Amount          int64     `json:"amount" validate:"required,min=0"`
 	TransactionDate time.Time `json:"transaction_date" validate:"required"`
-	Description     string    `json:"description" validate:"required,min=2,max=2000"`
+	Description     string    `json:"description" validate:"omitempty,max=2000"`
+}
+
+type UpdateReimbursementRequest struct {
+	Title           string    `json:"title" validate:"required,min=2,max=200"`
+	Category        string    `json:"category" validate:"required,min=2,max=120"`
+	Amount          int64     `json:"amount" validate:"required,min=0"`
+	TransactionDate time.Time `json:"transaction_date" validate:"required"`
+	Description     string    `json:"description" validate:"omitempty,max=2000"`
 }
 
 type ListReimbursementsQuery struct {

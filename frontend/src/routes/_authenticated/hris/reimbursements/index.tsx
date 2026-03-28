@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Controller, useForm } from "react-hook-form";
-import { CircleDollarSign, Plus, Receipt, TimerReset } from "lucide-react";
+import { CircleDollarSign, Pencil, Plus, Receipt, TimerReset, Trash2 } from "lucide-react";
 import { z } from "zod";
 
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -24,9 +24,11 @@ import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { employeesKeys, listEmployees } from "@/services/hris-employees";
 import {
   createReimbursement,
+  deleteReimbursement,
   getReimbursementSummary,
   listReimbursements,
   reimbursementsKeys,
+  updateReimbursement,
   uploadReimbursementAttachments,
 } from "@/services/hris-reimbursements";
 import type { Reimbursement, ReimbursementFilters, ReimbursementFormValues } from "@/types/hris";
@@ -39,6 +41,16 @@ const reimbursementSchema = z.object({
   transaction_date: z.string().min(1, "Tanggal transaksi wajib diisi"),
   description: z.string().max(2000),
 });
+
+const editReimbursementSchema = z.object({
+  title: z.string().min(2, "Judul minimal 2 karakter").max(200),
+  category: z.string().min(2, "Kategori wajib diisi").max(120),
+  amount: z.coerce.number().min(1, "Jumlah wajib diisi"),
+  transaction_date: z.string().min(1, "Tanggal transaksi wajib diisi"),
+  description: z.string().max(2000),
+});
+
+type EditReimbursementFormValues = z.infer<typeof editReimbursementSchema>;
 
 const defaultFilters: ReimbursementFilters = {
   page: 1,
@@ -63,6 +75,8 @@ function ReimbursementsPage() {
   const [filters, setFilters] = useState<ReimbursementFilters>(defaultFilters);
   const [showForm, setShowForm] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [editingReimbursement, setEditingReimbursement] = useState<Reimbursement | null>(null);
+  const [reimbursementToDelete, setReimbursementToDelete] = useState<Reimbursement | null>(null);
 
   const form = useForm<ReimbursementFormValues>({
     resolver: zodResolver(reimbursementSchema) as never,
@@ -75,6 +89,23 @@ function ReimbursementsPage() {
       description: "",
     },
   });
+
+  const editForm = useForm<EditReimbursementFormValues>({
+    resolver: zodResolver(editReimbursementSchema) as never,
+    defaultValues: { title: "", category: "", amount: 0, transaction_date: new Date().toISOString().slice(0, 10), description: "" },
+  });
+
+  useEffect(() => {
+    if (editingReimbursement) {
+      editForm.reset({
+        title: editingReimbursement.title,
+        category: editingReimbursement.category,
+        amount: editingReimbursement.amount,
+        transaction_date: new Date(editingReimbursement.transaction_date).toISOString().slice(0, 10),
+        description: editingReimbursement.description ?? "",
+      });
+    }
+  }, [editingReimbursement]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const employeesQuery = useQuery({
     queryKey: employeesKeys.list({ page: 1, perPage: 100, search: "", department: "", status: "" }),
@@ -110,6 +141,22 @@ function ReimbursementsPage() {
       });
       setFiles([]);
       setShowForm(false);
+      await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: EditReimbursementFormValues) => updateReimbursement(editingReimbursement!.id, values),
+    onSuccess: async () => {
+      setEditingReimbursement(null);
+      await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteReimbursement(reimbursementToDelete!.id),
+    onSuccess: async () => {
+      setReimbursementToDelete(null);
       await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
     },
   });
@@ -189,13 +236,37 @@ function ReimbursementsPage() {
       header: "Actions",
       align: "right",
       cell: (item) => (
-        <Link
-          className={buttonVariants({ size: "sm" })}
-          params={{ reimbursementId: item.id }}
-          to="/hris/reimbursements/$reimbursementId"
-        >
-          Open detail
-        </Link>
+        <div className="flex items-center justify-end gap-2">
+          {item.status === "submitted" && hasPermission(permissions.hrisReimbursementEdit) ? (
+            <>
+              <Button
+                className="h-8 w-8 p-0"
+                onClick={() => setEditingReimbursement(item)}
+                title="Edit"
+                type="button"
+                variant="ghost"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                className="h-8 w-8 p-0 text-error hover:text-error"
+                onClick={() => setReimbursementToDelete(item)}
+                title="Hapus"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          ) : null}
+          <Link
+            className={buttonVariants({ size: "sm" })}
+            params={{ reimbursementId: item.id }}
+            to="/hris/reimbursements/$reimbursementId"
+          >
+            Open detail
+          </Link>
+        </div>
       ),
     },
   ];
@@ -409,6 +480,95 @@ function ReimbursementsPage() {
           </div>
         </div>
       </FormModal>
+
+      <FormModal
+        isLoading={updateMutation.isPending}
+        isOpen={!!editingReimbursement}
+        onClose={() => setEditingReimbursement(null)}
+        onSubmit={editForm.handleSubmit((values) => updateMutation.mutate(values))}
+        size="lg"
+        submitLabel="Simpan perubahan"
+        title="Edit reimbursement"
+        subtitle="Ubah detail klaim. Hanya reimbursement yang belum diproses yang dapat diedit."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Kategori<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...editForm.register("category")} placeholder="Kategori" />
+            {editForm.formState.errors.category ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{editForm.formState.errors.category.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Judul<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...editForm.register("title")} placeholder="Judul" />
+            {editForm.formState.errors.title ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{editForm.formState.errors.title.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Jumlah<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Controller
+              control={editForm.control}
+              name="amount"
+              render={({ field }) => (
+                <CurrencyInput
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  ref={field.ref}
+                  value={field.value}
+                />
+              )}
+            />
+            {editForm.formState.errors.amount ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{editForm.formState.errors.amount.message}</p> : null}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Tanggal transaksi<span className="ml-0.5 text-priority-high">*</span>
+            </label>
+            <Input {...editForm.register("transaction_date")} type="date" />
+            {editForm.formState.errors.transaction_date ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{editForm.formState.errors.transaction_date.message}</p> : null}
+          </div>
+          <div className="lg:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-text-primary">
+              Deskripsi
+            </label>
+            <Input {...editForm.register("description")} placeholder="Deskripsi (opsional)" />
+            {editForm.formState.errors.description ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{editForm.formState.errors.description.message}</p> : null}
+          </div>
+        </div>
+      </FormModal>
+
+      {reimbursementToDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-text-primary">Hapus reimbursement?</h3>
+            <p className="mt-2 text-sm text-text-secondary">
+              Reimbursement <span className="font-medium text-text-primary">"{reimbursementToDelete.title}"</span> akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                disabled={deleteMutation.isPending}
+                onClick={() => setReimbursementToDelete(null)}
+                type="button"
+                variant="outline"
+              >
+                Batal
+              </Button>
+              <Button
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+                type="button"
+                variant="danger"
+              >
+                {deleteMutation.isPending ? "Menghapus..." : "Hapus"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      ) : null}
 
       {reimbursementsQuery.error instanceof Error ? (
         <Card className="p-6 text-sm text-error">{reimbursementsQuery.error.message}</Card>

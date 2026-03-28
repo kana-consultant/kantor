@@ -93,6 +93,27 @@ export async function markReimbursementPaid(reimbursementId: string, notes = "")
   );
 }
 
+export async function updateReimbursement(reimbursementId: string, values: Omit<ReimbursementFormValues, "employee_id">) {
+  return authRequestJSON<Reimbursement>(
+    `/hris/reimbursements/${reimbursementId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...values,
+        transaction_date: new Date(`${values.transaction_date}T00:00:00`).toISOString(),
+      }),
+    },
+  );
+}
+
+export async function deleteReimbursement(reimbursementId: string) {
+  return authRequestJSON<{ deleted: boolean }>(
+    `/hris/reimbursements/${reimbursementId}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function getReimbursementSummary(month: string, year: string) {
   const search = new URLSearchParams();
   if (month) search.set("month", month);

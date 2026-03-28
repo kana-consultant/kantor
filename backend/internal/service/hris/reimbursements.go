@@ -30,6 +30,8 @@ type reimbursementsRepository interface {
 	Create(ctx context.Context, params hrisrepo.CreateReimbursementParams) (model.Reimbursement, error)
 	List(ctx context.Context, params hrisrepo.ListReimbursementsParams) ([]model.Reimbursement, int64, error)
 	GetByID(ctx context.Context, reimbursementID string) (model.Reimbursement, error)
+	Update(ctx context.Context, reimbursementID string, params hrisrepo.UpdateReimbursementParams) (model.Reimbursement, error)
+	Delete(ctx context.Context, reimbursementID string) error
 	AddAttachments(ctx context.Context, reimbursementID string, attachments []string) (model.Reimbursement, error)
 	ApplyManagerReview(ctx context.Context, reimbursementID string, params hrisrepo.ReviewReimbursementParams) (model.Reimbursement, error)
 	MarkPaid(ctx context.Context, reimbursementID string, actorID string, notes *string) (model.Reimbursement, error)
@@ -150,6 +152,44 @@ func (s *ReimbursementsService) Get(ctx context.Context, reimbursementID string,
 		return model.Reimbursement{}, err
 	}
 	return item, nil
+}
+
+func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID string, request hrisdto.UpdateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
+	item, err := s.repo.GetByID(ctx, reimbursementID)
+	if err != nil {
+		return model.Reimbursement{}, mapReimbursementError(err)
+	}
+	if err := s.ensureEditable(ctx, item, actorID, perms); err != nil {
+		return model.Reimbursement{}, err
+	}
+	if item.Status != "submitted" {
+		return model.Reimbursement{}, ErrReimbursementInvalidState
+	}
+	updated, err := s.repo.Update(ctx, reimbursementID, hrisrepo.UpdateReimbursementParams{
+		Title:           strings.TrimSpace(request.Title),
+		Category:        strings.TrimSpace(request.Category),
+		Amount:          request.Amount,
+		TransactionDate: request.TransactionDate,
+		Description:     strings.TrimSpace(request.Description),
+	})
+	if err != nil {
+		return model.Reimbursement{}, mapReimbursementError(err)
+	}
+	return updated, nil
+}
+
+func (s *ReimbursementsService) Delete(ctx context.Context, reimbursementID string, actorID string, perms *rbac.CachedPermissions) error {
+	item, err := s.repo.GetByID(ctx, reimbursementID)
+	if err != nil {
+		return mapReimbursementError(err)
+	}
+	if err := s.ensureEditable(ctx, item, actorID, perms); err != nil {
+		return err
+	}
+	if item.Status != "submitted" {
+		return ErrReimbursementInvalidState
+	}
+	return mapReimbursementError(s.repo.Delete(ctx, reimbursementID))
 }
 
 func (s *ReimbursementsService) AddAttachments(ctx context.Context, reimbursementID string, attachments []string, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
