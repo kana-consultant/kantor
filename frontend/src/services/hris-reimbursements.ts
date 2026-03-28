@@ -93,7 +93,11 @@ export async function markReimbursementPaid(reimbursementId: string, notes = "")
   );
 }
 
-export async function updateReimbursement(reimbursementId: string, values: Omit<ReimbursementFormValues, "employee_id">) {
+export async function updateReimbursement(
+  reimbursementId: string,
+  values: Omit<ReimbursementFormValues, "employee_id">,
+  keptAttachments?: string[],
+) {
   return authRequestJSON<Reimbursement>(
     `/hris/reimbursements/${reimbursementId}`,
     {
@@ -102,6 +106,7 @@ export async function updateReimbursement(reimbursementId: string, values: Omit<
       body: JSON.stringify({
         ...values,
         transaction_date: new Date(`${values.transaction_date}T00:00:00`).toISOString(),
+        kept_attachments: keptAttachments ?? null,
       }),
     },
   );

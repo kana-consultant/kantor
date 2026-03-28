@@ -165,12 +165,17 @@ func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID stri
 	if item.Status != "submitted" {
 		return model.Reimbursement{}, ErrReimbursementInvalidState
 	}
+	keptAttachments := request.KeptAttachments
+	if keptAttachments == nil {
+		keptAttachments = item.Attachments
+	}
 	updated, err := s.repo.Update(ctx, reimbursementID, hrisrepo.UpdateReimbursementParams{
 		Title:           strings.TrimSpace(request.Title),
 		Category:        strings.TrimSpace(request.Category),
 		Amount:          request.Amount,
 		TransactionDate: request.TransactionDate,
 		Description:     strings.TrimSpace(request.Description),
+		Attachments:     keptAttachments,
 	})
 	if err != nil {
 		return model.Reimbursement{}, mapReimbursementError(err)

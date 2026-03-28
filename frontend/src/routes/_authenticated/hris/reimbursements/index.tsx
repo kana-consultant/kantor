@@ -76,6 +76,8 @@ function ReimbursementsPage() {
   const [showForm, setShowForm] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [editingReimbursement, setEditingReimbursement] = useState<Reimbursement | null>(null);
+  const [keptAttachments, setKeptAttachments] = useState<string[]>([]);
+  const [editFiles, setEditFiles] = useState<File[]>([]);
   const [reimbursementToDelete, setReimbursementToDelete] = useState<Reimbursement | null>(null);
 
   const form = useForm<ReimbursementFormValues>({
@@ -104,6 +106,8 @@ function ReimbursementsPage() {
         transaction_date: new Date(editingReimbursement.transaction_date).toISOString().slice(0, 10),
         description: editingReimbursement.description ?? "",
       });
+      setKeptAttachments(editingReimbursement.attachments ?? []);
+      setEditFiles([]);
     }
   }, [editingReimbursement]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -146,9 +150,17 @@ function ReimbursementsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (values: EditReimbursementFormValues) => updateReimbursement(editingReimbursement!.id, values),
+    mutationFn: async (values: EditReimbursementFormValues) => {
+      const updated = await updateReimbursement(editingReimbursement!.id, values, keptAttachments);
+      if (editFiles.length > 0) {
+        await uploadReimbursementAttachments(updated.id, editFiles);
+      }
+      return updated;
+    },
     onSuccess: async () => {
       setEditingReimbursement(null);
+      setKeptAttachments([]);
+      setEditFiles([]);
       await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
     },
   });
@@ -180,6 +192,15 @@ function ReimbursementsPage() {
     () => files.map((file) => `${file.name} (${Math.round(file.size / 1024)} KB)`),
     [files],
   );
+
+  const handleEditFiles = (incomingFiles: FileList | File[]) => {
+    const nextFiles = Array.from(incomingFiles).filter((file) => {
+      const validType = file.type.startsWith("image/") || file.type === "application/pdf";
+      const validSize = file.size <= 10 * 1024 * 1024;
+      return validType && validSize;
+    });
+    setEditFiles(nextFiles);
+  };
 
   const columns: Array<DataTableColumn<Reimbursement>> = [
     {
@@ -537,6 +558,62 @@ function ReimbursementsPage() {
             </label>
             <Input {...editForm.register("description")} placeholder="Deskripsi (opsional)" />
             {editForm.formState.errors.description ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{editForm.formState.errors.description.message}</p> : null}
+          </div>
+          <div className="lg:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-text-primary">Lampiran saat ini</label>
+            {keptAttachments.length > 0 ? (
+              <div className="mt-1 space-y-2">
+                {keptAttachments.map((path) => (
+                  <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-2" key={path}>
+                    <span className="truncate text-sm text-text-secondary">{path.split("/").pop()}</span>
+                    <Button
+                      className="ml-3 h-7 shrink-0 text-xs"
+                      onClick={() => setKeptAttachments((prev) => prev.filter((p) => p !== path))}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-error" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-text-secondary">Tidak ada lampiran.</p>
+            )}
+          </div>
+          <div
+            className="lg:col-span-2 rounded-md border border-dashed border-border bg-surface-muted p-6"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              handleEditFiles(event.dataTransfer.files);
+            }}
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="font-semibold text-text-primary">Tambah lampiran baru</p>
+                <p className="text-xs text-text-secondary">Drag image atau PDF. Maksimal 10MB per file.</p>
+              </div>
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted">
+                Pilih file
+                <input
+                  className="hidden"
+                  multiple
+                  onChange={(event) => handleEditFiles(event.target.files ?? [])}
+                  type="file"
+                />
+              </label>
+            </div>
+            {editFiles.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                {editFiles.map((file) => (
+                  <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-text-secondary" key={file.name}>
+                    {file.name} ({Math.round(file.size / 1024)} KB)
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       </FormModal>

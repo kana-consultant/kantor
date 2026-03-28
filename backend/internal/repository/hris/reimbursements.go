@@ -48,6 +48,7 @@ type UpdateReimbursementParams struct {
 	Amount          int64
 	TransactionDate time.Time
 	Description     string
+	Attachments     []string
 }
 
 type ReviewReimbursementParams struct {
@@ -261,6 +262,11 @@ func (r *ReimbursementsRepository) Update(ctx context.Context, reimbursementID s
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
+	attachmentsJSON, err := json.Marshal(params.Attachments)
+	if err != nil {
+		return model.Reimbursement{}, err
+	}
+
 	query := `
 		UPDATE reimbursements
 		SET title = $2,
@@ -268,6 +274,7 @@ func (r *ReimbursementsRepository) Update(ctx context.Context, reimbursementID s
 			amount = $4,
 			transaction_date = $5::date,
 			description = $6,
+			attachments = $7::jsonb,
 			updated_at = NOW()
 		WHERE id = $1::uuid
 		RETURNING id::text, employee_id::text, title, category, amount, transaction_date, description, status, attachments, submitted_by::text, manager_id::text, manager_action_at, manager_notes, finance_id::text, finance_action_at, finance_notes, paid_at, created_at, updated_at
@@ -281,6 +288,7 @@ func (r *ReimbursementsRepository) Update(ctx context.Context, reimbursementID s
 		params.Amount,
 		params.TransactionDate,
 		params.Description,
+		string(attachmentsJSON),
 	))
 	if err != nil {
 		return model.Reimbursement{}, err
