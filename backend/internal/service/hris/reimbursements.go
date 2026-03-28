@@ -128,6 +128,11 @@ func (s *ReimbursementsService) List(ctx context.Context, query hrisdto.ListReim
 		if err != nil {
 			return nil, 0, page, perPage, mapReimbursementError(err)
 		}
+		// Non-admin users can only see their own reimbursements.
+		// If a specific employee filter was requested but it's not their own, return forbidden.
+		if employeeID != "" && employeeID != employee.ID {
+			return nil, 0, page, perPage, ErrReimbursementForbidden
+		}
 		employeeID = employee.ID
 	}
 

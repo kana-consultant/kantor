@@ -348,6 +348,7 @@ function EmployeeDetailPage() {
       {tab === "reimbursements" ? (
         <ReimbursementsTab
           employeeName={employee.full_name}
+          error={reimbursementsQuery.error}
           items={reimbursementsQuery.data?.items ?? []}
           loading={reimbursementsQuery.isLoading}
         />
@@ -789,10 +790,12 @@ function BonusTab({
 
 function ReimbursementsTab({
   employeeName,
+  error,
   items,
   loading,
 }: {
   employeeName: string;
+  error: Error | null;
   items: Reimbursement[];
   loading: boolean;
 }) {
@@ -856,14 +859,18 @@ function ReimbursementsTab({
         <p className="mt-2 text-sm text-muted-foreground">All reimbursement requests submitted for {employeeName}.</p>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={items}
-        emptyDescription="No reimbursement history has been recorded for this employee yet."
-        emptyTitle="No reimbursements found"
-        getRowId={(item) => item.id}
-        loading={loading}
-      />
+      {error ? (
+        <p className="text-sm text-text-secondary">Anda tidak memiliki akses untuk melihat reimbursement karyawan lain.</p>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={items}
+          emptyDescription="No reimbursement history has been recorded for this employee yet."
+          emptyTitle="No reimbursements found"
+          getRowId={(item) => item.id}
+          loading={loading}
+        />
+      )}
     </Card>
   );
 }
