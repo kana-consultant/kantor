@@ -3,6 +3,7 @@ package files
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -43,7 +44,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !hasPermission(principal, file.Permission) {
+	if !hasPermission(principal, file.Permission, file.OwnerUserID) {
 		response.WriteError(w, http.StatusForbidden, "FORBIDDEN", "You do not have permission to access this file", nil)
 		return
 	}
@@ -52,13 +53,17 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, file.Path)
 }
 
-func hasPermission(principal platformmiddleware.Principal, permission string) bool {
-	if permission == "" {
+func hasPermission(principal platformmiddleware.Principal, permission string, ownerUserID *string) bool {
+	if principal.IsSuperAdmin {
 		return true
 	}
 
-	if principal.IsSuperAdmin {
+	if ownerUserID != nil && strings.TrimSpace(*ownerUserID) != "" && principal.UserID == strings.TrimSpace(*ownerUserID) {
 		return true
+	}
+
+	if strings.TrimSpace(permission) == "" {
+		return false
 	}
 
 	for _, item := range principal.Permissions {

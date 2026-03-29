@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { Bell, ChevronDown, LogOut, Moon, PanelLeft, PanelLeftClose, Phone, Sun, User, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useModuleTheme } from "@/hooks/use-module-theme";
 import { cn } from "@/lib/utils";
 import {
+  connectNotificationsStream,
   getUnreadNotificationsCount,
   listNotifications,
   markAllNotificationsRead,
@@ -19,12 +20,21 @@ import {
 import { logout } from "@/services/auth";
 import { getUserPhone, updateUserPhone, waKeys } from "@/services/wa-broadcast";
 import { useSidebarStore } from "@/stores/sidebar-store";
+import { toast } from "@/stores/toast-store";
 import { useThemeStore } from "@/stores/theme-store";
+import type { NotificationItem } from "@/types/notification";
+
+function readBrowserNotificationPermission(): NotificationPermission {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return "default";
+  }
+  return window.Notification.permission;
+}
 
 export function Topbar() {
   const queryClient = useQueryClient();
   const { breadcrumb } = useModuleTheme();
-  const { user, roleLabels, roleSummary } = useAuth();
+  const { isAuthenticated, user, roleLabels, roleSummary } = useAuth();
   const mode = useThemeStore((state) => state.mode);
   const toggleTheme = useThemeStore((state) => state.toggleMode);
   const { isDesktopCollapsed, toggleDesktopCollapsed, toggleMobileOpen } = useSidebarStore();
@@ -32,8 +42,10 @@ export function Topbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission>(readBrowserNotificationPermission);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
 
   const notificationsQuery = useQuery({
     queryKey: notificationsKeys.list({ page: 1, perPage: 8 }),
@@ -76,7 +88,8 @@ export function Topbar() {
 
   const unreadCount = unreadCountQuery.data?.unread_count ?? 0;
   const unreadLabel = useMemo(() => (unreadCount > 99 ? "99+" : String(unreadCount)), [unreadCount]);
-  const notificationItems = notificationsQuery.data?.items ?? [];
+  const notificationItems = useMemo(() => notificationsQuery.data?.items ?? [], [notificationsQuery.data?.items]);
+  const browserNotificationsSupported = typeof window !== "undefined" && "Notification" in window;
   const BreadcrumbIcon = breadcrumb.icon;
   const notificationsPanelClasses =
     "z-30 overflow-hidden rounded-[20px] border border-border/90 bg-surface shadow-[0_24px_56px_-28px_rgba(15,23,42,0.45)] motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-200 sm:absolute sm:right-0 sm:top-12 sm:w-[320px]";
@@ -88,6 +101,92 @@ export function Topbar() {
       window.location.href = "/login";
     });
   };
+
+  const handleNotificationClick = useEffectEvent((item: NotificationItem) => {
+    if (!item.is_read) {
+      markReadMutation.mutate(item.id);
+    }
+
+    setIsNotificationsOpen(false);
+
+    const href = resolveNotificationHref(item);
+    if (href) {
+      window.location.assign(href);
+    }
+  });
+
+  useEffect(() => {
+    if (!browserNotificationsSupported) {
+      return;
+    }
+
+    const syncPermission = () => {
+      setBrowserNotificationPermission(readBrowserNotificationPermission());
+    };
+
+    syncPermission();
+    window.addEventListener("focus", syncPermission);
+    document.addEventListener("visibilitychange", syncPermission);
+
+    return () => {
+      window.removeEventListener("focus", syncPermission);
+      document.removeEventListener("visibilitychange", syncPermission);
+    };
+  }, [browserNotificationsSupported]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    let cancelled = false;
+    let reconnectTimer: number | null = null;
+    let reconnectAttempt = 0;
+    let controller: AbortController | null = null;
+
+    const connect = () => {
+      if (cancelled) {
+        return;
+      }
+
+      controller = new AbortController();
+
+      void connectNotificationsStream({
+        signal: controller.signal,
+        onEvent: () => {
+          reconnectAttempt = 0;
+          void queryClient.invalidateQueries({ queryKey: notificationsKeys.all });
+        },
+      })
+        .then(() => {
+          if (cancelled || controller?.signal.aborted) {
+            return;
+          }
+
+          reconnectTimer = window.setTimeout(connect, 1_000);
+        })
+        .catch((error) => {
+          if (cancelled || controller?.signal.aborted) {
+            return;
+          }
+
+          console.warn("Notifications stream disconnected", error);
+          const delay = Math.min(30_000, 1_000 * 2 ** Math.min(reconnectAttempt, 5));
+          reconnectAttempt += 1;
+          reconnectTimer = window.setTimeout(connect, delay);
+        });
+    };
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      controller?.abort();
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+    };
+  }, [isAuthenticated, queryClient]);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -116,6 +215,73 @@ export function Topbar() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    const seen = seenNotificationIdsRef.current;
+    if (notificationItems.length === 0) {
+      return;
+    }
+    if (seen.size === 0) {
+      notificationItems.forEach((item) => seen.add(item.id));
+      return;
+    }
+
+    const freshUnread = notificationItems.filter((item) => !item.is_read && !seen.has(item.id));
+    notificationItems.forEach((item) => seen.add(item.id));
+
+    if (
+      freshUnread.length === 0 ||
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      browserNotificationPermission !== "granted" ||
+      document.visibilityState !== "hidden"
+    ) {
+      return;
+    }
+
+    freshUnread.slice().reverse().forEach((item) => {
+      const notification = new window.Notification(item.title, {
+        body: item.message,
+        tag: item.id,
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        handleNotificationClick(item);
+        notification.close();
+      };
+    });
+  }, [browserNotificationPermission, handleNotificationClick, notificationItems]);
+
+  const requestBrowserNotificationPermission = async () => {
+    if (!browserNotificationsSupported) {
+      toast.warning("Browser notification tidak didukung");
+      return;
+    }
+
+    const previousPermission = readBrowserNotificationPermission();
+    const permission = await window.Notification.requestPermission();
+    setBrowserNotificationPermission(permission);
+
+    if (permission === "granted") {
+      toast.success("Browser notification aktif", "Notifikasi baru akan muncul saat tab sedang tidak aktif.");
+      return;
+    }
+
+    if (permission === "denied") {
+      toast.warning(
+        previousPermission === "denied" ? "Izin browser masih ditolak" : "Izin browser ditolak",
+        "Aktifkan lagi dari site settings browser, lalu tekan tombol Cek ulang di panel notifikasi.",
+      );
+      return;
+    }
+
+    toast.info("Izin browser belum diaktifkan");
+  };
+
+  const refreshBrowserNotificationPermission = () => {
+    setBrowserNotificationPermission(readBrowserNotificationPermission());
+  };
 
   return (
     <header className="sticky top-1 z-20 flex min-w-0 items-center justify-between gap-2 rounded-[20px] border border-border/70 bg-surface px-2 py-2 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.3)] sm:top-1.5 sm:gap-4 sm:px-3 lg:top-2">
@@ -186,6 +352,17 @@ export function Topbar() {
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <h3 className="text-sm font-semibold text-text-primary">Notifikasi</h3>
                 <div className="flex items-center gap-2">
+                  {browserNotificationsSupported && browserNotificationPermission !== "granted" ? (
+                    <button
+                      className="text-xs font-semibold text-module transition hover:opacity-80"
+                      onClick={() => {
+                        void requestBrowserNotificationPermission();
+                      }}
+                      type="button"
+                    >
+                      {browserNotificationPermission === "denied" ? "Request permission lagi" : "Aktifkan browser"}
+                    </button>
+                  ) : null}
                   <button
                     className="text-xs font-semibold text-module transition hover:opacity-80 disabled:opacity-50"
                     disabled={markAllMutation.isPending || unreadCount === 0}
@@ -205,6 +382,42 @@ export function Topbar() {
                 </div>
               </div>
               <div className="max-h-[calc(100dvh-9.5rem)] overflow-y-auto sm:max-h-[320px]">
+                {browserNotificationsSupported && browserNotificationPermission !== "granted" ? (
+                  <div className="border-b border-border bg-surface-muted/50 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">
+                      Browser Notification
+                    </p>
+                    <p className="mt-1 text-sm text-text-secondary">
+                      {browserNotificationPermission === "denied"
+                        ? "Izin browser sedang ditolak. Coba request lagi. Jika browser tetap menolak prompt, aktifkan dari site settings lalu tekan Cek ulang."
+                        : "Aktifkan browser notification agar notifikasi tetap muncul saat tab sedang tidak aktif."}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        className="h-8"
+                        onClick={() => {
+                          void requestBrowserNotificationPermission();
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {browserNotificationPermission === "denied" ? "Request permission lagi" : "Aktifkan browser"}
+                      </Button>
+                      {browserNotificationPermission === "denied" ? (
+                        <Button
+                          className="h-8"
+                          onClick={refreshBrowserNotificationPermission}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          Cek ulang
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 {notificationItems.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-text-secondary">
                     Belum ada notifikasi.
@@ -218,11 +431,7 @@ export function Topbar() {
                           !item.is_read && "bg-module-light",
                         )}
                         key={item.id}
-                        onClick={() => {
-                          if (!item.is_read) {
-                            markReadMutation.mutate(item.id);
-                          }
-                        }}
+                        onClick={() => handleNotificationClick(item)}
                         type="button"
                       >
                         <span
@@ -361,5 +570,24 @@ export function Topbar() {
 
 function formatPhone(phone: string) {
   return phone.startsWith("+") ? phone : `+${phone}`;
+}
+
+function resolveNotificationHref(item: NotificationItem) {
+  if (!item.reference_id || !item.reference_type) {
+    return null;
+  }
+
+  switch (item.reference_type) {
+    case "reimbursement":
+      return `/hris/reimbursements/${item.reference_id}`;
+    case "project":
+      return `/operational/projects/${item.reference_id}`;
+    case "campaign":
+      return `/marketing/campaigns#campaign:${encodeURIComponent(item.reference_id)}`;
+    case "lead":
+      return `/marketing/leads#lead:${encodeURIComponent(item.reference_id)}`;
+    default:
+      return null;
+  }
 }
 

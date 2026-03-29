@@ -1,5 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 
+import { permissions } from "@/lib/permissions";
 import { ensureAuthenticated } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth-store";
 import type { AuthModuleRole, AuthSession } from "@/types/auth";
@@ -119,6 +120,39 @@ export function canAccess(session: AuthSession | null, options: AccessOptions) {
   }
 
   return false;
+}
+
+const landingRouteCandidates = [
+  { path: "/operational/overview", permission: permissions.operationalOverview },
+  { path: "/operational/projects", permission: permissions.operationalProjectView },
+  { path: "/operational/tracker", permission: permissions.operationalTrackerView },
+  { path: "/operational/wa-broadcast", permission: permissions.operationalWAView },
+  { path: "/hris/overview", permission: permissions.hrisOverview },
+  { path: "/hris/employees", permission: permissions.hrisEmployeeView },
+  { path: "/hris/departments", permission: permissions.hrisDepartmentView },
+  { path: "/hris/finance", permission: permissions.hrisFinanceView },
+  { path: "/hris/reimbursements", permission: permissions.hrisReimbursementView },
+  { path: "/hris/subscriptions", permission: permissions.hrisSubscriptionView },
+  { path: "/marketing/overview", permission: permissions.marketingOverview },
+  { path: "/marketing/campaigns", permission: permissions.marketingCampaignView },
+  { path: "/marketing/ads-metrics", permission: permissions.marketingAdsMetricsView },
+  { path: "/marketing/leads", permission: permissions.marketingLeadsView },
+  { path: "/admin/audit-logs", permission: permissions.adminAuditLogView },
+  { path: "/admin/roles", permission: permissions.adminRolesView },
+  { path: "/admin/users", permission: permissions.adminUsersView },
+  { path: "/admin/settings", permission: permissions.adminSettingsView },
+] as const;
+
+export function getDefaultAuthorizedPath(session: AuthSession | null) {
+  if (!session) {
+    return "/login";
+  }
+
+  const matchedRoute = landingRouteCandidates.find((candidate) =>
+    hasPermission(session, candidate.permission),
+  );
+
+  return matchedRoute?.path ?? "/profile";
 }
 
 export async function ensurePermission(permission: string) {

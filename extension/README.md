@@ -12,6 +12,8 @@ Extension ini tidak khusus untuk localhost. Flow utamanya adalah menerima konfig
 - Offline queue + batch sync saat koneksi kembali
 - Popup status tracker yang fokus pada status, waktu aktif, dan domain aktif
 - Options page untuk fallback manual, idle timeout, dan excluded domains
+- Access token disimpan di `chrome.storage.session`, bukan storage persisten
+- Host permission dibatasi ke `http://*/*` dan `https://*/*`
 
 ## Cara Pasang untuk User
 
@@ -54,7 +56,7 @@ Gunakan ini hanya jika auto-connect dari dashboard tidak bisa dipakai.
 ## Cara Kerja Singkat
 
 1. Dashboard web mengirim konfigurasi ke extension.
-2. Extension menyimpan `apiBaseUrl` dan access token di `chrome.storage.local`.
+2. Extension menyimpan `apiBaseUrl` di `chrome.storage.local`, sedangkan access token disimpan di `chrome.storage.session`.
 3. Extension memulai session tracker.
 4. Setiap 30 detik extension mengirim heartbeat berisi URL aktif, domain, judul halaman, dan status idle.
 5. Backend menyimpan data ke `activity_sessions` dan `activity_entries`.
@@ -63,6 +65,7 @@ Gunakan ini hanya jika auto-connect dari dashboard tidak bisa dipakai.
 Catatan:
 - kategori domain yang dianggap benar tetap mengikuti data di dashboard KANTOR
 - popup extension sengaja tidak menampilkan badge kategori agar tidak menyesatkan saat domain aktif belum masuk ringkasan lokal popup
+- special scheme seperti `chrome://`, `chrome-extension://`, `about:`, `edge:`, dan `file:` tidak di-track
 
 ## Alur Uji Manual
 
@@ -93,7 +96,7 @@ Catatan:
 
 ## Catatan Auth
 
-- extension menyimpan access token di `chrome.storage.local`
+- extension menyimpan access token di `chrome.storage.session`
 - refresh token tidak disimpan langsung oleh extension
 - saat access token expired, extension akan mencoba `POST /api/v1/auth/refresh` dengan cookie browser yang masih aktif
 - jika refresh gagal, user perlu menghubungkan ulang dari dashboard atau melakukan setup manual lagi
@@ -103,5 +106,4 @@ Catatan:
 - extension tidak hardcode ke satu host tertentu untuk flow utama
 - saat user klik `Hubungkan & Aktifkan`, dashboard web mengirim API URL aktif ke extension
 - untuk development lokal, URL seperti `http://localhost:3000/api/v1` tetap bisa dipakai lewat setup manual
-- domain seperti `chrome://`, `chrome-extension://`, `about:`, `edge:`, dan `file:` tidak di-track
 - jika Anda mengembangkan extension langsung dari repository, folder yang di-load unpacked adalah folder `extension/`

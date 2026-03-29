@@ -13,10 +13,15 @@ import { Select } from "@/components/ui/select";
 import type { Department, EmployeeFormValues } from "@/types/hris";
 import { cn } from "@/lib/utils";
 
+const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 const employeeFormSchema = z.object({
   full_name: z.string().min(3, "Nama minimal 3 karakter"),
   email: z.string().email("Email tidak valid"),
-  phone: z.string(),
+  phone: z.string().refine((value) => value.trim() === "" || isValidEmployeePhone(value), {
+    message: "Format telepon harus 08xx, 8xx, 628xx, atau +628xx",
+  }),
   position: z.string().min(1, "Tipe kepegawaian wajib dipilih"),
   department: z.string(),
   date_joined: z.string().min(1, "Tanggal join wajib diisi"),
@@ -26,7 +31,9 @@ const employeeFormSchema = z.object({
   avatar_url: z.string(),
   bank_account_number: z.string(),
   bank_name: z.string(),
-  linkedin_profile: z.string(),
+  linkedin_profile: z.string().refine((value) => value.trim() === "" || isValidLinkedInProfile(value), {
+    message: "URL LinkedIn tidak valid",
+  }),
   ssh_keys: z.string(),
 });
 
@@ -91,6 +98,8 @@ export function EmployeeForm({
   onAvatarFileChange,
   onSubmit,
 }: EmployeeFormProps) {
+  const [selectedAvatarPreview, setSelectedAvatarPreview] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const normalizedDefaultValues = useMemo<EmployeeFormValues>(
     () => ({
       full_name: defaultValues?.full_name ?? baseValues.full_name,
@@ -139,13 +148,12 @@ export function EmployeeForm({
 
   useEffect(() => {
     if (!isOpen) {
+      setAvatarError(null);
       return;
     }
 
     reset(normalizedDefaultValues);
   }, [isOpen, normalizedDefaultValues, reset]);
-
-  const [selectedAvatarPreview, setSelectedAvatarPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -184,13 +192,28 @@ export function EmployeeForm({
     { value: "terminated", label: "Diberhentikan" },
   ];
   const avatarInputKey = avatarFile?.name ?? existingAvatarPath ?? "empty-avatar";
+  const handleFormSubmit = handleSubmit((values) => {
+    if (avatarError) {
+      return;
+    }
+    onSubmit(values);
+  });
+  const handleAvatarChange = (file: File | null) => {
+    const nextError = validateAvatarFile(file);
+    setAvatarError(nextError);
+    if (nextError) {
+      onAvatarFileChange(null);
+      return;
+    }
+    onAvatarFileChange(file);
+  };
 
   return (
     <FormModal
       isLoading={isSubmitting}
       isOpen={isOpen}
       onClose={onCancel ?? (() => undefined)}
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleFormSubmit}
       size="lg"
       submitLabel={submitLabel}
       title={title}
@@ -274,7 +297,7 @@ export function EmployeeForm({
           <Field error={errors.emergency_contact?.message} label="Kontak darurat">
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("emergency_contact")} placeholder="Nama - nomor telepon" />
           </Field>
-          <Field label="Foto profil">
+          <Field error={avatarError ?? undefined} label="Foto profil">
             <div className="space-y-2">
               <div className="flex items-center gap-3 rounded-[12px] border border-border/70 bg-background/70 p-3">
                 <ProtectedAvatar
@@ -291,13 +314,13 @@ export function EmployeeForm({
                 </div>
               </div>
               <input
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 className={cn(
                   formControlClass,
                   "px-3 py-2 file:mr-3 file:rounded-md file:border-0 file:bg-hr/10 file:px-3 file:py-2 file:text-[13px] file:font-medium file:text-hr",
                 )}
                 key={avatarInputKey}
-                onChange={(event) => onAvatarFileChange(event.target.files?.[0] ?? null)}
+                onChange={(event) => handleAvatarChange(event.target.files?.[0] ?? null)}
                 type="file"
               />
               <div className="flex flex-wrap items-center gap-2 text-[12px] text-text-secondary">
@@ -334,6 +357,33 @@ export function EmployeeForm({
         </Field>
     </FormModal>
   );
+}
+
+function isValidEmployeePhone(value: string) {
+  const normalized = value.replace(/[\s()-]/g, "");
+  return /^(?:\+62|62|0|8)\d{8,13}$/.test(normalized);
+}
+
+function isValidLinkedInProfile(value: string) {
+  try {
+    const parsed = new URL(value);
+    return /^https?:$/.test(parsed.protocol) && (parsed.hostname === "linkedin.com" || parsed.hostname.endsWith(".linkedin.com"));
+  } catch {
+    return false;
+  }
+}
+
+function validateAvatarFile(file: File | null) {
+  if (!file) {
+    return null;
+  }
+  if (!ACCEPTED_AVATAR_TYPES.has(file.type)) {
+    return "Avatar harus berupa JPG, PNG, atau WebP";
+  }
+  if (file.size > MAX_AVATAR_SIZE_BYTES) {
+    return "Ukuran avatar maksimal 5 MB";
+  }
+  return null;
 }
 
 function Field({

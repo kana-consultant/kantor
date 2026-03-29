@@ -1,9 +1,8 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
-import { X } from "lucide-react";
 import { z } from "zod";
 
 import { FormModal } from "@/components/shared/form-modal";
@@ -96,7 +95,8 @@ export function ProjectForm({
     defaultValues: defaultValues ?? baseValues,
   });
 
-  const selectedMembers = watch("members") ?? [];
+  const watchedMembers = watch("members");
+  const selectedMembers = useMemo(() => watchedMembers ?? [], [watchedMembers]);
   const [memberSearch, setMemberSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -180,6 +180,8 @@ export function ProjectForm({
       document.addEventListener("mousedown", handleClick);
       return () => document.removeEventListener("mousedown", handleClick);
     }
+
+    return undefined;
   }, [dropdownOpen]);
 
   // Reset when modal closes
@@ -320,8 +322,9 @@ export function ProjectForm({
                 }}
                 onFocus={() => setDropdownOpen(true)}
                 onKeyDown={(e) => {
-                  if (e.key === "Backspace" && memberSearch === "" && selectedMembers.length > 0) {
-                    removeMember(selectedMembers[selectedMembers.length - 1].email);
+                  const lastSelectedMember = selectedMembers[selectedMembers.length - 1];
+                  if (e.key === "Backspace" && memberSearch === "" && lastSelectedMember) {
+                    removeMember(lastSelectedMember.email);
                   }
                   if (e.key === "Escape") {
                     setDropdownOpen(false);

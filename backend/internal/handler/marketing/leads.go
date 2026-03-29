@@ -274,6 +274,8 @@ func (h *LeadsHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"campaign_id": "not found"})
 	case errors.Is(err, marketingservice.ErrLeadContactRequired):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"phone": "phone or email required", "email": "phone or email required"})
+	case errors.Is(err, marketingservice.ErrLeadImportLimitExceeded):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"file": "maximum 10000 rows per import"})
 	default:
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -159,6 +159,29 @@ function MarketingLeadsPage() {
   const [importPreviewError, setImportPreviewError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<LeadImportSummary | null>(null);
   const [isParsingImport, setIsParsingImport] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const hash = window.location.hash;
+    if (!hash.startsWith("#lead:")) {
+      return;
+    }
+
+    const leadId = decodeURIComponent(hash.slice("#lead:".length)).trim();
+    if (!leadId) {
+      return;
+    }
+
+    setSelectedLeadId(leadId);
+    window.history.replaceState(
+      window.history.state,
+      document.title,
+      `${window.location.pathname}${window.location.search}`,
+    );
+  }, []);
 
   const employeesQuery = useQuery({
     queryKey: employeesKeys.list(employeeFilters),

@@ -521,12 +521,24 @@ function resolveDashboardUrl(state) {
 }
 
 async function loadState() {
-  const result = await chrome.storage.local.get(DEFAULT_STATE);
-  return { ...DEFAULT_STATE, ...result };
+  const [persistentState, sessionState] = await Promise.all([
+    chrome.storage.local.get(DEFAULT_STATE),
+    chrome.storage.session.get({ token: "" }),
+  ]);
+  return {
+    ...DEFAULT_STATE,
+    ...persistentState,
+    token: String(sessionState.token || ""),
+  };
 }
 
 async function saveState(nextState) {
-  await chrome.storage.local.set(nextState);
+  const { token, ...persistentState } = nextState;
+  await Promise.all([
+    chrome.storage.local.set(persistentState),
+    chrome.storage.local.remove("token"),
+    chrome.storage.session.set({ token: String(token || "") }),
+  ]);
 }
 
 async function updateState(partial) {

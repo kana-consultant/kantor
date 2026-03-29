@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
+import { getDefaultAuthorizedPath } from "@/lib/rbac";
 import { getValidStoredSession, register } from "@/services/auth";
 import { toast } from "@/stores/toast-store";
 
@@ -31,7 +32,7 @@ export const Route = createFileRoute("/register")({
     const session = getValidStoredSession();
     if (session?.tokens.access_token) {
       throw redirect({
-        to: "/operational/overview",
+        to: getDefaultAuthorizedPath(session),
       });
     }
   },

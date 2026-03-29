@@ -172,9 +172,13 @@ func (r *Repository) GetTemplateByID(ctx context.Context, id string) (model.WAMe
 
 func (r *Repository) GetTemplateBySlug(ctx context.Context, slug string) (model.WAMessageTemplate, error) {
 	var t model.WAMessageTemplate
+	candidates := templateSlugCandidates(slug)
 	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT id, name, slug, category, trigger_type, body_template,
 		description, available_variables, is_active, is_system, created_by, created_at, updated_at
-		FROM wa_message_templates WHERE slug = $1`, slug).Scan(
+		FROM wa_message_templates
+		WHERE slug = ANY($1::text[])
+		ORDER BY CASE WHEN slug = $2 THEN 0 ELSE 1 END
+		LIMIT 1`, candidates, slug).Scan(
 		&t.ID, &t.Name, &t.Slug, &t.Category, &t.TriggerType, &t.BodyTemplate,
 		&t.Description, &t.AvailableVariables, &t.IsActive, &t.IsSystem,
 		&t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
@@ -182,6 +186,15 @@ func (r *Repository) GetTemplateBySlug(ctx context.Context, slug string) (model.
 		return t, ErrTemplateNotFound
 	}
 	return t, err
+}
+
+func templateSlugCandidates(slug string) []string {
+	switch strings.TrimSpace(slug) {
+	case "project_deadline_h3", "project_deadline_warning":
+		return []string{"project_deadline_h3", "project_deadline_warning"}
+	default:
+		return []string{slug}
+	}
 }
 
 func (r *Repository) CreateTemplate(ctx context.Context, params CreateTemplateParams) (model.WAMessageTemplate, error) {
@@ -381,6 +394,15 @@ func (r *Repository) UpdateScheduleLastRun(ctx context.Context, id string) error
 	return err
 }
 
+func (r *Repository) UpdateScheduleRunMetadata(ctx context.Context, id string, lastRunAt time.Time, nextRunAt *time.Time) error {
+	_, err := repository.DB(ctx, r.db).Exec(ctx, `
+		UPDATE wa_broadcast_schedules
+		SET last_run_at = $2, next_run_at = $3, updated_at = NOW()
+		WHERE id = $1
+	`, id, lastRunAt, nextRunAt)
+	return err
+}
+
 // --------------- Broadcast Logs ---------------
 
 type CreateLogParams struct {
@@ -537,6 +559,16 @@ func (r *Repository) GetLogSummary(ctx context.Context, date string) (model.WALo
 	return summary, err
 }
 
+func (r *Repository) CountSentLogsToday(ctx context.Context) (int, error) {
+	var count int
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM wa_broadcast_logs
+		WHERE status = 'sent' AND created_at::date = CURRENT_DATE
+	`).Scan(&count)
+	return count, err
+}
+
 // CheckDuplicateToday checks if a message was already sent today for a given user+template+reference combo.
 func (r *Repository) CheckDuplicateToday(ctx context.Context, userID string, templateSlug string, referenceID string) (bool, error) {
 	var count int
@@ -559,6 +591,70 @@ type TaskDueInfo struct {
 	UserPhone   *string
 	DueDate     string
 	Priority    string
+}
+
+type BroadcastRecipient struct {
+	UserID   string
+	UserName string
+	Phone    *string
+}
+
+func (r *Repository) ListActiveRecipients(ctx context.Context) ([]BroadcastRecipient, error) {
+	return r.queryRecipients(ctx, `
+		SELECT id::text, full_name, phone
+		FROM users
+		WHERE is_active = TRUE
+		ORDER BY full_name ASC, id ASC
+	`)
+}
+
+func (r *Repository) ListDepartmentRecipients(ctx context.Context, department string) ([]BroadcastRecipient, error) {
+	return r.queryRecipients(ctx, `
+		SELECT id::text, full_name, phone
+		FROM users
+		WHERE is_active = TRUE AND COALESCE(department, '') = $1
+		ORDER BY full_name ASC, id ASC
+	`, strings.TrimSpace(department))
+}
+
+func (r *Repository) ListSpecificRecipients(ctx context.Context, userIDs []string) ([]BroadcastRecipient, error) {
+	trimmedIDs := make([]string, 0, len(userIDs))
+	for _, userID := range userIDs {
+		trimmedUserID := strings.TrimSpace(userID)
+		if trimmedUserID == "" {
+			continue
+		}
+		trimmedIDs = append(trimmedIDs, trimmedUserID)
+	}
+	if len(trimmedIDs) == 0 {
+		return []BroadcastRecipient{}, nil
+	}
+
+	args := make([]interface{}, 0, len(trimmedIDs))
+	placeholders := make([]string, 0, len(trimmedIDs))
+	for index, userID := range trimmedIDs {
+		args = append(args, userID)
+		placeholders = append(placeholders, fmt.Sprintf("$%d::uuid", index+1))
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id::text, full_name, phone
+		FROM users
+		WHERE is_active = TRUE AND id IN (%s)
+		ORDER BY full_name ASC, id ASC
+	`, strings.Join(placeholders, ", "))
+
+	return r.queryRecipients(ctx, query, args...)
+}
+
+func (r *Repository) ListProjectMemberRecipients(ctx context.Context, projectID string) ([]BroadcastRecipient, error) {
+	return r.queryRecipients(ctx, `
+		SELECT u.id::text, u.full_name, u.phone
+		FROM project_members pm
+		JOIN users u ON u.id = pm.user_id
+		WHERE pm.project_id = $1::uuid AND u.is_active = TRUE
+		ORDER BY pm.assigned_at ASC, u.id ASC
+	`, strings.TrimSpace(projectID))
 }
 
 func (r *Repository) GetTasksDueToday(ctx context.Context) ([]TaskDueInfo, error) {
@@ -595,6 +691,25 @@ func (r *Repository) queryTasksByDue(ctx context.Context, dateCondition string) 
 		tasks = append(tasks, t)
 	}
 	return tasks, nil
+}
+
+func (r *Repository) queryRecipients(ctx context.Context, query string, args ...interface{}) ([]BroadcastRecipient, error) {
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	recipients := make([]BroadcastRecipient, 0)
+	for rows.Next() {
+		var recipient BroadcastRecipient
+		if err := rows.Scan(&recipient.UserID, &recipient.UserName, &recipient.Phone); err != nil {
+			return nil, err
+		}
+		recipients = append(recipients, recipient)
+	}
+
+	return recipients, rows.Err()
 }
 
 type ProjectDeadlineInfo struct {
@@ -641,36 +756,62 @@ func (r *Repository) GetProjectsDeadlineIn3Days(ctx context.Context) ([]ProjectD
 		projects = append(projects, p)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate projects: %w", err)
+	}
+
+	if len(projects) == 0 {
+		return projects, nil
+	}
+
+	projectIDs := make([]string, 0, len(projects))
+	for _, project := range projects {
+		projectIDs = append(projectIDs, project.ProjectID)
+	}
+
+	memberMap, err := r.getProjectMembersByProjectIDs(ctx, projectIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	for i := range projects {
-		members, err := r.getProjectMembers(ctx, projects[i].ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		projects[i].Members = members
+		projects[i].Members = memberMap[projects[i].ProjectID]
 	}
 
 	return projects, nil
 }
 
-func (r *Repository) getProjectMembers(ctx context.Context, projectID string) ([]ProjectMemberInfo, error) {
-	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT u.id, u.full_name, u.phone
+func (r *Repository) getProjectMembersByProjectIDs(ctx context.Context, projectIDs []string) (map[string][]ProjectMemberInfo, error) {
+	args := make([]interface{}, 0, len(projectIDs))
+	placeholders := make([]string, 0, len(projectIDs))
+	for index, projectID := range projectIDs {
+		args = append(args, projectID)
+		placeholders = append(placeholders, fmt.Sprintf("$%d::uuid", index+1))
+	}
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, fmt.Sprintf(`SELECT pm.project_id::text, u.id, u.full_name, u.phone
 		FROM project_members pm
 		JOIN users u ON u.id = pm.user_id
-		WHERE pm.project_id = $1`, projectID)
+		WHERE pm.project_id IN (%s)
+		ORDER BY pm.project_id ASC, pm.assigned_at ASC, u.id ASC`, strings.Join(placeholders, ", ")), args...)
 	if err != nil {
 		return nil, fmt.Errorf("query members: %w", err)
 	}
 	defer rows.Close()
 
-	var members []ProjectMemberInfo
+	memberMap := make(map[string][]ProjectMemberInfo, len(projectIDs))
 	for rows.Next() {
+		var projectID string
 		var m ProjectMemberInfo
-		if err := rows.Scan(&m.UserID, &m.UserName, &m.Phone); err != nil {
+		if err := rows.Scan(&projectID, &m.UserID, &m.UserName, &m.Phone); err != nil {
 			return nil, fmt.Errorf("scan member: %w", err)
 		}
-		members = append(members, m)
+		memberMap[projectID] = append(memberMap[projectID], m)
 	}
-	return members, nil
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate members: %w", err)
+	}
+	return memberMap, nil
 }
 
 type WeeklyDigestInfo struct {

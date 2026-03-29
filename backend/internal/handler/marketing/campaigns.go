@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
@@ -113,7 +114,11 @@ func (h *CampaignsHandler) kanban(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CampaignsHandler) getCampaign(w http.ResponseWriter, r *http.Request) {
-	item, err := h.service.GetCampaign(r.Context(), chi.URLParam(r, "campaignID"))
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		return
+	}
+	item, err := h.service.GetCampaign(r.Context(), campaignID)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -122,7 +127,11 @@ func (h *CampaignsHandler) getCampaign(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CampaignsHandler) listActivities(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.ListActivities(r.Context(), chi.URLParam(r, "campaignID"))
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		return
+	}
+	items, err := h.service.ListActivities(r.Context(), campaignID)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -142,7 +151,10 @@ func (h *CampaignsHandler) updateCampaign(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	campaignID := chi.URLParam(r, "campaignID")
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		return
+	}
 	item, err := h.service.UpdateCampaign(r.Context(), campaignID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
@@ -153,7 +165,10 @@ func (h *CampaignsHandler) updateCampaign(w http.ResponseWriter, r *http.Request
 }
 
 func (h *CampaignsHandler) deleteCampaign(w http.ResponseWriter, r *http.Request) {
-	campaignID := chi.URLParam(r, "campaignID")
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		return
+	}
 	if err := h.service.DeleteCampaign(r.Context(), campaignID); err != nil {
 		h.writeError(w, err)
 		return
@@ -174,7 +189,10 @@ func (h *CampaignsHandler) moveCampaign(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	campaignID := chi.URLParam(r, "campaignID")
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		return
+	}
 	item, err := h.service.MoveCampaign(r.Context(), campaignID, input, principal.UserID)
 	if err != nil {
 		h.writeError(w, err)
@@ -216,10 +234,16 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	campaignID := chi.URLParam(r, "campaignID")
-	var result marketingservice.CampaignDetail
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		for _, uploaded := range uploadedFiles {
+			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(uploaded.FilePath)))
+		}
+		return
+	}
+	params := make([]marketingrepo.CreateCampaignAttachmentParams, 0, len(uploadedFiles))
 	for _, file := range uploadedFiles {
-		result, err = h.service.AddAttachment(r.Context(), marketingrepo.CreateCampaignAttachmentParams{
+		params = append(params, marketingrepo.CreateCampaignAttachmentParams{
 			CampaignID: campaignID,
 			FileName:   file.FileName,
 			FilePath:   file.FilePath,
@@ -227,13 +251,15 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 			FileSize:   file.FileSize,
 			UploadedBy: principal.UserID,
 		})
-		if err != nil {
-			for _, uploaded := range uploadedFiles {
-				_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(uploaded.FilePath)))
-			}
-			h.writeError(w, err)
-			return
+	}
+
+	result, err := h.service.AddAttachments(r.Context(), params)
+	if err != nil {
+		for _, uploaded := range uploadedFiles {
+			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(uploaded.FilePath)))
 		}
+		h.writeError(w, err)
+		return
 	}
 
 	platformmiddleware.AuditLog(r.Context(), "upload_attachments", "marketing", "campaign", campaignID, nil, nil)
@@ -241,7 +267,11 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *CampaignsHandler) listAttachments(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.ListAttachments(r.Context(), chi.URLParam(r, "campaignID"))
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		return
+	}
+	items, err := h.service.ListAttachments(r.Context(), campaignID)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -250,8 +280,15 @@ func (h *CampaignsHandler) listAttachments(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *CampaignsHandler) deleteAttachment(w http.ResponseWriter, r *http.Request) {
-	attachmentID := chi.URLParam(r, "attachmentID")
-	item, err := h.service.DeleteAttachment(r.Context(), chi.URLParam(r, "campaignID"), attachmentID)
+	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
+	if !ok {
+		return
+	}
+	attachmentID, ok := validateCampaignUUIDParam(w, "attachmentID", chi.URLParam(r, "attachmentID"))
+	if !ok {
+		return
+	}
+	item, err := h.service.DeleteAttachment(r.Context(), campaignID, attachmentID)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -495,4 +532,13 @@ func sanitizeCampaignFilename(value string) string {
 	filename = strings.ReplaceAll(filename, " ", "-")
 	filename = strings.ReplaceAll(filename, "..", "")
 	return filename
+}
+
+func validateCampaignUUIDParam(w http.ResponseWriter, field string, value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if _, err := uuid.Parse(value); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Path validation failed", map[string]string{field: "must be a valid UUID"})
+		return "", false
+	}
+	return value, true
 }

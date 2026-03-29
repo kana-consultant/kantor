@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kana-consultant/kantor/backend/internal/model"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 )
@@ -18,8 +19,9 @@ var (
 )
 
 type ResolvedFile struct {
-	Path       string
-	Permission string
+	Path        string
+	Permission  string
+	OwnerUserID *string
 }
 
 type filesReimbursementsRepository interface {
@@ -32,6 +34,7 @@ type filesCampaignsRepository interface {
 
 type filesEmployeesRepository interface {
 	FindAvatarPath(ctx context.Context, employeeID string, filename string) (string, error)
+	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
 }
 
 type Service struct {
@@ -59,6 +62,7 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 	var (
 		relativePath string
 		permission   string
+		ownerUserID  *string
 		err          error
 	)
 
@@ -82,7 +86,7 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 			return ResolvedFile{}, err
 		}
 	case "employees":
-		permission = ""
+		permission = "hris:employee:view"
 		relativePath, err = s.employeesRepo.FindAvatarPath(ctx, resourceID, filename)
 		if err != nil {
 			if errors.Is(err, hrisrepo.ErrEmployeeNotFound) || errors.Is(err, hrisrepo.ErrEmployeeAvatarNotFound) {
@@ -90,9 +94,21 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 			}
 			return ResolvedFile{}, err
 		}
+		employee, err := s.employeesRepo.GetEmployeeByID(ctx, resourceID)
+		if err != nil {
+			if errors.Is(err, hrisrepo.ErrEmployeeNotFound) {
+				return ResolvedFile{}, ErrFileNotFound
+			}
+			return ResolvedFile{}, err
+		}
+		ownerUserID = employee.UserID
 	case "profiles":
 		permission = ""
 		relativePath = filepath.Join("profiles", resourceID, filename)
+		trimmedResourceID := strings.TrimSpace(resourceID)
+		if trimmedResourceID != "" {
+			ownerUserID = &trimmedResourceID
+		}
 	default:
 		return ResolvedFile{}, ErrUnsupportedType
 	}
@@ -109,8 +125,9 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 	}
 
 	return ResolvedFile{
-		Path:       absolutePath,
-		Permission: permission,
+		Path:        absolutePath,
+		Permission:  permission,
+		OwnerUserID: ownerUserID,
 	}, nil
 }
 

@@ -4,16 +4,14 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"math/rand"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/kana-consultant/kantor/backend/internal/config"
 )
 
 type SessionStatus struct {
@@ -51,44 +49,47 @@ type CheckExistsResponse struct {
 	ChatID       string `json:"chatId"`
 }
 
-type WAHAClient struct {
-	cfg        config.WAHAConfig
-	httpClient *http.Client
+var ErrWAHADisabled = errors.New("whatsapp is disabled for this tenant")
 
-	mu        sync.Mutex
-	sentToday int
-	resetDate string
+type wahaClientConfig struct {
+	APIURL           string
+	APIKey           string
+	Session          string
+	Enabled          bool
+	MaxDailyMessages int
+	MinDelayMS       int
+	MaxDelayMS       int
+	ReminderCron     string
+	WeeklyDigestCron string
 }
 
-func NewWAHAClient(cfg config.WAHAConfig) *WAHAClient {
+type WAHAClient struct {
+	cfg        wahaClientConfig
+	httpClient *http.Client
+}
+
+func newWAHAClient(cfg wahaClientConfig) *WAHAClient {
 	return &WAHAClient{
 		cfg: cfg,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		resetDate: today(),
 	}
 }
 
 // NewWAHAClientFromDBConfig creates a WAHAClient from the per-tenant DB config.
 func NewWAHAClientFromDBConfig(dbCfg WADBConfig) *WAHAClient {
-	return &WAHAClient{
-		cfg: config.WAHAConfig{
-			APIURL:           dbCfg.APIURL,
-			APIKey:           dbCfg.APIKey,
-			Session:          dbCfg.SessionName,
-			Enabled:          dbCfg.Enabled,
-			MaxDailyMessages: dbCfg.MaxDailyMessages,
-			MinDelayMS:       dbCfg.MinDelayMS,
-			MaxDelayMS:       dbCfg.MaxDelayMS,
-			ReminderCron:     dbCfg.ReminderCron,
-			WeeklyDigestCron: dbCfg.WeeklyDigestCron,
-		},
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		resetDate: today(),
-	}
+	return newWAHAClient(wahaClientConfig{
+		APIURL:           dbCfg.APIURL,
+		APIKey:           dbCfg.APIKey,
+		Session:          dbCfg.SessionName,
+		Enabled:          dbCfg.Enabled,
+		MaxDailyMessages: dbCfg.MaxDailyMessages,
+		MinDelayMS:       dbCfg.MinDelayMS,
+		MaxDelayMS:       dbCfg.MaxDelayMS,
+		ReminderCron:     dbCfg.ReminderCron,
+		WeeklyDigestCron: dbCfg.WeeklyDigestCron,
+	})
 }
 
 // WADBConfig mirrors the per-tenant WA config stored in the database.
@@ -183,8 +184,7 @@ func (c *WAHAClient) GetQR() (string, error) {
 
 func (c *WAHAClient) StartSession() error {
 	if !c.cfg.Enabled {
-		slog.Info("WAHA disabled, skipping session start")
-		return nil
+		return ErrWAHADisabled
 	}
 
 	// 1. Check current status — if FAILED, logout first to clear stale auth
@@ -243,8 +243,7 @@ func (c *WAHAClient) logout() {
 
 func (c *WAHAClient) StopSession() error {
 	if !c.cfg.Enabled {
-		slog.Info("WAHA disabled, skipping session stop")
-		return nil
+		return ErrWAHADisabled
 	}
 
 	url := fmt.Sprintf("%s/api/sessions/%s/stop", c.cfg.APIURL, c.cfg.Session)
@@ -283,11 +282,7 @@ func (c *WAHAClient) GetAccountInfo() (*AccountInfo, error) {
 func (c *WAHAClient) SendMessage(phone string, message string) error {
 	if !c.cfg.Enabled {
 		slog.Info("WAHA disabled, message not sent", "phone", phone, "message_length", len(message))
-		return nil
-	}
-
-	if !c.incrementDaily() {
-		return fmt.Errorf("daily message limit reached (%d)", c.cfg.MaxDailyMessages)
+		return ErrWAHADisabled
 	}
 
 	normalized := NormalizePhone(phone)
@@ -337,7 +332,7 @@ func (c *WAHAClient) SendBulk(messages []BulkMessage) (*BulkResult, error) {
 
 func (c *WAHAClient) CheckPhoneExists(phone string) (bool, string, error) {
 	if !c.cfg.Enabled {
-		return true, NormalizePhone(phone) + "@c.us", nil
+		return false, "", ErrWAHADisabled
 	}
 
 	normalized := NormalizePhone(phone)
@@ -367,11 +362,8 @@ func (c *WAHAClient) CheckPhoneExists(phone string) (bool, string, error) {
 }
 
 func (c *WAHAClient) GetDailyStats() *DailyStats {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.maybeResetCounter()
 	return &DailyStats{
-		SentToday:  c.sentToday,
+		SentToday:  0,
 		DailyLimit: c.cfg.MaxDailyMessages,
 	}
 }
@@ -395,28 +387,4 @@ func (c *WAHAClient) doRequest(method string, url string, body []byte) (*http.Re
 	}
 
 	return c.httpClient.Do(req)
-}
-
-func (c *WAHAClient) incrementDaily() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.maybeResetCounter()
-
-	if c.sentToday >= c.cfg.MaxDailyMessages {
-		return false
-	}
-	c.sentToday++
-	return true
-}
-
-func (c *WAHAClient) maybeResetCounter() {
-	t := today()
-	if c.resetDate != t {
-		c.sentToday = 0
-		c.resetDate = t
-	}
-}
-
-func today() string {
-	return time.Now().Format("2006-01-02")
 }

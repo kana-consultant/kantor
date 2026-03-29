@@ -62,6 +62,10 @@ func NewProjectsRepository(db repository.DBTX) *ProjectsRepository {
 	return &ProjectsRepository{db: db}
 }
 
+func (r *ProjectsRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return repository.DB(ctx, r.db).Begin(ctx)
+}
+
 func (r *ProjectsRepository) CreateProject(ctx context.Context, params CreateProjectParams) (model.Project, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()

@@ -26,7 +26,6 @@ type Config struct {
 	TrackerRetentionDays      int
 	SeedSuperAdmin            SeedSuperAdminConfig
 	SeedDemoUsers             SeedDemoUsersConfig
-	WAHA                      WAHAConfig
 	AppURL                    string
 	Tenants                   []TenantConfig
 }
@@ -54,18 +53,6 @@ type SeedUserConfig struct {
 	Skills     []string
 }
 
-type WAHAConfig struct {
-	APIURL           string
-	APIKey           string
-	Session          string
-	Enabled          bool
-	MaxDailyMessages int
-	MinDelayMS       int
-	MaxDelayMS       int
-	ReminderCron     string
-	WeeklyDigestCron string
-}
-
 // TenantConfig describes one tenant seeded at startup.
 type TenantConfig struct {
 	Name    string
@@ -87,21 +74,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	jwtSecret := getEnv("JWT_SECRET", "change-me")
+	jwtSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	dataEncryptionKey := strings.TrimSpace(os.Getenv("DATA_ENCRYPTION_KEY"))
 	dataEncryptionKeyPrevious := strings.TrimSpace(os.Getenv("DATA_ENCRYPTION_KEY_PREVIOUS"))
 
-	seedEnabled, err := parseBool("SEED_SUPERADMIN_ENABLED", appEnv != "production")
+	seedEnabled, err := parseBool("SEED_SUPERADMIN_ENABLED", false)
 	if err != nil {
 		return Config{}, err
 	}
 
-	demoUsersEnabled, err := parseBool("SEED_DEMO_USERS_ENABLED", appEnv != "production")
-	if err != nil {
-		return Config{}, err
-	}
-
-	wahaEnabled, err := parseBool("WAHA_ENABLED", false)
+	demoUsersEnabled, err := parseBool("SEED_DEMO_USERS_ENABLED", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -120,17 +102,6 @@ func Load() (Config, error) {
 		TrackerRetentionDays:      parseIntEnv("TRACKER_RETENTION_DAYS", 90),
 		AppURL:                    getEnv("APP_URL", "http://localhost:3000"),
 		Tenants:                   parseTenants(getEnv("TENANTS", "Default|default|localhost")),
-		WAHA: WAHAConfig{
-			APIURL:           getEnv("WAHA_API_URL", "http://localhost:3000"),
-			APIKey:           os.Getenv("WAHA_API_KEY"),
-			Session:          getEnv("WAHA_SESSION", "default"),
-			Enabled:          wahaEnabled,
-			MaxDailyMessages: parseIntEnv("WAHA_MAX_DAILY_MESSAGES", 50),
-			MinDelayMS:       parseIntEnv("WAHA_MIN_DELAY_MS", 2000),
-			MaxDelayMS:       parseIntEnv("WAHA_MAX_DELAY_MS", 5000),
-			ReminderCron:     getEnv("WA_REMINDER_CRON", "0 8 * * 1-5"),
-			WeeklyDigestCron: getEnv("WA_WEEKLY_DIGEST_CRON", "0 8 * * 1"),
-		},
 		SeedSuperAdmin: SeedSuperAdminConfig{
 			Enabled:  seedEnabled,
 			Email:    getEnv("SEED_SUPERADMIN_EMAIL", "superadmin@kantor.local"),
@@ -174,14 +145,15 @@ func Load() (Config, error) {
 		return Config{}, errors.New("DATABASE_URL is required")
 	}
 
+	if cfg.JWTSecret == "" {
+		return Config{}, errors.New("JWT_SECRET is required")
+	}
+
 	if cfg.DataEncryptionKey == "" {
 		return Config{}, errors.New("DATA_ENCRYPTION_KEY is required")
 	}
 
 	if cfg.AppEnv == "production" {
-		if cfg.JWTSecret == "change-me" {
-			return Config{}, errors.New("JWT_SECRET must be explicitly set in production (do not use the default value)")
-		}
 		if len(cfg.JWTSecret) < 32 {
 			return Config{}, errors.New("JWT_SECRET must be at least 32 characters in production")
 		}

@@ -13,12 +13,15 @@ type StatusVariant =
   | "lead-status"
   | "assignment"
   | "audit-action"
-  | "module";
+  | "module"
+  | "wa-log-status"
+  | "wa-trigger";
 
 interface StatusBadgeProps {
   status: string | null | undefined;
   variant?: StatusVariant;
   className?: string;
+  label?: string;
 }
 
 type Tone = {
@@ -262,6 +265,37 @@ function resolveTone(status: string, variant: StatusVariant): Tone {
     }
   }
 
+  if (variant === "wa-log-status") {
+    switch (normalized) {
+      case "sent":
+        return tones.success;
+      case "failed":
+        return tones.error;
+      case "skipped_no_phone":
+      case "skipped_no_wa":
+      case "skipped_disabled":
+        return tones.neutral;
+      case "daily_limit_reached":
+        return tones.warning;
+      default:
+        return tones.neutral;
+    }
+  }
+
+  if (variant === "wa-trigger") {
+    switch (normalized) {
+      case "auto_scheduled":
+        return tones.success;
+      case "event_triggered":
+        return tones.info;
+      case "manual":
+      case "manual_quick_send":
+        return tones.neutral;
+      default:
+        return tones.neutral;
+    }
+  }
+
   switch (normalized) {
     case "active":
     case "approved":
@@ -296,6 +330,7 @@ export function StatusBadge({
   status,
   variant = "semantic",
   className,
+  label,
 }: StatusBadgeProps) {
   const value = (status ?? "").trim();
   if (!value) {
@@ -314,7 +349,7 @@ export function StatusBadge({
       )}
     >
       <span className={cn("h-1.5 w-1.5 rounded-full", resolved.dotClassName)} />
-      <span>{normalizeStatusLabel(value)}</span>
+      <span>{label ?? normalizeStatusLabel(value)}</span>
     </span>
   );
 }

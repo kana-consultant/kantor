@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   useMutation,
@@ -40,7 +40,6 @@ import {
 } from "@/services/admin-rbac";
 import { toast } from "@/stores/toast-store";
 import type {
-  AdminRoleSummary,
   AdminUserDetail,
   AdminUserFilters,
   AdminUserSummary,
@@ -125,7 +124,7 @@ function AdminUsersPage() {
       ),
     );
 
-    setSelectedRoleID(uniqueRoleIDs.length === 1 ? uniqueRoleIDs[0] : "");
+    setSelectedRoleID(uniqueRoleIDs.length === 1 ? (uniqueRoleIDs[0] ?? "") : "");
     setSelectedIsSuperAdmin(userDetailQuery.data.is_super_admin);
   }, [userDetailQuery.data]);
 
@@ -660,34 +659,38 @@ function AdminUsersPage() {
 function renderModuleBadges(moduleRoles: AdminUserSummary["module_roles"]) {
   const orderedModules = ["operational", "hris", "marketing", "admin"] as const;
 
-  return orderedModules
-    .filter((moduleID) => moduleRoles[moduleID])
-    .map((moduleID) => {
-      const role = moduleRoles[moduleID];
-      const label = moduleID === "operational"
-        ? "OPS"
-        : moduleID === "hris"
-          ? "HRIS"
-          : moduleID === "marketing"
-            ? "MKT"
-            : "ADMIN";
+  return orderedModules.reduce<ReactNode[]>((items, moduleID) => {
+    const role = moduleRoles[moduleID];
+    if (!role) {
+      return items;
+    }
 
-      return (
-        <span
-          className={cn(
-            "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
-            moduleID === "operational"
-              ? "bg-ops-light text-ops"
-              : moduleID === "hris"
-                ? "bg-hr-light text-hr"
-                : moduleID === "marketing"
-                  ? "bg-mkt-light text-mkt"
-                  : "bg-error-light text-error",
-          )}
-          key={moduleID}
-        >
-          {label}: {role.role_slug}
-        </span>
-      );
-    });
+    const label = moduleID === "operational"
+      ? "OPS"
+      : moduleID === "hris"
+        ? "HRIS"
+        : moduleID === "marketing"
+          ? "MKT"
+          : "ADMIN";
+
+    items.push(
+      <span
+        className={cn(
+          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
+          moduleID === "operational"
+            ? "bg-ops-light text-ops"
+            : moduleID === "hris"
+              ? "bg-hr-light text-hr"
+              : moduleID === "marketing"
+                ? "bg-mkt-light text-mkt"
+                : "bg-error-light text-error",
+        )}
+        key={moduleID}
+      >
+        {label}: {role.role_slug}
+      </span>,
+    );
+
+    return items;
+  }, []);
 }

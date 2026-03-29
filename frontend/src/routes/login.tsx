@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
+import { getDefaultAuthorizedPath } from "@/lib/rbac";
 import { getValidStoredSession, login } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/login")({
     const session = getValidStoredSession();
     if (session?.tokens.access_token) {
       throw redirect({
-        to: "/operational/overview",
+        to: getDefaultAuthorizedPath(session),
       });
     }
   },
@@ -48,7 +49,7 @@ function LoginPage() {
     mutationFn: login,
     onSuccess: (session) => {
       setSession(session);
-      window.location.replace("/operational/overview");
+      window.location.replace(getDefaultAuthorizedPath(session));
     },
   });
 

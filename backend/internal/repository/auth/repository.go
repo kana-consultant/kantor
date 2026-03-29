@@ -822,16 +822,62 @@ func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]U
 		return nil, 0, err
 	}
 
-	// Fetch roles for each user
+	userIDs := make([]string, 0, len(result))
+	for _, item := range result {
+		userIDs = append(userIDs, item.User.ID)
+	}
+
+	roleMap, err := r.listUserRoleKeys(ctx, userIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	for i := range result {
-		roles, _, err := r.GetUserRolesAndPermissions(ctx, result[i].User.ID)
-		if err != nil {
-			return nil, 0, err
-		}
-		result[i].Roles = roles
+		result[i].Roles = roleMap[result[i].User.ID]
 	}
 
 	return result, total, nil
+}
+
+func (r *Repository) listUserRoleKeys(ctx context.Context, userIDs []string) (map[string][]string, error) {
+	if len(userIDs) == 0 {
+		return map[string][]string{}, nil
+	}
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		SELECT user_id, role_key
+		FROM (
+			SELECT u.id::text AS user_id, 'super_admin' AS role_key
+			FROM users u
+			WHERE u.is_super_admin = TRUE AND u.id = ANY($1::uuid[])
+
+			UNION
+
+			SELECT umr.user_id::text AS user_id, roles.slug || ':' || umr.module_id AS role_key
+			FROM user_module_roles umr
+			INNER JOIN roles ON roles.id = umr.role_id
+			WHERE umr.user_id = ANY($1::uuid[])
+		) role_map
+		ORDER BY user_id ASC, role_key ASC
+	`, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	roleMap := make(map[string][]string, len(userIDs))
+	for rows.Next() {
+		var userID string
+		var roleKey string
+		if err := rows.Scan(&userID, &roleKey); err != nil {
+			return nil, err
+		}
+		roleMap[userID] = append(roleMap[userID], roleKey)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return roleMap, nil
 }
 
 func (r *Repository) SetUserActive(ctx context.Context, userID string, active bool) error {

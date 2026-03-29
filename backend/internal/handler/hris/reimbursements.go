@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
@@ -103,7 +104,11 @@ func (h *ReimbursementsHandler) get(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
 		return
 	}
-	item, err := h.service.Get(r.Context(), chi.URLParam(r, "reimbursementID"), principal.UserID, principal.Cached)
+	reimbursementID, ok := validateReimbursementIDParam(w, chi.URLParam(r, "reimbursementID"))
+	if !ok {
+		return
+	}
+	item, err := h.service.Get(r.Context(), reimbursementID, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -123,7 +128,10 @@ func (h *ReimbursementsHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reimbursementID := chi.URLParam(r, "reimbursementID")
+	reimbursementID, ok := validateReimbursementIDParam(w, chi.URLParam(r, "reimbursementID"))
+	if !ok {
+		return
+	}
 	item, err := h.service.Update(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
@@ -140,7 +148,10 @@ func (h *ReimbursementsHandler) deleteReimbursement(w http.ResponseWriter, r *ht
 		return
 	}
 
-	reimbursementID := chi.URLParam(r, "reimbursementID")
+	reimbursementID, ok := validateReimbursementIDParam(w, chi.URLParam(r, "reimbursementID"))
+	if !ok {
+		return
+	}
 	if err := h.service.Delete(r.Context(), reimbursementID, principal.UserID, principal.Cached); err != nil {
 		h.writeError(w, err)
 		return
@@ -178,9 +189,14 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 		return
 	}
 
-	reimbursementID := chi.URLParam(r, "reimbursementID")
+	reimbursementID, ok := validateReimbursementIDParam(w, chi.URLParam(r, "reimbursementID"))
+	if !ok {
+		removeSavedAttachments(h.uploadsDir, paths)
+		return
+	}
 	item, err := h.service.AddAttachments(r.Context(), reimbursementID, paths, principal.UserID, principal.Cached)
 	if err != nil {
+		removeSavedAttachments(h.uploadsDir, paths)
 		h.writeError(w, err)
 		return
 	}
@@ -200,7 +216,10 @@ func (h *ReimbursementsHandler) markPaid(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	reimbursementID := chi.URLParam(r, "reimbursementID")
+	reimbursementID, ok := validateReimbursementIDParam(w, chi.URLParam(r, "reimbursementID"))
+	if !ok {
+		return
+	}
 	item, err := h.service.MarkPaid(r.Context(), reimbursementID, input.Notes, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
@@ -239,7 +258,10 @@ func (h *ReimbursementsHandler) review(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reimbursementID := chi.URLParam(r, "reimbursementID")
+	reimbursementID, ok := validateReimbursementIDParam(w, chi.URLParam(r, "reimbursementID"))
+	if !ok {
+		return
+	}
 	item, err := h.service.ManagerReview(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
@@ -301,6 +323,8 @@ func (h *ReimbursementsHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusForbidden, "FORBIDDEN", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrReimbursementInvalidState):
 		response.WriteError(w, http.StatusConflict, "INVALID_STATE", "Only submitted reimbursements can be modified", nil)
+	case errors.Is(err, hrisservice.ErrReimbursementInvalidAttachment):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"kept_attachments": "contains attachment outside this reimbursement"})
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"employee_id": "not found"})
 	default:
@@ -378,4 +402,19 @@ func sanitizeFilename(value string) string {
 	filename = strings.ReplaceAll(filename, " ", "-")
 	filename = strings.ReplaceAll(filename, "..", "")
 	return filename
+}
+
+func validateReimbursementIDParam(w http.ResponseWriter, reimbursementID string) (string, bool) {
+	reimbursementID = strings.TrimSpace(reimbursementID)
+	if _, err := uuid.Parse(reimbursementID); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Path validation failed", map[string]string{"reimbursementID": "must be a valid UUID"})
+		return "", false
+	}
+	return reimbursementID, true
+}
+
+func removeSavedAttachments(baseUploadsDir string, paths []string) {
+	for _, attachmentPath := range paths {
+		_ = os.Remove(filepath.Join(baseUploadsDir, filepath.FromSlash(attachmentPath)))
+	}
 }

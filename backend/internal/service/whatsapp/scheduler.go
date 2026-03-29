@@ -145,9 +145,9 @@ func (s *Service) sendTaskReminder(ctx context.Context, task warepo.TaskDueInfo,
 }
 
 func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
-	tmpl, err := s.repo.GetTemplateBySlug(ctx, "project_deadline_warning")
+	tmpl, err := s.repo.GetTemplateBySlug(ctx, "project_deadline_h3")
 	if err != nil {
-		slog.Error("failed to get project_deadline_warning template", "error", err)
+		slog.Error("failed to get project_deadline_h3 template", "error", err)
 		return
 	}
 	if !tmpl.IsActive {

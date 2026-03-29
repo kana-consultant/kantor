@@ -30,9 +30,10 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const session = useAuthStore((state) => state.session);
   const setSession = useAuthStore((state) => state.setSession);
+  const accessToken = session?.tokens.access_token;
 
   useEffect(() => {
-    if (!session) {
+    if (!accessToken) {
       return;
     }
 
@@ -43,8 +44,13 @@ function AuthenticatedLayout() {
           return;
         }
 
+        const currentSession = useAuthStore.getState().session;
+        if (!currentSession || currentSession.tokens.access_token !== accessToken) {
+          return;
+        }
+
         setSession({
-          ...session,
+          ...currentSession,
           user: profile.user,
           module_roles: profile.module_roles,
           permissions: profile.permissions,
@@ -58,7 +64,7 @@ function AuthenticatedLayout() {
     return () => {
       active = false;
     };
-  }, [session?.tokens.access_token, setSession]);
+  }, [accessToken, setSession]);
 
   return (
     <PageShell>

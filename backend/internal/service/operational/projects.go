@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/kana-consultant/kantor/backend/internal/dto/operational"
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	"github.com/kana-consultant/kantor/backend/internal/repository"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 )
 
@@ -19,6 +21,7 @@ var (
 )
 
 type projectsRepository interface {
+	BeginTx(ctx context.Context) (pgx.Tx, error)
 	CreateProject(ctx context.Context, params operationalrepo.CreateProjectParams) (model.Project, error)
 	ListProjects(ctx context.Context, params operationalrepo.ListProjectsParams) ([]model.Project, int64, error)
 	GetProjectByID(ctx context.Context, projectID string) (model.Project, error)
@@ -52,7 +55,15 @@ func NewProjectsService(repo projectsRepository, kanbanRepo projectsKanbanReposi
 }
 
 func (s *ProjectsService) CreateProject(ctx context.Context, request operational.CreateProjectRequest, createdBy string) (ProjectDetail, error) {
-	project, err := s.repo.CreateProject(ctx, operationalrepo.CreateProjectParams{
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return ProjectDetail{}, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	txCtx := repository.WithConn(ctx, tx)
+
+	project, err := s.repo.CreateProject(txCtx, operationalrepo.CreateProjectParams{
 		Name:        strings.TrimSpace(request.Name),
 		Description: normalizeOptionalString(request.Description),
 		Deadline:    normalizeOptionalTime(request.Deadline),
@@ -65,7 +76,7 @@ func (s *ProjectsService) CreateProject(ctx context.Context, request operational
 	}
 
 	if s.kanbanRepo != nil {
-		if err := s.kanbanRepo.CreateDefaultColumns(ctx, project.ID); err != nil {
+		if err := s.kanbanRepo.CreateDefaultColumns(txCtx, project.ID); err != nil {
 			return ProjectDetail{}, err
 		}
 	}
@@ -78,13 +89,17 @@ func (s *ProjectsService) CreateProject(ctx context.Context, request operational
 				RoleInProject: strings.TrimSpace(member.RoleInProject),
 			})
 		}
-		if err := s.repo.BulkAssignMembersWithRoles(ctx, project.ID, members); err != nil {
+		if err := s.repo.BulkAssignMembersWithRoles(txCtx, project.ID, members); err != nil {
 			return ProjectDetail{}, err
 		}
 	} else if len(request.MemberEmails) > 0 {
-		if err := s.repo.BulkAssignMembers(ctx, project.ID, request.MemberEmails, "member"); err != nil {
+		if err := s.repo.BulkAssignMembers(txCtx, project.ID, request.MemberEmails, "member"); err != nil {
 			return ProjectDetail{}, err
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return ProjectDetail{}, err
 	}
 
 	return s.GetProject(ctx, project.ID)

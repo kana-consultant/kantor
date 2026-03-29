@@ -1,6 +1,4 @@
-import { env } from "@/lib/env";
 import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { getStoredSession } from "@/stores/auth-store";
 import type {
   Reimbursement,
   ReimbursementFilters,
@@ -51,24 +49,15 @@ export async function createReimbursement(values: ReimbursementFormValues) {
 }
 
 export async function uploadReimbursementAttachments(reimbursementId: string, files: File[]) {
-  const session = getStoredSession();
   const payload = new FormData();
   files.forEach((file) => payload.append("files", file));
-  const response = await fetch(
-    `${env.VITE_API_BASE_URL}/hris/reimbursements/${reimbursementId}/attachments`,
+  return authRequestJSON<Reimbursement>(
+    `/hris/reimbursements/${reimbursementId}/attachments`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${session?.tokens.access_token ?? ""}`,
-      },
       body: payload,
     },
   );
-  const json = await response.json();
-  if (!response.ok || !json.success) {
-    throw new Error(json.error?.message ?? "Attachment upload failed");
-  }
-  return json.data as Reimbursement;
 }
 
 export async function reviewReimbursement(reimbursementId: string, decision: "approved" | "rejected", notes = "") {

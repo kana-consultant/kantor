@@ -133,6 +133,10 @@ func (h *Handler) getStatus(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getQR(w http.ResponseWriter, r *http.Request) {
 	qr, err := h.service.GetQR(r.Context())
 	if err != nil {
+		if errors.Is(err, waservice.ErrWAHADisabled) {
+			response.WriteError(w, http.StatusConflict, "WA_DISABLED", err.Error(), nil)
+			return
+		}
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
@@ -147,6 +151,10 @@ func (h *Handler) startSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.StartSession(r.Context()); err != nil {
+		if errors.Is(err, waservice.ErrWAHADisabled) {
+			response.WriteError(w, http.StatusConflict, "WA_DISABLED", err.Error(), nil)
+			return
+		}
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
@@ -162,6 +170,10 @@ func (h *Handler) stopSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.StopSession(r.Context()); err != nil {
+		if errors.Is(err, waservice.ErrWAHADisabled) {
+			response.WriteError(w, http.StatusConflict, "WA_DISABLED", err.Error(), nil)
+			return
+		}
 		response.WriteError(w, http.StatusBadGateway, "WAHA_ERROR", err.Error(), nil)
 		return
 	}
@@ -398,9 +410,19 @@ func (h *Handler) deleteSchedule(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) triggerSchedule(w http.ResponseWriter, r *http.Request) {
-	// For now, manual trigger runs the daily reminders
-	go h.service.RunDailyReminders(r.Context())
-	platformmiddleware.AuditLog(r.Context(), "trigger", "operational", "wa_schedule", chi.URLParam(r, "scheduleID"), nil, map[string]any{"trigger": "manual"})
+	scheduleID := chi.URLParam(r, "scheduleID")
+	if err := h.service.TriggerSchedule(r.Context(), scheduleID); err != nil {
+		switch {
+		case errors.Is(err, waservice.ErrScheduleNotFound):
+			response.WriteError(w, http.StatusNotFound, "SCHEDULE_NOT_FOUND", "Schedule not found", nil)
+		case errors.Is(err, waservice.ErrWAHADisabled):
+			response.WriteError(w, http.StatusConflict, "WA_DISABLED", err.Error(), nil)
+		default:
+			response.WriteError(w, http.StatusBadRequest, "SCHEDULE_TRIGGER_FAILED", err.Error(), nil)
+		}
+		return
+	}
+	platformmiddleware.AuditLog(r.Context(), "trigger", "operational", "wa_schedule", scheduleID, nil, map[string]any{"trigger": "manual"})
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Schedule triggered"}, nil)
 }
 
@@ -486,6 +508,14 @@ func (h *Handler) quickSend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.QuickSend(r.Context(), input.Phone, input.Message); err != nil {
+		if errors.Is(err, waservice.ErrInvalidPhone) {
+			response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"phone": "must use 08xx, 8xx, 628xx, or +628xx format"})
+			return
+		}
+		if errors.Is(err, waservice.ErrWAHADisabled) {
+			response.WriteError(w, http.StatusConflict, "WA_DISABLED", err.Error(), nil)
+			return
+		}
 		response.WriteError(w, http.StatusBadGateway, "SEND_FAILED", err.Error(), nil)
 		return
 	}
@@ -527,6 +557,10 @@ func (h *Handler) updateUserPhone(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.UpdateUserPhone(r.Context(), principal.UserID, input.Phone); err != nil {
+		if errors.Is(err, waservice.ErrInvalidPhone) {
+			response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"phone": "must use 08xx, 8xx, 628xx, or +628xx format"})
+			return
+		}
 		h.writeInternalError(w, err)
 		return
 	}

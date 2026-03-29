@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
@@ -43,7 +45,10 @@ func (h *KanbanHandler) RegisterTaskRoutes(router chi.Router) {
 }
 
 func (h *KanbanHandler) createColumn(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.CreateKanbanColumnRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -61,7 +66,10 @@ func (h *KanbanHandler) createColumn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) listColumns(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	result, err := h.service.ListColumns(r.Context(), projectID)
 	if err != nil {
@@ -73,8 +81,14 @@ func (h *KanbanHandler) listColumns(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) updateColumn(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
-	columnID := chi.URLParam(r, "columnID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
+	columnID, ok := validateKanbanUUIDParam(w, "columnID", chi.URLParam(r, "columnID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.UpdateKanbanColumnRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -92,8 +106,14 @@ func (h *KanbanHandler) updateColumn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) deleteColumn(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
-	columnID := chi.URLParam(r, "columnID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
+	columnID, ok := validateKanbanUUIDParam(w, "columnID", chi.URLParam(r, "columnID"))
+	if !ok {
+		return
+	}
 
 	if err := h.service.DeleteColumn(r.Context(), projectID, columnID); err != nil {
 		h.writeError(w, err)
@@ -105,7 +125,10 @@ func (h *KanbanHandler) deleteColumn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) reorderColumns(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.ReorderKanbanColumnsRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -122,7 +145,10 @@ func (h *KanbanHandler) reorderColumns(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) createTask(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.CreateKanbanTaskRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -146,7 +172,10 @@ func (h *KanbanHandler) createTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	result, err := h.service.ListTasks(r.Context(), projectID)
 	if err != nil {
@@ -158,8 +187,14 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) updateTask(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
-	taskID := chi.URLParam(r, "taskID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
+	taskID, ok := validateKanbanUUIDParam(w, "taskID", chi.URLParam(r, "taskID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.UpdateKanbanTaskRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -183,8 +218,14 @@ func (h *KanbanHandler) updateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) deleteTask(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
-	taskID := chi.URLParam(r, "taskID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
+	taskID, ok := validateKanbanUUIDParam(w, "taskID", chi.URLParam(r, "taskID"))
+	if !ok {
+		return
+	}
 
 	if err := h.service.DeleteTask(r.Context(), projectID, taskID); err != nil {
 		h.writeError(w, err)
@@ -196,8 +237,14 @@ func (h *KanbanHandler) deleteTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) moveTask(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
-	taskID := chi.URLParam(r, "taskID")
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
+	taskID, ok := validateKanbanUUIDParam(w, "taskID", chi.URLParam(r, "taskID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.MoveKanbanTaskRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -233,7 +280,18 @@ func (h *KanbanHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusNotFound, "KANBAN_COLUMN_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, operationalservice.ErrKanbanTaskNotFound):
 		response.WriteError(w, http.StatusNotFound, "KANBAN_TASK_NOT_FOUND", err.Error(), nil)
+	case errors.Is(err, operationalservice.ErrKanbanTaskAssigneeNotMember):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"assignee_id": "must belong to the project"})
 	default:
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}
+}
+
+func validateKanbanUUIDParam(w http.ResponseWriter, field string, value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if _, err := uuid.Parse(value); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Path validation failed", map[string]string{field: "must be a valid UUID"})
+		return "", false
+	}
+	return value, true
 }

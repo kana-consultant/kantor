@@ -1,5 +1,9 @@
-import { getJSON, postJSON, requestEnvelope, requestJSON } from "@/lib/api-client";
-import { getStoredSession } from "@/stores/auth-store";
+import {
+  authGetJSON,
+  authPostJSON,
+  authRequestEnvelope,
+  authRequestJSON,
+} from "@/lib/api-client";
 
 // ---- Types ----
 
@@ -127,42 +131,38 @@ export const waKeys = {
 
 // ---- API functions ----
 
-function token() {
-  return getStoredSession()?.tokens.access_token;
-}
-
 // Config
 export function getWAConfig() {
-  return getJSON<WAConfig>("/wa/config", token());
+  return authGetJSON<WAConfig>("/wa/config");
 }
 
 export function updateWAConfig(data: WAConfig) {
-  return requestJSON<{ message: string }>("/wa/config", {
+  return authRequestJSON<{ message: string }>("/wa/config", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
-  }, token());
+  });
 }
 
 // Connection
 export function getWAStatus() {
-  return getJSON<WAStatusResponse>("/wa/status", token());
+  return authGetJSON<WAStatusResponse>("/wa/status");
 }
 
 export function getWAQR() {
-  return getJSON<{ qr: string }>("/wa/qr", token());
+  return authGetJSON<{ qr: string }>("/wa/qr");
 }
 
 export function startWASession() {
-  return postJSON<{ message: string }, undefined>("/wa/session/start", undefined, token());
+  return authPostJSON<{ message: string }, undefined>("/wa/session/start", undefined);
 }
 
 export function stopWASession() {
-  return postJSON<{ message: string }, undefined>("/wa/session/stop", undefined, token());
+  return authPostJSON<{ message: string }, undefined>("/wa/session/stop", undefined);
 }
 
 export function getWAStats() {
-  return getJSON<WAStatsResponse>("/wa/stats", token());
+  return authGetJSON<WAStatsResponse>("/wa/stats");
 }
 
 // Templates
@@ -171,60 +171,60 @@ export async function listTemplates(category?: string, triggerType?: string) {
   if (category) params.set("category", category);
   if (triggerType) params.set("trigger_type", triggerType);
   const qs = params.toString();
-  return getJSON<WATemplate[]>(`/wa/templates${qs ? "?" + qs : ""}`, token());
+  return authGetJSON<WATemplate[]>(`/wa/templates${qs ? "?" + qs : ""}`);
 }
 
 export function createTemplate(data: Partial<WATemplate>) {
-  return postJSON<WATemplate, Partial<WATemplate>>("/wa/templates", data, token());
+  return authPostJSON<WATemplate, Partial<WATemplate>>("/wa/templates", data);
 }
 
 export function updateTemplate(id: string, data: Partial<WATemplate>) {
-  return requestJSON<WATemplate>(`/wa/templates/${id}`, {
+  return authRequestJSON<WATemplate>(`/wa/templates/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
-  }, token());
+  });
 }
 
 export function deleteTemplate(id: string) {
-  return requestJSON<{ message: string }>(`/wa/templates/${id}`, { method: "DELETE" }, token());
+  return authRequestJSON<{ message: string }>(`/wa/templates/${id}`, { method: "DELETE" });
 }
 
 export function previewTemplate(id: string) {
-  return postJSON<{ preview: string }, undefined>(`/wa/templates/${id}/preview`, undefined, token());
+  return authPostJSON<{ preview: string }, undefined>(`/wa/templates/${id}/preview`, undefined);
 }
 
 // Schedules
 export function listSchedules() {
-  return getJSON<WASchedule[]>("/wa/schedules", token());
+  return authGetJSON<WASchedule[]>("/wa/schedules");
 }
 
 export function createSchedule(data: Record<string, unknown>) {
-  return postJSON<WASchedule, Record<string, unknown>>("/wa/schedules", data, token());
+  return authPostJSON<WASchedule, Record<string, unknown>>("/wa/schedules", data);
 }
 
 export function updateSchedule(id: string, data: Record<string, unknown>) {
-  return requestJSON<WASchedule>(`/wa/schedules/${id}`, {
+  return authRequestJSON<WASchedule>(`/wa/schedules/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
-  }, token());
+  });
 }
 
 export function deleteSchedule(id: string) {
-  return requestJSON<{ message: string }>(`/wa/schedules/${id}`, { method: "DELETE" }, token());
+  return authRequestJSON<{ message: string }>(`/wa/schedules/${id}`, { method: "DELETE" });
 }
 
 export function triggerSchedule(id: string) {
-  return postJSON<{ message: string }, undefined>(`/wa/schedules/${id}/trigger`, undefined, token());
+  return authPostJSON<{ message: string }, undefined>(`/wa/schedules/${id}/trigger`, undefined);
 }
 
 export function toggleSchedule(id: string, isActive: boolean) {
-  return requestJSON<WASchedule>(`/wa/schedules/${id}/toggle`, {
+  return authRequestJSON<WASchedule>(`/wa/schedules/${id}/toggle`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ is_active: isActive }),
-  }, token());
+  });
 }
 
 // Logs
@@ -240,10 +240,9 @@ export async function listLogs(filters: WALogFilters) {
   if (filters.dateTo) params.set("date_to", filters.dateTo);
   if (filters.search) params.set("search", filters.search);
 
-  const envelope = await requestEnvelope<WABroadcastLog[]>(
+  const envelope = await authRequestEnvelope<WABroadcastLog[]>(
     `/wa/logs?${params.toString()}`,
     { method: "GET" },
-    token(),
   );
   return {
     items: envelope.data,
@@ -253,23 +252,23 @@ export async function listLogs(filters: WALogFilters) {
 
 export function getLogSummary(date?: string) {
   const qs = date ? `?date=${date}` : "";
-  return getJSON<WALogSummary>(`/wa/logs/summary${qs}`, token());
+  return authGetJSON<WALogSummary>(`/wa/logs/summary${qs}`);
 }
 
 // Quick Send
 export function quickSend(phone: string, message: string) {
-  return postJSON<{ message: string }, { phone: string; message: string }>("/wa/send", { phone, message }, token());
+  return authPostJSON<{ message: string }, { phone: string; message: string }>("/wa/send", { phone, message });
 }
 
 // Phone
 export function getUserPhone() {
-  return getJSON<{ phone: string | null }>("/wa/phone", token());
+  return authGetJSON<{ phone: string | null }>("/wa/phone");
 }
 
 export function updateUserPhone(phone: string | null) {
-  return requestJSON<{ message: string }>("/wa/phone", {
+  return authRequestJSON<{ message: string }>("/wa/phone", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone }),
-  }, token());
+  });
 }

@@ -54,7 +54,7 @@
 - **Kanban Board** &mdash; Drag-and-drop task management with customizable columns per project. Labels, priority, assignees, due dates, and real-time reordering
 - **Auto-Assignment Rules** &mdash; Rule-based task assignment by department, skill, or current workload
 - **Activity Tracker** &mdash; Chrome Extension (Manifest V3) with 30-second heartbeat, idle detection, domain categorization, and productivity scoring. Includes privacy consent workflow and offline queue
-- **WhatsApp Broadcast** &mdash; Template-based messaging via [WAHA](https://waha.devlike.pro/), scheduled broadcasts, automated reminders (task due, overdue, weekly digest), rate limiting, and delivery tracking
+- **WhatsApp Broadcast** &mdash; Template-based messaging via [WAHA](https://waha.devlike.pro/), per-tenant WA settings, scheduled broadcasts, automated reminders (task due, overdue, weekly digest), DB-backed rate limiting, and delivery tracking
 
 ### HRIS Module
 
@@ -75,6 +75,8 @@
 - **Authentication** &mdash; JWT-based with access tokens (15m) + refresh tokens (7d). Account lockout after failed attempts
 - **RBAC** &mdash; Granular role-based access control with module-scoped permissions (`module:resource:action`). 5 standard roles: super_admin, admin, manager, staff, viewer
 - **Multi-Tenancy** &mdash; PostgreSQL Row-Level Security (RLS) with per-tenant data isolation. One database, multiple organizations, completely separated data
+- **Notification Center** &mdash; In-app notifications with unread counters, SSE-based realtime updates, and browser notifications when the tab is inactive
+- **Protected File Access** &mdash; Uploads are served through authenticated utility endpoints with permission and ownership checks
 - **Audit Logging** &mdash; All state-changing operations logged for compliance and traceability
 - **Data Encryption** &mdash; Sensitive data (salaries, bonuses) encrypted at rest with AES-256-GCM. Supports key rotation
 
@@ -247,10 +249,11 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `DATA_ENCRYPTION_KEY`    | Yes      | AES-256-GCM key for sensitive data encryption          |
 | `CORS_ORIGINS`           | No       | Comma-separated allowed origins                        |
 | `TENANTS`                | No       | Tenant definitions: `name\|slug\|domain1,domain2`      |
-| `WAHA_API_URL`           | No       | WAHA WhatsApp API endpoint                             |
-| `WAHA_ENABLED`           | No       | Enable WhatsApp broadcast features                     |
-| `APP_URL`                | No       | Public URL for SEO/OG meta tags (e.g. `https://kantor.example.com`) |
+| `APP_URL`                | No       | Public base URL used for deep links in WA messages and notifications |
 | `TRACKER_RETENTION_DAYS` | No       | Activity tracker data retention (default: 90)          |
+
+WhatsApp runtime settings are no longer configured from environment variables.
+WAHA endpoint, API key, session name, rate limits, and schedules are stored per tenant in `tenant_wa_configs` and managed from the WA Broadcast settings page.
 
 ### Multi-Tenancy
 
@@ -277,7 +280,9 @@ TENANTS=Company A|company-a|kantor.company-a.com;Company B|company-b|kantor.comp
 
 | Document                               | Description                                                             |
 | -------------------------------------- | ----------------------------------------------------------------------- |
+| [Architecture Overview](docs/architecture.md) | Runtime architecture, multi-tenancy, notifications, extension, and WA integration |
 | [Deployment Guide](docs/deployment.md) | Production deployment with Docker, TLS, backups, and security checklist |
+| [QA Remediation & Tests](QA_REMEDIATION_AND_TESTS.md) | Summary of QA fixes and manual verification steps |
 | [Contributing](CONTRIBUTING.md)        | Development setup, project rules, PR guidelines, and commit style       |
 | [Security Policy](SECURITY.md)         | Vulnerability reporting instructions                                    |
 | [Code of Conduct](CODE_OF_CONDUCT.md)  | Community standards (Contributor Covenant v2.1)                         |
@@ -299,7 +304,8 @@ TENANTS=Company A|company-a|kantor.company-a.com;Company B|company-b|kantor.comp
 - [x] Audit logging
 - [x] CSV/Excel export
 - [x] Multi-tenancy with PostgreSQL RLS
-- [ ] Notification center (in-app + email)
+- [x] Notification center (in-app + browser)
+- [ ] Email notifications
 - [ ] Dashboard analytics with custom widgets
 - [ ] API documentation (OpenAPI/Swagger)
 - [ ] Automated test suite

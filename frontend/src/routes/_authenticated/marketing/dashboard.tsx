@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
   Cell,
   Pie,
@@ -27,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/marketing/dashboard")({
   beforeLoad: async () => {
     await ensureModuleAccess("marketing");
     await ensurePermission(permissions.marketingOverview);
+    throw redirect({ to: "/marketing/overview" });
   },
   component: MarketingDashboardPage,
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -23,6 +23,9 @@ import {
   Save,
 } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { StatusBadge as SharedStatusBadge } from "@/components/shared/status-badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +59,7 @@ import {
   getWAConfig,
   updateWAConfig,
   type WAConfig,
+  type WABroadcastLog,
   type WATemplate,
   type WASchedule,
   type WALogFilters,
@@ -386,6 +390,11 @@ function QuickSendDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
 
 // ===================== Templates Tab =====================
 
+const GENERAL_TEMPLATE_VARIABLES: { label: string; vars: string[] } = {
+  label: "Umum (semua template)",
+  vars: ["name", "app_url"],
+};
+
 /** Map of available variables per template category/slug */
 const TEMPLATE_VARIABLES: Record<string, { label: string; vars: string[] }> = {
   task_assigned: {
@@ -404,6 +413,10 @@ const TEMPLATE_VARIABLES: Record<string, { label: string; vars: string[] }> = {
     label: "Project Deadline H-3",
     vars: ["name", "project_name", "deadline", "project_status", "open_tasks_count", "total_tasks_count", "app_url"],
   },
+  project_deadline_warning: {
+    label: "Project Deadline H-3",
+    vars: ["name", "project_name", "deadline", "project_status", "open_tasks_count", "total_tasks_count", "app_url"],
+  },
   weekly_digest: {
     label: "Weekly Digest",
     vars: ["name", "week_start", "week_end", "completed_count", "open_count", "overdue_count", "app_url"],
@@ -412,10 +425,7 @@ const TEMPLATE_VARIABLES: Record<string, { label: string; vars: string[] }> = {
     label: "Reimbursement Status",
     vars: ["name", "reimbursement_title", "amount", "new_status", "reviewer_notes_section", "app_url"],
   },
-  _general: {
-    label: "Umum (semua template)",
-    vars: ["name", "app_url"],
-  },
+  _general: GENERAL_TEMPLATE_VARIABLES,
 };
 
 function TemplatesTab() {
@@ -428,6 +438,7 @@ function TemplatesTab() {
   const [editTemplate, setEditTemplate] = useState<WATemplate | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [previewData, setPreviewData] = useState<{ text: string; name: string } | null>(null);
+  const [templateToDelete, setTemplateToDelete] = useState<WATemplate | null>(null);
 
   const templatesQuery = useQuery({
     queryKey: waKeys.templates(categoryFilter, triggerFilter),
@@ -447,6 +458,102 @@ function TemplatesTab() {
     const result = await previewMutation.mutateAsync(t.id);
     setPreviewData({ text: result.preview, name: t.name });
   };
+
+  const columns: Array<DataTableColumn<WATemplate>> = [
+    {
+      id: "name",
+      header: "Nama",
+      mobilePrimary: true,
+      cell: (template) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            {template.is_system ? <Lock className="h-3.5 w-3.5 text-text-secondary" /> : null}
+            <span className="font-medium text-text-primary">{template.name}</span>
+          </div>
+          {template.description ? (
+            <p className="text-xs text-text-secondary">{template.description}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: "slug",
+      header: "Slug",
+      cell: (template) => (
+        <span className="font-mono text-xs text-text-secondary">{template.slug}</span>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      id: "category",
+      header: "Kategori",
+      cell: (template) => <CategoryBadge category={template.category} />,
+    },
+    {
+      id: "trigger_type",
+      header: "Trigger",
+      cell: (template) => (
+        <SharedStatusBadge
+          label={formatWATriggerLabel(template.trigger_type)}
+          status={template.trigger_type}
+          variant="wa-trigger"
+        />
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (template) => (
+        <SharedStatusBadge
+          label={template.is_active ? "Aktif" : "Nonaktif"}
+          status={template.is_active ? "active" : "inactive"}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "Aksi",
+      align: "right",
+      cell: (template) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            className="h-8 w-8"
+            onClick={() => void handlePreview(template)}
+            size="icon"
+            title="Preview"
+            type="button"
+            variant="ghost"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          {canManage ? (
+            <Button
+              className="h-8 w-8"
+              onClick={() => setEditTemplate(template)}
+              size="icon"
+              title="Edit"
+              type="button"
+              variant="ghost"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {canManage && !template.is_system ? (
+            <Button
+              className="h-8 w-8 text-red-500 hover:text-red-600"
+              onClick={() => setTemplateToDelete(template)}
+              size="icon"
+              title="Hapus"
+              type="button"
+              variant="ghost"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -481,63 +588,16 @@ function TemplatesTab() {
         )}
       </div>
 
-      <div className="rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-surface-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Nama</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Slug</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Kategori</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Trigger</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Status</th>
-              <th className="px-4 py-3 text-right font-medium text-text-secondary">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {templatesQuery.data?.map((t) => (
-              <tr key={t.id} className="border-b border-border/50 last:border-0">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {t.is_system && <Lock className="h-3.5 w-3.5 text-text-secondary" />}
-                    <span className="font-medium">{t.name}</span>
-                  </div>
-                  {t.description && <p className="mt-0.5 text-xs text-text-secondary">{t.description}</p>}
-                </td>
-                <td className="px-4 py-3 font-mono text-xs text-text-secondary">{t.slug}</td>
-                <td className="px-4 py-3"><CategoryBadge category={t.category} /></td>
-                <td className="px-4 py-3"><TriggerBadge trigger={t.trigger_type} /></td>
-                <td className="px-4 py-3">
-                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                    t.is_active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-surface-muted text-text-secondary"
-                  )}>
-                    {t.is_active ? "Aktif" : "Nonaktif"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePreview(t)} title="Preview">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    {canManage && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditTemplate(t)} title="Edit">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {canManage && !t.is_system && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => { if (confirm("Hapus template ini?")) deleteMutation.mutate(t.id); }} title="Hapus">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {templatesQuery.data?.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-text-secondary">Belum ada template</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={templatesQuery.data ?? []}
+        emptyActionLabel={canManage ? "Buat Template" : undefined}
+        emptyDescription="Template WhatsApp akan muncul di sini setelah dibuat atau diaktifkan."
+        emptyTitle="Belum ada template WA"
+        getRowId={(template) => template.id}
+        loading={templatesQuery.isLoading}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
+      />
 
       {/* Preview Dialog */}
       <Dialog open={previewData !== null} onOpenChange={() => setPreviewData(null)}>
@@ -574,6 +634,30 @@ function TemplatesTab() {
           onClose={() => { setCreateOpen(false); setEditTemplate(null); }}
         />
       )}
+
+      <ConfirmDialog
+        confirmLabel="Hapus template"
+        description={
+          templateToDelete
+            ? `Template "${templateToDelete.name}" akan dihapus permanen dari tenant ini.`
+            : ""
+        }
+        isLoading={deleteMutation.isPending}
+        isOpen={templateToDelete !== null}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={() => {
+          if (!templateToDelete) {
+            return;
+          }
+          deleteMutation.mutate(templateToDelete.id, {
+            onSuccess: async () => {
+              await queryClient.invalidateQueries({ queryKey: waKeys.all });
+              setTemplateToDelete(null);
+            },
+          });
+        }}
+        title="Hapus template WA?"
+      />
     </div>
   );
 }
@@ -611,7 +695,7 @@ function TemplateFormDialog({ template, onClose }: { template: WATemplate | null
   });
 
   // Determine available variables based on slug
-  const varInfo = TEMPLATE_VARIABLES[slug] ?? TEMPLATE_VARIABLES._general;
+  const varInfo = TEMPLATE_VARIABLES[slug] ?? GENERAL_TEMPLATE_VARIABLES;
   const availableVars = varInfo.vars;
 
   const insertVariable = (varName: string) => {
@@ -774,6 +858,11 @@ function SchedulesTab() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [editSchedule, setEditSchedule] = useState<WASchedule | null>(null);
+  const [scheduleAction, setScheduleAction] = useState<
+    | { kind: "trigger"; schedule: WASchedule }
+    | { kind: "delete"; schedule: WASchedule }
+    | null
+  >(null);
 
   const schedulesQuery = useQuery({ queryKey: waKeys.schedules(), queryFn: listSchedules });
 
@@ -790,6 +879,108 @@ function SchedulesTab() {
     mutationFn: ({ id, active }: { id: string; active: boolean }) => toggleSchedule(id, active),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.all }); },
   });
+
+  const columns: Array<DataTableColumn<WASchedule>> = [
+    {
+      id: "name",
+      header: "Nama",
+      mobilePrimary: true,
+      cell: (schedule) => <span className="font-medium text-text-primary">{schedule.name}</span>,
+    },
+    {
+      id: "template_name",
+      header: "Template",
+      cell: (schedule) => <span className="text-text-secondary">{schedule.template_name}</span>,
+    },
+    {
+      id: "schedule",
+      header: "Jadwal",
+      cell: (schedule) => (
+        <span className="font-mono text-xs text-text-secondary">
+          {schedule.cron_expression ?? schedule.schedule_type}
+        </span>
+      ),
+    },
+    {
+      id: "target_type",
+      header: "Target",
+      cell: (schedule) => (
+        <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-text-secondary">
+          {formatScheduleTargetLabel(schedule.target_type)}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (schedule) => (
+        <button
+          className={cn("inline-flex", canManage && "cursor-pointer")}
+          disabled={!canManage}
+          onClick={() => toggleMutation.mutate({ id: schedule.id, active: !schedule.is_active })}
+          type="button"
+        >
+          <SharedStatusBadge
+            label={schedule.is_active ? "Aktif" : "Nonaktif"}
+            status={schedule.is_active ? "active" : "inactive"}
+          />
+        </button>
+      ),
+    },
+    {
+      id: "last_run_at",
+      header: "Terakhir Jalan",
+      cell: (schedule) => (
+        <span className="text-xs text-text-secondary">
+          {schedule.last_run_at ? new Date(schedule.last_run_at).toLocaleString("id-ID") : "-"}
+        </span>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      id: "actions",
+      header: "Aksi",
+      align: "right",
+      cell: (schedule) => (
+        <div className="flex justify-end gap-1">
+          {canManage ? (
+            <>
+              <Button
+                className="h-8 w-8"
+                onClick={() => setScheduleAction({ kind: "trigger", schedule })}
+                size="icon"
+                title="Jalankan Sekarang"
+                type="button"
+                variant="ghost"
+              >
+                <Play className="h-4 w-4" />
+              </Button>
+              <Button
+                className="h-8 w-8"
+                onClick={() => setEditSchedule(schedule)}
+                size="icon"
+                title="Edit"
+                type="button"
+                variant="ghost"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                className="h-8 w-8 text-red-500 hover:text-red-600"
+                onClick={() => setScheduleAction({ kind: "delete", schedule })}
+                size="icon"
+                title="Hapus"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -811,68 +1002,16 @@ function SchedulesTab() {
         </div>
       )}
 
-      <div className="rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-surface-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Nama</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Template</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Jadwal</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Target</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Status</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Terakhir Jalan</th>
-              <th className="px-4 py-3 text-right font-medium text-text-secondary">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {schedulesQuery.data?.map((s) => (
-              <tr key={s.id} className="border-b border-border/50 last:border-0">
-                <td className="px-4 py-3 font-medium">{s.name}</td>
-                <td className="px-4 py-3 text-text-secondary">{s.template_name}</td>
-                <td className="px-4 py-3 font-mono text-xs">{s.cron_expression ?? s.schedule_type}</td>
-                <td className="px-4 py-3">
-                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs">{s.target_type.replace(/_/g, " ")}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => canManage && toggleMutation.mutate({ id: s.id, active: !s.is_active })}
-                    className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium transition",
-                      s.is_active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-surface-muted text-text-secondary",
-                      canManage && "cursor-pointer hover:opacity-80"
-                    )}
-                    disabled={!canManage}
-                  >
-                    {s.is_active ? "Aktif" : "Nonaktif"}
-                  </button>
-                </td>
-                <td className="px-4 py-3 text-xs text-text-secondary">
-                  {s.last_run_at ? new Date(s.last_run_at).toLocaleString("id-ID") : "-"}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    {canManage && (
-                      <>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { if (confirm("Jalankan schedule sekarang?")) triggerMutation.mutate(s.id); }} title="Jalankan Sekarang">
-                          <Play className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditSchedule(s)} title="Edit">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => { if (confirm("Hapus schedule ini?")) deleteMutation.mutate(s.id); }} title="Hapus">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {schedulesQuery.data?.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-text-secondary">Belum ada custom schedule</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={schedulesQuery.data ?? []}
+        emptyActionLabel={canManage ? "Buat Schedule" : undefined}
+        emptyDescription="Schedule custom akan tampil di sini setelah dibuat untuk tenant ini."
+        emptyTitle="Belum ada schedule custom"
+        getRowId={(schedule) => schedule.id}
+        loading={schedulesQuery.isLoading}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
+      />
 
       {(createOpen || editSchedule) && (
         <ScheduleFormDialog
@@ -880,6 +1019,44 @@ function SchedulesTab() {
           onClose={() => { setCreateOpen(false); setEditSchedule(null); }}
         />
       )}
+
+      <ConfirmDialog
+        confirmLabel={scheduleAction?.kind === "trigger" ? "Jalankan sekarang" : "Hapus schedule"}
+        description={
+          scheduleAction
+            ? scheduleAction.kind === "trigger"
+              ? `Schedule "${scheduleAction.schedule.name}" akan dijalankan manual sekarang.`
+              : `Schedule "${scheduleAction.schedule.name}" akan dihapus permanen dari tenant ini.`
+            : ""
+        }
+        isLoading={triggerMutation.isPending || deleteMutation.isPending}
+        isOpen={scheduleAction !== null}
+        onClose={() => setScheduleAction(null)}
+        onConfirm={() => {
+          if (!scheduleAction) {
+            return;
+          }
+
+          if (scheduleAction.kind === "trigger") {
+            triggerMutation.mutate(scheduleAction.schedule.id, {
+              onSuccess: async () => {
+                await queryClient.invalidateQueries({ queryKey: waKeys.all });
+                setScheduleAction(null);
+              },
+            });
+            return;
+          }
+
+          deleteMutation.mutate(scheduleAction.schedule.id, {
+            onSuccess: async () => {
+              await queryClient.invalidateQueries({ queryKey: waKeys.all });
+              setScheduleAction(null);
+            },
+          });
+        }}
+        title={scheduleAction?.kind === "trigger" ? "Jalankan schedule sekarang?" : "Hapus schedule WA?"}
+        tone={scheduleAction?.kind === "trigger" ? "warning" : "danger"}
+      />
     </div>
   );
 }
@@ -1012,7 +1189,92 @@ function LogsTab() {
   });
   const summaryQuery = useQuery({ queryKey: waKeys.logSummary(), queryFn: () => getLogSummary() });
 
-  const totalPages = Math.ceil((logsQuery.data?.meta?.total ?? 0) / filters.perPage);
+  const columns: Array<DataTableColumn<WABroadcastLog>> = [
+    {
+      id: "expand",
+      header: "",
+      align: "center",
+      widthClassName: "w-12",
+      hideOnMobile: true,
+      cell: (log) =>
+        expandedId === log.id ? (
+          <ChevronDown className="h-3.5 w-3.5 text-text-secondary" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-text-secondary" />
+        ),
+    },
+    {
+      id: "created_at",
+      header: "Waktu",
+      accessor: "created_at",
+      sortable: true,
+      cell: (log) => (
+        <span className="text-xs text-text-secondary">
+          {new Date(log.created_at).toLocaleString("id-ID")}
+        </span>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      id: "recipient",
+      header: "Penerima",
+      mobilePrimary: true,
+      cell: (log) => (
+        <div className="space-y-1">
+          <p className="font-medium text-text-primary">
+            {log.recipient_name?.trim() || maskPhone(log.recipient_phone)}
+          </p>
+          {log.recipient_name ? (
+            <p className="text-xs text-text-secondary">{maskPhone(log.recipient_phone)}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: "trigger_type",
+      header: "Trigger",
+      accessor: "trigger_type",
+      cell: (log) => (
+        <SharedStatusBadge
+          label={formatWATriggerLabel(log.trigger_type)}
+          status={log.trigger_type}
+          variant="wa-trigger"
+        />
+      ),
+    },
+    {
+      id: "template_slug",
+      header: "Template",
+      accessor: "template_slug",
+      cell: (log) => (
+        <span className="font-mono text-xs text-text-secondary">{log.template_slug ?? "-"}</span>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessor: "status",
+      cell: (log) => (
+        <SharedStatusBadge
+          label={formatWALogStatusLabel(log.status)}
+          status={log.status}
+          variant="wa-log-status"
+        />
+      ),
+    },
+    {
+      id: "error_message",
+      header: "Error",
+      accessor: "error_message",
+      cell: (log) => (
+        <span className="block max-w-[220px] truncate text-xs text-red-500">
+          {log.error_message?.trim() || "-"}
+        </span>
+      ),
+      hideOnMobile: true,
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -1071,86 +1333,86 @@ function LogsTab() {
         </Button>
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-surface-muted/50">
-              <th className="w-8 px-2 py-3" />
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Waktu</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Trigger</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Template</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Penerima</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Status</th>
-              <th className="px-4 py-3 text-left font-medium text-text-secondary">Error</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logsQuery.data?.items?.map((log) => (
-              <LogRow key={log.id} log={log} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} />
-            ))}
-            {(logsQuery.data?.items?.length ?? 0) === 0 && (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-text-secondary">Belum ada log</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={logsQuery.data?.items ?? []}
+        emptyDescription="Belum ada log yang cocok dengan filter aktif."
+        emptyTitle="Log WhatsApp belum tersedia"
+        getRowId={(row) => row.id}
+        loading={logsQuery.isLoading}
+        onRowClick={(row) => setExpandedId((current) => (current === row.id ? null : row.id))}
+        pagination={
+          logsQuery.data?.meta
+            ? {
+                page: logsQuery.data.meta.page,
+                perPage: logsQuery.data.meta.per_page,
+                total: logsQuery.data.meta.total,
+                onPageChange: (page) => setFilters((current) => ({ ...current, page })),
+              }
+            : undefined
+        }
+        renderExpandedRow={(log) => (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-text-primary">
+                  Detail broadcast untuk {log.recipient_name?.trim() || maskPhone(log.recipient_phone)}
+                </p>
+                <p className="text-xs text-text-secondary">
+                  {new Date(log.created_at).toLocaleString("id-ID")} | {formatWATriggerLabel(log.trigger_type)}
+                  {log.template_slug ? ` | ${log.template_slug}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <SharedStatusBadge
+                  label={formatWATriggerLabel(log.trigger_type)}
+                  status={log.trigger_type}
+                  variant="wa-trigger"
+                />
+                <SharedStatusBadge
+                  label={formatWALogStatusLabel(log.status)}
+                  status={log.status}
+                  variant="wa-log-status"
+                />
+              </div>
+            </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-text-secondary">
-            Halaman {filters.page} dari {totalPages} ({logsQuery.data?.meta?.total ?? 0} total)
-          </p>
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" disabled={filters.page <= 1} onClick={() => setFilters({ ...filters, page: filters.page - 1 })}>
-              Prev
-            </Button>
-            <Button size="sm" variant="outline" disabled={filters.page >= totalPages} onClick={() => setFilters({ ...filters, page: filters.page + 1 })}>
-              Next
-            </Button>
+            <div className="grid gap-3 text-xs text-text-secondary md:grid-cols-2">
+              <div className="rounded-2xl border border-border/70 bg-surface px-4 py-3">
+                <p className="font-semibold uppercase tracking-[0.08em] text-text-tertiary">Penerima</p>
+                <p className="mt-1 text-sm text-text-primary">{log.recipient_name?.trim() || "-"}</p>
+                <p className="mt-1">{maskPhone(log.recipient_phone)}</p>
+              </div>
+              <div className="rounded-2xl border border-border/70 bg-surface px-4 py-3">
+                <p className="font-semibold uppercase tracking-[0.08em] text-text-tertiary">Referensi</p>
+                <p className="mt-1 text-sm text-text-primary">
+                  {log.reference_type ? `${log.reference_type} / ${log.reference_id ?? "-"}` : "Tidak ada referensi"}
+                </p>
+                {log.sent_at ? <p className="mt-1">Sent at {new Date(log.sent_at).toLocaleString("id-ID")}</p> : null}
+              </div>
+            </div>
+
+            {log.error_message ? (
+              <div className="rounded-2xl border border-error/20 bg-error-light px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-error">Error</p>
+                <p className="mt-1 text-sm text-error">{log.error_message}</p>
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary">Isi Pesan</p>
+              <pre className="whitespace-pre-wrap rounded-2xl border border-border/70 bg-background px-4 py-4 text-sm leading-relaxed text-text-primary">
+                {log.message_body || "(kosong)"}
+              </pre>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        selectedRowId={expandedId}
+      />
     </div>
   );
 }
 
-function LogRow({ log, expanded, onToggle }: { log: import("@/services/wa-broadcast").WABroadcastLog; expanded: boolean; onToggle: () => void }) {
-  return (
-    <>
-      <tr className="border-b border-border/50 last:border-0 cursor-pointer hover:bg-surface-muted/30" onClick={onToggle}>
-        <td className="px-2 py-3">
-          {expanded ? <ChevronDown className="h-3.5 w-3.5 text-text-secondary" /> : <ChevronRight className="h-3.5 w-3.5 text-text-secondary" />}
-        </td>
-        <td className="px-4 py-3 text-xs text-text-secondary">{new Date(log.created_at).toLocaleString("id-ID")}</td>
-        <td className="px-4 py-3"><TriggerBadge trigger={log.trigger_type} /></td>
-        <td className="px-4 py-3 font-mono text-xs text-text-secondary">{log.template_slug ?? "-"}</td>
-        <td className="px-4 py-3">
-          <div className="text-xs">
-            {log.recipient_name && <span className="font-medium text-text-primary">{log.recipient_name} — </span>}
-            <span className="text-text-secondary">{maskPhone(log.recipient_phone)}</span>
-          </div>
-        </td>
-        <td className="px-4 py-3"><StatusBadge status={log.status} /></td>
-        <td className="px-4 py-3 text-xs text-red-500 truncate max-w-[200px]">{log.error_message ?? ""}</td>
-      </tr>
-      {expanded && (
-        <tr className="bg-surface-muted/20">
-          <td colSpan={7} className="px-6 py-4">
-            <p className="text-xs font-medium text-text-secondary mb-1.5">Isi Pesan:</p>
-            <pre className="whitespace-pre-wrap rounded-lg bg-background border border-border p-4 text-sm leading-relaxed">{log.message_body || "(kosong)"}</pre>
-            {log.reference_type && (
-              <p className="mt-2 text-xs text-text-secondary">
-                Referensi: {log.reference_type} / {log.reference_id}
-              </p>
-            )}
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
 
 // ===================== Settings Tab =====================
 
@@ -1346,51 +1608,41 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
-function TriggerBadge({ trigger }: { trigger: string }) {
-  const colors: Record<string, string> = {
-    auto_scheduled: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    event_triggered: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    manual: "bg-surface-muted text-text-secondary",
-    manual_quick_send: "bg-surface-muted text-text-secondary",
-  };
+function formatWATriggerLabel(trigger: string) {
   const labels: Record<string, string> = {
-    auto_scheduled: "auto",
-    event_triggered: "event",
-    manual: "manual",
-    manual_quick_send: "manual",
+    auto_scheduled: "Auto",
+    event_triggered: "Event",
+    manual: "Manual",
+    manual_quick_send: "Manual",
   };
-  return (
-    <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium", colors[trigger] ?? colors.manual)}>
-      {labels[trigger] ?? trigger}
-    </span>
-  );
+  return labels[trigger] ?? trigger.replace(/_/g, " ");
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    sent: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-    queued: "bg-blue-100 text-blue-700",
-    skipped_no_phone: "bg-surface-muted text-text-secondary",
-    skipped_no_wa: "bg-surface-muted text-text-secondary",
-    daily_limit_reached: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  };
+function formatWALogStatusLabel(status: string) {
   const labels: Record<string, string> = {
-    sent: "terkirim",
-    failed: "gagal",
-    queued: "antrian",
-    skipped_no_phone: "no phone",
-    skipped_no_wa: "no WA",
-    daily_limit_reached: "limit",
+    sent: "Terkirim",
+    failed: "Gagal",
+    queued: "Antrian",
+    skipped_no_phone: "No Phone",
+    skipped_no_wa: "No WA",
+    skipped_disabled: "Disabled",
+    daily_limit_reached: "Limit Harian",
   };
-  return (
-    <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium", colors[status] ?? "bg-surface-muted text-text-secondary")}>
-      {labels[status] ?? status.replace(/_/g, " ")}
-    </span>
-  );
+  return labels[status] ?? status.replace(/_/g, " ");
+}
+
+function formatScheduleTargetLabel(targetType: string) {
+  const labels: Record<string, string> = {
+    all_employees: "Semua Karyawan",
+    department: "Per Department",
+    specific_users: "User Tertentu",
+    project_members: "Anggota Project",
+  };
+  return labels[targetType] ?? targetType.replace(/_/g, " ");
 }
 
 function maskPhone(phone: string): string {
   if (phone.length <= 6) return phone;
   return phone.slice(0, 4) + "****" + phone.slice(-4);
 }
+

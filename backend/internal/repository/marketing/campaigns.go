@@ -83,6 +83,10 @@ func NewCampaignsRepository(db repository.DBTX) *CampaignsRepository {
 	return &CampaignsRepository{db: db}
 }
 
+func (r *CampaignsRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return repository.DB(ctx, r.db).Begin(ctx)
+}
+
 func (r *CampaignsRepository) CreateCampaign(ctx context.Context, params UpsertCampaignParams) (model.Campaign, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -652,6 +656,22 @@ func (r *CampaignsRepository) ReorderColumns(ctx context.Context, columnIDs []st
 	}
 	if count != len(columnIDs) {
 		return fmt.Errorf("column reorder payload must contain every campaign column")
+	}
+
+	seen := make(map[string]struct{}, len(columnIDs))
+	for index, columnID := range columnIDs {
+		if _, exists := seen[columnID]; exists {
+			return fmt.Errorf("column reorder payload contains duplicate column ids")
+		}
+		seen[columnID] = struct{}{}
+
+		tag, execErr := tx.Exec(ctx, `UPDATE campaign_columns SET position = $2 WHERE id = $1::uuid`, columnID, -(index + 1))
+		if execErr != nil {
+			return execErr
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrCampaignColumnNotFound
+		}
 	}
 
 	for index, columnID := range columnIDs {

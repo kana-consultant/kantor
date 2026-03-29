@@ -5,6 +5,7 @@ import type {
   AdminSettings,
   AdminUserDetail,
   AdminUserFilters,
+  AdminUserSummary,
   ListAdminUsersResponse,
   ListRolesFilters,
   ModuleItem,

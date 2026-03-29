@@ -107,6 +107,30 @@ function MarketingCampaignsPage() {
     }
   }, [navigate, search.view]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const hash = window.location.hash;
+    if (!hash.startsWith("#campaign:")) {
+      return;
+    }
+
+    const campaignId = decodeURIComponent(hash.slice("#campaign:".length)).trim();
+    if (!campaignId) {
+      return;
+    }
+
+    setSelectedCampaignId(campaignId);
+    setDetailTab("overview");
+    window.history.replaceState(
+      window.history.state,
+      document.title,
+      `${window.location.pathname}${window.location.search}`,
+    );
+  }, []);
+
   const [filters, setFilters] = useState<CampaignFilters>(defaultFilters);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);

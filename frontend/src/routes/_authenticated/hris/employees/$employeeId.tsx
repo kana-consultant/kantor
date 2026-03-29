@@ -22,7 +22,6 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
-import { ApiError } from "@/lib/api-client";
 import { formatIDR } from "@/lib/currency";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";

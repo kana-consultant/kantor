@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
 	DndContext,
@@ -215,7 +215,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	});
 
 	const columns = columnsQuery.data ?? [];
-	const tasks = tasksQuery.data ?? [];
+	const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
 	const filteredTasks = tasks.filter((task) => matchesFilters(task, filters));
 	const activeFilterCount = [
 		filters.assignee,

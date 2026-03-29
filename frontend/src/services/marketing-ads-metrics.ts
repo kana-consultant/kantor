@@ -1,4 +1,3 @@
-import { ensureAuthenticated } from "@/services/auth";
 import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
 import type {
   AdsMetric,

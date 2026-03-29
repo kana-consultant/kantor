@@ -250,7 +250,8 @@ function appendFilter(
 
 function defaultFilename(endpoint: string) {
   const parts = endpoint.split("/").filter(Boolean);
-  const meaningful = parts.at(-1) === "export" ? parts.at(-2) : parts.at(-1);
+  const lastPart = parts[parts.length - 1];
+  const meaningful = lastPart === "export" ? parts[parts.length - 2] : lastPart;
   return meaningful ?? "report";
 }
 

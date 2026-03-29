@@ -1,4 +1,6 @@
 import { env } from "@/lib/env";
+import { getStoredSession, useAuthStore } from "@/stores/auth-store";
+import type { AuthPayload } from "@/types/auth";
 
 export interface ApiSuccess<TData> {
   success: true;
@@ -105,10 +107,51 @@ export async function getJSON<TData>(path: string, token?: string) {
 
 // --- Authenticated wrappers (auto-attach token + 401 refresh retry) ---
 
-import { getStoredSession } from "@/stores/auth-store";
-
 function getAccessToken(): string | undefined {
   return getStoredSession()?.tokens.access_token;
+}
+
+let refreshSessionPromise: Promise<AuthPayload> | null = null;
+
+async function refreshAuthenticatedSession() {
+  if (!refreshSessionPromise) {
+    refreshSessionPromise = (async () => {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+
+      const payload = (await response.json()) as ApiSuccess<AuthPayload> | ApiFailure;
+
+      if (!response.ok || !payload.success) {
+        if ("error" in payload) {
+          throw new ApiError(
+            response.status,
+            payload.error.message,
+            payload.error.code,
+            payload.error.details,
+          );
+        }
+
+        throw new ApiError(response.status, "Request failed");
+      }
+
+      useAuthStore.getState().setSession(payload.data);
+      return payload.data;
+    })().finally(() => {
+      refreshSessionPromise = null;
+    });
+  }
+
+  return refreshSessionPromise;
+}
+
+export async function refreshAuthSession() {
+  return refreshAuthenticatedSession();
 }
 
 async function handleAuthRetry<T>(
@@ -126,8 +169,7 @@ async function handleAuthRetry<T>(
       }
 
       try {
-        const { refreshSession } = await import("@/services/auth");
-        await refreshSession();
+        await refreshAuthenticatedSession();
 
         const refreshedToken = getAccessToken();
         return await fn(refreshedToken);
@@ -137,7 +179,6 @@ async function handleAuthRetry<T>(
           return await fn(latestToken);
         }
 
-        const { useAuthStore } = await import("@/stores/auth-store");
         useAuthStore.getState().clearSession();
         // Hard navigation: app state is potentially corrupted at this
         // point, so a full reload ensures no stale data remains.

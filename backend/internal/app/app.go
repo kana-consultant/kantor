@@ -24,7 +24,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
-	"github.com/kana-consultant/kantor/backend/internal/tenant"
 	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
@@ -52,6 +51,7 @@ import (
 	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
 	waservice "github.com/kana-consultant/kantor/backend/internal/service/whatsapp"
+	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
 
 type App struct {
@@ -219,7 +219,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	// WhatsApp Broadcast (per-tenant: client loaded from DB config on demand)
 	waRepository := warepo.New(pool)
-	whatsappService := waservice.NewService(waRepository, cfg)
+	whatsappService := waservice.NewService(waRepository, cfg, notificationsService)
 
 	// Wire event triggers
 	kanbanService.SetTaskAssignNotifier(whatsappService)
@@ -334,108 +334,108 @@ func (a *App) buildRouter(
 	router.Group(func(tenanted chi.Router) {
 		tenanted.Use(platformmiddleware.TenantMiddleware(a.db, a.tenantResolver))
 		tenanted.Route("/api/v1", func(r chi.Router) {
-		r.Route("/auth", authHandler.RegisterRoutes)
-		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			response.WriteJSON(w, http.StatusOK, map[string]string{
-				"status": "ok",
-			}, nil)
-		})
+			r.Route("/auth", authHandler.RegisterRoutes)
+			r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+				response.WriteJSON(w, http.StatusOK, map[string]string{
+					"status": "ok",
+				}, nil)
+			})
 
-		r.Group(func(protected chi.Router) {
-			protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load))
-			protected.Get("/auth/me", authHandler.Me)
-			protected.Get("/auth/profile", authHandler.GetProfile)
-			protected.Put("/auth/profile", authHandler.UpdateProfile)
-			protected.Put("/auth/profile/email", authHandler.ChangeEmail)
-			protected.Post("/auth/profile/avatar", authHandler.UploadProfileAvatar)
-			protected.Post("/auth/change-password", authHandler.ChangePassword)
-			protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
-			protected.With(platformmiddleware.RequireAnyPermission(
-				"admin:roles:view",
-				"admin:users:view",
-				"admin:settings:view",
-			)).Get("/modules", authHandler.ListModules)
-			protected.Route("/notifications", notificationsHandler.RegisterRoutes)
-
-			protected.Route("/admin", func(admin chi.Router) {
-				admin.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleAdmin))
-				admin.Route("/audit-logs", auditLogsHandler.RegisterRoutes)
-				admin.With(platformmiddleware.RequireAnyPermission(
+			r.Group(func(protected chi.Router) {
+				protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load))
+				protected.Get("/auth/me", authHandler.Me)
+				protected.Get("/auth/profile", authHandler.GetProfile)
+				protected.Put("/auth/profile", authHandler.UpdateProfile)
+				protected.Put("/auth/profile/email", authHandler.ChangeEmail)
+				protected.Post("/auth/profile/avatar", authHandler.UploadProfileAvatar)
+				protected.Post("/auth/change-password", authHandler.ChangePassword)
+				protected.Get("/files/{type}/{id}/{filename}", filesHandler.Serve)
+				protected.With(platformmiddleware.RequireAnyPermission(
 					"admin:roles:view",
 					"admin:users:view",
 					"admin:settings:view",
-				)).Get("/roles", authHandler.ListRoles)
-				admin.With(platformmiddleware.RequireAnyPermission(
-					"admin:roles:view",
-					"admin:users:view",
-				)).Get("/roles/{roleID}", authHandler.GetRole)
-				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Post("/roles", authHandler.CreateRole)
-				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Put("/roles/{roleID}", authHandler.UpdateRole)
-				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Delete("/roles/{roleID}", authHandler.DeleteRole)
-				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Patch("/roles/{roleID}/toggle", authHandler.ToggleRole)
-				admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Post("/roles/{roleID}/duplicate", authHandler.DuplicateRole)
-				admin.With(platformmiddleware.RequirePermission("admin:roles:view")).Get("/permissions", authHandler.ListPermissions)
+				)).Get("/modules", authHandler.ListModules)
+				protected.Route("/notifications", notificationsHandler.RegisterRoutes)
 
-				admin.With(platformmiddleware.RequirePermission("admin:users:view")).Get("/users", authHandler.ListUsers)
-				admin.With(platformmiddleware.RequirePermission("admin:users:view")).Get("/users/{userID}", authHandler.GetUser)
-				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Put("/users/{userID}/roles", authHandler.UpdateUserRoles)
-				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Patch("/users/{userID}/active", authHandler.ToggleUserActive)
-				admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Post("/users/{userID}/ensure-employee-profile", authHandler.EnsureUserEmployeeProfile)
-				admin.With(platformmiddleware.SuperAdminMiddleware()).Post("/users/{userID}/toggle-super-admin", authHandler.ToggleUserSuperAdmin)
+				protected.Route("/admin", func(admin chi.Router) {
+					admin.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleAdmin))
+					admin.Route("/audit-logs", auditLogsHandler.RegisterRoutes)
+					admin.With(platformmiddleware.RequireAnyPermission(
+						"admin:roles:view",
+						"admin:users:view",
+						"admin:settings:view",
+					)).Get("/roles", authHandler.ListRoles)
+					admin.With(platformmiddleware.RequireAnyPermission(
+						"admin:roles:view",
+						"admin:users:view",
+					)).Get("/roles/{roleID}", authHandler.GetRole)
+					admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Post("/roles", authHandler.CreateRole)
+					admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Put("/roles/{roleID}", authHandler.UpdateRole)
+					admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Delete("/roles/{roleID}", authHandler.DeleteRole)
+					admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Patch("/roles/{roleID}/toggle", authHandler.ToggleRole)
+					admin.With(platformmiddleware.RequirePermission("admin:roles:manage")).Post("/roles/{roleID}/duplicate", authHandler.DuplicateRole)
+					admin.With(platformmiddleware.RequirePermission("admin:roles:view")).Get("/permissions", authHandler.ListPermissions)
 
-				admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings", authHandler.GetSettings)
-				admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings/departments", authHandler.ListSettingsDepartments)
-				admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/default-roles", authHandler.UpdateDefaultRoles)
-				admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/auto-create-employee", authHandler.UpdateAutoCreateEmployee)
-			})
+					admin.With(platformmiddleware.RequirePermission("admin:users:view")).Get("/users", authHandler.ListUsers)
+					admin.With(platformmiddleware.RequirePermission("admin:users:view")).Get("/users/{userID}", authHandler.GetUser)
+					admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Put("/users/{userID}/roles", authHandler.UpdateUserRoles)
+					admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Patch("/users/{userID}/active", authHandler.ToggleUserActive)
+					admin.With(platformmiddleware.RequirePermission("admin:users:manage")).Post("/users/{userID}/ensure-employee-profile", authHandler.EnsureUserEmployeeProfile)
+					admin.With(platformmiddleware.SuperAdminMiddleware()).Post("/users/{userID}/toggle-super-admin", authHandler.ToggleUserSuperAdmin)
 
-			protected.Route("/operational", func(module chi.Router) {
-				module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
-				module.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/overview", operationalOverviewHandler.Get)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings", authHandler.GetSettings)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings/departments", authHandler.ListSettingsDepartments)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/default-roles", authHandler.UpdateDefaultRoles)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/auto-create-employee", authHandler.UpdateAutoCreateEmployee)
+				})
 
-				module.Route("/projects", projectsHandler.RegisterRoutes)
-				module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
-				module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
-			})
+				protected.Route("/operational", func(module chi.Router) {
+					module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
+					module.With(platformmiddleware.RequirePermission("operational:project:view")).Get("/overview", operationalOverviewHandler.Get)
 
-			protected.Route("/tracker", func(tracker chi.Router) {
-				tracker.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
-				trackerHandler.RegisterRoutes(tracker)
-			})
+					module.Route("/projects", projectsHandler.RegisterRoutes)
+					module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
+					module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
+				})
 
-			protected.Route("/hris", func(module chi.Router) {
-				module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleHRIS))
-				module.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/overview", hrisOverviewHandler.Get)
+				protected.Route("/tracker", func(tracker chi.Router) {
+					tracker.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
+					trackerHandler.RegisterRoutes(tracker)
+				})
 
-				module.Route("/employees", employeesHandler.RegisterRoutes)
-				module.Route("/departments", departmentsHandler.RegisterRoutes)
-				module.Route("/employees/{employeeID}/salaries", compensationHandler.RegisterSalaryRoutes)
-				module.Route("/employees/{employeeID}/bonuses", compensationHandler.RegisterBonusRoutes)
-				module.With(platformmiddleware.RequirePermission("hris:bonus:edit")).Put("/bonuses/{bonusID}", compensationHandler.UpdateBonus)
-				module.With(platformmiddleware.RequirePermission("hris:bonus:delete")).Delete("/bonuses/{bonusID}", compensationHandler.DeleteBonus)
-				module.With(platformmiddleware.RequirePermission("hris:bonus:approve")).Patch("/bonuses/{bonusID}/approve", compensationHandler.ApproveBonus)
-				module.With(platformmiddleware.RequirePermission("hris:bonus:approve")).Patch("/bonuses/{bonusID}/reject", compensationHandler.RejectBonus)
-				module.Route("/finance", financeHandler.RegisterRoutes)
-				module.Route("/reimbursements", reimbursementsHandler.RegisterRoutes)
-				module.Route("/subscriptions", subscriptionsHandler.RegisterRoutes)
-			})
+				protected.Route("/hris", func(module chi.Router) {
+					module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleHRIS))
+					module.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/overview", hrisOverviewHandler.Get)
 
-			protected.Route("/marketing", func(module chi.Router) {
-				module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleMarketing))
-				module.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/overview", marketingOverviewHandler.Get)
+					module.Route("/employees", employeesHandler.RegisterRoutes)
+					module.Route("/departments", departmentsHandler.RegisterRoutes)
+					module.Route("/employees/{employeeID}/salaries", compensationHandler.RegisterSalaryRoutes)
+					module.Route("/employees/{employeeID}/bonuses", compensationHandler.RegisterBonusRoutes)
+					module.With(platformmiddleware.RequirePermission("hris:bonus:edit")).Put("/bonuses/{bonusID}", compensationHandler.UpdateBonus)
+					module.With(platformmiddleware.RequirePermission("hris:bonus:delete")).Delete("/bonuses/{bonusID}", compensationHandler.DeleteBonus)
+					module.With(platformmiddleware.RequirePermission("hris:bonus:approve")).Patch("/bonuses/{bonusID}/approve", compensationHandler.ApproveBonus)
+					module.With(platformmiddleware.RequirePermission("hris:bonus:approve")).Patch("/bonuses/{bonusID}/reject", compensationHandler.RejectBonus)
+					module.Route("/finance", financeHandler.RegisterRoutes)
+					module.Route("/reimbursements", reimbursementsHandler.RegisterRoutes)
+					module.Route("/subscriptions", subscriptionsHandler.RegisterRoutes)
+				})
 
-				module.Route("/campaigns", campaignsHandler.RegisterRoutes)
-				module.Route("/ads-metrics", adsMetricsHandler.RegisterRoutes)
-				module.Route("/leads", leadsHandler.RegisterRoutes)
-				module.Route("/columns", campaignsHandler.RegisterColumnRoutes)
-			})
+				protected.Route("/marketing", func(module chi.Router) {
+					module.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleMarketing))
+					module.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/overview", marketingOverviewHandler.Get)
 
-			protected.Route("/wa", func(wa chi.Router) {
-				wa.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
-				waHandler.RegisterRoutes(wa)
+					module.Route("/campaigns", campaignsHandler.RegisterRoutes)
+					module.Route("/ads-metrics", adsMetricsHandler.RegisterRoutes)
+					module.Route("/leads", leadsHandler.RegisterRoutes)
+					module.Route("/columns", campaignsHandler.RegisterColumnRoutes)
+				})
+
+				protected.Route("/wa", func(wa chi.Router) {
+					wa.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
+					waHandler.RegisterRoutes(wa)
+				})
 			})
 		})
-	})
 	})
 
 	return router
@@ -451,10 +451,21 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 		}
 	}
 
-	go func() {
+	runBackground := func(name string, fn func()) {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("background job panicked", "job", name, "panic", r, "stack", string(debug.Stack()))
+				}
+			}()
+			fn()
+		}()
+	}
+
+	runBackground("background_scheduler", func() {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("background job panicked", "panic", r, "stack", string(debug.Stack()))
+				slog.Error("background job panicked", "job", "background_scheduler", "panic", r, "stack", string(debug.Stack()))
 			}
 		}()
 
@@ -469,20 +480,6 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			return err
 		})
 
-		// Run daily WA reminders on startup
-		go runPerTenant("wa_daily_reminders", func(tCtx context.Context, t tenant.Info) error {
-			whatsappService.RunDailyReminders(tCtx)
-			return nil
-		})
-
-		// Check if today is Monday for weekly digest
-		if time.Now().Weekday() == time.Monday {
-			go runPerTenant("wa_weekly_digest", func(tCtx context.Context, t tenant.Info) error {
-				whatsappService.RunWeeklyDigest(tCtx)
-				return nil
-			})
-		}
-
 		for {
 			select {
 			case <-ctx.Done():
@@ -495,25 +492,29 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 					_, err := trackerService.PurgeOldData(tCtx, tickAt)
 					return err
 				})
-
-				// Daily WA reminders (weekdays only)
-				if tickAt.Weekday() >= time.Monday && tickAt.Weekday() <= time.Friday {
-					go runPerTenant("wa_daily_reminders", func(tCtx context.Context, t tenant.Info) error {
-						whatsappService.RunDailyReminders(tCtx)
-						return nil
-					})
-				}
-
-				// Weekly digest on Mondays
-				if tickAt.Weekday() == time.Monday {
-					go runPerTenant("wa_weekly_digest", func(tCtx context.Context, t tenant.Info) error {
-						whatsappService.RunWeeklyDigest(tCtx)
-						return nil
-					})
-				}
 			}
 		}
-	}()
+	})
+
+	runBackground("wa_scheduler", func() {
+		runPerTenant("wa_scheduler", func(tCtx context.Context, t tenant.Info) error {
+			return whatsappService.RunCronJobs(tCtx, time.Now())
+		})
+
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickAt := <-ticker.C:
+				runPerTenant("wa_scheduler", func(tCtx context.Context, t tenant.Info) error {
+					return whatsappService.RunCronJobs(tCtx, tickAt)
+				})
+			}
+		}
+	})
 }
 
 func runMigrations(databaseURL string) error {

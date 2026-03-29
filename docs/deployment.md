@@ -40,9 +40,24 @@ cp .env.example .env
 | `JWT_ACCESS_EXPIRY` | No | `15m` | Access token TTL |
 | `JWT_REFRESH_EXPIRY` | No | `168h` | Refresh token TTL |
 | `CORS_ORIGINS` | No | `http://localhost:3000` | Comma-separated allowed origins |
+| `APP_URL` | No | `http://localhost:3000` | Public base URL used for deep links in WA messages and notifications |
 | `POSTGRES_DB` | No | `internal_platform` | Database name |
 | `POSTGRES_USER` | No | `dev` | Database user |
 | `POSTGRES_PASSWORD` | Yes | — | Database password |
+
+### WhatsApp Broadcast Configuration
+
+WA Broadcast runtime settings are configured per tenant from the application UI and stored in `tenant_wa_configs`.
+This includes:
+
+- WAHA API URL
+- WAHA API key
+- Session name
+- Daily limit
+- Delay range
+- Reminder and digest schedules
+
+Production environment variables no longer carry those tenant-level WA settings. The backend still uses `APP_URL` to generate links included in messages and notifications.
 
 ### Seed Users
 
@@ -76,6 +91,7 @@ UPLOADS_DIR=/app/data/uploads
 JWT_ACCESS_EXPIRY=15m
 JWT_REFRESH_EXPIRY=168h
 CORS_ORIGINS=https://your-domain.com
+APP_URL=https://your-domain.com
 SEED_SUPERADMIN_ENABLED=false
 SEED_DEMO_USERS_ENABLED=false
 VITE_API_BASE_URL=/api/v1
@@ -126,6 +142,11 @@ After setting up HTTPS, update `CORS_ORIGINS` to match your domain:
 ```env
 CORS_ORIGINS=https://your-domain.com
 ```
+
+### Browser Notifications
+
+If you want browser notifications to work reliably, serve the app over HTTPS in production.
+Most browsers only allow the Notification API on secure origins (or `localhost` during development).
 
 ## 5. Database
 

@@ -199,6 +199,8 @@ function OperationalTrackerPage() {
   });
 
   useEffect(() => {
+    const pendingRequests = pendingExtensionRequests.current;
+
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== window || !event.data || typeof event.data !== "object") {
         return;
@@ -223,13 +225,13 @@ function OperationalTrackerPage() {
       }
 
       if (data.type === "KANTOR_TRACKER_RESULT" && data.requestId) {
-        const pending = pendingExtensionRequests.current.get(data.requestId);
+        const pending = pendingRequests.get(data.requestId);
         if (!pending) {
           return;
         }
 
         window.clearTimeout(pending.timeoutId);
-        pendingExtensionRequests.current.delete(data.requestId);
+        pendingRequests.delete(data.requestId);
 
         if (data.success) {
           pending.resolve(data.payload);
@@ -248,10 +250,10 @@ function OperationalTrackerPage() {
     return () => {
       window.removeEventListener("message", handleMessage);
       window.clearTimeout(pingTimeout);
-      for (const pending of pendingExtensionRequests.current.values()) {
+      for (const pending of pendingRequests.values()) {
         window.clearTimeout(pending.timeoutId);
       }
-      pendingExtensionRequests.current.clear();
+      pendingRequests.clear();
     };
   }, []);
 
@@ -263,8 +265,7 @@ function OperationalTrackerPage() {
     }
   }, []);
 
-  const categoryChartData = myActivityQuery.data?.category_breakdown ?? [];
-  const teamUsers = teamActivityQuery.data?.users ?? [];
+  const teamUsers = useMemo(() => teamActivityQuery.data?.users ?? [], [teamActivityQuery.data?.users]);
   const stackedCategoryKeys = useMemo(() => {
     const categories = new Set<string>();
     for (const user of teamUsers) {
@@ -1087,7 +1088,7 @@ function MyActivityContent({ data, topDomainColumns }: { data: TrackerActivityOv
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
                 <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} interval={1} angle={-45} textAnchor="end" height={70} />
                 <YAxis stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} tickFormatter={(value) => formatHourTick(value)} />
-                <Tooltip formatter={(value: number) => formatDuration(Number(value))} contentStyle={tooltipStyle} />
+                <Tooltip formatter={formatTooltipDuration} contentStyle={tooltipStyle} />
                 <Bar dataKey="duration_seconds" fill="#0065FF" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -1108,7 +1109,7 @@ function MyActivityContent({ data, topDomainColumns }: { data: TrackerActivityOv
                       <Cell key={entry.category} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => formatDuration(Number(value))} contentStyle={tooltipStyle} />
+                  <Tooltip formatter={formatTooltipDuration} contentStyle={tooltipStyle} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -1192,7 +1193,7 @@ function TeamActivityTab({
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
                 <XAxis dataKey="user_name" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
                 <YAxis stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} tickFormatter={(value) => formatHourTick(value)} />
-                <Tooltip formatter={(value: number) => formatDuration(Number(value))} contentStyle={tooltipStyle} />
+                <Tooltip formatter={formatTooltipDuration} contentStyle={tooltipStyle} />
                 <Legend />
                 {stackedCategoryKeys.map((key, index) => (
                   <Bar key={key} dataKey={key} stackId="categories" fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} radius={index === stackedCategoryKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
@@ -1325,3 +1326,8 @@ const tooltipStyle = {
   borderRadius: 8,
   boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
 };
+
+function formatTooltipDuration(value: unknown) {
+  const normalized = Array.isArray(value) ? value[0] : value;
+  return formatDuration(Number(normalized ?? 0));
+}

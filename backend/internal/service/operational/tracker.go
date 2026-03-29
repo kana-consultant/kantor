@@ -3,6 +3,7 @@ package operational
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -206,11 +207,7 @@ func sortHeartbeats(entries []operationaldto.TrackerHeartbeatRequest) {
 	if len(entries) < 2 {
 		return
 	}
-	for i := 0; i < len(entries)-1; i++ {
-		for j := i + 1; j < len(entries); j++ {
-			if entries[j].Timestamp.Before(entries[i].Timestamp) {
-				entries[i], entries[j] = entries[j], entries[i]
-			}
-		}
-	}
+	sort.Slice(entries, func(i int, j int) bool {
+		return entries[i].Timestamp.Before(entries[j].Timestamp)
+	})
 }

@@ -29,10 +29,10 @@ type Encrypter struct {
 //
 // Key rotation procedure (requires application restart):
 //  1. Set DATA_ENCRYPTION_KEY to the new key
-//  2. Set DATA_ENCRYPTION_KEY_OLD to the previous key
+//  2. Set DATA_ENCRYPTION_KEY_PREVIOUS to the previous key
 //  3. Restart the application
 //  4. New writes use the new key; old data decrypts via the old key
-//  5. Once all data is re-encrypted, DATA_ENCRYPTION_KEY_OLD can be removed
+//  5. Once all data is re-encrypted, DATA_ENCRYPTION_KEY_PREVIOUS can be removed
 func NewEncrypter(secret string, previousSecrets ...string) (*Encrypter, error) {
 	if strings.TrimSpace(secret) == "" {
 		return nil, errors.New("DATA_ENCRYPTION_KEY is required")

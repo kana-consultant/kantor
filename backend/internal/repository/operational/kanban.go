@@ -79,7 +79,12 @@ func (r *KanbanRepository) CreateDefaultColumns(ctx context.Context, projectID s
 		{Name: "Done", Color: "#22C55E"},
 	}
 
-	tx, err := repository.DB(ctx, r.db).Begin(ctx)
+	db := repository.DB(ctx, r.db)
+	if tx, ok := db.(pgx.Tx); ok {
+		return r.insertDefaultColumns(ctx, tx, projectID, defaults)
+	}
+
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -89,18 +94,8 @@ func (r *KanbanRepository) CreateDefaultColumns(ctx context.Context, projectID s
 		}
 	}()
 
-	for index, column := range defaults {
-		_, err = tx.Exec(
-			ctx,
-			`INSERT INTO kanban_columns (project_id, name, position, color) VALUES ($1::uuid, $2, $3, $4)`,
-			projectID,
-			column.Name,
-			index+1,
-			column.Color,
-		)
-		if err != nil {
-			return err
-		}
+	if err = r.insertDefaultColumns(ctx, tx, projectID, defaults); err != nil {
+		return err
 	}
 
 	return tx.Commit(ctx)
@@ -294,6 +289,29 @@ func (r *KanbanRepository) ReorderColumns(ctx context.Context, projectID string,
 		return fmt.Errorf("column reorder payload must contain every project column")
 	}
 
+	seen := make(map[string]struct{}, len(columnIDs))
+	for index, columnID := range columnIDs {
+		if _, exists := seen[columnID]; exists {
+			return fmt.Errorf("column reorder payload contains duplicate column ids")
+		}
+		seen[columnID] = struct{}{}
+
+		commandTag, execErr := tx.Exec(
+			ctx,
+			`UPDATE kanban_columns SET position = $3 WHERE project_id = $1::uuid AND id = $2::uuid`,
+			projectID,
+			columnID,
+			-(index + 1),
+		)
+		if execErr != nil {
+			return execErr
+		}
+
+		if commandTag.RowsAffected() == 0 {
+			return ErrKanbanColumnNotFound
+		}
+	}
+
 	for index, columnID := range columnIDs {
 		commandTag, execErr := tx.Exec(
 			ctx,
@@ -305,7 +323,6 @@ func (r *KanbanRepository) ReorderColumns(ctx context.Context, projectID string,
 		if execErr != nil {
 			return execErr
 		}
-
 		if commandTag.RowsAffected() == 0 {
 			return ErrKanbanColumnNotFound
 		}
@@ -775,6 +792,26 @@ func (r *KanbanRepository) resolveColumnInsertPosition(ctx context.Context, tx p
 	}
 
 	return *requested, nil
+}
+
+func (r *KanbanRepository) insertDefaultColumns(ctx context.Context, tx pgx.Tx, projectID string, defaults []struct {
+	Name  string
+	Color string
+}) error {
+	for index, column := range defaults {
+		if _, err := tx.Exec(
+			ctx,
+			`INSERT INTO kanban_columns (project_id, name, position, color) VALUES ($1::uuid, $2, $3, $4)`,
+			projectID,
+			column.Name,
+			index+1,
+			column.Color,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *KanbanRepository) ensureColumnBelongsToProject(ctx context.Context, tx queryRowExecutor, projectID string, columnID string) error {

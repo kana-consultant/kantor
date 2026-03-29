@@ -1,10 +1,14 @@
 package notifications
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -23,6 +27,7 @@ func New(service *notificationsservice.Service) *Handler {
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/", h.List)
+	r.Get("/stream", h.Stream)
 	r.Get("/unread-count", h.UnreadCount)
 	r.Patch("/{notificationID}/read", h.MarkRead)
 	r.Patch("/read-all", h.MarkAllRead)
@@ -117,4 +122,90 @@ func (h *Handler) UnreadCount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteJSON(w, http.StatusOK, map[string]int64{"unread_count": count}, nil)
+}
+
+func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		response.WriteError(w, http.StatusInternalServerError, "STREAM_UNSUPPORTED", "Streaming is not supported", nil)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	lastSignature := ""
+	if err := h.writeNotificationSnapshot(r.Context(), w, principal.UserID, &lastSignature); err != nil {
+		return
+	}
+	flusher.Flush()
+
+	pollTicker := time.NewTicker(5 * time.Second)
+	defer pollTicker.Stop()
+
+	heartbeatTicker := time.NewTicker(25 * time.Second)
+	defer heartbeatTicker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-pollTicker.C:
+			if err := h.writeNotificationSnapshot(r.Context(), w, principal.UserID, &lastSignature); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-heartbeatTicker.C:
+			if _, err := fmt.Fprint(w, ": keep-alive\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
+	}
+}
+
+func (h *Handler) writeNotificationSnapshot(ctx context.Context, w http.ResponseWriter, userID string, lastSignature *string) error {
+	count, err := h.service.CountUnread(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	items, _, err := h.service.List(ctx, notificationsservice.ListParams{
+		UserID:  userID,
+		Page:    1,
+		PerPage: 1,
+	})
+	if err != nil {
+		return err
+	}
+
+	latestID := ""
+	if len(items) > 0 {
+		latestID = items[0].ID
+	}
+
+	signature := fmt.Sprintf("%d:%s", count, latestID)
+	if signature == *lastSignature {
+		return nil
+	}
+	*lastSignature = signature
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"unread_count": count,
+		"latest_id":    latestID,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(w, "event: notifications_updated\ndata: %s\n\n", payload)
+	return err
 }

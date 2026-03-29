@@ -56,6 +56,9 @@ function OperationalOverviewPage() {
     }
 
     const observer = new ResizeObserver(([entry]) => {
+      if (!entry) {
+        return;
+      }
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
         setCanRenderCharts(true);

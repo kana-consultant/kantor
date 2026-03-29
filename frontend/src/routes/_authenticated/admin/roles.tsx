@@ -39,7 +39,6 @@ import {
 } from "@/services/admin-rbac";
 import { toast } from "@/stores/toast-store";
 import type {
-  AdminRoleDetail,
   AdminRoleSummary,
   ListRolesFilters,
   PermissionItem,
@@ -54,7 +53,7 @@ const roleSchema = z.object({
     .min(3, "Slug minimal 3 karakter")
     .max(50)
     .regex(/^[a-z0-9_-]+$/, "Slug hanya boleh huruf kecil, angka, dash, dan underscore"),
-  description: z.string().max(500).default(""),
+  description: z.string().max(500),
 });
 
 type RoleFormValues = z.infer<typeof roleSchema>;
@@ -115,7 +114,7 @@ function AdminRolesPage() {
     queryKey: adminRbacKeys.roleDetail(
       modalState?.mode === "edit" ? modalState.roleId : "new",
     ),
-    queryFn: () => getRole(modalState!.mode === "edit" ? modalState.roleId : ""),
+    queryFn: () => getRole(modalState?.mode === "edit" ? modalState.roleId : ""),
     enabled: modalState?.mode === "edit",
   });
 
@@ -183,15 +182,14 @@ function AdminRolesPage() {
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const selectedRole = selectedRoleQuery.data ?? null;
-  const groupedPermissions = permissionsQuery.data ?? [];
 
   const permissionMatrices = useMemo(
     () =>
-      groupedPermissions.map((group) => ({
+      (permissionsQuery.data ?? []).map((group) => ({
         group,
         matrix: buildPermissionMatrix(group),
       })),
-    [groupedPermissions],
+    [permissionsQuery.data],
   );
 
   useEffect(() => {
@@ -337,9 +335,9 @@ function AdminRolesPage() {
   }
 
   const submitRoleForm = form.handleSubmit((values) => {
-    const payload = {
+    const payload: UpsertRolePayload = {
       ...values,
-      description: values.description ?? "",
+      description: values.description,
       hierarchy_level: selectedRole?.hierarchy_level ?? 50,
       permission_ids: selectedPermissionIDs,
     };
@@ -524,6 +522,7 @@ function AdminRolesPage() {
           ) : permissionMatrices.length === 0 ? (
             <EmptyState
               description="Belum ada permission yang bisa dipilih."
+              icon={Shield}
               title="Permission kosong"
             />
           ) : (

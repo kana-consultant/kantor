@@ -177,7 +177,7 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
       return () => {
         document.removeEventListener("keydown", handleKeyDown);
       };
-    }, [context.dismissible, context.onOpenChange, context.open, context.rendered]);
+    }, [context, context.dismissible, context.onOpenChange, context.open, context.rendered]);
 
     if (!context.rendered || typeof document === "undefined") {
       return null;

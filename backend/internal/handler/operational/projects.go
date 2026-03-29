@@ -5,9 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
@@ -94,7 +96,10 @@ func (h *ProjectsHandler) listProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectsHandler) getProject(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateProjectIDParam(w, chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	result, err := h.service.GetProject(r.Context(), projectID)
 	if err != nil {
@@ -106,7 +111,10 @@ func (h *ProjectsHandler) getProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectsHandler) updateProject(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateProjectIDParam(w, chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.UpdateProjectRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -124,7 +132,10 @@ func (h *ProjectsHandler) updateProject(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ProjectsHandler) deleteProject(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateProjectIDParam(w, chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	if err := h.service.DeleteProject(r.Context(), projectID); err != nil {
 		h.writeError(w, err)
@@ -138,7 +149,10 @@ func (h *ProjectsHandler) deleteProject(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ProjectsHandler) mutateMembers(w http.ResponseWriter, r *http.Request) {
-	projectID := chi.URLParam(r, "projectID")
+	projectID, ok := validateProjectIDParam(w, chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
 
 	var input operationaldto.ProjectMembersMutationRequest
 	if !h.decodeAndValidate(w, r, &input) {
@@ -240,4 +254,13 @@ func validationDetails(err error) map[string]string {
 	}
 
 	return details
+}
+
+func validateProjectIDParam(w http.ResponseWriter, projectID string) (string, bool) {
+	projectID = strings.TrimSpace(projectID)
+	if _, err := uuid.Parse(projectID); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Path validation failed", map[string]string{"projectID": "must be a valid UUID"})
+		return "", false
+	}
+	return projectID, true
 }

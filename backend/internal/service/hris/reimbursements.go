@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,9 +17,10 @@ import (
 )
 
 var (
-	ErrReimbursementNotFound     = errors.New("reimbursement not found")
-	ErrReimbursementForbidden    = errors.New("reimbursement access is forbidden")
-	ErrReimbursementInvalidState = errors.New("reimbursement status transition is invalid")
+	ErrReimbursementNotFound          = errors.New("reimbursement not found")
+	ErrReimbursementForbidden         = errors.New("reimbursement access is forbidden")
+	ErrReimbursementInvalidState      = errors.New("reimbursement status transition is invalid")
+	ErrReimbursementInvalidAttachment = errors.New("reimbursement attachment is invalid")
 )
 
 // ReimbursementStatusNotifier is called when a reimbursement status changes.
@@ -170,9 +172,12 @@ func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID stri
 	if item.Status != "submitted" {
 		return model.Reimbursement{}, ErrReimbursementInvalidState
 	}
-	keptAttachments := request.KeptAttachments
-	if keptAttachments == nil {
-		keptAttachments = item.Attachments
+	keptAttachments := item.Attachments
+	if request.KeptAttachments != nil {
+		keptAttachments, err = filterKeptAttachments(item.Attachments, request.KeptAttachments)
+		if err != nil {
+			return model.Reimbursement{}, err
+		}
 	}
 	updated, err := s.repo.Update(ctx, reimbursementID, hrisrepo.UpdateReimbursementParams{
 		Title:           strings.TrimSpace(request.Title),
@@ -396,6 +401,40 @@ func uniqueIDs(userIDs []string) []string {
 		items = append(items, trimmed)
 	}
 	return items
+}
+
+func filterKeptAttachments(existing []string, requested []string) ([]string, error) {
+	allowed := make(map[string]struct{}, len(existing))
+	for _, attachment := range existing {
+		normalized := normalizeAttachmentPath(attachment)
+		if normalized == "" {
+			continue
+		}
+		allowed[normalized] = struct{}{}
+	}
+
+	filtered := make([]string, 0, len(requested))
+	seen := make(map[string]struct{}, len(requested))
+	for _, attachment := range requested {
+		normalized := normalizeAttachmentPath(attachment)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := allowed[normalized]; !ok {
+			return nil, ErrReimbursementInvalidAttachment
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		filtered = append(filtered, normalized)
+	}
+
+	return filtered, nil
+}
+
+func normalizeAttachmentPath(value string) string {
+	return filepath.ToSlash(strings.TrimSpace(value))
 }
 
 func mapReimbursementError(err error) error {

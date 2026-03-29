@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
+import { getDefaultAuthorizedPath } from "@/lib/rbac";
 import { ensureAuthenticated } from "@/services/auth";
 
 export const Route = createFileRoute("/")({
@@ -7,7 +8,7 @@ export const Route = createFileRoute("/")({
     const session = await ensureAuthenticated();
 
     throw redirect({
-      to: session ? "/operational/overview" : "/login",
+      to: getDefaultAuthorizedPath(session),
     });
   },
 });

@@ -65,6 +65,9 @@ export interface ListAdminUsersResponse {
   meta: PaginationMeta;
 }
 
+export type AdminUser = AdminUserDetail;
+export type ListUsersResponse = ListAdminUsersResponse;
+
 export interface ListRolesFilters {
   search: string;
   isSystem?: boolean | null;
@@ -83,6 +86,8 @@ export interface SetUserModuleRolePayload {
   module_id: string;
   role_id: string | null;
 }
+
+export type RoleKeyDTO = SetUserModuleRolePayload;
 
 export interface RoleReference {
   role_id: string | null;

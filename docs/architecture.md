@@ -98,7 +98,26 @@ Key patterns:
 - **PermissionGate** / **ModuleGate** components for conditional UI rendering
 - **useRBAC()** hook for imperative permission checks
 - **Optimistic updates** via TanStack Query cache manipulation (kanban drag-and-drop)
+- **Notifications SSE stream** for lightweight realtime invalidation of the topbar notification center
 - **File-based routing** — route structure mirrors the URL structure
+
+## Notifications
+
+```
+Backend
+  ├── GET /api/v1/notifications/unread-count
+  ├── GET /api/v1/notifications
+  ├── PATCH /api/v1/notifications/:id/read
+  └── GET /api/v1/notifications/stream  (SSE)
+
+Frontend
+  ├── Topbar bell dropdown
+  ├── SSE reconnect loop for realtime invalidation
+  ├── Browser Notification API when tab is inactive
+  └── Deep-link navigation to the related resource
+```
+
+The notification center uses REST endpoints for listing and marking reads, plus a server-sent events stream for realtime invalidation. Browser notifications are opt-in and depend on the user's browser permission state.
 
 ## Data Security
 
@@ -130,6 +149,7 @@ Backend:
 ```
 
 Privacy: tracking requires explicit user consent (opt-in). Data retention is configurable via `TRACKER_RETENTION_DAYS`.
+Access tokens are stored in `chrome.storage.session`, while persistent tracker settings remain in `chrome.storage.local`. Host permissions are limited to `http://*/*` and `https://*/*`.
 
 ## WhatsApp Integration
 
@@ -141,9 +161,11 @@ KANTOR Backend
 
 Features:
   ├── Template-based messages with variable placeholders
-  ├── Scheduled broadcasts (cron-based)
+  ├── Per-tenant WA settings stored in `tenant_wa_configs`
+  ├── Scheduled broadcasts (cron-based, configured per tenant)
   ├── Automated reminders (task due, overdue, weekly digest)
-  └── Rate limiting (configurable daily cap + random delays)
+  ├── DB-backed daily rate limiting + random delays
+  └── In-app notification sync for relevant WA events
 ```
 
 ## Database

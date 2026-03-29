@@ -212,7 +212,7 @@ function FinancePage() {
   });
 
   const recordType = recordForm.watch("type");
-  const categories = categoriesQuery.data ?? [];
+  const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
   const records = recordsQuery.data?.items ?? [];
   const meta = recordsQuery.data?.meta;
   const visibleCategories = useMemo(

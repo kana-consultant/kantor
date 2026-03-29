@@ -20,7 +20,10 @@ var (
 	ErrLeadAssignedUserNotFound = errors.New("lead assigned employee not found")
 	ErrLeadCampaignNotFound     = errors.New("lead campaign not found")
 	ErrLeadContactRequired      = errors.New("lead must include at least phone or email")
+	ErrLeadImportLimitExceeded  = errors.New("lead import exceeds 10000 rows")
 )
+
+const maxLeadImportRows = 10000
 
 type leadsRepository interface {
 	CreateLead(ctx context.Context, params marketingrepo.UpsertLeadParams) (model.Lead, error)
@@ -159,11 +162,14 @@ func (s *LeadsService) ImportCSV(ctx context.Context, reader io.Reader, actorID 
 	csvReader := csv.NewReader(reader)
 	csvReader.TrimLeadingSpace = true
 
-	rows, err := csvReader.ReadAll()
+	header, err := csvReader.Read()
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return model.LeadImportSummary{}, nil
+		}
 		return model.LeadImportSummary{}, err
 	}
-	if len(rows) <= 1 {
+	if len(header) == 0 {
 		return model.LeadImportSummary{}, nil
 	}
 
@@ -171,8 +177,27 @@ func (s *LeadsService) ImportCSV(ctx context.Context, reader io.Reader, actorID 
 		Errors: make([]model.LeadImportError, 0),
 	}
 
-	for index, row := range rows[1:] {
-		lineNumber := index + 2
+	importedRows := 0
+	lineNumber := 1
+	for {
+		row, readErr := csvReader.Read()
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			return model.LeadImportSummary{}, readErr
+		}
+
+		lineNumber++
+		if isBlankLeadCSVRow(row) {
+			continue
+		}
+
+		importedRows++
+		if importedRows > maxLeadImportRows {
+			return summary, ErrLeadImportLimitExceeded
+		}
+
 		request, parseErr := parseLeadCSVRow(row)
 		if parseErr != nil {
 			summary.FailedCount++
@@ -196,6 +221,15 @@ func (s *LeadsService) ImportCSV(ctx context.Context, reader io.Reader, actorID 
 	}
 
 	return summary, nil
+}
+
+func isBlankLeadCSVRow(row []string) bool {
+	for _, cell := range row {
+		if strings.TrimSpace(cell) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *LeadsService) Summary(ctx context.Context) (model.LeadSummary, error) {

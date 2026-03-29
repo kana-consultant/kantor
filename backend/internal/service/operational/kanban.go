@@ -17,8 +17,9 @@ type TaskAssignNotifier interface {
 }
 
 var (
-	ErrKanbanColumnNotFound = errors.New("kanban column not found")
-	ErrKanbanTaskNotFound   = errors.New("kanban task not found")
+	ErrKanbanColumnNotFound        = errors.New("kanban column not found")
+	ErrKanbanTaskNotFound          = errors.New("kanban task not found")
+	ErrKanbanTaskAssigneeNotMember = errors.New("task assignee must be a project member")
 )
 
 type kanbanRepository interface {
@@ -123,6 +124,9 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 			assigneeID = &autoID
 		}
 	}
+	if err := s.ensureTaskAssigneeIsProjectMember(ctx, projectID, assigneeID); err != nil {
+		return model.KanbanTask{}, err
+	}
 
 	task, err := s.repo.CreateTask(ctx, projectID, operationalrepo.CreateKanbanTaskParams{
 		ColumnID:    request.ColumnID,
@@ -170,6 +174,9 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 		if autoID := s.resolveAutoAssign(ctx, projectID); autoID != "" {
 			assigneeID = &autoID
 		}
+	}
+	if err := s.ensureTaskAssigneeIsProjectMember(ctx, projectID, assigneeID); err != nil {
+		return model.KanbanTask{}, err
 	}
 
 	task, err := s.repo.UpdateTask(ctx, projectID, taskID, operationalrepo.UpdateKanbanTaskParams{
@@ -251,6 +258,29 @@ func (s *KanbanService) resolveAutoAssign(ctx context.Context, projectID string)
 	default:
 		return ""
 	}
+}
+
+func (s *KanbanService) ensureTaskAssigneeIsProjectMember(ctx context.Context, projectID string, assigneeID *string) error {
+	if assigneeID == nil {
+		return nil
+	}
+
+	trimmedAssigneeID := strings.TrimSpace(*assigneeID)
+	if trimmedAssigneeID == "" || s.projectsRepo == nil {
+		return nil
+	}
+
+	memberIDs, err := s.projectsRepo.ListMemberIDsOrdered(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	for _, memberID := range memberIDs {
+		if memberID == trimmedAssigneeID {
+			return nil
+		}
+	}
+
+	return ErrKanbanTaskAssigneeNotMember
 }
 
 func normalizeTimePointer(value *time.Time) *string {

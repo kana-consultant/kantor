@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/model"
+	"github.com/kana-consultant/kantor/backend/internal/repository"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 )
@@ -21,6 +23,7 @@ var (
 )
 
 type campaignsRepository interface {
+	BeginTx(ctx context.Context) (pgx.Tx, error)
 	CreateCampaign(ctx context.Context, params marketingrepo.UpsertCampaignParams) (model.Campaign, error)
 	ListCampaigns(ctx context.Context, params marketingrepo.ListCampaignsParams) ([]model.Campaign, int64, error)
 	GetCampaignByID(ctx context.Context, campaignID string) (model.Campaign, error)
@@ -196,18 +199,46 @@ func (s *CampaignsService) MoveCampaign(ctx context.Context, campaignID string, 
 }
 
 func (s *CampaignsService) AddAttachment(ctx context.Context, params marketingrepo.CreateCampaignAttachmentParams) (CampaignDetail, error) {
-	attachment, err := s.repo.CreateAttachment(ctx, params)
-	if err != nil {
-		return CampaignDetail{}, mapCampaignError(err)
+	return s.AddAttachments(ctx, []marketingrepo.CreateCampaignAttachmentParams{params})
+}
+
+func (s *CampaignsService) AddAttachments(ctx context.Context, params []marketingrepo.CreateCampaignAttachmentParams) (CampaignDetail, error) {
+	if len(params) == 0 {
+		return CampaignDetail{}, fmt.Errorf("at least one attachment is required")
 	}
 
-	if err := s.repo.LogActivity(ctx, params.CampaignID, params.UploadedBy, "attachment_uploaded", map[string]any{
-		"file_name": attachment.FileName,
-		"file_type": attachment.FileType,
-	}); err != nil {
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
 		return CampaignDetail{}, err
 	}
-	return s.GetCampaign(ctx, params.CampaignID)
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	txCtx := repository.WithConn(ctx, tx)
+	campaignID := params[0].CampaignID
+
+	for _, item := range params {
+		if item.CampaignID != campaignID {
+			return CampaignDetail{}, fmt.Errorf("all attachments must target the same campaign")
+		}
+
+		attachment, err := s.repo.CreateAttachment(txCtx, item)
+		if err != nil {
+			return CampaignDetail{}, mapCampaignError(err)
+		}
+
+		if err := s.repo.LogActivity(txCtx, item.CampaignID, item.UploadedBy, "attachment_uploaded", map[string]any{
+			"file_name": attachment.FileName,
+			"file_type": attachment.FileType,
+		}); err != nil {
+			return CampaignDetail{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return CampaignDetail{}, err
+	}
+
+	return s.GetCampaign(ctx, campaignID)
 }
 
 func (s *CampaignsService) ListAttachments(ctx context.Context, campaignID string) ([]model.CampaignAttachment, error) {
