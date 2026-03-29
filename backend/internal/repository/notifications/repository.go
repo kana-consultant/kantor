@@ -25,6 +25,11 @@ type ListParams struct {
 	Offset int
 }
 
+type StreamState struct {
+	UnreadCount int64
+	LatestID    string
+}
+
 type CreateParams struct {
 	UserID        string
 	Type          string
@@ -182,6 +187,26 @@ func (r *Repository) CountUnread(ctx context.Context, userID string) (int64, err
 		userID,
 	).Scan(&count)
 	return count, err
+}
+
+func (r *Repository) GetStreamState(ctx context.Context, userID string) (StreamState, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	var state StreamState
+	err := repository.DB(ctx, r.db).QueryRow(
+		ctx,
+		`
+			SELECT
+				(SELECT COUNT(*) FROM notifications WHERE user_id = $1::uuid AND is_read = FALSE) AS unread_count,
+				COALESCE(
+					(SELECT id::text FROM notifications WHERE user_id = $1::uuid ORDER BY created_at DESC LIMIT 1),
+					''
+				) AS latest_id
+		`,
+		userID,
+	).Scan(&state.UnreadCount, &state.LatestID)
+	return state, err
 }
 
 func (r *Repository) MarkRead(ctx context.Context, notificationID string, userID string) error {

@@ -43,6 +43,7 @@ export function Topbar() {
   const [phoneInput, setPhoneInput] = useState("");
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission>(readBrowserNotificationPermission);
+  const [isNotificationsStreamLive, setIsNotificationsStreamLive] = useState(false);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const profileRef = useRef<HTMLDivElement | null>(null);
   const seenNotificationIdsRef = useRef<Set<string>>(new Set());
@@ -50,13 +51,13 @@ export function Topbar() {
   const notificationsQuery = useQuery({
     queryKey: notificationsKeys.list({ page: 1, perPage: 8 }),
     queryFn: () => listNotifications({ page: 1, perPage: 8 }),
-    refetchInterval: 30_000,
+    refetchInterval: isNotificationsStreamLive ? false : 30_000,
   });
 
   const unreadCountQuery = useQuery({
     queryKey: notificationsKeys.unreadCount(),
     queryFn: getUnreadNotificationsCount,
-    refetchInterval: 30_000,
+    refetchInterval: isNotificationsStreamLive ? false : 30_000,
   });
 
   const markReadMutation = useMutation({
@@ -153,12 +154,17 @@ export function Topbar() {
 
       void connectNotificationsStream({
         signal: controller.signal,
+        onOpen: () => {
+          reconnectAttempt = 0;
+          setIsNotificationsStreamLive(true);
+        },
         onEvent: () => {
           reconnectAttempt = 0;
           void queryClient.invalidateQueries({ queryKey: notificationsKeys.all });
         },
       })
         .then(() => {
+          setIsNotificationsStreamLive(false);
           if (cancelled || controller?.signal.aborted) {
             return;
           }
@@ -166,6 +172,7 @@ export function Topbar() {
           reconnectTimer = window.setTimeout(connect, 1_000);
         })
         .catch((error) => {
+          setIsNotificationsStreamLive(false);
           if (cancelled || controller?.signal.aborted) {
             return;
           }
@@ -181,6 +188,7 @@ export function Topbar() {
 
     return () => {
       cancelled = true;
+      setIsNotificationsStreamLive(false);
       controller?.abort();
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer);

@@ -15,12 +15,18 @@ type notificationsRepository interface {
 	CreateMany(ctx context.Context, params []notificationsrepo.CreateParams) error
 	List(ctx context.Context, params notificationsrepo.ListParams) ([]model.Notification, int64, error)
 	CountUnread(ctx context.Context, userID string) (int64, error)
+	GetStreamState(ctx context.Context, userID string) (notificationsrepo.StreamState, error)
 	MarkRead(ctx context.Context, notificationID string, userID string) error
 	MarkAllRead(ctx context.Context, userID string) error
 }
 
 type Service struct {
 	repo notificationsRepository
+}
+
+type StreamState struct {
+	UnreadCount int64
+	LatestID    string
 }
 
 type ListParams struct {
@@ -61,6 +67,18 @@ func (s *Service) List(ctx context.Context, params ListParams) ([]model.Notifica
 
 func (s *Service) CountUnread(ctx context.Context, userID string) (int64, error) {
 	return s.repo.CountUnread(ctx, strings.TrimSpace(userID))
+}
+
+func (s *Service) GetStreamState(ctx context.Context, userID string) (StreamState, error) {
+	state, err := s.repo.GetStreamState(ctx, strings.TrimSpace(userID))
+	if err != nil {
+		return StreamState{}, err
+	}
+
+	return StreamState{
+		UnreadCount: state.UnreadCount,
+		LatestID:    state.LatestID,
+	}, nil
 }
 
 func (s *Service) MarkRead(ctx context.Context, notificationID string, userID string) error {

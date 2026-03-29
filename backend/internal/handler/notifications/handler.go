@@ -148,7 +148,7 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 	}
 	flusher.Flush()
 
-	pollTicker := time.NewTicker(5 * time.Second)
+	pollTicker := time.NewTicker(10 * time.Second)
 	defer pollTicker.Stop()
 
 	heartbeatTicker := time.NewTicker(25 * time.Second)
@@ -173,34 +173,22 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) writeNotificationSnapshot(ctx context.Context, w http.ResponseWriter, userID string, lastSignature *string) error {
-	count, err := h.service.CountUnread(ctx, userID)
-	if err != nil {
-		return err
-	}
-
-	items, _, err := h.service.List(ctx, notificationsservice.ListParams{
-		UserID:  userID,
-		Page:    1,
-		PerPage: 1,
+	state, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (notificationsservice.StreamState, error) {
+		return h.service.GetStreamState(scopedCtx, userID)
 	})
 	if err != nil {
 		return err
 	}
 
-	latestID := ""
-	if len(items) > 0 {
-		latestID = items[0].ID
-	}
-
-	signature := fmt.Sprintf("%d:%s", count, latestID)
+	signature := fmt.Sprintf("%d:%s", state.UnreadCount, state.LatestID)
 	if signature == *lastSignature {
 		return nil
 	}
 	*lastSignature = signature
 
 	payload, err := json.Marshal(map[string]interface{}{
-		"unread_count": count,
-		"latest_id":    latestID,
+		"unread_count": state.UnreadCount,
+		"latest_id":    state.LatestID,
 	})
 	if err != nil {
 		return err

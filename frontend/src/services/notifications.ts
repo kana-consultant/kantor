@@ -59,14 +59,18 @@ export interface NotificationsStreamEvent {
 export async function connectNotificationsStream({
   signal,
   onEvent,
+  onOpen,
 }: {
   signal: AbortSignal;
   onEvent: (event: NotificationsStreamEvent) => void;
+  onOpen?: () => void;
 }) {
   const response = await openNotificationsStreamResponse(signal, true);
   if (!response.body) {
     throw new Error("Notifications stream is unavailable");
   }
+
+  onOpen?.();
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

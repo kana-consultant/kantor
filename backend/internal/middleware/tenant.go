@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,6 +14,10 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
+
+const notificationsStreamPath = "/api/v1/notifications/stream"
+
+type tenantPoolCtxKey struct{}
 
 // setupTenantConn configures a pooled connection for RLS.
 // It sets the app.current_tenant GUC using a parameterized query (guaranteed
@@ -47,6 +53,53 @@ func setupTenantConn(ctx context.Context, conn *pgxpool.Conn, tenantID string) e
 	return nil
 }
 
+func withTenantPool(ctx context.Context, pool *pgxpool.Pool) context.Context {
+	return context.WithValue(ctx, tenantPoolCtxKey{}, pool)
+}
+
+func tenantPoolFromContext(ctx context.Context) (*pgxpool.Pool, bool) {
+	pool, ok := ctx.Value(tenantPoolCtxKey{}).(*pgxpool.Pool)
+	return pool, ok && pool != nil
+}
+
+// WithScopedTenantConn ensures the callback runs with a tenant-scoped
+// connection. If the context already carries a tenant-scoped DB handle, it is
+// reused as-is.
+func WithScopedTenantConn[T any](ctx context.Context, fn func(context.Context) (T, error)) (T, error) {
+	var zero T
+
+	if repository.DB(ctx, nil) != nil {
+		return fn(ctx)
+	}
+
+	pool, ok := tenantPoolFromContext(ctx)
+	if !ok {
+		return zero, errors.New("tenant pool is missing from context")
+	}
+
+	info, ok := tenant.FromContext(ctx)
+	if !ok {
+		return zero, errors.New("tenant info is missing from context")
+	}
+
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return zero, err
+	}
+
+	if err := setupTenantConn(ctx, conn, info.ID); err != nil {
+		conn.Release()
+		return zero, err
+	}
+
+	defer func() {
+		_, _ = conn.Exec(context.Background(), "RESET ALL")
+		conn.Release()
+	}()
+
+	return fn(repository.WithConn(ctx, conn))
+}
+
 // TenantMiddleware resolves the tenant from the Host header, acquires a
 // dedicated connection from the pool, and configures RLS by setting the
 // app.current_tenant GUC and (when superuser) downgrading to kantor_app.
@@ -56,6 +109,14 @@ func TenantMiddleware(pool *pgxpool.Pool, resolver *tenant.Resolver) func(http.H
 			info, err := resolver.Resolve(r.Context(), r.Host)
 			if err != nil {
 				response.WriteError(w, http.StatusBadRequest, "UNKNOWN_TENANT", "Could not resolve tenant for this domain", nil)
+				return
+			}
+
+			ctx := tenant.WithInfo(r.Context(), info)
+			ctx = withTenantPool(ctx, pool)
+
+			if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, notificationsStreamPath) {
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
@@ -72,7 +133,6 @@ func TenantMiddleware(pool *pgxpool.Pool, resolver *tenant.Resolver) func(http.H
 			}
 
 			// Store tenant info and the scoped connection in context.
-			ctx := tenant.WithInfo(r.Context(), info)
 			ctx = repository.WithConn(ctx, conn)
 
 			// Ensure we clean up the connection regardless of outcome.

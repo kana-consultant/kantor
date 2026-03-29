@@ -48,7 +48,9 @@ func AuthMiddleware(
 				return
 			}
 
-			cachedPermissions, err := loadPermissions(r.Context(), claims.Subject)
+			cachedPermissions, err := WithScopedTenantConn(r.Context(), func(ctx context.Context) (*rbac.CachedPermissions, error) {
+				return loadPermissions(ctx, claims.Subject)
+			})
 			if err != nil {
 				response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Failed to resolve user permissions", nil)
 				return
