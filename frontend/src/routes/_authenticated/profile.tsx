@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api-client";
+import { formatCalendarDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { changePassword, ensureAuthenticated, logout } from "@/services/auth";
 import { changeEmail, getProfile, profileKeys, updateProfile, uploadProfileAvatar } from "@/services/profile";
@@ -356,7 +357,7 @@ function ProfilePage() {
         <InfoCard
           icon={Calendar}
           label="Tanggal Bergabung"
-          value={employee?.date_joined ? new Date(employee.date_joined).toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" }) : "-"}
+          value={employee?.date_joined ? formatCalendarDate(employee.date_joined, "id-ID") : "-"}
         />
         <InfoCard
           icon={User}

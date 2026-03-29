@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { extractDateInputValue, formatCalendarDate } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
@@ -68,7 +69,7 @@ function ProjectWorkspacePage() {
     return {
       name: project.name,
       description: project.description ?? "",
-      deadline: project.deadline ? project.deadline.slice(0, 10) : "",
+      deadline: project.deadline ? extractDateInputValue(project.deadline) : "",
       status: project.status,
       priority: project.priority,
     };
@@ -88,7 +89,7 @@ function ProjectWorkspacePage() {
       updateProject(projectId, {
         name: project!.name,
         description: project!.description ?? "",
-        deadline: project!.deadline ? project!.deadline.slice(0, 10) : "",
+        deadline: project!.deadline ? extractDateInputValue(project!.deadline) : "",
         status: project!.status,
         priority: project!.priority,
         auto_assign_mode: mode,
@@ -188,7 +189,7 @@ function ProjectWorkspacePage() {
               <SharedStatusBadge status={project.priority} variant="priority" />
               <Badge value={`${project.member_count} anggota`} />
               <Badge
-                value={project.deadline ? `Deadline ${new Date(project.deadline).toLocaleDateString()}` : "Tanpa deadline"}
+                value={project.deadline ? `Deadline ${formatCalendarDate(project.deadline)}` : "Tanpa deadline"}
               />
             </div>
 
@@ -251,7 +252,7 @@ function ProjectWorkspacePage() {
                 <SummaryRow label="Priority" value={project.priority} />
                 <SummaryRow
                   label="Deadline"
-                  value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"}
+                  value={project.deadline ? formatCalendarDate(project.deadline) : "-"}
                 />
                 <SummaryRow label="Anggota" value={String(project.member_count)} />
                 <SummaryRow label="Auto-assign" value={autoAssignLabels[project.auto_assign_mode] ?? "Nonaktif"} />
@@ -343,7 +344,7 @@ function ProjectWorkspacePage() {
               <div className="mt-5 grid gap-3">
                 <SummaryRow label="Status" value={project.status.replace("_", " ")} />
                 <SummaryRow label="Priority" value={project.priority} />
-                <SummaryRow label="Deadline" value={project.deadline ? new Date(project.deadline).toLocaleDateString() : "-"} />
+                <SummaryRow label="Deadline" value={project.deadline ? formatCalendarDate(project.deadline) : "-"} />
                 <SummaryRow label="Deskripsi" value={project.description || "-"} />
               </div>
             </Card>

@@ -1,5 +1,6 @@
-import { authRequestJSON } from "@/lib/api-client";
+﻿import { authRequestJSON } from "@/lib/api-client";
 import { parseLooseCurrency } from "@/lib/currency";
+import { toUTCDateOnlyISOString } from "@/lib/date";
 import type {
   BonusRecord,
   BonusFormValues,
@@ -32,7 +33,7 @@ export async function createSalary(employeeId: string, input: SalaryFormValues) 
         base_salary: input.base_salary,
         allowances: parseAmountMap(input.allowances),
         deductions: parseAmountMap(input.deductions),
-        effective_date: new Date(input.effective_date).toISOString(),
+        effective_date: toUTCDateOnlyISOString(input.effective_date),
       }),
     },
   );

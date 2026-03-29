@@ -1,4 +1,5 @@
-import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+﻿import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toUTCDateOnlyISOString } from "@/lib/date";
 import type {
   Reimbursement,
   ReimbursementFilters,
@@ -43,7 +44,7 @@ export async function createReimbursement(values: ReimbursementFormValues) {
     "/hris/reimbursements",
     {
       ...values,
-      transaction_date: new Date(`${values.transaction_date}T00:00:00`).toISOString(),
+      transaction_date: toUTCDateOnlyISOString(values.transaction_date),
     },
   );
 }
@@ -94,7 +95,7 @@ export async function updateReimbursement(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...values,
-        transaction_date: new Date(`${values.transaction_date}T00:00:00`).toISOString(),
+        transaction_date: toUTCDateOnlyISOString(values.transaction_date),
         kept_attachments: keptAttachments ?? null,
       }),
     },
@@ -114,3 +115,4 @@ export async function getReimbursementSummary(month: string, year: string) {
   if (year) search.set("year", year);
   return authGetJSON<ReimbursementSummary>(`/hris/reimbursements/summary?${search.toString()}`);
 }
+

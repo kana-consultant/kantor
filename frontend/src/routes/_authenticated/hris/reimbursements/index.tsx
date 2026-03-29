@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { formatIDR } from "@/lib/currency";
+import { extractDateInputValue, formatCalendarDate, formatDateInputValue } from "@/lib/date";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
@@ -87,14 +88,14 @@ function ReimbursementsPage() {
       title: "",
       category: "",
       amount: 0,
-      transaction_date: new Date().toISOString().slice(0, 10),
+      transaction_date: formatDateInputValue(),
       description: "",
     },
   });
 
   const editForm = useForm<EditReimbursementFormValues>({
     resolver: zodResolver(editReimbursementSchema) as never,
-    defaultValues: { title: "", category: "", amount: 0, transaction_date: new Date().toISOString().slice(0, 10), description: "" },
+    defaultValues: { title: "", category: "", amount: 0, transaction_date: formatDateInputValue(), description: "" },
   });
 
   useEffect(() => {
@@ -103,7 +104,7 @@ function ReimbursementsPage() {
         title: editingReimbursement.title,
         category: editingReimbursement.category,
         amount: editingReimbursement.amount,
-        transaction_date: new Date(editingReimbursement.transaction_date).toISOString().slice(0, 10),
+        transaction_date: extractDateInputValue(editingReimbursement.transaction_date),
         description: editingReimbursement.description ?? "",
       });
       setKeptAttachments(editingReimbursement.attachments ?? []);
@@ -140,7 +141,7 @@ function ReimbursementsPage() {
         title: "",
         category: "",
         amount: 0,
-        transaction_date: new Date().toISOString().slice(0, 10),
+        transaction_date: formatDateInputValue(),
         description: "",
       });
       setFiles([]);
@@ -224,7 +225,7 @@ function ReimbursementsPage() {
         <div className="space-y-1">
           <p className="text-sm text-text-primary">{item.category}</p>
           <p className="text-[13px] text-text-secondary">
-            {new Date(item.transaction_date).toLocaleDateString("id-ID")}
+            {formatCalendarDate(item.transaction_date)}
           </p>
         </div>
       ),
@@ -675,3 +676,4 @@ function ReimbursementsPage() {
     </div>
   );
 }
+

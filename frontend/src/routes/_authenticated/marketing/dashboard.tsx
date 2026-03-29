@@ -12,6 +12,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
+import { formatDateInputValue } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
@@ -195,8 +196,8 @@ function getMonthRange(offset: number) {
   const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
 
   return {
-    dateFrom: start.toISOString().slice(0, 10),
-    dateTo: end.toISOString().slice(0, 10),
+    dateFrom: formatDateInputValue(start),
+    dateTo: formatDateInputValue(end),
   };
 }
 

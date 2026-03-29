@@ -33,6 +33,7 @@ import {
   channelMeta,
 } from "@/lib/marketing";
 import { formatIDR } from "@/lib/currency";
+import { extractDateInputValue, formatCalendarDate } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { getProtectedFileName, openProtectedFile } from "@/services/files";
@@ -345,7 +346,7 @@ function MarketingCampaignsPage() {
       sortable: true,
       cell: (campaign) => (
         <span className="text-sm text-text-secondary">
-          {new Date(campaign.start_date).toLocaleDateString("id-ID")} - {new Date(campaign.end_date).toLocaleDateString("id-ID")}
+          {formatCalendarDate(campaign.start_date)} - {formatCalendarDate(campaign.end_date)}
         </span>
       ),
     },
@@ -745,7 +746,7 @@ function CampaignDetailDrawer({
               <InfoRow label="Budget" value={formatIDR(campaign.budget_amount)} />
               <InfoRow label="PIC" value={campaign.pic_employee_name ?? "Unassigned"} />
               <InfoRow label="Status" value={<StatusBadge status={campaign.status} variant="campaign-status" />} />
-              <InfoRow label="Timeline" value={`${new Date(campaign.start_date).toLocaleDateString()} - ${new Date(campaign.end_date).toLocaleDateString()}`} />
+              <InfoRow label="Timeline" value={`${formatCalendarDate(campaign.start_date)} - ${formatCalendarDate(campaign.end_date)}`} />
               <Card className="p-4">
                 <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">Description</p>
                 <p className="mt-3 text-sm text-muted-foreground">{campaign.description || "No campaign description yet."}</p>
@@ -835,7 +836,7 @@ function CampaignDetailDrawer({
                       <div>
                         <p className="font-semibold">{metric.platform.replaceAll("_", " ")}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {new Date(metric.period_start).toLocaleDateString("id-ID")} - {new Date(metric.period_end).toLocaleDateString("id-ID")}
+                          {formatCalendarDate(metric.period_start)} - {formatCalendarDate(metric.period_end)}
                         </p>
                       </div>
                       <div className="text-right text-sm">
@@ -958,8 +959,8 @@ function toCampaignFormValues(campaign: Campaign): CampaignFormValues {
     budget_amount: campaign.budget_amount,
     budget_currency: campaign.budget_currency,
     pic_employee_id: campaign.pic_employee_id ?? "",
-    start_date: campaign.start_date.slice(0, 10),
-    end_date: campaign.end_date.slice(0, 10),
+    start_date: extractDateInputValue(campaign.start_date),
+    end_date: extractDateInputValue(campaign.end_date),
     brief_text: campaign.brief_text ?? "",
     status: campaign.status,
   };

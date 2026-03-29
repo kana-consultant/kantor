@@ -24,6 +24,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
+import { formatCalendarDate } from "@/lib/date";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
@@ -200,7 +201,7 @@ function HrisOverviewPage() {
                         />
                       </div>
                       <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
-                        <span>{new Date(item.renewal_date).toLocaleDateString("id-ID")}</span>
+                        <span>{formatCalendarDate(item.renewal_date)}</span>
                         <span className="font-mono tabular-nums">{formatIDR(item.cost_amount)}</span>
                       </div>
                     </div>

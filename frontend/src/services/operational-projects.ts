@@ -1,4 +1,5 @@
-import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+﻿import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toUTCDateOnlyISOString } from "@/lib/date";
 import type {
   AvailableUser,
   ListProjectsResponse,
@@ -118,7 +119,7 @@ function serializeProjectForm(input: ProjectFormValues) {
   return {
     name: input.name.trim(),
     description: input.description.trim() || null,
-    deadline: input.deadline ? new Date(input.deadline).toISOString() : null,
+    deadline: input.deadline ? toUTCDateOnlyISOString(input.deadline) : null,
     status: input.status,
     priority: input.priority,
     ...(input.auto_assign_mode ? { auto_assign_mode: input.auto_assign_mode } : {}),

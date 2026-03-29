@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatIDR } from "@/lib/currency";
+import { formatCalendarDate } from "@/lib/date";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
@@ -78,7 +79,7 @@ function ReimbursementDetailPage() {
             <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">{item.employee_name}</p>
             <h3 className="mt-2 text-3xl font-bold">{item.title}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              {item.category} - {new Date(item.transaction_date).toLocaleDateString("id-ID")}
+              {item.category} - {formatCalendarDate(item.transaction_date)}
             </p>
           </div>
           <div className="text-right">
@@ -290,4 +291,5 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
 

@@ -17,6 +17,7 @@ import { CalendarDays, Paperclip } from "lucide-react";
 import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { Card } from "@/components/ui/card";
 import { formatIDR } from "@/lib/currency";
+import { formatCalendarDate } from "@/lib/date";
 import { channelMeta } from "@/lib/marketing";
 import { cn } from "@/lib/utils";
 import type { Campaign, CampaignColumn } from "@/types/marketing";
@@ -239,7 +240,7 @@ function CampaignCard({
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" />
-            {new Date(campaign.start_date).toLocaleDateString()} - {new Date(campaign.end_date).toLocaleDateString()}
+            {formatCalendarDate(campaign.start_date)} - {formatCalendarDate(campaign.end_date)}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Paperclip className="h-3.5 w-3.5" />

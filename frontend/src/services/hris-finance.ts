@@ -1,4 +1,5 @@
-import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+﻿import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toUTCDateOnlyISOString } from "@/lib/date";
 import type {
   FinanceCategory,
   FinanceCategoryFormValues,
@@ -72,7 +73,7 @@ export async function createFinanceRecord(values: FinanceRecordFormValues) {
     "/hris/finance/records",
     {
       ...values,
-      record_date: new Date(`${values.record_date}T00:00:00`).toISOString(),
+      record_date: toUTCDateOnlyISOString(values.record_date),
     },
   );
 }
@@ -85,7 +86,7 @@ export async function updateFinanceRecord(recordId: string, values: FinanceRecor
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...values,
-        record_date: new Date(`${values.record_date}T00:00:00`).toISOString(),
+        record_date: toUTCDateOnlyISOString(values.record_date),
       }),
     },
   );

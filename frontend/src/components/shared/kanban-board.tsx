@@ -41,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { permissions } from "@/lib/permissions";
+import { extractDateInputValue, formatCalendarDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import {
 	createKanbanColumn,
@@ -245,7 +246,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 			title: task.title,
 			description: task.description ?? "",
 			assignee_id: task.assignee_id ?? "",
-			due_date: task.due_date ? task.due_date.slice(0, 10) : "",
+			due_date: task.due_date ? extractDateInputValue(task.due_date) : "",
 			priority: task.priority,
 			label: task.label ?? "",
 		});
@@ -718,7 +719,7 @@ function matchesFilters(task: KanbanTask, filters: KanbanFilters) {
 	}
 	if (
 		filters.dueDate &&
-		(!task.due_date || task.due_date.slice(0, 10) !== filters.dueDate)
+		(!task.due_date || extractDateInputValue(task.due_date) !== filters.dueDate)
 	) {
 		return false;
 	}
@@ -1467,5 +1468,5 @@ function AvatarBadge({
 }
 
 function formatDate(value: string) {
-	return new Date(value).toLocaleDateString();
+	return formatCalendarDate(value);
 }

@@ -31,6 +31,7 @@ import { Card } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { formatIDR } from "@/lib/currency";
+import { extractDateInputValue, formatCalendarDate, formatDateInputValue } from "@/lib/date";
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
@@ -126,7 +127,7 @@ function FinancePage() {
       type: "income",
       amount: 0,
       description: "",
-      record_date: new Date().toISOString().slice(0, 10),
+      record_date: formatDateInputValue(),
     },
   });
 
@@ -252,7 +253,7 @@ function FinancePage() {
       sortable: true,
       cell: (record) => (
         <span className="text-sm text-text-secondary">
-          {new Date(record.record_date).toLocaleDateString("id-ID")}
+          {formatCalendarDate(record.record_date)}
         </span>
       ),
     },
@@ -296,7 +297,7 @@ function FinancePage() {
                     type: record.type,
                     amount: record.amount,
                     description: record.description,
-                    record_date: record.record_date.slice(0, 10),
+                    record_date: extractDateInputValue(record.record_date),
                   });
                 }}
                 size="sm"
@@ -800,7 +801,7 @@ function resetRecordForm(form: Pick<ReturnType<typeof useForm<FinanceRecordFormV
     type: "income",
     amount: 0,
     description: "",
-    record_date: new Date().toISOString().slice(0, 10),
+    record_date: formatDateInputValue(),
   });
 }
 

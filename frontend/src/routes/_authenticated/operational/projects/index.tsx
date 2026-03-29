@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useRBAC } from "@/hooks/use-rbac";
+import { formatCalendarDate } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
@@ -107,7 +108,7 @@ function ProjectsListPage() {
       sortable: true,
       cell: (project) => (
         <span className="text-sm text-text-secondary">
-          {project.deadline ? new Date(project.deadline).toLocaleDateString("id-ID") : "-"}
+          {project.deadline ? formatCalendarDate(project.deadline) : "-"}
         </span>
       ),
     },

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
+import { extractDateInputValue, formatCalendarDate, getCalendarDayDifference } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { employeesKeys, listEmployees } from "@/services/hris-employees";
@@ -143,7 +144,7 @@ function SubscriptionsPage() {
       cell: (subscription) => (
         <div className="space-y-1">
           <p className="text-sm text-text-primary">
-            {new Date(subscription.renewal_date).toLocaleDateString("id-ID")}
+            {formatCalendarDate(subscription.renewal_date)}
           </p>
           <StatusBadge status={renewalAlertLabel(subscription.renewal_date)} variant="renewal-alert" />
         </div>
@@ -362,8 +363,8 @@ function toSubscriptionFormValues(subscription: Subscription): SubscriptionFormV
     cost_amount: subscription.cost_amount,
     cost_currency: subscription.cost_currency,
     billing_cycle: subscription.billing_cycle,
-    start_date: subscription.start_date.slice(0, 10),
-    renewal_date: subscription.renewal_date.slice(0, 10),
+    start_date: extractDateInputValue(subscription.start_date),
+    renewal_date: extractDateInputValue(subscription.renewal_date),
     status: subscription.status,
     pic_employee_id: subscription.pic_employee_id ?? "",
     category: subscription.category,
@@ -373,7 +374,10 @@ function toSubscriptionFormValues(subscription: Subscription): SubscriptionFormV
 }
 
 function renewalAlertLabel(renewalDate: string) {
-  const diffDays = Math.ceil((new Date(renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const diffDays = getCalendarDayDifference(renewalDate);
+  if (diffDays === null) {
+    return "";
+  }
   if (diffDays <= 1) {
     return "1_day";
   }

@@ -34,6 +34,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
+import { extractDateInputValue, formatCalendarDate, formatDateInputValue } from "@/lib/date";
 import { adsMetricPlatformOptions, adsPlatformMeta } from "@/lib/marketing";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
@@ -70,8 +71,8 @@ const metricSchema = z
 const defaultMetricForm: AdsMetricFormValues = {
   campaign_id: "",
   platform: "instagram",
-  period_start: new Date().toISOString().slice(0, 10),
-  period_end: new Date().toISOString().slice(0, 10),
+  period_start: formatDateInputValue(),
+  period_end: formatDateInputValue(),
   amount_spent: 0,
   impressions: 0,
   clicks: 0,
@@ -106,7 +107,7 @@ function AdsMetricsPage() {
   const [filters, setFilters] = useState<AdsMetricFilters>(defaultFilters);
   const [dashboardRange, setDashboardRange] = useState({
     dateFrom: `${new Date().getFullYear()}-01-01`,
-    dateTo: new Date().toISOString().slice(0, 10),
+    dateTo: formatDateInputValue(),
   });
   const [showForm, setShowForm] = useState(false);
   const [showBatchForm, setShowBatchForm] = useState(false);
@@ -336,8 +337,8 @@ function AdsMetricsPage() {
                 form.reset({
                   campaign_id: item.campaign_id,
                   platform: item.platform,
-                  period_start: item.period_start.slice(0, 10),
-                  period_end: item.period_end.slice(0, 10),
+                  period_start: extractDateInputValue(item.period_start),
+                  period_end: extractDateInputValue(item.period_end),
                   amount_spent: item.amount_spent,
                   impressions: item.impressions,
                   clicks: item.clicks,
@@ -821,7 +822,7 @@ async function invalidateAdsMetrics(queryClient: ReturnType<typeof useQueryClien
 }
 
 function formatShortDate(value: string) {
-  return new Date(value).toLocaleDateString("id-ID");
+  return formatCalendarDate(value);
 }
 
 function formatMetricCurrency(value?: number | null) {

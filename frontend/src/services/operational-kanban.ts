@@ -1,4 +1,5 @@
-import { authRequestJSON } from "@/lib/api-client";
+﻿import { authRequestJSON } from "@/lib/api-client";
+import { toUTCDateOnlyISOString } from "@/lib/date";
 import type { KanbanColumn, KanbanTask, TaskFormValues } from "@/types/kanban";
 
 export const kanbanKeys = {
@@ -126,7 +127,7 @@ function serializeTaskForm(input: Partial<{ column_id: string }> & TaskFormValue
     title: input.title.trim(),
     description: input.description.trim() || null,
     assignee_id: input.assignee_id.trim() || null,
-    due_date: input.due_date ? new Date(input.due_date).toISOString() : null,
+    due_date: input.due_date ? toUTCDateOnlyISOString(input.due_date) : null,
     priority: input.priority,
     label: input.label.trim() || null,
   };

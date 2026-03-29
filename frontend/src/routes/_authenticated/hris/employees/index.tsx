@@ -12,6 +12,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useRBAC } from "@/hooks/use-rbac";
+import { formatCalendarDate } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { departmentsKeys, listDepartments } from "@/services/hris-departments";
@@ -114,7 +115,7 @@ function EmployeesPage() {
       hideOnMobile: true,
       cell: (employee) => (
         <span className="text-sm text-text-secondary">
-          {new Date(employee.date_joined).toLocaleDateString("id-ID")}
+          {formatCalendarDate(employee.date_joined)}
         </span>
       ),
     },

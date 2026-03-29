@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
 import { formatIDR } from "@/lib/currency";
+import { extractDateInputValue, formatCalendarDate } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import {
@@ -362,7 +363,7 @@ function ProfileTab({ employee }: { employee: Employee }) {
     { label: "Telepon", value: employee.phone || "-" },
     { label: "Departemen", value: employee.department || "-" },
     { label: "Status", value: employee.employment_status },
-    { label: "Tanggal bergabung", value: new Date(employee.date_joined).toLocaleDateString() },
+    { label: "Tanggal bergabung", value: formatCalendarDate(employee.date_joined) },
     { label: "Kontak darurat", value: employee.emergency_contact || "-" },
     { label: "Nomor rekening", value: employee.bank_account_number || "-" },
     { label: "Nama bank / E-Wallet", value: employee.bank_name || "-" },
@@ -483,7 +484,7 @@ function SalaryTab({
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm font-semibold">{formatIDR(item.net_salary)}</p>
-                    <p className="text-xs text-muted-foreground">Effective {new Date(item.effective_date).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground">Effective {formatCalendarDate(item.effective_date)}</p>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Base {formatIDR(item.base_salary)} | Allowances {formatIDR(sumAmountMap(item.allowances))} | Deductions {formatIDR(sumAmountMap(item.deductions))}
@@ -825,7 +826,7 @@ function ReimbursementsTab({
       header: "Transaction date",
       accessor: "transaction_date",
       sortable: true,
-      cell: (item) => new Date(item.transaction_date).toLocaleDateString("id-ID"),
+      cell: (item) => formatCalendarDate(item.transaction_date),
     },
     {
       id: "status",
@@ -916,7 +917,7 @@ function toEmployeeFormValues(employee: Employee): EmployeeFormValues {
     phone: employee.phone ?? "",
     position: employee.position,
     department: employee.department ?? "",
-    date_joined: employee.date_joined.slice(0, 10),
+    date_joined: extractDateInputValue(employee.date_joined),
     employment_status: employee.employment_status,
     address: employee.address ?? "",
     emergency_contact: employee.emergency_contact ?? "",
@@ -940,3 +941,4 @@ function resetBonusForm(form: Pick<ReturnType<typeof useForm<BonusFormValues>>, 
     period_year: new Date().getFullYear(),
   });
 }
+
