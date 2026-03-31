@@ -1,4 +1,4 @@
-import { authGetJSON, getJSON } from "@/lib/api-client";
+import { authGetJSON, authRequestJSON, getJSON } from "@/lib/api-client";
 import type { AuthModuleRole, AuthUser } from "@/types/auth";
 
 export interface HealthStatus {
@@ -18,4 +18,22 @@ export function fetchApiHealth() {
 
 export async function fetchSessionProfile() {
   return authGetJSON<SessionProfile>("/auth/me");
+}
+
+
+export interface BrowserClientContext {
+  timezone: string | null;
+  timezone_offset_minutes: number;
+  locale: string | null;
+}
+
+export async function syncClientContext(input: BrowserClientContext) {
+  const payload = await authRequestJSON<{ user: AuthUser }>("/auth/client-context", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  return payload.user;
 }

@@ -22,18 +22,19 @@ const (
 )
 
 var (
-	ErrEmailAlreadyExists  = errors.New("email sudah terdaftar")
-	ErrInvalidCredentials  = errors.New("email atau kata sandi tidak valid")
+	ErrEmailAlreadyExists     = errors.New("email sudah terdaftar")
+	ErrInvalidCredentials     = errors.New("email atau kata sandi tidak valid")
 	ErrInvalidCurrentPassword = errors.New("kata sandi saat ini tidak sesuai")
-	ErrInactiveUser        = errors.New("akun pengguna sedang tidak aktif")
-	ErrAccountLocked       = errors.New("akun dikunci sementara karena terlalu banyak percobaan login yang gagal")
-	ErrInvalidRefreshToken = errors.New("refresh token tidak valid")
-	ErrExpiredRefreshToken = errors.New("refresh token sudah kedaluwarsa")
-	ErrPasswordUnchanged   = errors.New("kata sandi baru harus berbeda dari kata sandi saat ini")
-	ErrEmailUnchanged      = errors.New("email baru harus berbeda dari email saat ini")
+	ErrInactiveUser           = errors.New("akun pengguna sedang tidak aktif")
+	ErrAccountLocked          = errors.New("akun dikunci sementara karena terlalu banyak percobaan login yang gagal")
+	ErrInvalidRefreshToken    = errors.New("refresh token tidak valid")
+	ErrExpiredRefreshToken    = errors.New("refresh token sudah kedaluwarsa")
+	ErrPasswordUnchanged      = errors.New("kata sandi baru harus berbeda dari kata sandi saat ini")
+	ErrEmailUnchanged         = errors.New("email baru harus berbeda dari email saat ini")
 )
 
 type authRepository interface {
+	UpdateUserClientContext(ctx context.Context, userID string, params authrepo.UpdateUserClientContextParams) error
 	EnsureUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
 	CreateUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
 	GetUserByEmail(ctx context.Context, email string) (model.User, error)
@@ -312,6 +313,18 @@ func (s *Service) GetSession(ctx context.Context, userID string) (AuthResult, er
 		Permissions:  cachedPermissions.PermissionList(),
 		IsSuperAdmin: cachedPermissions.IsSuperAdmin,
 	}, nil
+}
+
+func (s *Service) UpdateClientContext(ctx context.Context, userID string, input dto.UpdateClientContextRequest) (model.User, error) {
+	if err := s.repo.UpdateUserClientContext(ctx, userID, authrepo.UpdateUserClientContextParams{
+		Timezone:              input.Timezone,
+		TimezoneOffsetMinutes: input.TimezoneOffsetMinutes,
+		Locale:                input.Locale,
+	}); err != nil {
+		return model.User{}, err
+	}
+
+	return s.repo.GetUserByID(ctx, userID)
 }
 
 // ---------------------------------------------------------------------------

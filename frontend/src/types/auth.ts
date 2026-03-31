@@ -3,6 +3,11 @@ export interface AuthUser {
   email: string;
   full_name: string;
   avatar_url?: string | null;
+  browser_timezone?: string | null;
+  browser_timezone_offset_minutes?: number | null;
+  browser_locale?: string | null;
+  tracker_extension_version?: string | null;
+  tracker_extension_reported_at?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

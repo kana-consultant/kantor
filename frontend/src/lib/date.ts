@@ -1,4 +1,4 @@
-﻿function padDatePart(value: number) {
+function padDatePart(value: number) {
   return String(value).padStart(2, "0");
 }
 
@@ -40,6 +40,10 @@ export function parseCalendarDate(value: string) {
   const month = parts[1] ?? 1;
   const day = parts[2] ?? 1;
   return new Date(year, month - 1, day);
+}
+
+export function toDateOnlyString(value: string) {
+  return extractDateInputValue(value);
 }
 
 export function toUTCDateOnlyISOString(value: string) {

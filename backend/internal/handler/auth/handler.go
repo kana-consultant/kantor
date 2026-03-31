@@ -52,6 +52,29 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 	router.Post("/logout", h.logout)
 }
 
+func (h *Handler) UpdateClientContext(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Sesi login tidak ditemukan", nil)
+		return
+	}
+
+	var input dto.UpdateClientContextRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	user, err := h.service.UpdateClientContext(r.Context(), principal.UserID, input)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menyimpan konteks browser", nil)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]any{
+		"user": user,
+	}, nil)
+}
+
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
 	if !ok {

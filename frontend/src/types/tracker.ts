@@ -81,6 +81,9 @@ export interface TrackerConsentAudit {
   consented_at?: string | null;
   revoked_at?: string | null;
   ip_address?: string | null;
+  browser_timezone?: string | null;
+  tracker_extension_version?: string | null;
+  tracker_extension_reported_at?: string | null;
   last_session_started_at?: string | null;
   last_activity_at?: string | null;
 }

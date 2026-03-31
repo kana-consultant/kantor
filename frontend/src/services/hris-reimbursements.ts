@@ -1,5 +1,5 @@
-﻿import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { toUTCDateOnlyISOString } from "@/lib/date";
+import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toDateOnlyString } from "@/lib/date";
 import type {
   Reimbursement,
   ReimbursementFilters,
@@ -23,6 +23,8 @@ export async function listReimbursements(filters: ReimbursementFilters) {
   if (filters.employee) search.set("employee", filters.employee);
   if (filters.month) search.set("month", filters.month);
   if (filters.year) search.set("year", filters.year);
+  if (filters.sortBy) search.set("sort_by", filters.sortBy);
+  if (filters.sortOrder) search.set("sort_order", filters.sortOrder);
 
   const envelope = await authRequestEnvelope<Reimbursement[]>(
     `/hris/reimbursements?${search.toString()}`,
@@ -44,7 +46,7 @@ export async function createReimbursement(values: ReimbursementFormValues) {
     "/hris/reimbursements",
     {
       ...values,
-      transaction_date: toUTCDateOnlyISOString(values.transaction_date),
+      transaction_date: toDateOnlyString(values.transaction_date),
     },
   );
 }
@@ -95,7 +97,7 @@ export async function updateReimbursement(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...values,
-        transaction_date: toUTCDateOnlyISOString(values.transaction_date),
+        transaction_date: toDateOnlyString(values.transaction_date),
         kept_attachments: keptAttachments ?? null,
       }),
     },
@@ -115,4 +117,3 @@ export async function getReimbursementSummary(month: string, year: string) {
   if (year) search.set("year", year);
   return authGetJSON<ReimbursementSummary>(`/hris/reimbursements/summary?${search.toString()}`);
 }
-

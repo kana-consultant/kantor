@@ -21,6 +21,11 @@ export interface DataTableColumn<TData> {
   hideOnMobile?: boolean;
 }
 
+export type SortState = {
+  columnId: string;
+  direction: "asc" | "desc";
+} | null;
+
 interface DataTableProps<TData> {
   columns: Array<DataTableColumn<TData>>;
   data: TData[];
@@ -35,6 +40,9 @@ interface DataTableProps<TData> {
   emptyDescription: string;
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
+  manualSorting?: boolean;
+  sortState?: SortState;
+  onSortChange?: (next: SortState) => void;
   pagination?: {
     page: number;
     perPage: number;
@@ -42,11 +50,6 @@ interface DataTableProps<TData> {
     onPageChange: (page: number) => void;
   };
 }
-
-type SortState = {
-  columnId: string;
-  direction: "asc" | "desc";
-} | null;
 
 export function DataTable<TData>({
   columns,
@@ -62,16 +65,20 @@ export function DataTable<TData>({
   emptyDescription,
   emptyActionLabel,
   onEmptyAction,
+  manualSorting = false,
+  sortState: controlledSortState,
+  onSortChange,
   pagination,
 }: DataTableProps<TData>) {
-  const [sortState, setSortState] = useState<SortState>(null);
+  const [internalSortState, setInternalSortState] = useState<SortState>(null);
+  const activeSortState = manualSorting ? controlledSortState ?? null : internalSortState;
 
   const sortedRows = useMemo(() => {
-    if (!sortState) {
+    if (manualSorting || !activeSortState) {
       return data;
     }
 
-    const column = columns.find((item) => item.id === sortState.columnId);
+    const column = columns.find((item) => item.id === activeSortState.columnId);
     if (!column) {
       return data;
     }
@@ -92,20 +99,19 @@ export function DataTable<TData>({
       }
 
       if (typeof leftValue === "number" && typeof rightValue === "number") {
-        return sortState.direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
+        return activeSortState.direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
       }
 
       const comparison = String(leftValue).localeCompare(String(rightValue), "id");
-      return sortState.direction === "asc" ? comparison : -comparison;
+      return activeSortState.direction === "asc" ? comparison : -comparison;
     });
 
     return next;
-  }, [columns, data, sortState]);
+  }, [activeSortState, columns, data, manualSorting]);
 
   const totalPages = pagination ? Math.max(1, Math.ceil(pagination.total / pagination.perPage)) : 1;
   const mobileColumns = columns.filter((column) => !column.hideOnMobile);
-  const mobilePrimaryColumn =
-    mobileColumns.find((column) => column.mobilePrimary) ?? mobileColumns[0] ?? null;
+  const mobilePrimaryColumn = mobileColumns.find((column) => column.mobilePrimary) ?? mobileColumns[0] ?? null;
 
   if (loading) {
     return <DataTablePageSkeleton columns={columns.length} rows={loadingRows} />;
@@ -122,6 +128,15 @@ export function DataTable<TData>({
       />
     );
   }
+
+  const handleSort = (columnId: string) => {
+    const nextSortState = toggleSort(activeSortState, columnId);
+    if (manualSorting) {
+      onSortChange?.(nextSortState);
+      return;
+    }
+    setInternalSortState(nextSortState);
+  };
 
   return (
     <div className="table-shell">
@@ -215,11 +230,11 @@ export function DataTable<TData>({
                   {column.sortable ? (
                     <button
                       className="inline-flex items-center gap-2 transition hover:text-text-primary"
-                      onClick={() => setSortState(toggleSort(sortState, column.id))}
+                      onClick={() => handleSort(column.id)}
                       type="button"
                     >
                       <span>{column.header}</span>
-                      <SortIndicator active={sortState?.columnId === column.id} direction={sortState?.direction} />
+                      <SortIndicator active={activeSortState?.columnId === column.id} direction={activeSortState?.direction} />
                     </button>
                   ) : (
                     column.header

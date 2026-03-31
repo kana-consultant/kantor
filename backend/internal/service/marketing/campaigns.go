@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/repository"
@@ -75,6 +76,15 @@ func NewCampaignsService(
 }
 
 func (s *CampaignsService) CreateCampaign(ctx context.Context, request marketingdto.CreateCampaignRequest, actorID string) (CampaignDetail, error) {
+	startDate, err := shareddto.ParseDateOnly(request.StartDate)
+	if err != nil {
+		return CampaignDetail{}, err
+	}
+
+	endDate, err := shareddto.ParseDateOnly(request.EndDate)
+	if err != nil {
+		return CampaignDetail{}, err
+	}
 	item, err := s.repo.CreateCampaign(ctx, marketingrepo.UpsertCampaignParams{
 		Name:           strings.TrimSpace(request.Name),
 		Description:    trimOptionalString(request.Description),
@@ -82,8 +92,8 @@ func (s *CampaignsService) CreateCampaign(ctx context.Context, request marketing
 		BudgetAmount:   request.BudgetAmount,
 		BudgetCurrency: normalizeCurrency(request.BudgetCurrency),
 		PICEmployeeID:  trimOptionalString(request.PICEmployeeID),
-		StartDate:      request.StartDate,
-		EndDate:        request.EndDate,
+		StartDate:      startDate,
+		EndDate:        endDate,
 		BriefText:      trimOptionalString(request.BriefText),
 		Status:         request.Status,
 		ActorID:        actorID,
@@ -140,6 +150,15 @@ func (s *CampaignsService) GetCampaign(ctx context.Context, campaignID string) (
 }
 
 func (s *CampaignsService) UpdateCampaign(ctx context.Context, campaignID string, request marketingdto.UpdateCampaignRequest, actorID string) (CampaignDetail, error) {
+	startDate, err := shareddto.ParseDateOnly(request.StartDate)
+	if err != nil {
+		return CampaignDetail{}, err
+	}
+
+	endDate, err := shareddto.ParseDateOnly(request.EndDate)
+	if err != nil {
+		return CampaignDetail{}, err
+	}
 	item, err := s.repo.UpdateCampaign(ctx, campaignID, marketingrepo.UpsertCampaignParams{
 		Name:           strings.TrimSpace(request.Name),
 		Description:    trimOptionalString(request.Description),
@@ -147,8 +166,8 @@ func (s *CampaignsService) UpdateCampaign(ctx context.Context, campaignID string
 		BudgetAmount:   request.BudgetAmount,
 		BudgetCurrency: normalizeCurrency(request.BudgetCurrency),
 		PICEmployeeID:  trimOptionalString(request.PICEmployeeID),
-		StartDate:      request.StartDate,
-		EndDate:        request.EndDate,
+		StartDate:      startDate,
+		EndDate:        endDate,
 		BriefText:      trimOptionalString(request.BriefText),
 		Status:         request.Status,
 		ActorID:        actorID,

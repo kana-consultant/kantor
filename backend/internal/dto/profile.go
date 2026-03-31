@@ -16,3 +16,9 @@ type UpdateProfileRequest struct {
 	LinkedInProfile   *string `json:"linkedin_profile" validate:"omitempty,max=500"`
 	SSHKeys           *string `json:"ssh_keys" validate:"omitempty,max=8000"`
 }
+
+type UpdateClientContextRequest struct {
+	Timezone              *string `json:"timezone" validate:"omitempty,min=1,max=64"`
+	TimezoneOffsetMinutes *int    `json:"timezone_offset_minutes" validate:"omitempty,min=-720,max=840"`
+	Locale                *string `json:"locale" validate:"omitempty,min=2,max=32"`
+}

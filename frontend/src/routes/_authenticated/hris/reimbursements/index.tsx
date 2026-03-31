@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,7 +7,7 @@ import { Controller, useForm } from "react-hook-form";
 import { CircleDollarSign, Pencil, Plus, Receipt, TimerReset, Trash2 } from "lucide-react";
 import { z } from "zod";
 
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { DataTable, type DataTableColumn, type SortState } from "@/components/shared/data-table";
 import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
@@ -60,6 +60,8 @@ const defaultFilters: ReimbursementFilters = {
   employee: "",
   month: String(new Date().getMonth() + 1),
   year: String(new Date().getFullYear()),
+  sortBy: "created_at",
+  sortOrder: "desc",
 };
 
 export const Route = createFileRoute("/_authenticated/hris/reimbursements/")({
@@ -177,6 +179,16 @@ function ReimbursementsPage() {
   const employees = employeesQuery.data?.items ?? [];
   const meta = reimbursementsQuery.data?.meta;
   const canReview = hasPermission(permissions.hrisReimbursementApprove);
+  const reimbursementSortState = useMemo<SortState>(() => {
+    if (!filters.sortBy || filters.sortBy === "created_at" || !filters.sortOrder) {
+      return null;
+    }
+
+    return {
+      columnId: filters.sortBy,
+      direction: filters.sortOrder,
+    };
+  }, [filters.sortBy, filters.sortOrder]);
   const canMarkPaid = hasRole("manager", "hris") || hasRole("admin", "hris") || hasRole("super_admin");
   const reimbursements = reimbursementsQuery.data?.items ?? [];
 
@@ -655,6 +667,16 @@ function ReimbursementsPage() {
       <DataTable
         columns={columns}
         data={reimbursements}
+        manualSorting
+        sortState={reimbursementSortState}
+        onSortChange={(nextSort) =>
+          setFilters((current) => ({
+            ...current,
+            page: 1,
+            sortBy: nextSort?.columnId ? (nextSort.columnId as ReimbursementFilters["sortBy"]) : "created_at",
+            sortOrder: nextSort?.direction ?? "desc",
+          }))
+        }
         emptyActionLabel={hasPermission(permissions.hrisReimbursementCreate) ? "Submit reimbursement" : undefined}
         emptyDescription="No reimbursement requests match the current filter."
         emptyTitle="No reimbursements found"
@@ -676,4 +698,8 @@ function ReimbursementsPage() {
     </div>
   );
 }
+
+
+
+
 

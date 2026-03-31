@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
@@ -44,13 +45,18 @@ func (s *EmployeesService) SetAuthRepo(syncer userFieldsSyncer) {
 }
 
 func (s *EmployeesService) CreateEmployee(ctx context.Context, request hrisdto.CreateEmployeeRequest) (model.Employee, error) {
+	dateJoined, err := shareddto.ParseDateOnly(request.DateJoined)
+	if err != nil {
+		return model.Employee{}, err
+	}
+
 	employee, err := s.repo.CreateEmployee(ctx, hrisrepo.UpsertEmployeeParams{
 		FullName:          strings.TrimSpace(request.FullName),
 		Email:             strings.ToLower(strings.TrimSpace(request.Email)),
 		Phone:             trimOptionalString(request.Phone),
 		Position:          strings.TrimSpace(request.Position),
 		Department:        trimOptionalString(request.Department),
-		DateJoined:        request.DateJoined,
+		DateJoined:        dateJoined,
 		EmploymentStatus:  strings.TrimSpace(request.EmploymentStatus),
 		Address:           trimOptionalString(request.Address),
 		EmergencyContact:  trimOptionalString(request.EmergencyContact),
@@ -102,13 +108,18 @@ func (s *EmployeesService) GetEmployee(ctx context.Context, employeeID string) (
 }
 
 func (s *EmployeesService) UpdateEmployee(ctx context.Context, employeeID string, request hrisdto.UpdateEmployeeRequest) (model.Employee, error) {
+	dateJoined, err := shareddto.ParseDateOnly(request.DateJoined)
+	if err != nil {
+		return model.Employee{}, err
+	}
+
 	employee, err := s.repo.UpdateEmployee(ctx, employeeID, hrisrepo.UpsertEmployeeParams{
 		FullName:          strings.TrimSpace(request.FullName),
 		Email:             strings.ToLower(strings.TrimSpace(request.Email)),
 		Phone:             trimOptionalString(request.Phone),
 		Position:          strings.TrimSpace(request.Position),
 		Department:        trimOptionalString(request.Department),
-		DateJoined:        request.DateJoined,
+		DateJoined:        dateJoined,
 		EmploymentStatus:  strings.TrimSpace(request.EmploymentStatus),
 		Address:           trimOptionalString(request.Address),
 		EmergencyContact:  trimOptionalString(request.EmergencyContact),
@@ -122,7 +133,6 @@ func (s *EmployeesService) UpdateEmployee(ctx context.Context, employeeID string
 		return model.Employee{}, mapEmployeeError(err)
 	}
 
-	// Sync full_name and email back to users table if linked
 	if employee.UserID != nil && s.authRepo != nil {
 		_ = s.authRepo.UpdateUserFields(ctx, *employee.UserID, employee.FullName, employee.Email)
 		_ = s.authRepo.UpdateUserAvatar(ctx, *employee.UserID, employee.AvatarURL)

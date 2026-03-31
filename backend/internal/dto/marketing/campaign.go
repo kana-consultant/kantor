@@ -1,31 +1,31 @@
 package marketing
 
-import "time"
+import dto "github.com/kana-consultant/kantor/backend/internal/dto"
 
 type CreateCampaignRequest struct {
-	Name           string    `json:"name" validate:"required,min=3,max=180"`
-	Description    *string   `json:"description"`
-	Channel        string    `json:"channel" validate:"required,oneof=instagram facebook google_ads tiktok youtube email other"`
-	BudgetAmount   int64     `json:"budget_amount" validate:"min=0"`
-	BudgetCurrency string    `json:"budget_currency" validate:"omitempty,max=8"`
-	PICEmployeeID  *string   `json:"pic_employee_id" validate:"omitempty,uuid4"`
-	StartDate      time.Time `json:"start_date" validate:"required"`
-	EndDate        time.Time `json:"end_date" validate:"required"`
-	BriefText      *string   `json:"brief_text"`
-	Status         string    `json:"status" validate:"required,oneof=ideation planning in_production live completed archived"`
+	Name           string       `json:"name" validate:"required,min=3,max=180"`
+	Description    *string      `json:"description"`
+	Channel        string       `json:"channel" validate:"required,oneof=instagram facebook google_ads tiktok youtube email other"`
+	BudgetAmount   int64        `json:"budget_amount" validate:"min=0"`
+	BudgetCurrency string       `json:"budget_currency" validate:"omitempty,max=8"`
+	PICEmployeeID  *string      `json:"pic_employee_id" validate:"omitempty,uuid4"`
+	StartDate      dto.DateOnly `json:"start_date" validate:"required,datetime=2006-01-02"`
+	EndDate        dto.DateOnly `json:"end_date" validate:"required,datetime=2006-01-02"`
+	BriefText      *string      `json:"brief_text"`
+	Status         string       `json:"status" validate:"required,oneof=ideation planning in_production live completed archived"`
 }
 
 type UpdateCampaignRequest struct {
-	Name           string    `json:"name" validate:"required,min=3,max=180"`
-	Description    *string   `json:"description"`
-	Channel        string    `json:"channel" validate:"required,oneof=instagram facebook google_ads tiktok youtube email other"`
-	BudgetAmount   int64     `json:"budget_amount" validate:"min=0"`
-	BudgetCurrency string    `json:"budget_currency" validate:"omitempty,max=8"`
-	PICEmployeeID  *string   `json:"pic_employee_id" validate:"omitempty,uuid4"`
-	StartDate      time.Time `json:"start_date" validate:"required"`
-	EndDate        time.Time `json:"end_date" validate:"required"`
-	BriefText      *string   `json:"brief_text"`
-	Status         string    `json:"status" validate:"required,oneof=ideation planning in_production live completed archived"`
+	Name           string       `json:"name" validate:"required,min=3,max=180"`
+	Description    *string      `json:"description"`
+	Channel        string       `json:"channel" validate:"required,oneof=instagram facebook google_ads tiktok youtube email other"`
+	BudgetAmount   int64        `json:"budget_amount" validate:"min=0"`
+	BudgetCurrency string       `json:"budget_currency" validate:"omitempty,max=8"`
+	PICEmployeeID  *string      `json:"pic_employee_id" validate:"omitempty,uuid4"`
+	StartDate      dto.DateOnly `json:"start_date" validate:"required,datetime=2006-01-02"`
+	EndDate        dto.DateOnly `json:"end_date" validate:"required,datetime=2006-01-02"`
+	BriefText      *string      `json:"brief_text"`
+	Status         string       `json:"status" validate:"required,oneof=ideation planning in_production live completed archived"`
 }
 
 type ListCampaignsQuery struct {

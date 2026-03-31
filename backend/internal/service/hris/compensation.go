@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
@@ -54,6 +55,11 @@ func NewCompensationService(repo compensationRepository, employeesRepo compensat
 }
 
 func (s *CompensationService) CreateSalary(ctx context.Context, employeeID string, request hrisdto.CreateSalaryRequest, actorID string) (model.SalaryRecord, error) {
+	effectiveDate, err := shareddto.ParseDateOnly(request.EffectiveDate)
+	if err != nil {
+		return model.SalaryRecord{}, err
+	}
+
 	if _, err := s.employeesRepo.GetEmployeeByID(ctx, employeeID); err != nil {
 		return model.SalaryRecord{}, err
 	}
@@ -82,7 +88,7 @@ func (s *CompensationService) CreateSalary(ctx context.Context, employeeID strin
 		Allowances:    allowancesCipher,
 		Deductions:    deductionsCipher,
 		NetSalary:     netCipher,
-		EffectiveDate: request.EffectiveDate,
+		EffectiveDate: effectiveDate,
 		CreatedBy:     actorID,
 	})
 	if err != nil {

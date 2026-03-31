@@ -13,8 +13,8 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	"github.com/kana-consultant/kantor/backend/internal/model"
-	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
+	repository "github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
 var (
@@ -534,12 +534,12 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
+		SELECT %s
 		FROM users
 		WHERE %s
 		ORDER BY created_at DESC
 		LIMIT $%d OFFSET $%d
-	`, whereClause, index, index+1)
+	`, userSelectColumns, whereClause, index, index+1)
 	args = append(args, perPage, (page-1)*perPage)
 
 	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
@@ -553,21 +553,7 @@ func (r *Repository) ListAdminUsers(ctx context.Context, params dto.ListUsersQue
 	var users []model.User
 	for rows.Next() {
 		var user model.User
-		if err := rows.Scan(
-			&user.ID,
-			&user.Email,
-			&user.PasswordHash,
-			&user.FullName,
-			&user.AvatarURL,
-			&user.Department,
-			&user.Skills,
-			&user.IsActive,
-			&user.IsSuperAdmin,
-			&user.FailedLoginAttempts,
-			&user.LockedUntil,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		); err != nil {
+		if err := scanUser(rows, &user); err != nil {
 			return nil, 0, err
 		}
 		users = append(users, user)

@@ -275,6 +275,8 @@ func (h *ReimbursementsHandler) parseListQuery(w http.ResponseWriter, r *http.Re
 	query := hrisdto.ListReimbursementsQuery{
 		Status:     r.URL.Query().Get("status"),
 		EmployeeID: r.URL.Query().Get("employee"),
+		SortBy:     r.URL.Query().Get("sort_by"),
+		SortOrder:  r.URL.Query().Get("sort_order"),
 	}
 	if value := strings.TrimSpace(r.URL.Query().Get("page")); value != "" {
 		page, err := strconv.Atoi(value)

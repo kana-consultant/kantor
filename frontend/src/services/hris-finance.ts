@@ -1,5 +1,5 @@
-﻿import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { toUTCDateOnlyISOString } from "@/lib/date";
+import { authGetJSON, authPostJSON, authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toDateOnlyString } from "@/lib/date";
 import type {
   FinanceCategory,
   FinanceCategoryFormValues,
@@ -73,7 +73,7 @@ export async function createFinanceRecord(values: FinanceRecordFormValues) {
     "/hris/finance/records",
     {
       ...values,
-      record_date: toUTCDateOnlyISOString(values.record_date),
+      record_date: toDateOnlyString(values.record_date),
     },
   );
 }
@@ -86,7 +86,7 @@ export async function updateFinanceRecord(recordId: string, values: FinanceRecor
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...values,
-        record_date: toUTCDateOnlyISOString(values.record_date),
+        record_date: toDateOnlyString(values.record_date),
       }),
     },
   );
@@ -120,3 +120,4 @@ export async function reviewFinanceRecord(recordId: string, decision: "approved"
 export async function getFinanceSummary(year: number) {
   return authGetJSON<FinanceSummary>(`/hris/finance/summary?year=${year}`);
 }
+

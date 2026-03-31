@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
@@ -83,6 +84,10 @@ func (s *ReimbursementsService) SetWANotifier(n ReimbursementStatusNotifier) {
 }
 
 func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.CreateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
+	transactionDate, err := shareddto.ParseDateOnly(request.TransactionDate)
+	if err != nil {
+		return model.Reimbursement{}, err
+	}
 	employee, err := s.employeesRepo.GetEmployeeByID(ctx, request.EmployeeID)
 	if err != nil {
 		return model.Reimbursement{}, mapReimbursementError(err)
@@ -99,7 +104,7 @@ func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.Crea
 		Title:           strings.TrimSpace(request.Title),
 		Category:        strings.TrimSpace(request.Category),
 		Amount:          request.Amount,
-		TransactionDate: request.TransactionDate,
+		TransactionDate: transactionDate,
 		Description:     strings.TrimSpace(request.Description),
 		SubmittedBy:     actorID,
 	})
@@ -146,6 +151,8 @@ func (s *ReimbursementsService) List(ctx context.Context, query hrisdto.ListReim
 		Department: "",
 		Month:      query.Month,
 		Year:       query.Year,
+		SortBy:     strings.TrimSpace(query.SortBy),
+		SortOrder:  strings.TrimSpace(query.SortOrder),
 	})
 	return items, total, page, perPage, err
 }
@@ -162,6 +169,10 @@ func (s *ReimbursementsService) Get(ctx context.Context, reimbursementID string,
 }
 
 func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID string, request hrisdto.UpdateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
+	transactionDate, err := shareddto.ParseDateOnly(request.TransactionDate)
+	if err != nil {
+		return model.Reimbursement{}, err
+	}
 	item, err := s.repo.GetByID(ctx, reimbursementID)
 	if err != nil {
 		return model.Reimbursement{}, mapReimbursementError(err)
@@ -183,7 +194,7 @@ func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID stri
 		Title:           strings.TrimSpace(request.Title),
 		Category:        strings.TrimSpace(request.Category),
 		Amount:          request.Amount,
-		TransactionDate: request.TransactionDate,
+		TransactionDate: transactionDate,
 		Description:     strings.TrimSpace(request.Description),
 		Attachments:     keptAttachments,
 	})

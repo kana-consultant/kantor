@@ -20,14 +20,35 @@ var (
 	ErrDomainCategoryNotFound = errors.New("domain category not found")
 )
 
+const (
+	trackerMinTimezoneOffsetMinutes = -720
+	trackerMaxTimezoneOffsetMinutes = 840
+)
+
+type TrackerStartSessionParams struct {
+	StartedAt             time.Time
+	TimezoneOffsetMinutes int
+	TimezoneName          *string
+	ExtensionVersion      *string
+}
+
 type TrackerHeartbeatParams struct {
-	SessionID string
-	UserID    string
-	URL       string
-	Domain    string
-	PageTitle *string
-	IsIdle    bool
-	Timestamp time.Time
+	SessionID             string
+	UserID                string
+	URL                   string
+	Domain                string
+	PageTitle             *string
+	IsIdle                bool
+	Timestamp             time.Time
+	TimezoneOffsetMinutes int
+	TimezoneName          *string
+	ExtensionVersion      *string
+}
+
+type trackerUserContext struct {
+	BrowserTimezone              *string
+	BrowserTimezoneOffsetMinutes *int
+	TrackerExtensionVersion      *string
 }
 
 type TrackerActivityRange struct {
@@ -134,9 +155,11 @@ func (r *TrackerRepository) UpsertConsent(ctx context.Context, userID string, co
 	return consent, nil
 }
 
-func (r *TrackerRepository) StartSession(ctx context.Context, userID string, startedAt time.Time) (model.ActivitySession, error) {
+func (r *TrackerRepository) StartSession(ctx context.Context, userID string, params TrackerStartSessionParams) (model.ActivitySession, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
+
+	startedAt := params.StartedAt.UTC()
 
 	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
@@ -148,9 +171,19 @@ func (r *TrackerRepository) StartSession(ctx context.Context, userID string, sta
 		}
 	}()
 
+	userContext, timezoneOffsetMinutes, timezoneName, err := r.resolveEffectiveTrackerOffset(ctx, tx, userID, startedAt, params.TimezoneName, params.TimezoneOffsetMinutes)
+	if err != nil {
+		return model.ActivitySession{}, err
+	}
+	if shouldPersistTrackerUserContext(userContext, timezoneName, timezoneOffsetMinutes, params.ExtensionVersion) {
+		if err = r.saveTrackerUserClientContext(ctx, tx, userID, timezoneName, timezoneOffsetMinutes, params.ExtensionVersion, startedAt); err != nil {
+			return model.ActivitySession{}, err
+		}
+	}
+
 	var existing model.ActivitySession
 	err = tx.QueryRow(ctx, `
-		SELECT id::text, user_id::text, date, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
+		SELECT id::text, user_id::text, date, timezone_offset_minutes, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
 		FROM activity_sessions
 		WHERE user_id = $1::uuid AND is_active = TRUE
 		ORDER BY start_time DESC
@@ -160,6 +193,7 @@ func (r *TrackerRepository) StartSession(ctx context.Context, userID string, sta
 		&existing.ID,
 		&existing.UserID,
 		&existing.Date,
+		&existing.TimezoneOffsetMinutes,
 		&existing.StartTime,
 		&existing.EndTime,
 		&existing.TotalActiveSeconds,
@@ -178,23 +212,7 @@ func (r *TrackerRepository) StartSession(ctx context.Context, userID string, sta
 		return model.ActivitySession{}, err
 	}
 
-	var session model.ActivitySession
-	err = tx.QueryRow(ctx, `
-		INSERT INTO activity_sessions (user_id, date, start_time, end_time, total_active_seconds, total_idle_seconds, is_active)
-		VALUES ($1::uuid, $2::date, $3, $3, 0, 0, TRUE)
-		RETURNING id::text, user_id::text, date, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
-	`, userID, startedAt.UTC().Format("2006-01-02"), startedAt.UTC()).Scan(
-		&session.ID,
-		&session.UserID,
-		&session.Date,
-		&session.StartTime,
-		&session.EndTime,
-		&session.TotalActiveSeconds,
-		&session.TotalIdleSeconds,
-		&session.IsActive,
-		&session.CreatedAt,
-		&session.UpdatedAt,
-	)
+	session, err := r.createSession(ctx, tx, userID, startedAt, timezoneOffsetMinutes)
 	if err != nil {
 		return model.ActivitySession{}, err
 	}
@@ -205,7 +223,6 @@ func (r *TrackerRepository) StartSession(ctx context.Context, userID string, sta
 
 	return session, nil
 }
-
 func (r *TrackerRepository) EndSession(ctx context.Context, userID string, sessionID string, endedAt time.Time) (model.ActivitySession, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -215,11 +232,12 @@ func (r *TrackerRepository) EndSession(ctx context.Context, userID string, sessi
 		UPDATE activity_sessions
 		SET end_time = $3, is_active = FALSE, updated_at = $3
 		WHERE id = $1::uuid AND user_id = $2::uuid
-		RETURNING id::text, user_id::text, date, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
+		RETURNING id::text, user_id::text, date, timezone_offset_minutes, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
 	`, sessionID, userID, endedAt.UTC()).Scan(
 		&session.ID,
 		&session.UserID,
 		&session.Date,
+		&session.TimezoneOffsetMinutes,
 		&session.StartTime,
 		&session.EndTime,
 		&session.TotalActiveSeconds,
@@ -237,7 +255,6 @@ func (r *TrackerRepository) EndSession(ctx context.Context, userID string, sessi
 
 	return session, nil
 }
-
 func (r *TrackerRepository) RecordHeartbeat(ctx context.Context, params TrackerHeartbeatParams) (model.ActivityEntry, model.ActivitySession, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -261,32 +278,57 @@ func (r *TrackerRepository) RecordHeartbeat(ctx context.Context, params TrackerH
 		return model.ActivityEntry{}, model.ActivitySession{}, ErrTrackerSessionNotFound
 	}
 
+	params.Domain = strings.ToLower(strings.TrimSpace(params.Domain))
+
 	timestamp := params.Timestamp.UTC()
 	if timestamp.Before(session.StartTime) {
 		timestamp = session.StartTime
 	}
 
-	deltaSeconds := int(timestamp.Sub(session.UpdatedAt).Seconds())
-	if deltaSeconds < 0 {
-		deltaSeconds = 0
+	userContext, timezoneOffsetMinutes, timezoneName, err := r.resolveEffectiveTrackerOffset(ctx, tx, params.UserID, timestamp, params.TimezoneName, params.TimezoneOffsetMinutes)
+	if err != nil {
+		return model.ActivityEntry{}, model.ActivitySession{}, err
+	}
+	params.TimezoneOffsetMinutes = timezoneOffsetMinutes
+	if shouldPersistTrackerUserContext(userContext, timezoneName, timezoneOffsetMinutes, params.ExtensionVersion) {
+		if err = r.saveTrackerUserClientContext(ctx, tx, params.UserID, timezoneName, timezoneOffsetMinutes, params.ExtensionVersion, timestamp); err != nil {
+			return model.ActivityEntry{}, model.ActivitySession{}, err
+		}
 	}
 
-	var entry model.ActivityEntry
-	if !params.IsIdle && deltaSeconds > 0 {
-		category, productive, resolveErr := r.resolveDomainCategory(ctx, tx, params.Domain)
-		if resolveErr != nil {
-			return model.ActivityEntry{}, model.ActivitySession{}, resolveErr
-		}
-
-		entry, err = r.upsertActivityEntry(ctx, tx, params, category, productive, deltaSeconds, timestamp)
+	category := "uncategorized"
+	productive := false
+	if !params.IsIdle {
+		category, productive, err = r.resolveDomainCategory(ctx, tx, params.Domain)
 		if err != nil {
 			return model.ActivityEntry{}, model.ActivitySession{}, err
 		}
 	}
 
-	session, err = r.updateSessionAfterHeartbeat(ctx, tx, session, deltaSeconds, params.IsIdle, timestamp)
-	if err != nil {
-		return model.ActivityEntry{}, model.ActivitySession{}, err
+	var entry model.ActivityEntry
+	if shouldRotateTrackerSession(session, timestamp, params.TimezoneOffsetMinutes) {
+		entry, session, err = r.recordHeartbeatAcrossSessionBoundary(ctx, tx, session, params, timestamp, category, productive)
+		if err != nil {
+			return model.ActivityEntry{}, model.ActivitySession{}, err
+		}
+	} else {
+		deltaSeconds := int(timestamp.Sub(session.UpdatedAt).Seconds())
+		if deltaSeconds < 0 {
+			deltaSeconds = 0
+		}
+
+		if !params.IsIdle && deltaSeconds > 0 {
+			params.SessionID = session.ID
+			entry, err = r.upsertActivityEntry(ctx, tx, params, category, productive, deltaSeconds, timestamp)
+			if err != nil {
+				return model.ActivityEntry{}, model.ActivitySession{}, err
+			}
+		}
+
+		session, err = r.updateSessionAfterHeartbeat(ctx, tx, session, deltaSeconds, params.IsIdle, timestamp)
+		if err != nil {
+			return model.ActivityEntry{}, model.ActivitySession{}, err
+		}
 	}
 
 	if err = tx.Commit(ctx); err != nil {
@@ -295,7 +337,6 @@ func (r *TrackerRepository) RecordHeartbeat(ctx context.Context, params TrackerH
 
 	return entry, session, nil
 }
-
 func (r *TrackerRepository) GetActivityOverview(ctx context.Context, userID string, activityRange TrackerActivityRange) (model.TrackerActivityOverview, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -370,6 +411,7 @@ func (r *TrackerRepository) GetTeamActivity(ctx context.Context, activityRange T
 				e.user_id::text,
 				COALESCE(SUM(e.duration_seconds) FILTER (WHERE COALESCE(dc.is_productive, FALSE)), 0)::bigint AS productive_seconds
 			FROM activity_entries e
+			INNER JOIN activity_sessions s ON s.id = e.session_id
 			LEFT JOIN LATERAL (
 				SELECT is_productive
 				FROM domain_categories
@@ -377,7 +419,7 @@ func (r *TrackerRepository) GetTeamActivity(ctx context.Context, activityRange T
 				ORDER BY LENGTH(domain_pattern) DESC
 				LIMIT 1
 			) dc ON TRUE
-			WHERE e.started_at::date BETWEEN $1::date AND $2::date
+			WHERE s.date BETWEEN $1::date AND $2::date
 			%s
 			GROUP BY e.user_id
 		),
@@ -388,7 +430,8 @@ func (r *TrackerRepository) GetTeamActivity(ctx context.Context, activityRange T
 			FROM (
 				SELECT e.user_id::text AS user_id, e.domain, SUM(e.duration_seconds)::bigint AS duration_seconds
 				FROM activity_entries e
-				WHERE e.started_at::date BETWEEN $1::date AND $2::date
+				INNER JOIN activity_sessions s ON s.id = e.session_id
+				WHERE s.date BETWEEN $1::date AND $2::date
 				%s
 				GROUP BY e.user_id, e.domain
 			) ranked
@@ -432,7 +475,8 @@ func (r *TrackerRepository) GetTeamActivity(ctx context.Context, activityRange T
 	breakdownRows, err := repository.DB(ctx, r.db).Query(ctx, fmt.Sprintf(`
 		SELECT e.user_id::text, e.category, COALESCE(SUM(e.duration_seconds), 0)::bigint
 		FROM activity_entries e
-		WHERE e.started_at::date BETWEEN $1::date AND $2::date
+		INNER JOIN activity_sessions s ON s.id = e.session_id
+		WHERE s.date BETWEEN $1::date AND $2::date
 		%s
 		GROUP BY e.user_id, e.category
 	`, optionalEntryUserFilter(userID, "e.user_id")), args...)
@@ -478,7 +522,6 @@ func (r *TrackerRepository) GetTeamActivity(ctx context.Context, activityRange T
 
 	return overview, nil
 }
-
 func (r *TrackerRepository) GetDailySummary(ctx context.Context, date time.Time) (model.TrackerDailySummary, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -568,6 +611,9 @@ func (r *TrackerRepository) ListConsentAudit(ctx context.Context) ([]model.Track
 		var consentedAt sql.NullTime
 		var revokedAt sql.NullTime
 		var ipAddress sql.NullString
+		var browserTimezone sql.NullString
+		var trackerExtensionVersion sql.NullString
+		var trackerExtensionReportedAt sql.NullTime
 		var lastSessionStartedAt sql.NullTime
 		var lastActivityAt sql.NullTime
 		if err := rows.Scan(
@@ -578,6 +624,9 @@ func (r *TrackerRepository) ListConsentAudit(ctx context.Context) ([]model.Track
 			&consentedAt,
 			&revokedAt,
 			&ipAddress,
+			&browserTimezone,
+			&trackerExtensionVersion,
+			&trackerExtensionReportedAt,
 			&lastSessionStartedAt,
 			&lastActivityAt,
 		); err != nil {
@@ -586,6 +635,9 @@ func (r *TrackerRepository) ListConsentAudit(ctx context.Context) ([]model.Track
 		item.ConsentedAt = nullTimePointer(consentedAt)
 		item.RevokedAt = nullTimePointer(revokedAt)
 		item.IPAddress = nullStringPointer(ipAddress)
+		item.BrowserTimezone = nullStringPointer(browserTimezone)
+		item.TrackerExtensionVersion = nullStringPointer(trackerExtensionVersion)
+		item.TrackerExtensionReportedAt = nullTimePointer(trackerExtensionReportedAt)
 		item.LastSessionStartedAt = nullTimePointer(lastSessionStartedAt)
 		item.LastActivityAt = nullTimePointer(lastActivityAt)
 		items = append(items, item)
@@ -670,7 +722,7 @@ func (r *TrackerRepository) PurgeOldSessions(ctx context.Context, cutoff time.Ti
 func (r *TrackerRepository) getSessionForUpdate(ctx context.Context, tx pgx.Tx, userID string, sessionID string) (model.ActivitySession, error) {
 	var session model.ActivitySession
 	err := tx.QueryRow(ctx, `
-		SELECT id::text, user_id::text, date, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
+		SELECT id::text, user_id::text, date, timezone_offset_minutes, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
 		FROM activity_sessions
 		WHERE id = $1::uuid AND user_id = $2::uuid
 		FOR UPDATE
@@ -678,6 +730,7 @@ func (r *TrackerRepository) getSessionForUpdate(ctx context.Context, tx pgx.Tx, 
 		&session.ID,
 		&session.UserID,
 		&session.Date,
+		&session.TimezoneOffsetMinutes,
 		&session.StartTime,
 		&session.EndTime,
 		&session.TotalActiveSeconds,
@@ -695,6 +748,264 @@ func (r *TrackerRepository) getSessionForUpdate(ctx context.Context, tx pgx.Tx, 
 	return session, nil
 }
 
+func (r *TrackerRepository) createSession(ctx context.Context, tx pgx.Tx, userID string, startedAt time.Time, timezoneOffsetMinutes int) (model.ActivitySession, error) {
+	var session model.ActivitySession
+	dateValue := trackerLocalDateOnly(startedAt, timezoneOffsetMinutes).Format("2006-01-02")
+	err := tx.QueryRow(ctx, `
+		INSERT INTO activity_sessions (user_id, date, timezone_offset_minutes, start_time, end_time, total_active_seconds, total_idle_seconds, is_active)
+		VALUES ($1::uuid, $2::date, $3, $4, $4, 0, 0, TRUE)
+		RETURNING id::text, user_id::text, date, timezone_offset_minutes, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
+	`, userID, dateValue, timezoneOffsetMinutes, startedAt.UTC()).Scan(
+		&session.ID,
+		&session.UserID,
+		&session.Date,
+		&session.TimezoneOffsetMinutes,
+		&session.StartTime,
+		&session.EndTime,
+		&session.TotalActiveSeconds,
+		&session.TotalIdleSeconds,
+		&session.IsActive,
+		&session.CreatedAt,
+		&session.UpdatedAt,
+	)
+	return session, err
+}
+
+func (r *TrackerRepository) closeSessionAt(ctx context.Context, tx pgx.Tx, sessionID string, userID string, endedAt time.Time) (model.ActivitySession, error) {
+	var session model.ActivitySession
+	err := tx.QueryRow(ctx, `
+		UPDATE activity_sessions
+		SET end_time = $3, is_active = FALSE, updated_at = $3
+		WHERE id = $1::uuid AND user_id = $2::uuid
+		RETURNING id::text, user_id::text, date, timezone_offset_minutes, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
+	`, sessionID, userID, endedAt.UTC()).Scan(
+		&session.ID,
+		&session.UserID,
+		&session.Date,
+		&session.TimezoneOffsetMinutes,
+		&session.StartTime,
+		&session.EndTime,
+		&session.TotalActiveSeconds,
+		&session.TotalIdleSeconds,
+		&session.IsActive,
+		&session.CreatedAt,
+		&session.UpdatedAt,
+	)
+	return session, err
+}
+
+func (r *TrackerRepository) recordHeartbeatAcrossSessionBoundary(ctx context.Context, tx pgx.Tx, session model.ActivitySession, params TrackerHeartbeatParams, timestamp time.Time, category string, isProductive bool) (model.ActivityEntry, model.ActivitySession, error) {
+	boundary := trackerSessionBoundaryUTC(session, timestamp, params.TimezoneOffsetMinutes)
+	if boundary.Before(session.UpdatedAt) || boundary.After(timestamp) {
+		boundary = timestamp
+	}
+
+	var entry model.ActivityEntry
+	oldDeltaSeconds := int(boundary.Sub(session.UpdatedAt).Seconds())
+	if oldDeltaSeconds < 0 {
+		oldDeltaSeconds = 0
+	}
+	if !params.IsIdle && oldDeltaSeconds > 0 {
+		oldParams := params
+		oldParams.SessionID = session.ID
+		var err error
+		entry, err = r.upsertActivityEntry(ctx, tx, oldParams, category, isProductive, oldDeltaSeconds, boundary)
+		if err != nil {
+			return model.ActivityEntry{}, model.ActivitySession{}, err
+		}
+	}
+
+	updatedSession, err := r.updateSessionAfterHeartbeat(ctx, tx, session, oldDeltaSeconds, params.IsIdle, boundary)
+	if err != nil {
+		return model.ActivityEntry{}, model.ActivitySession{}, err
+	}
+	updatedSession, err = r.closeSessionAt(ctx, tx, updatedSession.ID, updatedSession.UserID, boundary)
+	if err != nil {
+		return model.ActivityEntry{}, model.ActivitySession{}, err
+	}
+
+	nextSession, err := r.createSession(ctx, tx, updatedSession.UserID, boundary, params.TimezoneOffsetMinutes)
+	if err != nil {
+		return model.ActivityEntry{}, model.ActivitySession{}, err
+	}
+
+	remainingDeltaSeconds := int(timestamp.Sub(nextSession.UpdatedAt).Seconds())
+	if remainingDeltaSeconds < 0 {
+		remainingDeltaSeconds = 0
+	}
+	if !params.IsIdle && remainingDeltaSeconds > 0 {
+		nextParams := params
+		nextParams.SessionID = nextSession.ID
+		entry, err = r.upsertActivityEntry(ctx, tx, nextParams, category, isProductive, remainingDeltaSeconds, timestamp)
+		if err != nil {
+			return model.ActivityEntry{}, model.ActivitySession{}, err
+		}
+	}
+
+	nextSession, err = r.updateSessionAfterHeartbeat(ctx, tx, nextSession, remainingDeltaSeconds, params.IsIdle, timestamp)
+	if err != nil {
+		return model.ActivityEntry{}, model.ActivitySession{}, err
+	}
+
+	return entry, nextSession, nil
+}
+
+func normalizeTrackerTimezoneName(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func normalizeTrackerMetadataString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func trackerOffsetFromTimezone(timestamp time.Time, timezoneName string) (int, bool) {
+	location, err := time.LoadLocation(strings.TrimSpace(timezoneName))
+	if err != nil {
+		return 0, false
+	}
+	_, offsetSeconds := timestamp.In(location).Zone()
+	return normalizeTrackerTimezoneOffset(-(offsetSeconds / 60)), true
+}
+
+func (r *TrackerRepository) getUserTrackerContext(ctx context.Context, tx pgx.Tx, userID string) (trackerUserContext, error) {
+	var context trackerUserContext
+	var browserTimezone sql.NullString
+	var browserTimezoneOffset sql.NullInt32
+	var trackerExtensionVersion sql.NullString
+
+	err := tx.QueryRow(ctx, `
+		SELECT browser_timezone, browser_timezone_offset_minutes, tracker_extension_version
+		FROM users
+		WHERE id = $1::uuid
+	`, userID).Scan(&browserTimezone, &browserTimezoneOffset, &trackerExtensionVersion)
+	if err != nil {
+		return trackerUserContext{}, err
+	}
+
+	context.BrowserTimezone = nullStringPointer(browserTimezone)
+	if browserTimezoneOffset.Valid {
+		value := int(browserTimezoneOffset.Int32)
+		context.BrowserTimezoneOffsetMinutes = &value
+	}
+	context.TrackerExtensionVersion = nullStringPointer(trackerExtensionVersion)
+
+	return context, nil
+}
+
+func (r *TrackerRepository) resolveEffectiveTrackerOffset(ctx context.Context, tx pgx.Tx, userID string, timestamp time.Time, timezoneName *string, requestOffset int) (trackerUserContext, int, *string, error) {
+	userContext, err := r.getUserTrackerContext(ctx, tx, userID)
+	if err != nil {
+		return trackerUserContext{}, 0, nil, err
+	}
+
+	normalizedTimezone := normalizeTrackerTimezoneName(timezoneName)
+	if normalizedTimezone != nil {
+		if offset, ok := trackerOffsetFromTimezone(timestamp, *normalizedTimezone); ok {
+			return userContext, offset, normalizedTimezone, nil
+		}
+	}
+
+	if userContext.BrowserTimezone != nil {
+		if offset, ok := trackerOffsetFromTimezone(timestamp, *userContext.BrowserTimezone); ok {
+			normalizedStoredTimezone := normalizeTrackerTimezoneName(userContext.BrowserTimezone)
+			return userContext, offset, normalizedStoredTimezone, nil
+		}
+	}
+
+	if userContext.BrowserTimezoneOffsetMinutes != nil {
+		return userContext, normalizeTrackerTimezoneOffset(*userContext.BrowserTimezoneOffsetMinutes), normalizedTimezone, nil
+	}
+
+	return userContext, normalizeTrackerTimezoneOffset(requestOffset), normalizedTimezone, nil
+}
+
+func shouldPersistTrackerUserContext(current trackerUserContext, timezoneName *string, timezoneOffsetMinutes int, extensionVersion *string) bool {
+	if current.BrowserTimezoneOffsetMinutes == nil || *current.BrowserTimezoneOffsetMinutes != timezoneOffsetMinutes {
+		return true
+	}
+
+	normalizedTimezone := normalizeTrackerTimezoneName(timezoneName)
+	if normalizedTimezone != nil && (current.BrowserTimezone == nil || !strings.EqualFold(*current.BrowserTimezone, *normalizedTimezone)) {
+		return true
+	}
+
+	normalizedVersion := normalizeTrackerMetadataString(extensionVersion)
+	if normalizedVersion != nil && (current.TrackerExtensionVersion == nil || *current.TrackerExtensionVersion != *normalizedVersion) {
+		return true
+	}
+
+	return false
+}
+
+func (r *TrackerRepository) saveTrackerUserClientContext(ctx context.Context, tx pgx.Tx, userID string, timezoneName *string, timezoneOffsetMinutes int, extensionVersion *string, reportedAt time.Time) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE users
+		SET
+			browser_timezone = COALESCE(NULLIF($2, ''), browser_timezone),
+			browser_timezone_offset_minutes = $3,
+			tracker_extension_version = COALESCE(NULLIF($4, ''), tracker_extension_version),
+			tracker_extension_reported_at = CASE
+				WHEN NULLIF($4, '') IS NOT NULL THEN $5
+				ELSE tracker_extension_reported_at
+			END,
+			updated_at = NOW()
+		WHERE id = $1::uuid
+	`, userID, nullableTrackerText(timezoneName), timezoneOffsetMinutes, nullableTrackerText(extensionVersion), reportedAt.UTC())
+	return err
+}
+
+func normalizeTrackerTimezoneOffset(value int) int {
+	if value < trackerMinTimezoneOffsetMinutes {
+		return trackerMinTimezoneOffsetMinutes
+	}
+	if value > trackerMaxTimezoneOffsetMinutes {
+		return trackerMaxTimezoneOffsetMinutes
+	}
+	return value
+}
+
+func trackerLocalTime(timestamp time.Time, timezoneOffsetMinutes int) time.Time {
+	offset := normalizeTrackerTimezoneOffset(timezoneOffsetMinutes)
+	return timestamp.UTC().Add(-time.Duration(offset) * time.Minute)
+}
+
+func trackerLocalDateOnly(timestamp time.Time, timezoneOffsetMinutes int) time.Time {
+	local := trackerLocalTime(timestamp, timezoneOffsetMinutes)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func trackerLocalDateString(timestamp time.Time, timezoneOffsetMinutes int) string {
+	return trackerLocalDateOnly(timestamp, timezoneOffsetMinutes).Format("2006-01-02")
+}
+
+func trackerSessionBoundaryUTC(session model.ActivitySession, timestamp time.Time, timezoneOffsetMinutes int) time.Time {
+	currentLocalDate := trackerLocalDateOnly(timestamp, timezoneOffsetMinutes)
+	if trackerLocalDateString(timestamp, timezoneOffsetMinutes) == session.Date.Format("2006-01-02") && session.TimezoneOffsetMinutes != timezoneOffsetMinutes {
+		return timestamp
+	}
+	return currentLocalDate.Add(time.Duration(timezoneOffsetMinutes) * time.Minute)
+}
+
+func shouldRotateTrackerSession(session model.ActivitySession, timestamp time.Time, timezoneOffsetMinutes int) bool {
+	if session.TimezoneOffsetMinutes != timezoneOffsetMinutes {
+		return true
+	}
+	return session.Date.Format("2006-01-02") != trackerLocalDateString(timestamp, timezoneOffsetMinutes)
+}
 func (r *TrackerRepository) resolveDomainCategory(ctx context.Context, tx pgx.Tx, domain string) (string, bool, error) {
 	var (
 		category     string
@@ -799,7 +1110,7 @@ func (r *TrackerRepository) updateSessionAfterHeartbeat(ctx context.Context, tx 
 			end_time = $5,
 			updated_at = $5
 		WHERE id = $1::uuid AND user_id = $2::uuid
-		RETURNING id::text, user_id::text, date, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
+		RETURNING id::text, user_id::text, date, timezone_offset_minutes, start_time, end_time, total_active_seconds, total_idle_seconds, is_active, created_at, updated_at
 	`
 	activeDelta := 0
 	idleDelta := 0
@@ -814,6 +1125,7 @@ func (r *TrackerRepository) updateSessionAfterHeartbeat(ctx context.Context, tx 
 		&updated.ID,
 		&updated.UserID,
 		&updated.Date,
+		&updated.TimezoneOffsetMinutes,
 		&updated.StartTime,
 		&updated.EndTime,
 		&updated.TotalActiveSeconds,
@@ -824,12 +1136,12 @@ func (r *TrackerRepository) updateSessionAfterHeartbeat(ctx context.Context, tx 
 	)
 	return updated, err
 }
-
 func (r *TrackerRepository) getProductiveSeconds(ctx context.Context, userID string, activityRange TrackerActivityRange) (int64, error) {
 	var productiveSeconds int64
 	err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COALESCE(SUM(e.duration_seconds) FILTER (WHERE COALESCE(dc.is_productive, FALSE)), 0)::bigint
 		FROM activity_entries e
+		INNER JOIN activity_sessions s ON s.id = e.session_id
 		LEFT JOIN LATERAL (
 			SELECT is_productive
 			FROM domain_categories
@@ -838,7 +1150,7 @@ func (r *TrackerRepository) getProductiveSeconds(ctx context.Context, userID str
 			LIMIT 1
 		) dc ON TRUE
 		WHERE e.user_id = $1::uuid
-		  AND e.started_at::date BETWEEN $2::date AND $3::date
+		  AND s.date BETWEEN $2::date AND $3::date
 	`, userID, activityRange.DateFrom, activityRange.DateTo).Scan(&productiveSeconds)
 	return productiveSeconds, err
 }
@@ -850,6 +1162,7 @@ func (r *TrackerRepository) listCategoryBreakdown(ctx context.Context, userID st
 			COALESCE(SUM(e.duration_seconds), 0)::bigint AS duration_seconds,
 			COALESCE(BOOL_OR(dc.is_productive), FALSE) AS is_productive
 		FROM activity_entries e
+		INNER JOIN activity_sessions s ON s.id = e.session_id
 		LEFT JOIN LATERAL (
 			SELECT is_productive
 			FROM domain_categories
@@ -858,7 +1171,7 @@ func (r *TrackerRepository) listCategoryBreakdown(ctx context.Context, userID st
 			LIMIT 1
 		) dc ON TRUE
 		WHERE e.user_id = $1::uuid
-		  AND e.started_at::date BETWEEN $2::date AND $3::date
+		  AND s.date BETWEEN $2::date AND $3::date
 		GROUP BY e.category
 		ORDER BY duration_seconds DESC, e.category ASC
 	`, userID, activityRange.DateFrom, activityRange.DateTo)
@@ -880,10 +1193,11 @@ func (r *TrackerRepository) listCategoryBreakdown(ctx context.Context, userID st
 
 func (r *TrackerRepository) listHourlyBreakdown(ctx context.Context, userID string, activityRange TrackerActivityRange) ([]model.TrackerHourlyBreakdown, error) {
 	rows, err := repository.DB(ctx, r.db).Query(ctx, `
-		SELECT EXTRACT(HOUR FROM started_at)::int AS hour_value, COALESCE(SUM(duration_seconds), 0)::bigint
-		FROM activity_entries
-		WHERE user_id = $1::uuid
-		  AND started_at::date BETWEEN $2::date AND $3::date
+		SELECT EXTRACT(HOUR FROM (e.started_at - make_interval(mins => s.timezone_offset_minutes)))::int AS hour_value, COALESCE(SUM(e.duration_seconds), 0)::bigint
+		FROM activity_entries e
+		INNER JOIN activity_sessions s ON s.id = e.session_id
+		WHERE e.user_id = $1::uuid
+		  AND s.date BETWEEN $2::date AND $3::date
 		GROUP BY hour_value
 		ORDER BY hour_value ASC
 	`, userID, activityRange.DateFrom, activityRange.DateTo)
@@ -917,9 +1231,6 @@ func (r *TrackerRepository) listHourlyBreakdown(ctx context.Context, userID stri
 }
 
 func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, activityRange TrackerActivityRange, limit int) ([]model.TrackerTopDomain, error) {
-	// Query totalActive BEFORE opening the rows cursor — using a single
-	// *pgxpool.Conn (from tenant middleware context), a second query while
-	// rows are open causes "conn busy".
 	var totalActive int64
 	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT COALESCE(SUM(total_active_seconds), 0)::bigint
@@ -936,6 +1247,7 @@ func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, a
 			COALESCE(SUM(e.duration_seconds), 0)::bigint AS duration_seconds,
 			COALESCE(BOOL_OR(dc.is_productive), FALSE) AS is_productive
 		FROM activity_entries e
+		INNER JOIN activity_sessions s ON s.id = e.session_id
 		LEFT JOIN LATERAL (
 			SELECT category, is_productive
 			FROM domain_categories
@@ -944,7 +1256,7 @@ func (r *TrackerRepository) listTopDomains(ctx context.Context, userID string, a
 			LIMIT 1
 		) dc ON TRUE
 		WHERE e.user_id = $1::uuid
-		  AND e.started_at::date BETWEEN $2::date AND $3::date
+		  AND s.date BETWEEN $2::date AND $3::date
 		GROUP BY e.domain
 		ORDER BY duration_seconds DESC, e.domain ASC
 		LIMIT $4
@@ -976,6 +1288,7 @@ func (r *TrackerRepository) listDomainsByProductivity(ctx context.Context, date 
 			COALESCE(SUM(e.duration_seconds), 0)::bigint AS duration_seconds,
 			COALESCE(BOOL_OR(dc.is_productive), FALSE) AS is_productive
 		FROM activity_entries e
+		INNER JOIN activity_sessions s ON s.id = e.session_id
 		LEFT JOIN LATERAL (
 			SELECT category, is_productive
 			FROM domain_categories
@@ -983,7 +1296,7 @@ func (r *TrackerRepository) listDomainsByProductivity(ctx context.Context, date 
 			ORDER BY LENGTH(domain_pattern) DESC
 			LIMIT 1
 		) dc ON TRUE
-		WHERE e.started_at::date = $1::date
+		WHERE s.date = $1::date
 		  AND COALESCE(dc.is_productive, FALSE) = $2
 		GROUP BY e.domain
 		ORDER BY duration_seconds DESC, e.domain ASC
@@ -1016,7 +1329,6 @@ func (r *TrackerRepository) listDomainsByProductivity(ctx context.Context, date 
 
 	return items, nil
 }
-
 func optionalEntryUserFilter(userID *string, column string) string {
 	if userID == nil || strings.TrimSpace(*userID) == "" {
 		return ""

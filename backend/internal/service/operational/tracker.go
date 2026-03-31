@@ -21,7 +21,7 @@ var (
 type trackerRepository interface {
 	GetConsent(ctx context.Context, userID string) (model.ActivityConsent, error)
 	UpsertConsent(ctx context.Context, userID string, consented bool, ipAddress string, now time.Time) (model.ActivityConsent, error)
-	StartSession(ctx context.Context, userID string, startedAt time.Time) (model.ActivitySession, error)
+	StartSession(ctx context.Context, userID string, params operationalrepo.TrackerStartSessionParams) (model.ActivitySession, error)
 	EndSession(ctx context.Context, userID string, sessionID string, endedAt time.Time) (model.ActivitySession, error)
 	RecordHeartbeat(ctx context.Context, params operationalrepo.TrackerHeartbeatParams) (model.ActivityEntry, model.ActivitySession, error)
 	GetActivityOverview(ctx context.Context, userID string, activityRange operationalrepo.TrackerActivityRange) (model.TrackerActivityOverview, error)
@@ -71,11 +71,22 @@ func (s *TrackerService) RevokeConsent(ctx context.Context, userID string, ipAdd
 	return s.repo.UpsertConsent(ctx, userID, false, ipAddress, now)
 }
 
-func (s *TrackerService) StartSession(ctx context.Context, userID string, now time.Time) (model.ActivitySession, error) {
+func (s *TrackerService) StartSession(ctx context.Context, userID string, request operationaldto.TrackerStartSessionRequest, now time.Time) (model.ActivitySession, error) {
 	if err := s.requireConsent(ctx, userID); err != nil {
 		return model.ActivitySession{}, err
 	}
-	return s.repo.StartSession(ctx, userID, now)
+
+	startedAt := now
+	if request.Timestamp != nil {
+		startedAt = *request.Timestamp
+	}
+
+	return s.repo.StartSession(ctx, userID, operationalrepo.TrackerStartSessionParams{
+		StartedAt:             startedAt,
+		TimezoneOffsetMinutes: request.TimezoneOffsetMinutes,
+		TimezoneName:          request.TimezoneName,
+		ExtensionVersion:      request.ExtensionVersion,
+	})
 }
 
 func (s *TrackerService) EndSession(ctx context.Context, userID string, sessionID string, now time.Time) (model.ActivitySession, error) {
@@ -92,13 +103,16 @@ func (s *TrackerService) RecordHeartbeat(ctx context.Context, userID string, req
 	}
 
 	entry, session, err := s.repo.RecordHeartbeat(ctx, operationalrepo.TrackerHeartbeatParams{
-		SessionID: request.SessionID,
-		UserID:    userID,
-		URL:       strings.TrimSpace(request.URL),
-		Domain:    strings.ToLower(strings.TrimSpace(request.Domain)),
-		PageTitle: request.PageTitle,
-		IsIdle:    request.IsIdle,
-		Timestamp: request.Timestamp,
+		SessionID:             request.SessionID,
+		UserID:                userID,
+		URL:                   strings.TrimSpace(request.URL),
+		Domain:                strings.ToLower(strings.TrimSpace(request.Domain)),
+		PageTitle:             request.PageTitle,
+		IsIdle:                request.IsIdle,
+		Timestamp:             request.Timestamp,
+		TimezoneOffsetMinutes: request.TimezoneOffsetMinutes,
+		TimezoneName:          request.TimezoneName,
+		ExtensionVersion:      request.ExtensionVersion,
 	})
 	if errors.Is(err, operationalrepo.ErrTrackerSessionNotFound) {
 		return model.ActivityEntry{}, model.ActivitySession{}, ErrTrackerSessionNotFound

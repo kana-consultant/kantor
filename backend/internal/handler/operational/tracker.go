@@ -108,7 +108,14 @@ func (h *TrackerHandler) startSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.service.StartSession(r.Context(), principal.UserID, time.Now())
+	var request operationaldto.TrackerStartSessionRequest
+	if r.ContentLength > 0 {
+		if !h.decodeAndValidate(w, r, &request) {
+			return
+		}
+	}
+
+	session, err := h.service.StartSession(r.Context(), principal.UserID, request, time.Now())
 	if err != nil {
 		h.writeError(w, err)
 		return

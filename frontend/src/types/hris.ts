@@ -273,6 +273,8 @@ export interface ReimbursementFilters {
   employee: string;
   month: string;
   year: string;
+  sortBy: "" | "title" | "category" | "amount" | "status" | "transaction_date" | "created_at";
+  sortOrder: "" | "asc" | "desc";
 }
 
 export interface ReimbursementFormValues {
@@ -283,3 +285,5 @@ export interface ReimbursementFormValues {
   transaction_date: string;
   description: string;
 }
+
+

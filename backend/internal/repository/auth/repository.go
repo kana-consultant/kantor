@@ -60,7 +60,7 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 		}
 	}()
 
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO users (email, password_hash, full_name, department, skills, is_active, is_super_admin)
 		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]), TRUE, FALSE)
 		ON CONFLICT (tenant_id, email)
@@ -71,25 +71,11 @@ func (r *Repository) EnsureUserWithRoles(ctx context.Context, params CreateUserP
 			skills = EXCLUDED.skills,
 			is_active = TRUE,
 			updated_at = NOW()
-		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
-	`
+		RETURNING %s
+	`, userSelectColumns)
 
 	var user model.User
-	err = tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName, nullableText(params.Department), params.Skills).Scan(
-		&user.ID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.FullName,
-		&user.AvatarURL,
-		&user.Department,
-		&user.Skills,
-		&user.IsActive,
-		&user.IsSuperAdmin,
-		&user.FailedLoginAttempts,
-		&user.LockedUntil,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err = scanUser(tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName, nullableText(params.Department), params.Skills), &user)
 	if err != nil {
 		return model.User{}, err
 	}
@@ -122,28 +108,14 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 		}
 	}()
 
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO users (email, password_hash, full_name, department, skills, is_super_admin)
 		VALUES ($1, $2, $3, NULLIF($4, ''), COALESCE($5::text[], '{}'::text[]), FALSE)
-		RETURNING id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
-	`
+		RETURNING %s
+	`, userSelectColumns)
 
 	var user model.User
-	err = tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName, nullableText(params.Department), params.Skills).Scan(
-		&user.ID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.FullName,
-		&user.AvatarURL,
-		&user.Department,
-		&user.Skills,
-		&user.IsActive,
-		&user.IsSuperAdmin,
-		&user.FailedLoginAttempts,
-		&user.LockedUntil,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err = scanUser(tx.QueryRow(ctx, query, params.Email, params.PasswordHash, params.FullName, nullableText(params.Department), params.Skills), &user)
 	if err != nil {
 		return model.User{}, err
 	}
@@ -167,28 +139,14 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, params CreateUserP
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.User, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM users
 		WHERE email = $1
-	`
+	`, userSelectColumns)
 
 	var user model.User
-	err := repository.DB(ctx, r.db).QueryRow(ctx, query, email).Scan(
-		&user.ID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.FullName,
-		&user.AvatarURL,
-		&user.Department,
-		&user.Skills,
-		&user.IsActive,
-		&user.IsSuperAdmin,
-		&user.FailedLoginAttempts,
-		&user.LockedUntil,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err := scanUser(repository.DB(ctx, r.db).QueryRow(ctx, query, email), &user)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.User{}, ErrNotFound
@@ -203,28 +161,14 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (model.Us
 func (r *Repository) GetUserByID(ctx context.Context, userID string) (model.User, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	query := `
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
+	query := fmt.Sprintf(`
+		SELECT %s
 		FROM users
 		WHERE id = $1
-	`
+	`, userSelectColumns)
 
 	var user model.User
-	err := repository.DB(ctx, r.db).QueryRow(ctx, query, userID).Scan(
-		&user.ID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.FullName,
-		&user.AvatarURL,
-		&user.Department,
-		&user.Skills,
-		&user.IsActive,
-		&user.IsSuperAdmin,
-		&user.FailedLoginAttempts,
-		&user.LockedUntil,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err := scanUser(repository.DB(ctx, r.db).QueryRow(ctx, query, userID), &user)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.User{}, ErrNotFound
@@ -796,12 +740,12 @@ func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]U
 
 	offset := (page - 1) * perPage
 	listQuery := fmt.Sprintf(`
-		SELECT u.id::text, u.email, u.password_hash, u.full_name, u.avatar_url, u.department, u.skills, u.is_active, u.is_super_admin, u.created_at, u.updated_at
+		SELECT %s
 		FROM users u
 		WHERE %s
 		ORDER BY u.created_at DESC
 		LIMIT $%d OFFSET $%d
-	`, where, idx, idx+1)
+	`, userSelectColumns, where, idx, idx+1)
 	args = append(args, perPage, offset)
 
 	rows, err := repository.DB(ctx, r.db).Query(ctx, listQuery, args...)
@@ -813,7 +757,7 @@ func (r *Repository) ListUsers(ctx context.Context, params ListUsersParams) ([]U
 	result := make([]UserWithRoles, 0)
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.AvatarURL, &u.Department, &u.Skills, &u.IsActive, &u.IsSuperAdmin, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := scanUser(rows, &u); err != nil {
 			return nil, 0, err
 		}
 		result = append(result, UserWithRoles{User: u})

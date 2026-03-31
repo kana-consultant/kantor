@@ -10,8 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/page-shell";
 import { ensureAuthenticated } from "@/services/auth";
-import { fetchSessionProfile } from "@/services/foundation";
+import { fetchSessionProfile, syncClientContext } from "@/services/foundation";
 import { useAuthStore } from "@/stores/auth-store";
+import type { AuthUser } from "@/types/auth";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -38,6 +39,18 @@ function AuthenticatedLayout() {
     }
 
     let active = true;
+    const mergeUser = (user: AuthUser) => {
+      const currentSession = useAuthStore.getState().session;
+      if (!currentSession || currentSession.tokens.access_token !== accessToken) {
+        return;
+      }
+
+      setSession({
+        ...currentSession,
+        user,
+      });
+    };
+
     void fetchSessionProfile()
       .then((profile) => {
         if (!active) {
@@ -59,6 +72,23 @@ function AuthenticatedLayout() {
       })
       .catch(() => {
         // Route guards already handle auth loss; ignore profile sync errors here.
+      });
+
+    const resolvedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+    const locale = navigator.language || null;
+    void syncClientContext({
+      timezone: resolvedTimezone,
+      timezone_offset_minutes: new Date().getTimezoneOffset(),
+      locale,
+    })
+      .then((user) => {
+        if (!active) {
+          return;
+        }
+        mergeUser(user);
+      })
+      .catch(() => {
+        // Timezone sync is a best-effort enhancement.
       });
 
     return () => {

@@ -40,6 +40,8 @@ type ListReimbursementsParams struct {
 	Department string
 	Month      int
 	Year       int
+	SortBy     string
+	SortOrder  string
 }
 
 type UpdateReimbursementParams struct {
@@ -133,6 +135,13 @@ func (r *ReimbursementsRepository) List(ctx context.Context, params ListReimburs
 	}
 
 	offset := (params.Page - 1) * params.PerPage
+	sortColumn := resolveReimbursementSortColumn(params.SortBy)
+	sortOrder := resolveSortOrder(params.SortOrder)
+	orderClause := fmt.Sprintf("%s %s", sortColumn, sortOrder)
+	if sortColumn != "reimbursements.created_at" {
+		orderClause += ", reimbursements.created_at DESC"
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
 			reimbursements.id::text,
@@ -158,9 +167,9 @@ func (r *ReimbursementsRepository) List(ctx context.Context, params ListReimburs
 		FROM reimbursements
 		INNER JOIN employees ON employees.id = reimbursements.employee_id
 		WHERE %s
-		ORDER BY reimbursements.created_at DESC
+		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, whereClause, index, index+1)
+	`, whereClause, orderClause, index, index+1)
 	args = append(args, params.PerPage, offset)
 
 	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
@@ -558,4 +567,30 @@ func nullableText(value *string) interface{} {
 		return nil
 	}
 	return strings.TrimSpace(*value)
+}
+
+func resolveReimbursementSortColumn(value string) string {
+	switch strings.TrimSpace(value) {
+	case "title":
+		return "reimbursements.title"
+	case "category":
+		return "reimbursements.category"
+	case "amount":
+		return "reimbursements.amount"
+	case "status":
+		return "reimbursements.status"
+	case "transaction_date":
+		return "reimbursements.transaction_date"
+	case "created_at":
+		fallthrough
+	default:
+		return "reimbursements.created_at"
+	}
+}
+
+func resolveSortOrder(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "asc") {
+		return "ASC"
+	}
+	return "DESC"
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
@@ -40,15 +41,24 @@ func NewAdsMetricsService(repo adsMetricsRepository) *AdsMetricsService {
 }
 
 func (s *AdsMetricsService) CreateMetric(ctx context.Context, request marketingdto.CreateAdsMetricRequest, actorID string) (model.AdsMetric, error) {
-	if err := validateAdsMetricPeriod(request.PeriodStart, request.PeriodEnd); err != nil {
+	periodStart, err := shareddto.ParseDateOnly(request.PeriodStart)
+	if err != nil {
+		return model.AdsMetric{}, err
+	}
+
+	periodEnd, err := shareddto.ParseDateOnly(request.PeriodEnd)
+	if err != nil {
+		return model.AdsMetric{}, err
+	}
+	if err := validateAdsMetricPeriod(periodStart, periodEnd); err != nil {
 		return model.AdsMetric{}, err
 	}
 
 	item, err := s.repo.CreateMetric(ctx, marketingrepo.UpsertAdsMetricParams{
 		CampaignID:  strings.TrimSpace(request.CampaignID),
 		Platform:    strings.TrimSpace(request.Platform),
-		PeriodStart: request.PeriodStart,
-		PeriodEnd:   request.PeriodEnd,
+		PeriodStart: periodStart,
+		PeriodEnd:   periodEnd,
 		AmountSpent: request.AmountSpent,
 		Impressions: request.Impressions,
 		Clicks:      request.Clicks,
@@ -63,15 +73,25 @@ func (s *AdsMetricsService) CreateMetric(ctx context.Context, request marketingd
 func (s *AdsMetricsService) BatchCreateMetrics(ctx context.Context, request marketingdto.BatchCreateAdsMetricsRequest, actorID string) ([]model.AdsMetric, error) {
 	params := make([]marketingrepo.UpsertAdsMetricParams, 0, len(request.Entries))
 	for _, entry := range request.Entries {
-		if err := validateAdsMetricPeriod(entry.PeriodStart, entry.PeriodEnd); err != nil {
+		periodStart, err := shareddto.ParseDateOnly(entry.PeriodStart)
+		if err != nil {
+			return nil, err
+		}
+
+		periodEnd, err := shareddto.ParseDateOnly(entry.PeriodEnd)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := validateAdsMetricPeriod(periodStart, periodEnd); err != nil {
 			return nil, err
 		}
 
 		params = append(params, marketingrepo.UpsertAdsMetricParams{
 			CampaignID:  strings.TrimSpace(entry.CampaignID),
 			Platform:    strings.TrimSpace(entry.Platform),
-			PeriodStart: entry.PeriodStart,
-			PeriodEnd:   entry.PeriodEnd,
+			PeriodStart: periodStart,
+			PeriodEnd:   periodEnd,
 			AmountSpent: entry.AmountSpent,
 			Impressions: entry.Impressions,
 			Clicks:      entry.Clicks,
@@ -118,15 +138,24 @@ func (s *AdsMetricsService) GetMetric(ctx context.Context, metricID string) (mod
 }
 
 func (s *AdsMetricsService) UpdateMetric(ctx context.Context, metricID string, request marketingdto.UpdateAdsMetricRequest) (model.AdsMetric, error) {
-	if err := validateAdsMetricPeriod(request.PeriodStart, request.PeriodEnd); err != nil {
+	periodStart, err := shareddto.ParseDateOnly(request.PeriodStart)
+	if err != nil {
+		return model.AdsMetric{}, err
+	}
+
+	periodEnd, err := shareddto.ParseDateOnly(request.PeriodEnd)
+	if err != nil {
+		return model.AdsMetric{}, err
+	}
+	if err := validateAdsMetricPeriod(periodStart, periodEnd); err != nil {
 		return model.AdsMetric{}, err
 	}
 
 	item, err := s.repo.UpdateMetric(ctx, strings.TrimSpace(metricID), marketingrepo.UpsertAdsMetricParams{
 		CampaignID:  strings.TrimSpace(request.CampaignID),
 		Platform:    strings.TrimSpace(request.Platform),
-		PeriodStart: request.PeriodStart,
-		PeriodEnd:   request.PeriodEnd,
+		PeriodStart: periodStart,
+		PeriodEnd:   periodEnd,
 		AmountSpent: request.AmountSpent,
 		Impressions: request.Impressions,
 		Clicks:      request.Clicks,

@@ -515,6 +515,23 @@ function OperationalTrackerPage() {
       cell: (row) => <span className="font-mono text-[13px]">{formatDateTime(row.consented_at)}</span>,
     },
     {
+      id: "client_context",
+      header: "Versi & Timezone",
+      cell: (row) => (
+        <div className="space-y-1">
+          <p className="font-mono text-[12px] text-text-primary">
+            {row.tracker_extension_version ? `v${row.tracker_extension_version}` : "Belum lapor versi"}
+          </p>
+          <p className="text-xs text-text-secondary">{row.browser_timezone || "Belum ada fallback timezone"}</p>
+          <p className="text-[11px] text-text-secondary">
+            {row.tracker_extension_reported_at
+              ? `Lapor ${formatDateTime(row.tracker_extension_reported_at)}`
+              : "Menunggu metadata extension"}
+          </p>
+        </div>
+      ),
+    },
+    {
       id: "revoked_at",
       header: "Dicabut",
       sortable: true,
@@ -541,6 +558,9 @@ function OperationalTrackerPage() {
   const consented = Boolean(consentQuery.data?.consented);
   const isExtensionReady = extensionInstalled === true;
   const trackerReady = consented && isExtensionReady;
+  const browserTimezone = session?.user.browser_timezone ?? null;
+  const extensionVersion = session?.user.tracker_extension_version ?? null;
+  const extensionReportedAt = session?.user.tracker_extension_reported_at ?? null;
 
   return (
     <div className="space-y-6">
@@ -695,6 +715,9 @@ function OperationalTrackerPage() {
           onEnableTracking={() => void handleExtensionConnect(true)}
           onOpenConsent={() => setConsentDialogOpen(true)}
           showAdminAuditHint={canAuditConsent}
+          browserTimezone={browserTimezone}
+          extensionVersion={extensionVersion}
+          extensionReportedAt={extensionReportedAt}
         />
       ) : activeTab === "my" ? (
         <MyActivityTab data={myActivityQuery.data} isLoading={myActivityQuery.isLoading} topDomainColumns={topDomainColumns} />
@@ -891,6 +914,9 @@ function TrackerSetupTab({
   onEnableTracking,
   onOpenConsent,
   showAdminAuditHint,
+  browserTimezone,
+  extensionVersion,
+  extensionReportedAt,
 }: {
   consented: boolean;
   extensionInstalled: boolean | null;
@@ -901,12 +927,19 @@ function TrackerSetupTab({
   onEnableTracking: () => void;
   onOpenConsent: () => void;
   showAdminAuditHint: boolean;
+  browserTimezone: string | null;
+  extensionVersion: string | null;
+  extensionReportedAt: string | null;
 }) {
   const extensionStatus = extensionInstalled === true ? "active" : extensionInstalled === false ? "inactive" : "pending";
+  const extensionVersionLabel = extensionVersion ? `v${extensionVersion}` : "Belum terlapor";
+  const timezoneHelper = browserTimezone
+    ? "Backend akan memakai timezone ini saat extension lama belum mengirim metadata lengkap."
+    : "Buka dashboard setelah login agar browser timezone tersimpan sebagai fallback.";
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={PlugZap}
           label="Extension"
@@ -921,13 +954,26 @@ function TrackerSetupTab({
           helper="Izin ini menentukan apakah extension boleh mengirim heartbeat aktivitas."
         />
         <StatCard
-          icon={Users2}
-          label="Laporan Admin"
+          icon={Globe2}
+          label="Fallback Timezone"
           tone="info"
-          value={showAdminAuditHint ? "Ada di Team Activity" : "Manager/Admin only"}
-          helper="Admin dapat melihat siapa yang menyalakan atau mematikan tracker di tabel Consent Audit."
+          value={browserTimezone ?? "Belum tersimpan"}
+          helper={timezoneHelper}
+        />
+        <StatCard
+          icon={Clock3}
+          label="Versi Extension"
+          tone={extensionVersion ? "success" : "warning"}
+          value={extensionVersionLabel}
+          helper={extensionReportedAt ? `Laporan terakhir ${formatDateTime(extensionReportedAt)}` : "Jika kosong, browser fallback tetap dipakai sampai extension diperbarui."}
         />
       </div>
+
+      {showAdminAuditHint ? (
+        <p className="text-sm text-text-secondary">
+          Admin dapat memantau versi extension dan fallback timezone user dari tab <strong>Team Activity</strong> pada tabel <strong>Consent Audit</strong>.
+        </p>
+      ) : null}
 
       <Card className="p-6">
         <div className="border-b border-border pb-4">
@@ -1039,7 +1085,7 @@ function TrackerSetupTab({
                   Admin atau super admin bisa membuka tab <strong>Team Activity</strong>, lalu lihat tabel <strong>Consent Audit</strong>.
                 </p>
                 <p className="text-sm leading-6 text-text-secondary">
-                  Di sana terlihat siapa yang sedang aktif, kapan consent dinyalakan, kapan dimatikan, dan aktivitas terakhirnya.
+                  Di sana terlihat siapa yang sedang aktif, kapan consent dinyalakan, kapan dimatikan, versi extension yang dipakai, timezone fallback yang tersimpan, dan aktivitas terakhirnya.
                 </p>
               </div>
             </div>

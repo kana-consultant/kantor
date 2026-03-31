@@ -1,5 +1,5 @@
-﻿import { authRequestJSON } from "@/lib/api-client";
-import { toUTCDateOnlyISOString } from "@/lib/date";
+import { authRequestJSON } from "@/lib/api-client";
+import { toDateOnlyString } from "@/lib/date";
 import type {
   Subscription,
   SubscriptionAlert,
@@ -69,8 +69,8 @@ function serializeSubscriptionForm(input: SubscriptionFormValues) {
     cost_amount: input.cost_amount,
     cost_currency: input.cost_currency.trim().toUpperCase(),
     billing_cycle: input.billing_cycle,
-    start_date: toUTCDateOnlyISOString(input.start_date),
-    renewal_date: toUTCDateOnlyISOString(input.renewal_date),
+    start_date: toDateOnlyString(input.start_date),
+    renewal_date: toDateOnlyString(input.renewal_date),
     status: input.status,
     pic_employee_id: input.pic_employee_id.trim() || null,
     category: input.category.trim(),
@@ -78,3 +78,4 @@ function serializeSubscriptionForm(input: SubscriptionFormValues) {
     notes: input.notes.trim() || null,
   };
 }
+

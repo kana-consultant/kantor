@@ -1,5 +1,5 @@
-﻿import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { toUTCDateOnlyISOString } from "@/lib/date";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toDateOnlyString } from "@/lib/date";
 import type {
   AdsMetric,
   AdsMetricFilters,
@@ -112,8 +112,8 @@ function serializeAdsMetric(input: AdsMetricFormValues) {
   return {
     campaign_id: input.campaign_id.trim(),
     platform: input.platform,
-    period_start: toUTCDateOnlyISOString(input.period_start),
-    period_end: toUTCDateOnlyISOString(input.period_end),
+    period_start: toDateOnlyString(input.period_start),
+    period_end: toDateOnlyString(input.period_end),
     amount_spent: input.amount_spent,
     impressions: input.impressions,
     clicks: input.clicks,
@@ -122,3 +122,4 @@ function serializeAdsMetric(input: AdsMetricFormValues) {
     notes: input.notes.trim() || null,
   };
 }
+

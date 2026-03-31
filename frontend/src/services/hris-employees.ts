@@ -1,5 +1,5 @@
-﻿import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { toUTCDateOnlyISOString } from "@/lib/date";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toDateOnlyString } from "@/lib/date";
 import type {
   Employee,
   EmployeeFilters,
@@ -98,7 +98,7 @@ function serializeEmployeeForm(input: EmployeeFormValues) {
     phone: input.phone.trim() || null,
     position: input.position.trim(),
     department: input.department.trim() || null,
-    date_joined: toUTCDateOnlyISOString(input.date_joined),
+    date_joined: toDateOnlyString(input.date_joined),
     employment_status: input.employment_status,
     address: input.address.trim() || null,
     emergency_contact: input.emergency_contact.trim() || null,
@@ -109,3 +109,4 @@ function serializeEmployeeForm(input: EmployeeFormValues) {
     ssh_keys: input.ssh_keys.trim() || null,
   };
 }
+

@@ -41,7 +41,7 @@ export const Route = createFileRoute("/_authenticated/operational/overview")({
 function OperationalOverviewPage() {
   const navigate = useNavigate();
   const { hasPermission } = useRBAC();
-  const [canRenderCharts, setCanRenderCharts] = useState(false);
+  const [canRenderCharts, setCanRenderCharts] = useState(true);
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const canCreateProject = hasPermission(permissions.operationalProjectCreate);
   const overviewQuery = useQuery({
@@ -55,18 +55,27 @@ function OperationalOverviewPage() {
       return undefined;
     }
 
+    const updateChartReadiness = () => {
+      const { width, height } = node.getBoundingClientRect();
+      setCanRenderCharts(width > 0 && height > 0);
+    };
+
+    updateChartReadiness();
+    const frameId = window.requestAnimationFrame(updateChartReadiness);
+
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) {
         return;
       }
       const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) {
-        setCanRenderCharts(true);
-      }
+      setCanRenderCharts(width > 0 && height > 0);
     });
 
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
   }, []);
 
   if (overviewQuery.isLoading) {
@@ -92,20 +101,20 @@ function OperationalOverviewPage() {
       <Card className="p-5 sm:p-6 lg:p-7">
         <div className="flex flex-col gap-4 border-b border-border/80 pb-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
-            Operasional
-          </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
+              Operasional
+            </p>
             <h1 className="mt-2 text-[24px] font-bold tracking-tight text-text-primary sm:text-[28px]">
-            Ringkasan eksekusi project
-          </h1>
+              Ringkasan eksekusi project
+            </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
-            Pantau jumlah project aktif, beban task berjalan, task overdue, dan update task terbaru dari seluruh board.
-          </p>
+              Pantau jumlah project aktif, beban task berjalan, task overdue, dan update task terbaru dari seluruh board.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button className="w-full sm:w-auto" onClick={() => void navigate({ to: "/operational/projects" })}>
-            {canCreateProject ? "Kelola project" : "Lihat project"}
-          </Button>
+              {canCreateProject ? "Kelola project" : "Lihat project"}
+            </Button>
           </div>
         </div>
       </Card>
@@ -141,8 +150,8 @@ function OperationalOverviewPage() {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr,1fr]">
-        <Card className="p-6">
+      <div className="grid items-start gap-6 xl:grid-cols-[1.35fr,1fr]">
+        <Card className="self-start p-6">
           <div className="border-b border-border pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
               Aktivitas project
@@ -170,7 +179,11 @@ function OperationalOverviewPage() {
                   <Bar dataKey="value" fill="var(--module-primary)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            ) : null}
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border/80 bg-surface-muted/30 px-6 text-center text-sm text-text-secondary">
+                Grafik mingguan sedang menyesuaikan ukuran tampilan.
+              </div>
+            )}
           </div>
         </Card>
 

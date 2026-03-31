@@ -1,5 +1,5 @@
-﻿import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { toUTCDateOnlyISOString } from "@/lib/date";
+import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
+import { toDateOnlyString } from "@/lib/date";
 import type {
   CampaignActivity,
   CampaignColumn,
@@ -206,9 +206,10 @@ function serializeCampaignForm(input: CampaignFormValues) {
     budget_amount: input.budget_amount,
     budget_currency: input.budget_currency.trim() || "IDR",
     pic_employee_id: input.pic_employee_id.trim() || null,
-    start_date: toUTCDateOnlyISOString(input.start_date),
-    end_date: toUTCDateOnlyISOString(input.end_date),
+    start_date: toDateOnlyString(input.start_date),
+    end_date: toDateOnlyString(input.end_date),
     brief_text: input.brief_text.trim() || null,
     status: input.status,
   };
 }
+

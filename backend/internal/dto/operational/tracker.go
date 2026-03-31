@@ -2,13 +2,23 @@ package operational
 
 import "time"
 
+type TrackerStartSessionRequest struct {
+	Timestamp             *time.Time `json:"timestamp,omitempty"`
+	TimezoneOffsetMinutes int        `json:"timezone_offset_minutes" validate:"min=-720,max=840"`
+	TimezoneName          *string    `json:"timezone_name,omitempty" validate:"omitempty,max=64"`
+	ExtensionVersion      *string    `json:"extension_version,omitempty" validate:"omitempty,max=32"`
+}
+
 type TrackerHeartbeatRequest struct {
-	SessionID string    `json:"session_id" validate:"required,uuid4"`
-	URL       string    `json:"url" validate:"required,url"`
-	Domain    string    `json:"domain" validate:"required,max=255"`
-	PageTitle *string   `json:"page_title,omitempty" validate:"omitempty,max=500"`
-	IsIdle    bool      `json:"is_idle"`
-	Timestamp time.Time `json:"timestamp" validate:"required"`
+	SessionID             string    `json:"session_id" validate:"required,uuid4"`
+	URL                   string    `json:"url" validate:"required,url"`
+	Domain                string    `json:"domain" validate:"required,max=255"`
+	PageTitle             *string   `json:"page_title,omitempty" validate:"omitempty,max=500"`
+	IsIdle                bool      `json:"is_idle"`
+	Timestamp             time.Time `json:"timestamp" validate:"required"`
+	TimezoneOffsetMinutes int       `json:"timezone_offset_minutes" validate:"min=-720,max=840"`
+	TimezoneName          *string   `json:"timezone_name,omitempty" validate:"omitempty,max=64"`
+	ExtensionVersion      *string   `json:"extension_version,omitempty" validate:"omitempty,max=32"`
 }
 
 type TrackerBatchEntriesRequest struct {

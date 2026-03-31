@@ -26,25 +26,11 @@ func (r *Repository) EnsureEmployeeProfileForUser(ctx context.Context, userID st
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var user model.User
-	if err := tx.QueryRow(ctx, `
-		SELECT id::text, email, password_hash, full_name, avatar_url, department, skills, is_active, is_super_admin, failed_login_attempts, locked_until, created_at, updated_at
+	if err := scanUser(tx.QueryRow(ctx, fmt.Sprintf(`
+		SELECT %s
 		FROM users
 		WHERE id = $1::uuid
-	`, userID).Scan(
-		&user.ID,
-		&user.Email,
-		&user.PasswordHash,
-		&user.FullName,
-		&user.AvatarURL,
-		&user.Department,
-		&user.Skills,
-		&user.IsActive,
-		&user.IsSuperAdmin,
-		&user.FailedLoginAttempts,
-		&user.LockedUntil,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	); err != nil {
+	`, userSelectColumns), userID), &user); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.Employee{}, ErrNotFound
 		}

@@ -3,16 +3,17 @@ package model
 import "time"
 
 type ActivitySession struct {
-	ID                 string     `json:"id"`
-	UserID             string     `json:"user_id"`
-	Date               time.Time  `json:"date"`
-	StartTime          time.Time  `json:"start_time"`
-	EndTime            *time.Time `json:"end_time,omitempty"`
-	TotalActiveSeconds int        `json:"total_active_seconds"`
-	TotalIdleSeconds   int        `json:"total_idle_seconds"`
-	IsActive           bool       `json:"is_active"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                    string     `json:"id"`
+	UserID                string     `json:"user_id"`
+	Date                  time.Time  `json:"date"`
+	TimezoneOffsetMinutes int        `json:"timezone_offset_minutes"`
+	StartTime             time.Time  `json:"start_time"`
+	EndTime               *time.Time `json:"end_time,omitempty"`
+	TotalActiveSeconds    int        `json:"total_active_seconds"`
+	TotalIdleSeconds      int        `json:"total_idle_seconds"`
+	IsActive              bool       `json:"is_active"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
 }
 
 type ActivityEntry struct {
@@ -49,15 +50,18 @@ type ActivityConsent struct {
 }
 
 type TrackerConsentAudit struct {
-	UserID               string     `json:"user_id"`
-	UserName             string     `json:"user_name"`
-	UserEmail            string     `json:"user_email"`
-	Consented            bool       `json:"consented"`
-	ConsentedAt          *time.Time `json:"consented_at,omitempty"`
-	RevokedAt            *time.Time `json:"revoked_at,omitempty"`
-	IPAddress            *string    `json:"ip_address,omitempty"`
-	LastSessionStartedAt *time.Time `json:"last_session_started_at,omitempty"`
-	LastActivityAt       *time.Time `json:"last_activity_at,omitempty"`
+	UserID                     string     `json:"user_id"`
+	UserName                   string     `json:"user_name"`
+	UserEmail                  string     `json:"user_email"`
+	Consented                  bool       `json:"consented"`
+	ConsentedAt                *time.Time `json:"consented_at,omitempty"`
+	RevokedAt                  *time.Time `json:"revoked_at,omitempty"`
+	IPAddress                  *string    `json:"ip_address,omitempty"`
+	BrowserTimezone            *string    `json:"browser_timezone,omitempty"`
+	TrackerExtensionVersion    *string    `json:"tracker_extension_version,omitempty"`
+	TrackerExtensionReportedAt *time.Time `json:"tracker_extension_reported_at,omitempty"`
+	LastSessionStartedAt       *time.Time `json:"last_session_started_at,omitempty"`
+	LastActivityAt             *time.Time `json:"last_activity_at,omitempty"`
 }
 
 type TrackerCategoryBreakdown struct {

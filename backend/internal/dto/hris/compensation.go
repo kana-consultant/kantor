@@ -1,12 +1,12 @@
 package hris
 
-import "time"
+import dto "github.com/kana-consultant/kantor/backend/internal/dto"
 
 type CreateSalaryRequest struct {
 	BaseSalary    int64            `json:"base_salary" validate:"required,min=0"`
 	Allowances    map[string]int64 `json:"allowances"`
 	Deductions    map[string]int64 `json:"deductions"`
-	EffectiveDate time.Time        `json:"effective_date" validate:"required"`
+	EffectiveDate dto.DateOnly     `json:"effective_date" validate:"required,datetime=2006-01-02"`
 }
 
 type CreateBonusRequest struct {

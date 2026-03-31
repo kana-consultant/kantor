@@ -344,6 +344,7 @@ func (a *App) buildRouter(
 			r.Group(func(protected chi.Router) {
 				protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load))
 				protected.Get("/auth/me", authHandler.Me)
+				protected.Put("/auth/client-context", authHandler.UpdateClientContext)
 				protected.Get("/auth/profile", authHandler.GetProfile)
 				protected.Put("/auth/profile", authHandler.UpdateProfile)
 				protected.Put("/auth/profile/email", authHandler.ChangeEmail)

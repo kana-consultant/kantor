@@ -1,6 +1,6 @@
 package hris
 
-import "time"
+import dto "github.com/kana-consultant/kantor/backend/internal/dto"
 
 type CreateFinanceCategoryRequest struct {
 	Name string `json:"name" validate:"required,min=2,max=120"`
@@ -10,11 +10,11 @@ type CreateFinanceCategoryRequest struct {
 type UpdateFinanceCategoryRequest = CreateFinanceCategoryRequest
 
 type CreateFinanceRecordRequest struct {
-	CategoryID  string    `json:"category_id" validate:"required,uuid4"`
-	Type        string    `json:"type" validate:"required,oneof=income outcome"`
-	Amount      int64     `json:"amount" validate:"required,min=0"`
-	Description string    `json:"description" validate:"required,min=2,max=2000"`
-	RecordDate  time.Time `json:"record_date" validate:"required"`
+	CategoryID  string       `json:"category_id" validate:"required,uuid4"`
+	Type        string       `json:"type" validate:"required,oneof=income outcome"`
+	Amount      int64        `json:"amount" validate:"required,min=0"`
+	Description string       `json:"description" validate:"required,min=2,max=2000"`
+	RecordDate  dto.DateOnly `json:"record_date" validate:"required,datetime=2006-01-02"`
 }
 
 type UpdateFinanceRecordRequest = CreateFinanceRecordRequest

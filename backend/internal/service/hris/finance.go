@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
@@ -73,12 +74,17 @@ func (s *FinanceService) DeleteCategory(ctx context.Context, categoryID string) 
 }
 
 func (s *FinanceService) CreateRecord(ctx context.Context, request hrisdto.CreateFinanceRecordRequest, actorID string) (model.FinanceRecord, error) {
+	recordDate, err := shareddto.ParseDateOnly(request.RecordDate)
+	if err != nil {
+		return model.FinanceRecord{}, err
+	}
+
 	item, err := s.repo.CreateRecord(ctx, hrisrepo.UpsertFinanceRecordParams{
 		CategoryID:  strings.TrimSpace(request.CategoryID),
 		Type:        strings.TrimSpace(request.Type),
 		Amount:      request.Amount,
 		Description: strings.TrimSpace(request.Description),
-		RecordDate:  request.RecordDate,
+		RecordDate:  recordDate,
 		SubmittedBy: actorID,
 	})
 	return item, mapFinanceServiceError(err)
@@ -118,6 +124,11 @@ func (s *FinanceService) GetRecord(ctx context.Context, recordID string, actorID
 }
 
 func (s *FinanceService) UpdateRecord(ctx context.Context, recordID string, request hrisdto.UpdateFinanceRecordRequest, actorID string, perms *rbac.CachedPermissions) (model.FinanceRecord, error) {
+	recordDate, err := shareddto.ParseDateOnly(request.RecordDate)
+	if err != nil {
+		return model.FinanceRecord{}, err
+	}
+
 	current, err := s.repo.GetRecordByID(ctx, recordID)
 	if err != nil {
 		return model.FinanceRecord{}, mapFinanceServiceError(err)
@@ -130,7 +141,7 @@ func (s *FinanceService) UpdateRecord(ctx context.Context, recordID string, requ
 		Type:        strings.TrimSpace(request.Type),
 		Amount:      request.Amount,
 		Description: strings.TrimSpace(request.Description),
-		RecordDate:  request.RecordDate,
+		RecordDate:  recordDate,
 		SubmittedBy: optionalString(current.SubmittedBy),
 	})
 	return item, mapFinanceServiceError(err)

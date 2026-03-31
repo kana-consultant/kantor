@@ -153,6 +153,9 @@ async function handleHeartbeatTick() {
     page_title: tabInfo.title || tabInfo.domain,
     is_idle: idleState !== "active",
     timestamp: new Date().toISOString(),
+    timezone_offset_minutes: getTimezoneOffsetMinutes(),
+    timezone_name: getTimezoneName(),
+    extension_version: getExtensionVersion(),
   };
 
   await updateState({
@@ -244,7 +247,12 @@ async function ensureActiveSession(forceRestart = false) {
   try {
     const response = await authorizedRequest("/tracker/sessions/start", {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+        timezone_offset_minutes: getTimezoneOffsetMinutes(),
+        timezone_name: getTimezoneName(),
+        extension_version: getExtensionVersion(),
+      }),
     });
     const sessionId = response?.data?.session_id || "";
     await updateState({
@@ -361,7 +369,7 @@ async function fetchTodaySummary() {
   if (!state.apiBaseUrl || !state.token || !state.consented) {
     return;
   }
-  const date = new Date().toISOString().slice(0, 10);
+  const date = formatLocalDate();
   try {
     const summary = await authorizedRequest(`/tracker/my-activity?date_from=${date}&date_to=${date}`, {
       method: "GET",
@@ -501,6 +509,33 @@ function normalizeIdleTimeout(value) {
   return Math.round(parsed);
 }
 
+function getTimezoneOffsetMinutes() {
+  return new Date().getTimezoneOffset();
+}
+
+function getTimezoneName() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return "";
+  }
+}
+
+function getExtensionVersion() {
+  try {
+    return chrome.runtime.getManifest()?.version || "";
+  } catch {
+    return "";
+  }
+}
+
+function formatLocalDate(value = new Date()) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function toDashboardUrl(apiBaseUrl) {
   const value = sanitizeApiBaseUrl(apiBaseUrl);
   if (!value) {
@@ -545,3 +580,4 @@ async function updateState(partial) {
   const current = await loadState();
   await saveState({ ...current, ...partial });
 }
+

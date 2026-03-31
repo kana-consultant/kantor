@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	"github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
@@ -176,6 +177,15 @@ func (s *SubscriptionsService) GenerateSubscriptionAlerts(ctx context.Context, n
 }
 
 func (s *SubscriptionsService) mapParams(ctx context.Context, request hris.CreateSubscriptionRequest, actorID string) (hrisrepo.CreateSubscriptionParams, error) {
+	startDate, err := shareddto.ParseDateOnly(request.StartDate)
+	if err != nil {
+		return hrisrepo.CreateSubscriptionParams{}, err
+	}
+
+	renewalDate, err := shareddto.ParseDateOnly(request.RenewalDate)
+	if err != nil {
+		return hrisrepo.CreateSubscriptionParams{}, err
+	}
 	if request.PICEmployeeID != nil && strings.TrimSpace(*request.PICEmployeeID) != "" {
 		if _, err := s.employeesRepo.GetEmployeeByID(ctx, strings.TrimSpace(*request.PICEmployeeID)); err != nil {
 			return hrisrepo.CreateSubscriptionParams{}, err
@@ -198,8 +208,8 @@ func (s *SubscriptionsService) mapParams(ctx context.Context, request hris.Creat
 		CostAmount:                request.CostAmount,
 		CostCurrency:              strings.ToUpper(strings.TrimSpace(request.CostCurrency)),
 		BillingCycle:              strings.TrimSpace(request.BillingCycle),
-		StartDate:                 request.StartDate,
-		RenewalDate:               request.RenewalDate,
+		StartDate:                 startDate,
+		RenewalDate:               renewalDate,
 		Status:                    strings.TrimSpace(request.Status),
 		PICEmployeeID:             trimOptionalString(request.PICEmployeeID),
 		Category:                  strings.TrimSpace(request.Category),
