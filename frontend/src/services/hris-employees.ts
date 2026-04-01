@@ -48,6 +48,10 @@ export async function getEmployee(employeeId: string) {
   return authRequestJSON<Employee>(`/hris/employees/${employeeId}`, { method: "GET" });
 }
 
+export async function getMyEmployee() {
+  return authRequestJSON<Employee>("/hris/employees/me", { method: "GET" });
+}
+
 export async function createEmployee(input: EmployeeFormValues) {
   return authRequestJSON<Employee>(
     "/hris/employees",

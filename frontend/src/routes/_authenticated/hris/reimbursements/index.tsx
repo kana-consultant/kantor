@@ -22,7 +22,7 @@ import { extractDateInputValue, formatCalendarDate, formatDateInputValue } from 
 import { useRBAC } from "@/hooks/use-rbac";
 import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
-import { employeesKeys, listEmployees } from "@/services/hris-employees";
+import { employeesKeys, getMyEmployee, listEmployees } from "@/services/hris-employees";
 import {
   bulkMarkReimbursementsPaid,
   bulkReviewReimbursements,
@@ -120,10 +120,25 @@ function ReimbursementsPage() {
     }
   }, [editingReimbursement]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const canViewAllEmployees = hasPermission(permissions.hrisEmployeeView);
+
   const employeesQuery = useQuery({
     queryKey: employeesKeys.list({ page: 1, perPage: 100, search: "", department: "", status: "" }),
     queryFn: () => listEmployees({ page: 1, perPage: 100, search: "", department: "", status: "" }),
+    enabled: canViewAllEmployees,
   });
+
+  const myEmployeeQuery = useQuery({
+    queryKey: [...employeesKeys.all, "me"],
+    queryFn: getMyEmployee,
+    enabled: !canViewAllEmployees,
+  });
+
+  useEffect(() => {
+    if (myEmployeeQuery.data && !canViewAllEmployees) {
+      form.setValue("employee_id", myEmployeeQuery.data.id);
+    }
+  }, [myEmployeeQuery.data, canViewAllEmployees]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reimbursementsQuery = useQuery({
     queryKey: reimbursementsKeys.list(filters),
@@ -474,15 +489,23 @@ function ReimbursementsPage() {
             <label className="mb-1 block text-sm font-medium text-text-primary">
               Karyawan<span className="ml-0.5 text-priority-high">*</span>
             </label>
-            <select className="field-select" {...form.register("employee_id")}>
-              <option value="">Pilih karyawan</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.full_name}
-                </option>
-              ))}
-            </select>
-            {form.formState.errors.employee_id ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.employee_id.message}</p> : null}
+            {canViewAllEmployees ? (
+              <>
+                <select className="field-select" {...form.register("employee_id")}>
+                  <option value="">Pilih karyawan</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.full_name}
+                    </option>
+                  ))}
+                </select>
+                {form.formState.errors.employee_id ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.employee_id.message}</p> : null}
+              </>
+            ) : (
+              <p className="flex h-9 items-center rounded-md border border-border bg-surface-muted px-3 text-sm text-text-primary">
+                {myEmployeeQuery.data?.full_name ?? "Memuat..."}
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-text-primary">

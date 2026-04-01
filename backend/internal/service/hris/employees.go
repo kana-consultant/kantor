@@ -26,6 +26,7 @@ type employeesRepository interface {
 	CreateEmployee(ctx context.Context, params hrisrepo.UpsertEmployeeParams) (model.Employee, error)
 	ListEmployees(ctx context.Context, params hrisrepo.ListEmployeesParams) ([]model.Employee, int64, error)
 	GetEmployeeByID(ctx context.Context, employeeID string) (model.Employee, error)
+	GetEmployeeByUserID(ctx context.Context, userID string) (model.Employee, error)
 	UpdateEmployee(ctx context.Context, employeeID string, params hrisrepo.UpsertEmployeeParams) (model.Employee, error)
 	UpdateEmployeeAvatar(ctx context.Context, employeeID string, avatarURL *string) (model.Employee, error)
 	DeleteEmployee(ctx context.Context, employeeID string) error
@@ -100,6 +101,15 @@ func (s *EmployeesService) ListEmployees(ctx context.Context, query hrisdto.List
 
 func (s *EmployeesService) GetEmployee(ctx context.Context, employeeID string) (model.Employee, error) {
 	employee, err := s.repo.GetEmployeeByID(ctx, employeeID)
+	if err != nil {
+		return model.Employee{}, mapEmployeeError(err)
+	}
+
+	return employee, nil
+}
+
+func (s *EmployeesService) GetMyEmployee(ctx context.Context, userID string) (model.Employee, error) {
+	employee, err := s.repo.GetEmployeeByUserID(ctx, userID)
 	if err != nil {
 		return model.Employee{}, mapEmployeeError(err)
 	}

@@ -128,14 +128,16 @@ function OperationalTrackerPage() {
     queryFn: listTrackerConsents,
     enabled: canAuditConsent && activeTab === "team",
     refetchInterval: canAuditConsent && activeTab === "team" ? 5_000 : false,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
+    retry: 1,
   });
   const teamActivityQuery = useQuery({
     queryKey: trackerKeys.teamActivity(dateFrom, dateTo, teamUserFilter || undefined),
     queryFn: () => getTeamTrackerActivity(dateFrom, dateTo, teamUserFilter || undefined),
     enabled: canViewTeam,
     refetchInterval: canViewTeam && activeTab === "team" ? 5_000 : false,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
+    retry: 1,
   });
   const userDetailQuery = useQuery({
     queryKey: trackerKeys.userActivity(selectedUser?.user_id ?? "", dateFrom, dateTo),

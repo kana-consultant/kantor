@@ -51,6 +51,7 @@ type HrisUpcomingRenewal struct {
 
 type HrisOverview struct {
 	TotalEmployees                int64                  `json:"total_employees"`
+	TotalMonthlyPayroll           int64                  `json:"total_monthly_payroll"`
 	ActiveSubscriptions           int64                  `json:"active_subscriptions"`
 	ActiveSubscriptionMonthlyCost int64                  `json:"active_subscription_monthly_cost"`
 	MonthlyNet                    int64                  `json:"monthly_net"`

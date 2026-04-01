@@ -49,6 +49,7 @@ func (h *EmployeesHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:employee:create")).Post("/", h.createEmployee)
 	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/", h.listEmployees)
 	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/export", h.exportList)
+	router.Get("/me", h.getMyEmployee)
 	router.With(platformmiddleware.RequirePermission("hris:employee:view")).Get("/{employeeID}", h.getEmployee)
 	router.With(platformmiddleware.RequireAllPermissions("hris:employee:view", "hris:salary:view")).Get("/{employeeID}/export", h.exportDetail)
 	router.With(platformmiddleware.RequirePermission("hris:employee:edit")).Put("/{employeeID}", h.updateEmployee)
@@ -89,6 +90,22 @@ func (h *EmployeesHandler) listEmployees(w http.ResponseWriter, r *http.Request)
 		"per_page": int64(perPage),
 		"total":    total,
 	})
+}
+
+func (h *EmployeesHandler) getMyEmployee(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	result, err := h.service.GetMyEmployee(r.Context(), principal.UserID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *EmployeesHandler) getEmployee(w http.ResponseWriter, r *http.Request) {

@@ -15,6 +15,7 @@ import {
   Landmark,
   Receipt,
   Users,
+  Wallet,
 } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
@@ -42,7 +43,6 @@ function HrisOverviewPage() {
   const navigate = useNavigate();
   const { hasPermission } = useRBAC();
   const canViewFinance = hasPermission(permissions.hrisFinanceView);
-  const canViewSubscription = hasPermission(permissions.hrisSubscriptionView);
   const canViewReimbursement = hasPermission(permissions.hrisReimbursementView);
 
   const overviewQuery = useQuery({
@@ -96,7 +96,7 @@ function HrisOverviewPage() {
         </div>
       </div>
 
-      <div className={`grid gap-4 ${canViewFinance ? "lg:grid-cols-4" : canViewReimbursement ? "lg:grid-cols-2" : ""}`}>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           helper="Karyawan dengan status employment active."
           icon={Users}
@@ -104,15 +104,21 @@ function HrisOverviewPage() {
           tone="hr"
           value={overview.total_employees.toLocaleString("id-ID")}
         />
-        {canViewSubscription && (
-          <StatCard
-            helper={`${formatIDR(overview.active_subscription_monthly_cost)} per bulan`}
-            icon={CreditCard}
-            label="Active Subscriptions"
-            tone="hr"
-            value={overview.active_subscriptions.toLocaleString("id-ID")}
-          />
-        )}
+        <StatCard
+          helper="Total gaji bersih per bulan seluruh karyawan aktif."
+          icon={Wallet}
+          label="Total Payroll"
+          mono
+          tone="hr"
+          value={formatIDR(overview.total_monthly_payroll)}
+        />
+        <StatCard
+          helper={`${formatIDR(overview.active_subscription_monthly_cost)} per bulan`}
+          icon={CreditCard}
+          label="Active Subscriptions"
+          tone="hr"
+          value={overview.active_subscriptions.toLocaleString("id-ID")}
+        />
         {canViewFinance && (
           <StatCard
             helper="Income dikurangi outcome bulan berjalan."
@@ -134,90 +140,86 @@ function HrisOverviewPage() {
         )}
       </div>
 
-      {(canViewFinance || canViewSubscription) && (
-        <div className="grid gap-6 xl:grid-cols-2">
-          {canViewFinance && (
-            <Card className="p-6">
-              <div className="border-b border-border pb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
-                  Income vs Outcome
-                </p>
-                <h2 className="mt-2 text-[22px] font-bold text-text-primary">
-                  Last 6 months
-                </h2>
-              </div>
-              <div className="mt-6 h-[320px]">
-                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
-                  <BarChart data={overview.income_vs_outcome}>
-                    <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
-                    <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
-                    <YAxis
-                      stroke="hsl(var(--text-tertiary))"
-                      tickFormatter={(value) => compactCurrency(value)}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--surface))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: 8,
-                        boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
-                      }}
-                      formatter={(value) => formatIDR(Number(value))}
-                    />
-                    <Bar dataKey="income" fill="#36B37E" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="outcome" fill="#FF5630" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          )}
-
-          {canViewSubscription && (
-            <Card className="p-6">
-              <div className="border-b border-border pb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
-                  Upcoming Renewals
-                </p>
-                <h2 className="mt-2 text-[22px] font-bold text-text-primary">
-                  Next 30 days
-                </h2>
-              </div>
-              <div className="mt-6 space-y-3">
-                {overview.upcoming_renewals.length > 0 ? (
-                  overview.upcoming_renewals.map((item) => (
-                    <div className="rounded-md border border-border bg-surface p-4" key={item.id}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-text-primary">{item.name}</p>
-                          <p className="mt-1 text-xs text-text-secondary">
-                            {item.vendor} {item.pic_employee_name ? `| PIC ${item.pic_employee_name}` : ""}
-                          </p>
-                        </div>
-                        <StatusBadge
-                          status={alertStatus(item.days_remaining)}
-                          variant="renewal-alert"
-                        />
-                      </div>
-                      <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
-                        <span>{formatCalendarDate(item.renewal_date)}</span>
-                        <span className="font-mono tabular-nums">{formatIDR(item.cost_amount)}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <EmptyState
-                    description="Belum ada subscription aktif yang jatuh tempo dalam 30 hari ke depan."
-                    icon={CreditCard}
-                    title="Tidak ada renewal dekat"
+      <div className="grid gap-6 xl:grid-cols-2">
+        {canViewFinance && (
+          <Card className="p-6">
+            <div className="border-b border-border pb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
+                Income vs Outcome
+              </p>
+              <h2 className="mt-2 text-[22px] font-bold text-text-primary">
+                Last 6 months
+              </h2>
+            </div>
+            <div className="mt-6 h-[320px]">
+              <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
+                <BarChart data={overview.income_vs_outcome}>
+                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
+                  <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
+                  <YAxis
+                    stroke="hsl(var(--text-tertiary))"
+                    tickFormatter={(value) => compactCurrency(value)}
+                    tickLine={false}
+                    axisLine={false}
                   />
-                )}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--surface))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: 8,
+                      boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
+                    }}
+                    formatter={(value) => formatIDR(Number(value))}
+                  />
+                  <Bar dataKey="income" fill="#36B37E" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="outcome" fill="#FF5630" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
+
+          <Card className="p-6">
+            <div className="border-b border-border pb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-hr">
+                Upcoming Renewals
+              </p>
+              <h2 className="mt-2 text-[22px] font-bold text-text-primary">
+                Next 30 days
+              </h2>
+            </div>
+            <div className="mt-6 space-y-3">
+              {overview.upcoming_renewals.length > 0 ? (
+                overview.upcoming_renewals.map((item) => (
+                  <div className="rounded-md border border-border bg-surface p-4" key={item.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{item.name}</p>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          {item.vendor} {item.pic_employee_name ? `| PIC ${item.pic_employee_name}` : ""}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        status={alertStatus(item.days_remaining)}
+                        variant="renewal-alert"
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
+                      <span>{formatCalendarDate(item.renewal_date)}</span>
+                      <span className="font-mono tabular-nums">{formatIDR(item.cost_amount)}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState
+                  description="Belum ada subscription aktif yang jatuh tempo dalam 30 hari ke depan."
+                  icon={CreditCard}
+                  title="Tidak ada renewal dekat"
+                />
+              )}
+            </div>
+          </Card>
+      </div>
 
       {canViewReimbursement && (
         <Card className="p-6">

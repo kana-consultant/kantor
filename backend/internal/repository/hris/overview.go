@@ -28,6 +28,18 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time, emp
 		return model.HrisOverview{}, err
 	}
 
+	// Non-fatal: if salaries table doesn't exist or has no data, use 0
+	_ = repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT COALESCE(SUM(latest.net_salary), 0)::bigint
+		FROM (
+			SELECT DISTINCT ON (s.employee_id) s.net_salary
+			FROM salaries s
+			INNER JOIN employees e ON e.id = s.employee_id
+			WHERE e.employment_status = 'active'
+			ORDER BY s.employee_id, s.effective_date DESC, s.created_at DESC
+		) latest
+	`).Scan(&overview.TotalMonthlyPayroll)
+
 	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			COUNT(*)::bigint,
