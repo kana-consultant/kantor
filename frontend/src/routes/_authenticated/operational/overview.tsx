@@ -150,23 +150,23 @@ function OperationalOverviewPage() {
         />
       </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[1.35fr,1fr]">
-        <Card className="self-start p-6">
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr,340px]">
+        <Card className="min-w-0 p-6">
           <div className="border-b border-border pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
               Aktivitas project
             </p>
-            <h2 className="mt-2 text-[22px] font-bold text-text-primary">
+            <h2 className="mt-1.5 text-xl font-bold text-text-primary">
               Task selesai per minggu
             </h2>
           </div>
-          <div className="mt-6 h-[320px] min-w-0" ref={chartContainerRef}>
+          <div className="mt-6 h-[280px] min-w-0" ref={chartContainerRef}>
             {canRenderCharts ? (
-              <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
-                <BarChart data={overview.completed_by_week}>
+              <ResponsiveContainer height="100%" minHeight={200} minWidth={1} width="100%">
+                <BarChart data={overview.completed_by_week} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                   <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
-                  <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
-                  <YAxis allowDecimals={false} stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
+                  <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--surface))",
@@ -187,51 +187,39 @@ function OperationalOverviewPage() {
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="border-b border-border pb-4">
+        <Card className="p-5">
+          <div className="border-b border-border pb-3">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ops">
               Task terbaru
             </p>
-            <h2 className="mt-2 text-[22px] font-bold text-text-primary">
-              Update paling baru
+            <h2 className="mt-1.5 text-xl font-bold text-text-primary">
+              Update terkini
             </h2>
           </div>
-          <div className="mt-6 space-y-3">
+          <div className="mt-4 space-y-1">
             {overview.recent_tasks.length > 0 ? (
               overview.recent_tasks.map((task) => (
                 <Link
-                  className="block rounded-md border border-border bg-surface p-4 transition hover:border-ops/30 hover:shadow-card-hover"
+                  className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition hover:bg-surface-muted"
                   key={task.id}
                   params={{ projectId: task.project_id }}
                   search={{ view: "board" }}
                   to="/operational/projects/$projectId"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-text-primary">{task.title}</p>
-                      <p className="mt-1 text-xs text-text-secondary">{task.project_name}</p>
+                  <ProtectedAvatar
+                    alt={task.assignee_name ?? "?"}
+                    avatarUrl={task.assignee_avatar}
+                    className="mt-0.5 h-7 w-7 shrink-0"
+                    fallbackClassName="bg-module text-white text-[10px]"
+                    iconClassName="h-3 w-3"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text-primary leading-snug">{task.title}</p>
+                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                      <StatusBadge status={task.priority} variant="priority" />
+                      <span className="text-xs text-text-tertiary">{task.project_name}</span>
                     </div>
-                    <StatusBadge status={task.status} />
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <StatusBadge status={task.priority} variant="priority" />
-                    {task.assignee_name ? (
-                      <span className="inline-flex items-center gap-2 rounded-full bg-surface-muted px-2 py-1 text-xs font-medium text-text-secondary">
-                        <ProtectedAvatar
-                          alt={task.assignee_name}
-                          avatarUrl={task.assignee_avatar}
-                          className="h-5 w-5"
-                          fallbackClassName="bg-module text-white"
-                          iconClassName="h-3 w-3"
-                        />
-                        {task.assignee_name}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-text-tertiary">Belum ada PIC</span>
-                    )}
-                    <span className="text-xs text-text-tertiary">
-                      {formatDateTime(task.updated_at)}
-                    </span>
+                    <p className="mt-0.5 text-xs text-text-tertiary">{formatDateTime(task.updated_at)}</p>
                   </div>
                 </Link>
               ))
