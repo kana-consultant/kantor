@@ -104,6 +104,28 @@ export async function updateReimbursement(
   );
 }
 
+export async function bulkReviewReimbursements(ids: string[], decision: "approved" | "rejected", notes?: string) {
+  return authRequestJSON<{ updated: number }>(
+    "/hris/reimbursements/bulk-review",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, decision, notes: notes ?? null }),
+    },
+  );
+}
+
+export async function bulkMarkReimbursementsPaid(ids: string[], notes?: string) {
+  return authRequestJSON<{ updated: number }>(
+    "/hris/reimbursements/bulk-mark-paid",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, notes: notes ?? null }),
+    },
+  );
+}
+
 export async function deleteReimbursement(reimbursementId: string) {
   return authRequestJSON<{ deleted: boolean }>(
     `/hris/reimbursements/${reimbursementId}`,

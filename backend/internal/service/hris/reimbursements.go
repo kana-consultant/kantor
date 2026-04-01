@@ -37,7 +37,9 @@ type reimbursementsRepository interface {
 	Delete(ctx context.Context, reimbursementID string) error
 	AddAttachments(ctx context.Context, reimbursementID string, attachments []string) (model.Reimbursement, error)
 	ApplyManagerReview(ctx context.Context, reimbursementID string, params hrisrepo.ReviewReimbursementParams) (model.Reimbursement, error)
+	BulkApplyManagerReview(ctx context.Context, ids []string, params hrisrepo.ReviewReimbursementParams) ([]model.Reimbursement, error)
 	MarkPaid(ctx context.Context, reimbursementID string, actorID string, notes *string) (model.Reimbursement, error)
+	BulkMarkPaid(ctx context.Context, ids []string, actorID string, notes *string) ([]model.Reimbursement, error)
 	Summary(ctx context.Context, month int, year int, employeeID string, department string) (model.ReimbursementSummary, error)
 }
 
@@ -312,6 +314,67 @@ func (s *ReimbursementsService) MarkPaid(ctx context.Context, reimbursementID st
 	}
 
 	return updated, nil
+}
+
+func (s *ReimbursementsService) BulkReview(ctx context.Context, request hrisdto.BulkReviewRequest, actorID string, perms *rbac.CachedPermissions) (int, error) {
+	if !canApproveReimbursements(perms) {
+		return 0, ErrReimbursementForbidden
+	}
+	updated, err := s.repo.BulkApplyManagerReview(ctx, request.IDs, hrisrepo.ReviewReimbursementParams{
+		Decision: strings.TrimSpace(request.Decision),
+		ActorID:  actorID,
+		Notes:    request.Notes,
+	})
+	if err != nil {
+		return 0, err
+	}
+	for _, item := range updated {
+		_ = s.notifyRequester(ctx, item, "reimbursement.reviewed", "Reimbursement review updated")
+	}
+	return len(updated), nil
+}
+
+func (s *ReimbursementsService) BulkMarkPaid(ctx context.Context, request hrisdto.BulkMarkPaidRequest, actorID string, perms *rbac.CachedPermissions) (int, error) {
+	if !canMarkPaidReimbursements(perms) {
+		return 0, ErrReimbursementForbidden
+	}
+
+	db := repository.DB(ctx, nil)
+	if db == nil {
+		return 0, fmt.Errorf("no database connection in context")
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	txCtx := repository.WithConn(ctx, tx)
+
+	updated, err := s.repo.BulkMarkPaid(txCtx, request.IDs, actorID, request.Notes)
+	if err != nil {
+		return 0, err
+	}
+
+	if s.financeService != nil {
+		for _, item := range updated {
+			recordDate := time.Now()
+			if item.PaidAt != nil {
+				recordDate = *item.PaidAt
+			}
+			if finErr := s.financeService.RecordOutcome(txCtx, "reimbursement", item.Amount, "Reimbursement: "+item.Title, recordDate, actorID); finErr != nil {
+				return 0, fmt.Errorf("record finance entry: %w", finErr)
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	for _, item := range updated {
+		_ = s.notifyRequester(ctx, item, "reimbursement.paid", "Reimbursement has been marked as paid")
+	}
+	return len(updated), nil
 }
 
 func (s *ReimbursementsService) Summary(ctx context.Context, month int, year int, actorID string, perms *rbac.CachedPermissions) (model.ReimbursementSummary, error) {

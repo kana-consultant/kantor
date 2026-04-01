@@ -50,7 +50,9 @@ func (h *ReimbursementsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:edit")).Delete("/{reimbursementID}", h.deleteReimbursement)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:edit")).Post("/{reimbursementID}/attachments", h.uploadAttachments)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:approve")).Patch("/{reimbursementID}/review", h.review)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:approve")).Post("/bulk-review", h.bulkReview)
 	router.With(platformmiddleware.RequirePermission("hris:reimbursement:mark_paid")).Patch("/{reimbursementID}/mark-paid", h.markPaid)
+	router.With(platformmiddleware.RequirePermission("hris:reimbursement:mark_paid")).Post("/bulk-mark-paid", h.bulkMarkPaid)
 }
 
 func (h *ReimbursementsHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -244,6 +246,48 @@ func (h *ReimbursementsHandler) summary(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
+}
+
+func (h *ReimbursementsHandler) bulkReview(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+
+	var input hrisdto.BulkReviewRequest
+	if !decodeAndValidate(h.validator, w, r, &input) {
+		return
+	}
+
+	count, err := h.service.BulkReview(r.Context(), input, principal.UserID, principal.Cached)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	platformmiddleware.AuditLog(r.Context(), "bulk_review", "hris", "reimbursement", "", nil, input)
+	response.WriteJSON(w, http.StatusOK, map[string]int{"updated": count}, nil)
+}
+
+func (h *ReimbursementsHandler) bulkMarkPaid(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required", nil)
+		return
+	}
+
+	var input hrisdto.BulkMarkPaidRequest
+	if !decodeAndValidate(h.validator, w, r, &input) {
+		return
+	}
+
+	count, err := h.service.BulkMarkPaid(r.Context(), input, principal.UserID, principal.Cached)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	platformmiddleware.AuditLog(r.Context(), "bulk_mark_paid", "hris", "reimbursement", "", nil, input)
+	response.WriteJSON(w, http.StatusOK, map[string]int{"updated": count}, nil)
 }
 
 func (h *ReimbursementsHandler) review(w http.ResponseWriter, r *http.Request) {

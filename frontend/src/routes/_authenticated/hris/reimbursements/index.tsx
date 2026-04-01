@@ -24,6 +24,8 @@ import { permissions } from "@/lib/permissions";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { employeesKeys, listEmployees } from "@/services/hris-employees";
 import {
+  bulkMarkReimbursementsPaid,
+  bulkReviewReimbursements,
   createReimbursement,
   deleteReimbursement,
   getReimbursementSummary,
@@ -82,6 +84,10 @@ function ReimbursementsPage() {
   const [keptAttachments, setKeptAttachments] = useState<string[]>([]);
   const [editFiles, setEditFiles] = useState<File[]>([]);
   const [reimbursementToDelete, setReimbursementToDelete] = useState<Reimbursement | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkApproveOpen, setBulkApproveOpen] = useState(false);
+  const [bulkMarkPaidOpen, setBulkMarkPaidOpen] = useState(false);
+  const [bulkNotes, setBulkNotes] = useState("");
 
   const form = useForm<ReimbursementFormValues>({
     resolver: zodResolver(reimbursementSchema) as never,
@@ -176,6 +182,26 @@ function ReimbursementsPage() {
     },
   });
 
+  const bulkApproveMutation = useMutation({
+    mutationFn: () => bulkReviewReimbursements([...selectedIds], "approved", bulkNotes || undefined),
+    onSuccess: async () => {
+      setSelectedIds(new Set());
+      setBulkApproveOpen(false);
+      setBulkNotes("");
+      await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
+    },
+  });
+
+  const bulkMarkPaidMutation = useMutation({
+    mutationFn: () => bulkMarkReimbursementsPaid([...selectedIds], bulkNotes || undefined),
+    onSuccess: async () => {
+      setSelectedIds(new Set());
+      setBulkMarkPaidOpen(false);
+      setBulkNotes("");
+      await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
+    },
+  });
+
   const employees = employeesQuery.data?.items ?? [];
   const meta = reimbursementsQuery.data?.meta;
   const canReview = hasPermission(permissions.hrisReimbursementApprove);
@@ -191,6 +217,18 @@ function ReimbursementsPage() {
   }, [filters.sortBy, filters.sortOrder]);
   const canMarkPaid = hasRole("manager", "hris") || hasRole("admin", "hris") || hasRole("super_admin");
   const reimbursements = reimbursementsQuery.data?.items ?? [];
+
+  const selectedItems = reimbursements.filter((r) => selectedIds.has(r.id));
+  const allSelectedSubmitted = selectedItems.length > 0 && selectedItems.every((r) => r.status === "submitted");
+  const allSelectedApproved = selectedItems.length > 0 && selectedItems.every((r) => r.status === "approved");
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const selectAll = () => setSelectedIds(new Set(reimbursements.map((r) => r.id)));
+  const clearSelection = () => setSelectedIds(new Set());
 
   const handleFiles = (incomingFiles: FileList | File[]) => {
     const nextFiles = Array.from(incomingFiles).filter((file) => {
@@ -216,6 +254,20 @@ function ReimbursementsPage() {
   };
 
   const columns: Array<DataTableColumn<Reimbursement>> = [
+    {
+      id: "select",
+      header: "",
+      widthClassName: "w-10",
+      cell: (item) => (
+        <input
+          checked={selectedIds.has(item.id)}
+          className="h-4 w-4 cursor-pointer accent-primary"
+          onChange={() => toggleSelect(item.id)}
+          onClick={(e) => e.stopPropagation()}
+          type="checkbox"
+        />
+      ),
+    },
     {
       id: "title",
       header: "Request",
@@ -662,6 +714,85 @@ function ReimbursementsPage() {
 
       {reimbursementsQuery.error instanceof Error ? (
         <Card className="p-6 text-sm text-error">{reimbursementsQuery.error.message}</Card>
+      ) : null}
+
+      {selectedIds.size > 0 ? (
+        <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between border-primary">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-text-primary">{selectedIds.size} item dipilih</span>
+            <button className="text-xs text-text-secondary underline" onClick={selectAll} type="button">
+              Pilih semua ({reimbursements.length})
+            </button>
+            <button className="text-xs text-text-secondary underline" onClick={clearSelection} type="button">
+              Batalkan
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!allSelectedSubmitted && !allSelectedApproved ? (
+              <p className="text-xs text-text-secondary">Pilih item dengan status yang sama untuk aksi bulk.</p>
+            ) : null}
+            {allSelectedSubmitted && canReview ? (
+              <Button onClick={() => { setBulkNotes(""); setBulkApproveOpen(true); }} size="sm" type="button">
+                Approve {selectedIds.size} item
+              </Button>
+            ) : null}
+            {allSelectedApproved && canMarkPaid ? (
+              <Button onClick={() => { setBulkNotes(""); setBulkMarkPaidOpen(true); }} size="sm" type="button">
+                Tandai lunas {selectedIds.size} item
+              </Button>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {bulkApproveOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-text-primary">Approve {selectedIds.size} reimbursement?</h3>
+            <p className="mt-1 text-sm text-text-secondary">Semua item yang dipilih akan disetujui sekaligus.</p>
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-text-primary">Catatan (opsional)</label>
+              <textarea
+                className="field-input w-full resize-none"
+                onChange={(e) => setBulkNotes(e.target.value)}
+                placeholder="Catatan untuk semua item..."
+                rows={3}
+                value={bulkNotes}
+              />
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button disabled={bulkApproveMutation.isPending} onClick={() => setBulkApproveOpen(false)} type="button" variant="outline">Batal</Button>
+              <Button disabled={bulkApproveMutation.isPending} onClick={() => bulkApproveMutation.mutate()} type="button">
+                {bulkApproveMutation.isPending ? "Memproses..." : "Approve semua"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {bulkMarkPaidOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-text-primary">Tandai lunas {selectedIds.size} reimbursement?</h3>
+            <p className="mt-1 text-sm text-text-secondary">Semua item yang dipilih akan ditandai sebagai sudah dibayar.</p>
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-text-primary">Catatan (opsional)</label>
+              <textarea
+                className="field-input w-full resize-none"
+                onChange={(e) => setBulkNotes(e.target.value)}
+                placeholder="Misal: Transfer batch Maret via BCA..."
+                rows={3}
+                value={bulkNotes}
+              />
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button disabled={bulkMarkPaidMutation.isPending} onClick={() => setBulkMarkPaidOpen(false)} type="button" variant="outline">Batal</Button>
+              <Button disabled={bulkMarkPaidMutation.isPending} onClick={() => bulkMarkPaidMutation.mutate()} type="button">
+                {bulkMarkPaidMutation.isPending ? "Memproses..." : "Tandai lunas semua"}
+              </Button>
+            </div>
+          </Card>
+        </div>
       ) : null}
 
       <DataTable

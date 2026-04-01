@@ -39,3 +39,14 @@ type ReviewReimbursementRequest struct {
 type MarkPaidRequest struct {
 	Notes *string `json:"notes" validate:"omitempty,max=2000"`
 }
+
+type BulkReviewRequest struct {
+	IDs      []string `json:"ids" validate:"required,min=1,dive,uuid4"`
+	Decision string   `json:"decision" validate:"required,oneof=approved rejected"`
+	Notes    *string  `json:"notes" validate:"omitempty,max=2000"`
+}
+
+type BulkMarkPaidRequest struct {
+	IDs   []string `json:"ids" validate:"required,min=1,dive,uuid4"`
+	Notes *string  `json:"notes" validate:"omitempty,max=2000"`
+}

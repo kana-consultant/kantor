@@ -319,6 +319,152 @@ func (r *ReimbursementsRepository) Delete(ctx context.Context, reimbursementID s
 	return nil
 }
 
+func (r *ReimbursementsRepository) BulkApplyManagerReview(ctx context.Context, ids []string, params ReviewReimbursementParams) ([]model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	nextStatus := "approved"
+	if params.Decision == "rejected" {
+		nextStatus = "rejected"
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d::uuid", i+1)
+		args[i] = id
+	}
+	startIdx := len(ids) + 1
+	args = append(args, nextStatus, params.ActorID, nullableText(params.Notes))
+
+	query := fmt.Sprintf(`
+		WITH updated AS (
+			UPDATE reimbursements
+			SET status = $%d,
+				manager_id = $%d::uuid,
+				manager_action_at = NOW(),
+				manager_notes = NULLIF($%d, ''),
+				updated_at = NOW()
+			WHERE id IN (%s) AND status = 'submitted'
+			RETURNING *
+		)
+		SELECT
+			updated.id::text,
+			updated.employee_id::text,
+			employees.full_name,
+			updated.title,
+			updated.category,
+			updated.amount,
+			updated.transaction_date,
+			updated.description,
+			updated.status,
+			updated.attachments,
+			updated.submitted_by::text,
+			updated.manager_id::text,
+			updated.manager_action_at,
+			updated.manager_notes,
+			updated.finance_id::text,
+			updated.finance_action_at,
+			updated.finance_notes,
+			updated.paid_at,
+			updated.created_at,
+			updated.updated_at
+		FROM updated
+		INNER JOIN employees ON employees.id = updated.employee_id
+	`, startIdx, startIdx+1, startIdx+2, strings.Join(placeholders, ", "))
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.Reimbursement, 0, len(ids))
+	for rows.Next() {
+		item, err := scanReimbursement(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *ReimbursementsRepository) BulkMarkPaid(ctx context.Context, ids []string, actorID string, notes *string) ([]model.Reimbursement, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d::uuid", i+1)
+		args[i] = id
+	}
+	startIdx := len(ids) + 1
+	args = append(args, actorID, nullableText(notes))
+
+	query := fmt.Sprintf(`
+		WITH updated AS (
+			UPDATE reimbursements
+			SET status = 'paid',
+				finance_id = $%d::uuid,
+				finance_action_at = NOW(),
+				finance_notes = COALESCE(NULLIF($%d, ''), finance_notes),
+				paid_at = NOW(),
+				updated_at = NOW()
+			WHERE id IN (%s) AND status = 'approved'
+			RETURNING *
+		)
+		SELECT
+			updated.id::text,
+			updated.employee_id::text,
+			employees.full_name,
+			updated.title,
+			updated.category,
+			updated.amount,
+			updated.transaction_date,
+			updated.description,
+			updated.status,
+			updated.attachments,
+			updated.submitted_by::text,
+			updated.manager_id::text,
+			updated.manager_action_at,
+			updated.manager_notes,
+			updated.finance_id::text,
+			updated.finance_action_at,
+			updated.finance_notes,
+			updated.paid_at,
+			updated.created_at,
+			updated.updated_at
+		FROM updated
+		INNER JOIN employees ON employees.id = updated.employee_id
+	`, startIdx, startIdx+1, strings.Join(placeholders, ", "))
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.Reimbursement, 0, len(ids))
+	for rows.Next() {
+		item, err := scanReimbursement(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (r *ReimbursementsRepository) ApplyManagerReview(ctx context.Context, reimbursementID string, params ReviewReimbursementParams) (model.Reimbursement, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
