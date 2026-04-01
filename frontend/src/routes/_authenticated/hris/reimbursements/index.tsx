@@ -221,6 +221,7 @@ function ReimbursementsPage() {
   const selectedItems = reimbursements.filter((r) => selectedIds.has(r.id));
   const allSelectedSubmitted = selectedItems.length > 0 && selectedItems.every((r) => r.status === "submitted");
   const allSelectedApproved = selectedItems.length > 0 && selectedItems.every((r) => r.status === "approved");
+  const selectedTotal = selectedItems.reduce((sum, r) => sum + r.amount, 0);
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -746,53 +747,35 @@ function ReimbursementsPage() {
       ) : null}
 
       {bulkApproveOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-text-primary">Approve {selectedIds.size} reimbursement?</h3>
-            <p className="mt-1 text-sm text-text-secondary">Semua item yang dipilih akan disetujui sekaligus.</p>
-            <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-text-primary">Catatan (opsional)</label>
-              <textarea
-                className="field-input w-full resize-none"
-                onChange={(e) => setBulkNotes(e.target.value)}
-                placeholder="Catatan untuk semua item..."
-                rows={3}
-                value={bulkNotes}
-              />
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <Button disabled={bulkApproveMutation.isPending} onClick={() => setBulkApproveOpen(false)} type="button" variant="outline">Batal</Button>
-              <Button disabled={bulkApproveMutation.isPending} onClick={() => bulkApproveMutation.mutate()} type="button">
-                {bulkApproveMutation.isPending ? "Memproses..." : "Approve semua"}
-              </Button>
-            </div>
-          </Card>
-        </div>
+        <BulkConfirmDialog
+          confirmLabel="Approve semua"
+          isPending={bulkApproveMutation.isPending}
+          items={selectedItems}
+          notes={bulkNotes}
+          onClose={() => setBulkApproveOpen(false)}
+          onConfirm={() => bulkApproveMutation.mutate()}
+          onNotesChange={setBulkNotes}
+          notesPlaceholder="Catatan untuk semua item..."
+          title={`Approve ${selectedIds.size} reimbursement?`}
+          subtitle="Semua item yang dipilih akan disetujui sekaligus."
+          total={selectedTotal}
+        />
       ) : null}
 
       {bulkMarkPaidOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-text-primary">Tandai lunas {selectedIds.size} reimbursement?</h3>
-            <p className="mt-1 text-sm text-text-secondary">Semua item yang dipilih akan ditandai sebagai sudah dibayar.</p>
-            <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-text-primary">Catatan (opsional)</label>
-              <textarea
-                className="field-input w-full resize-none"
-                onChange={(e) => setBulkNotes(e.target.value)}
-                placeholder="Misal: Transfer batch Maret via BCA..."
-                rows={3}
-                value={bulkNotes}
-              />
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <Button disabled={bulkMarkPaidMutation.isPending} onClick={() => setBulkMarkPaidOpen(false)} type="button" variant="outline">Batal</Button>
-              <Button disabled={bulkMarkPaidMutation.isPending} onClick={() => bulkMarkPaidMutation.mutate()} type="button">
-                {bulkMarkPaidMutation.isPending ? "Memproses..." : "Tandai lunas semua"}
-              </Button>
-            </div>
-          </Card>
-        </div>
+        <BulkConfirmDialog
+          confirmLabel="Tandai lunas semua"
+          isPending={bulkMarkPaidMutation.isPending}
+          items={selectedItems}
+          notes={bulkNotes}
+          onClose={() => setBulkMarkPaidOpen(false)}
+          onConfirm={() => bulkMarkPaidMutation.mutate()}
+          onNotesChange={setBulkNotes}
+          notesPlaceholder="Misal: Transfer batch Maret via BCA..."
+          title={`Tandai lunas ${selectedIds.size} reimbursement?`}
+          subtitle="Semua item yang dipilih akan ditandai sebagai sudah dibayar."
+          total={selectedTotal}
+        />
       ) : null}
 
       <DataTable
@@ -826,6 +809,122 @@ function ReimbursementsPage() {
             : undefined
         }
       />
+    </div>
+  );
+}
+
+function BulkConfirmDialog({
+  title,
+  subtitle,
+  confirmLabel,
+  isPending,
+  items,
+  notes,
+  notesPlaceholder,
+  onClose,
+  onConfirm,
+  onNotesChange,
+  total,
+}: {
+  title: string;
+  subtitle: string;
+  confirmLabel: string;
+  isPending: boolean;
+  items: Reimbursement[];
+  notes: string;
+  notesPlaceholder: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  onNotesChange: (v: string) => void;
+  total: number;
+}) {
+  const itemsWithAttachments = items.filter((r) => r.attachments.length > 0);
+
+  // Group by employee for per-person breakdown
+  const byEmployee = items.reduce<Record<string, { name: string; count: number; total: number; items: Reimbursement[] }>>(
+    (acc, r) => {
+      const key = r.employee_id;
+      if (!acc[key]) acc[key] = { name: r.employee_name ?? r.employee_id, count: 0, total: 0, items: [] };
+      acc[key].count++;
+      acc[key].total += r.amount;
+      acc[key].items.push(r);
+      return acc;
+    },
+    {},
+  );
+  const employeeGroups = Object.values(byEmployee);
+  const hasMultipleEmployees = employeeGroups.length > 1;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="flex w-full max-w-lg flex-col gap-0 p-6">
+        <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
+        <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
+
+        <div className="mt-3 flex items-center justify-between rounded-md bg-surface-muted px-4 py-3">
+          <span className="text-sm text-text-secondary">Total nominal</span>
+          <span className="font-mono text-sm font-semibold tabular-nums text-text-primary">{formatIDR(total)}</span>
+        </div>
+
+        {hasMultipleEmployees ? (
+          <div className="mt-3 space-y-1">
+            {employeeGroups.map((g) => (
+              <div className="flex items-center justify-between px-4 py-1.5 text-sm" key={g.name}>
+                <span className="text-text-secondary">{g.name} <span className="text-text-tertiary">({g.count} item)</span></span>
+                <span className="font-mono tabular-nums text-text-primary">{formatIDR(g.total)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 px-4 text-sm text-text-secondary">
+            Karyawan: <span className="font-medium text-text-primary">{employeeGroups[0]?.name}</span>
+          </div>
+        )}
+
+        {itemsWithAttachments.length > 0 ? (
+          <div className="mt-4">
+            <p className="mb-2 text-sm font-medium text-text-primary">
+              Lampiran tersedia ({itemsWithAttachments.length} item)
+            </p>
+            <div className="max-h-[180px] space-y-2 overflow-y-auto pr-1">
+              {itemsWithAttachments.map((item) => (
+                <div className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2" key={item.id}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-text-primary">{item.title}</p>
+                    <p className="text-xs text-text-secondary">{item.employee_name} · {formatIDR(item.amount)}</p>
+                  </div>
+                  <a
+                    className="ml-3 shrink-0 text-xs font-semibold text-primary hover:underline"
+                    href={`/hris/reimbursements/${item.id}`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    Lihat {item.attachments.length} lampiran →
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-4">
+          <label className="mb-1 block text-sm font-medium text-text-primary">Catatan (opsional)</label>
+          <textarea
+            className="field-input w-full resize-none"
+            onChange={(e) => onNotesChange(e.target.value)}
+            placeholder={notesPlaceholder}
+            rows={3}
+            value={notes}
+          />
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <Button disabled={isPending} onClick={onClose} type="button" variant="outline">Batal</Button>
+          <Button disabled={isPending} onClick={onConfirm} type="button">
+            {isPending ? "Memproses..." : confirmLabel}
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
