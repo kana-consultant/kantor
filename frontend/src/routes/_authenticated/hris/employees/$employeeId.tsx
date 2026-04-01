@@ -22,6 +22,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRBAC } from "@/hooks/use-rbac";
+import { useAuthStore } from "@/stores/auth-store";
 import { formatIDR } from "@/lib/currency";
 import { extractDateInputValue, formatCalendarDate } from "@/lib/date";
 import { permissions } from "@/lib/permissions";
@@ -75,6 +76,8 @@ export const Route = createFileRoute("/_authenticated/hris/employees/$employeeId
 function EmployeeDetailPage() {
   const { employeeId } = Route.useParams();
   const queryClient = useQueryClient();
+  const session = useAuthStore((s) => s.session);
+  const { hasPermission } = useRBAC();
   const [tab, setTab] = useState<"profile" | "salary" | "bonus" | "reimbursements">("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
@@ -226,6 +229,7 @@ function EmployeeDetailPage() {
   });
 
   const employee = employeeQuery.data;
+  const isOwnProfile = employee?.user_id != null && employee.user_id === session?.user.id;
 
   if (employeeQuery.isLoading) {
     return (
@@ -303,10 +307,7 @@ function EmployeeDetailPage() {
       {tab === "profile" ? <ProfileTab employee={employee} /> : null}
 
       {tab === "salary" ? (
-        <PermissionGate
-          fallback={<Card className="p-6 text-sm text-muted-foreground">Anda tidak punya akses melihat data salary.</Card>}
-          permission={permissions.hrisSalaryView}
-        >
+        hasPermission(permissions.hrisSalaryView) || isOwnProfile ? (
           <SalaryTab
             createMutation={createSalaryMutation}
             currentSalary={salaryHistoryQuery.data?.[0]}
@@ -317,14 +318,13 @@ function EmployeeDetailPage() {
             isModalOpen={isSalaryModalOpen}
             onModalOpenChange={setIsSalaryModalOpen}
           />
-        </PermissionGate>
+        ) : (
+          <Card className="p-6 text-sm text-muted-foreground">Anda tidak punya akses melihat data salary.</Card>
+        )
       ) : null}
 
       {tab === "bonus" ? (
-        <PermissionGate
-          fallback={<Card className="p-6 text-sm text-muted-foreground">Anda tidak punya akses melihat data bonus.</Card>}
-          permission={permissions.hrisBonusView}
-        >
+        hasPermission(permissions.hrisBonusView) || isOwnProfile ? (
           <BonusTab
             approveMutation={approveBonusMutation}
             bonuses={bonusesQuery.data ?? []}
@@ -342,7 +342,9 @@ function EmployeeDetailPage() {
             setIsModalOpen={setIsBonusModalOpen}
             updateMutation={updateBonusMutation}
           />
-        </PermissionGate>
+        ) : (
+          <Card className="p-6 text-sm text-muted-foreground">Anda tidak punya akses melihat data bonus.</Card>
+        )
       ) : null}
 
       {tab === "reimbursements" ? (

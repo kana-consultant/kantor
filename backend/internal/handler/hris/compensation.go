@@ -27,13 +27,13 @@ func NewCompensationHandler(service *hrisservice.CompensationService) *Compensat
 
 func (h *CompensationHandler) RegisterSalaryRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:salary:create")).Post("/", h.createSalary)
-	router.With(platformmiddleware.RequirePermission("hris:salary:view")).Get("/", h.listSalaries)
-	router.With(platformmiddleware.RequirePermission("hris:salary:view")).Get("/current", h.getCurrentSalary)
+	router.Get("/", h.listSalaries)
+	router.Get("/current", h.getCurrentSalary)
 }
 
 func (h *CompensationHandler) RegisterBonusRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("hris:bonus:create")).Post("/", h.createBonus)
-	router.With(platformmiddleware.RequirePermission("hris:bonus:view")).Get("/", h.listBonuses)
+	router.Get("/", h.listBonuses)
 }
 
 func (h *CompensationHandler) createSalary(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +64,7 @@ func (h *CompensationHandler) listSalaries(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	result, err := h.service.ListSalaries(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID)
+	result, err := h.service.ListSalaries(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -84,7 +84,7 @@ func (h *CompensationHandler) getCurrentSalary(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result, err := h.service.GetCurrentSalary(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID)
+	result, err := h.service.GetCurrentSalary(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -206,6 +206,8 @@ func (h *CompensationHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusNotFound, "EMPLOYEE_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrSalaryNotFound):
 		response.WriteError(w, http.StatusNotFound, "SALARY_NOT_FOUND", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrSalaryForbidden):
+		response.WriteError(w, http.StatusForbidden, "SALARY_FORBIDDEN", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrBonusNotFound):
 		response.WriteError(w, http.StatusNotFound, "BONUS_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrBonusNotPending):

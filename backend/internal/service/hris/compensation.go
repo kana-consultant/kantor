@@ -17,6 +17,7 @@ import (
 
 var (
 	ErrSalaryNotFound  = errors.New("salary record not found")
+	ErrSalaryForbidden = errors.New("salary access is forbidden")
 	ErrBonusNotFound   = errors.New("bonus record not found")
 	ErrBonusNotPending = errors.New("only pending bonus records can be changed")
 	ErrBonusForbidden  = errors.New("bonus access is forbidden")
@@ -98,7 +99,13 @@ func (s *CompensationService) CreateSalary(ctx context.Context, employeeID strin
 	return s.mapSalaryRow(row)
 }
 
-func (s *CompensationService) ListSalaries(ctx context.Context, employeeID string, actorID string) ([]model.SalaryRecord, error) {
+func (s *CompensationService) ListSalaries(ctx context.Context, employeeID string, actorID string, perms *rbac.CachedPermissions) ([]model.SalaryRecord, error) {
+	if !rbac.CanViewAll(perms, "hris:salary:view") {
+		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
+		if err != nil || employee.ID != employeeID {
+			return nil, ErrSalaryForbidden
+		}
+	}
 	rows, err := s.repo.ListSalaries(ctx, employeeID)
 	if err != nil {
 		return nil, err
@@ -118,7 +125,13 @@ func (s *CompensationService) ListSalaries(ctx context.Context, employeeID strin
 	return result, nil
 }
 
-func (s *CompensationService) GetCurrentSalary(ctx context.Context, employeeID string, actorID string) (model.SalaryRecord, error) {
+func (s *CompensationService) GetCurrentSalary(ctx context.Context, employeeID string, actorID string, perms *rbac.CachedPermissions) (model.SalaryRecord, error) {
+	if !rbac.CanViewAll(perms, "hris:salary:view") {
+		employee, err := s.employeesRepo.GetEmployeeByUserID(ctx, actorID)
+		if err != nil || employee.ID != employeeID {
+			return model.SalaryRecord{}, ErrSalaryForbidden
+		}
+	}
 	row, err := s.repo.GetCurrentSalary(ctx, employeeID)
 	if err != nil {
 		if errors.Is(err, hrisrepo.ErrSalaryNotFound) {

@@ -79,7 +79,7 @@ func (h *EmployeesHandler) exportDetail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	salaries, err := h.compensation.ListSalaries(r.Context(), employeeID, principal.UserID)
+	salaries, err := h.compensation.ListSalaries(r.Context(), employeeID, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
