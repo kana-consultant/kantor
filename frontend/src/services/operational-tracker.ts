@@ -3,8 +3,10 @@ import type {
   ActivityConsent,
   DomainCategory,
   TrackerActivityOverview,
+  TrackerBulkClassifyDomainsResult,
   TrackerConsentAudit,
   TrackerDailySummary,
+  TrackerObservedDomain,
   TrackerTeamOverview,
 } from "@/types/tracker";
 
@@ -12,6 +14,12 @@ interface DomainCategoryPayload {
   domain_pattern: string;
   category: string;
   is_productive: boolean;
+}
+
+interface BulkClassifyTrackerDomainsPayload {
+  domains: string[];
+  is_productive: boolean;
+  category?: string | null;
 }
 
 function createDateParams(dateFrom: string, dateTo: string) {
@@ -32,6 +40,7 @@ export const trackerKeys = {
   summary: (date: string) => ["operational", "tracker", "summary", date] as const,
   consents: () => ["operational", "tracker", "consents"] as const,
   domains: () => ["operational", "tracker", "domains"] as const,
+  observedDomains: () => ["operational", "tracker", "observed-domains"] as const,
 };
 
 export async function getTrackerConsent() {
@@ -76,6 +85,10 @@ export async function listTrackerDomains() {
   return authGetJSON<DomainCategory[]>("/tracker/domains");
 }
 
+export async function listObservedTrackerDomains() {
+  return authGetJSON<TrackerObservedDomain[]>("/tracker/domains/observed");
+}
+
 export async function downloadTrackerExtension() {
   return authDownload("/tracker/extension/download", {
     method: "GET",
@@ -89,6 +102,16 @@ export async function createTrackerDomain(payload: DomainCategoryPayload) {
 export async function updateTrackerDomain(domainId: string, payload: DomainCategoryPayload) {
   return authRequestJSON<DomainCategory>(`/tracker/domains/${domainId}`, {
     method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function bulkClassifyObservedTrackerDomains(payload: BulkClassifyTrackerDomainsPayload) {
+  return authRequestJSON<TrackerBulkClassifyDomainsResult>("/tracker/domains/observed/bulk-classify", {
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
     },

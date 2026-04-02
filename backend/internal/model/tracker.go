@@ -39,6 +39,22 @@ type DomainCategory struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+type TrackerObservedDomain struct {
+	Domain               string     `json:"domain"`
+	Category             string     `json:"category"`
+	IsProductive         bool       `json:"is_productive"`
+	RuleSource           string     `json:"rule_source"`
+	MatchedPattern       *string    `json:"matched_pattern,omitempty"`
+	TotalDurationSeconds int64      `json:"total_duration_seconds"`
+	EntryCount           int64      `json:"entry_count"`
+	LastSeenAt           *time.Time `json:"last_seen_at,omitempty"`
+}
+
+type BulkClassifyDomainsResult struct {
+	UpdatedCount int      `json:"updated_count"`
+	Domains      []string `json:"domains"`
+}
+
 type ActivityConsent struct {
 	ID          string     `json:"id"`
 	UserID      string     `json:"user_id"`

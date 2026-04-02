@@ -47,7 +47,9 @@ func (h *TrackerHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("operational:tracker:view_team")).Get("/consents", h.listConsentAudit)
 
 	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Get("/domains", h.listDomains)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Get("/domains/observed", h.listObservedDomains)
 	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Post("/domains", h.createDomain)
+	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Post("/domains/observed/bulk-classify", h.bulkClassifyObservedDomains)
 	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Put("/domains/{domainID}", h.updateDomain)
 	router.With(platformmiddleware.RequirePermission("operational:tracker:manage_domains")).Delete("/domains/{domainID}", h.deleteDomain)
 }
@@ -292,6 +294,15 @@ func (h *TrackerHandler) listDomains(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items, nil)
 }
 
+func (h *TrackerHandler) listObservedDomains(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.ListObservedDomains(r.Context())
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list tracked domains", nil)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, items, nil)
+}
+
 func (h *TrackerHandler) listConsentAudit(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListConsentAudit(r.Context())
 	if err != nil {
@@ -314,6 +325,21 @@ func (h *TrackerHandler) createDomain(w http.ResponseWriter, r *http.Request) {
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "operational", "tracker_domain", item.ID, nil, item)
 	response.WriteJSON(w, http.StatusCreated, item, nil)
+}
+
+func (h *TrackerHandler) bulkClassifyObservedDomains(w http.ResponseWriter, r *http.Request) {
+	var request operationaldto.TrackerBulkClassifyDomainsRequest
+	if !h.decodeAndValidate(w, r, &request) {
+		return
+	}
+
+	result, err := h.service.BulkClassifyObservedDomains(r.Context(), request)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to bulk classify tracker domains", nil)
+		return
+	}
+	platformmiddleware.AuditLog(r.Context(), "update", "operational", "tracker_observed_domains", strings.Join(result.Domains, ","), nil, result)
+	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *TrackerHandler) updateDomain(w http.ResponseWriter, r *http.Request) {
@@ -393,3 +419,4 @@ func parseDateRange(w http.ResponseWriter, r *http.Request) (time.Time, time.Tim
 	}
 	return dateFrom, dateTo, true
 }
+

@@ -28,9 +28,11 @@ type trackerRepository interface {
 	GetTeamActivity(ctx context.Context, activityRange operationalrepo.TrackerActivityRange, userID *string) (model.TrackerTeamOverview, error)
 	GetDailySummary(ctx context.Context, date time.Time) (model.TrackerDailySummary, error)
 	ListDomainCategories(ctx context.Context) ([]model.DomainCategory, error)
+	ListObservedDomains(ctx context.Context) ([]model.TrackerObservedDomain, error)
 	ListConsentAudit(ctx context.Context) ([]model.TrackerConsentAudit, error)
 	CreateDomainCategory(ctx context.Context, params operationalrepo.UpsertDomainCategoryParams) (model.DomainCategory, error)
 	UpdateDomainCategory(ctx context.Context, domainID string, params operationalrepo.UpsertDomainCategoryParams) (model.DomainCategory, error)
+	BulkClassifyObservedDomains(ctx context.Context, domains []string, isProductive bool, category *string) (model.BulkClassifyDomainsResult, error)
 	DeleteDomainCategory(ctx context.Context, domainID string) error
 	PurgeOldSessions(ctx context.Context, cutoff time.Time) (int64, error)
 }
@@ -160,6 +162,10 @@ func (s *TrackerService) ListDomainCategories(ctx context.Context) ([]model.Doma
 	return s.repo.ListDomainCategories(ctx)
 }
 
+func (s *TrackerService) ListObservedDomains(ctx context.Context) ([]model.TrackerObservedDomain, error) {
+	return s.repo.ListObservedDomains(ctx)
+}
+
 func (s *TrackerService) ListConsentAudit(ctx context.Context) ([]model.TrackerConsentAudit, error) {
 	return s.repo.ListConsentAudit(ctx)
 }
@@ -182,6 +188,10 @@ func (s *TrackerService) UpdateDomainCategory(ctx context.Context, domainID stri
 		return model.DomainCategory{}, ErrDomainCategoryNotFound
 	}
 	return item, err
+}
+
+func (s *TrackerService) BulkClassifyObservedDomains(ctx context.Context, request operationaldto.TrackerBulkClassifyDomainsRequest) (model.BulkClassifyDomainsResult, error) {
+	return s.repo.BulkClassifyObservedDomains(ctx, request.Domains, request.IsProductive, request.Category)
 }
 
 func (s *TrackerService) DeleteDomainCategory(ctx context.Context, domainID string) error {

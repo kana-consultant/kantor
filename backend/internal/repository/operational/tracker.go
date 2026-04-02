@@ -579,6 +579,74 @@ func (r *TrackerRepository) ListDomainCategories(ctx context.Context) ([]model.D
 	return items, rows.Err()
 }
 
+func (r *TrackerRepository) ListObservedDomains(ctx context.Context) ([]model.TrackerObservedDomain, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		WITH observed_domains AS (
+			SELECT
+				domain,
+				COALESCE(SUM(duration_seconds), 0)::bigint AS total_duration_seconds,
+				COUNT(*)::bigint AS entry_count,
+				MAX(ended_at) AS last_seen_at
+			FROM activity_entries
+			WHERE domain <> ''
+			GROUP BY domain
+		)
+		SELECT
+			o.domain,
+			COALESCE(dc.category, 'uncategorized') AS category,
+			COALESCE(dc.is_productive, FALSE) AS is_productive,
+			COALESCE(dc.rule_source, 'fallback') AS rule_source,
+			dc.domain_pattern,
+			o.total_duration_seconds,
+			o.entry_count,
+			o.last_seen_at
+		FROM observed_domains o
+		LEFT JOIN LATERAL (
+			SELECT
+				domain_pattern,
+				category,
+				is_productive,
+				CASE WHEN o.domain = domain_pattern THEN 'exact' ELSE 'pattern' END AS rule_source
+			FROM domain_categories
+			WHERE o.domain = domain_pattern OR o.domain LIKE ('%.' || domain_pattern)
+			ORDER BY CASE WHEN o.domain = domain_pattern THEN 0 ELSE 1 END, LENGTH(domain_pattern) DESC
+			LIMIT 1
+		) dc ON TRUE
+		ORDER BY o.total_duration_seconds DESC, o.last_seen_at DESC NULLS LAST, o.domain ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.TrackerObservedDomain, 0)
+	for rows.Next() {
+		var item model.TrackerObservedDomain
+		var matchedPattern sql.NullString
+		var lastSeenAt sql.NullTime
+		if err := rows.Scan(
+			&item.Domain,
+			&item.Category,
+			&item.IsProductive,
+			&item.RuleSource,
+			&matchedPattern,
+			&item.TotalDurationSeconds,
+			&item.EntryCount,
+			&lastSeenAt,
+		); err != nil {
+			return nil, err
+		}
+		item.MatchedPattern = nullStringPointer(matchedPattern)
+		item.LastSeenAt = nullTimePointer(lastSeenAt)
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
 func (r *TrackerRepository) ListConsentAudit(ctx context.Context) ([]model.TrackerConsentAudit, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -592,12 +660,15 @@ func (r *TrackerRepository) ListConsentAudit(ctx context.Context) ([]model.Track
 			c.consented_at,
 			c.revoked_at,
 			c.ip_address,
+			u.browser_timezone,
+			u.tracker_extension_version,
+			u.tracker_extension_reported_at,
 			MAX(s.start_time) AS last_session_started_at,
 			MAX(s.updated_at) AS last_activity_at
 		FROM activity_consents c
 		INNER JOIN users u ON u.id = c.user_id
 		LEFT JOIN activity_sessions s ON s.user_id = c.user_id
-		GROUP BY u.id, u.full_name, u.email, c.consented, c.consented_at, c.revoked_at, c.ip_address
+		GROUP BY u.id, u.full_name, u.email, c.consented, c.consented_at, c.revoked_at, c.ip_address, u.browser_timezone, u.tracker_extension_version, u.tracker_extension_reported_at
 		ORDER BY u.full_name ASC
 	`)
 	if err != nil {
@@ -689,6 +760,60 @@ func (r *TrackerRepository) UpdateDomainCategory(ctx context.Context, domainID s
 		return model.DomainCategory{}, err
 	}
 	return item, nil
+}
+
+func (r *TrackerRepository) BulkClassifyObservedDomains(ctx context.Context, domains []string, isProductive bool, category *string) (model.BulkClassifyDomainsResult, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	normalizedDomains := normalizeObservedDomains(domains)
+	if len(normalizedDomains) == 0 {
+		return model.BulkClassifyDomainsResult{}, nil
+	}
+
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
+	if err != nil {
+		return model.BulkClassifyDomainsResult{}, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	requestedCategory := strings.TrimSpace(strings.ToLower(strings.TrimSpace(derefString(category))))
+	for _, domain := range normalizedDomains {
+		resolvedCategory := requestedCategory
+		if resolvedCategory == "" {
+			resolvedCategory, _, err = r.resolveDomainCategory(ctx, tx, domain)
+			if err != nil {
+				return model.BulkClassifyDomainsResult{}, err
+			}
+		}
+		if resolvedCategory == "" {
+			resolvedCategory = "uncategorized"
+		}
+
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO domain_categories (domain_pattern, category, is_productive)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (tenant_id, domain_pattern)
+			DO UPDATE SET
+				category = EXCLUDED.category,
+				is_productive = EXCLUDED.is_productive
+		`, domain, resolvedCategory, isProductive); err != nil {
+			return model.BulkClassifyDomainsResult{}, err
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return model.BulkClassifyDomainsResult{}, err
+	}
+
+	return model.BulkClassifyDomainsResult{
+		UpdatedCount: len(normalizedDomains),
+		Domains:      normalizedDomains,
+	}, nil
 }
 
 func (r *TrackerRepository) DeleteDomainCategory(ctx context.Context, domainID string) error {
@@ -1015,7 +1140,7 @@ func (r *TrackerRepository) resolveDomainCategory(ctx context.Context, tx pgx.Tx
 		SELECT category, is_productive
 		FROM domain_categories
 		WHERE $1 = domain_pattern OR $1 LIKE ('%.' || domain_pattern)
-		ORDER BY LENGTH(domain_pattern) DESC
+		ORDER BY CASE WHEN $1 = domain_pattern THEN 0 ELSE 1 END, LENGTH(domain_pattern) DESC
 		LIMIT 1
 	`, strings.ToLower(strings.TrimSpace(domain))).Scan(&category, &isProductive)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -1336,6 +1461,33 @@ func optionalEntryUserFilter(userID *string, column string) string {
 	return fmt.Sprintf(" AND %s = $3::uuid", column)
 }
 
+func normalizeObservedDomains(domains []string) []string {
+	if len(domains) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(domains))
+	normalized := make([]string, 0, len(domains))
+	for _, domain := range domains {
+		trimmed := strings.ToLower(strings.TrimSpace(domain))
+		if trimmed == "" {
+			continue
+		}
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		normalized = append(normalized, trimmed)
+	}
+	return normalized
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 func topProductiveMember(items []model.TrackerUserSummary) *string {
 	var best *model.TrackerUserSummary
 	for index := range items {
@@ -1396,3 +1548,4 @@ func nullStringPointer(value sql.NullString) *string {
 	result := strings.TrimSpace(value.String)
 	return &result
 }
+

@@ -36,3 +36,9 @@ type DomainCategoryRequest struct {
 	Category      string `json:"category" validate:"required,oneof=work communication social_media entertainment development design documentation other uncategorized"`
 	IsProductive  bool   `json:"is_productive"`
 }
+
+type TrackerBulkClassifyDomainsRequest struct {
+	Domains      []string `json:"domains" validate:"required,min=1,dive,required,max=255"`
+	IsProductive bool     `json:"is_productive"`
+	Category     *string  `json:"category,omitempty" validate:"omitempty,oneof=work communication social_media entertainment development design documentation other uncategorized"`
+}

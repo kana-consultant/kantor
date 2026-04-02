@@ -73,6 +73,22 @@ export interface DomainCategory {
   created_at: string;
 }
 
+export interface TrackerObservedDomain {
+  domain: string;
+  category: string;
+  is_productive: boolean;
+  rule_source: "exact" | "pattern" | "fallback" | string;
+  matched_pattern?: string | null;
+  total_duration_seconds: number;
+  entry_count: number;
+  last_seen_at?: string | null;
+}
+
+export interface TrackerBulkClassifyDomainsResult {
+  updated_count: number;
+  domains: string[];
+}
+
 export interface TrackerConsentAudit {
   user_id: string;
   user_name: string;

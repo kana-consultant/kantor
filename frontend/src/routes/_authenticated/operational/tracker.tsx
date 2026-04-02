@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -35,7 +35,6 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/shared/drawer";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FormModal } from "@/components/shared/form-modal";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { OverviewSkeleton } from "@/components/shared/skeletons";
 import { StatCard } from "@/components/shared/stat-card";
@@ -44,6 +43,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { useRBAC } from "@/hooks/use-rbac";
 import { env } from "@/lib/env";
@@ -52,6 +52,7 @@ import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import {
   trackerKeys,
+  bulkClassifyObservedTrackerDomains,
   createTrackerDomain,
   deleteTrackerDomain,
   downloadTrackerExtension,
@@ -60,17 +61,35 @@ import {
   getTrackerConsent,
   getTrackerSummary,
   getTrackerUserActivity,
+  listObservedTrackerDomains,
   listTrackerConsents,
   listTrackerDomains,
   revokeTrackerConsent,
   updateTrackerDomain,
 } from "@/services/operational-tracker";
 import { toast } from "@/stores/toast-store";
-import type { DomainCategory, TrackerActivityOverview, TrackerConsentAudit, TrackerDailySummary, TrackerTeamOverview, TrackerUserSummary } from "@/types/tracker";
-
+import type {
+  DomainCategory,
+  TrackerActivityOverview,
+  TrackerConsentAudit,
+  TrackerDailySummary,
+  TrackerObservedDomain,
+  TrackerTeamOverview,
+  TrackerUserSummary,
+} from "@/types/tracker";
 const CATEGORY_COLORS = ["#0065FF", "#4C9AFF", "#6554C0", "#FF5630", "#FF8B00", "#36B37E", "#00B8D9", "#97A0AF"];
 const TRACKER_WEB_SOURCE = "KANTOR_WEB_APP";
 const TRACKER_EXTENSION_SOURCE = "KANTOR_TRACKER_EXTENSION";
+const DOMAIN_CATEGORY_OPTIONS = [
+  { value: "development", label: "Development" },
+  { value: "documentation", label: "Documentation" },
+  { value: "communication", label: "Communication" },
+  { value: "design", label: "Design" },
+  { value: "social_media", label: "Social Media" },
+  { value: "entertainment", label: "Entertainment" },
+  { value: "other", label: "Other" },
+  { value: "uncategorized", label: "Uncategorized" },
+];
 
 export const Route = createFileRoute("/_authenticated/operational/tracker")({
   beforeLoad: async () => {
@@ -106,6 +125,9 @@ function OperationalTrackerPage() {
     category: "development",
     isProductive: true,
   });
+  const [observedDomainSearch, setObservedDomainSearch] = useState("");
+  const [selectedObservedDomains, setSelectedObservedDomains] = useState<string[]>([]);
+  const [domainManagementTab, setDomainManagementTab] = useState<"observed" | "rules">("observed");
   const pendingExtensionRequests = useRef<
     Map<string, { resolve: (value: unknown) => void; reject: (reason?: unknown) => void; timeoutId: number }>
   >(new Map());
@@ -151,6 +173,27 @@ function OperationalTrackerPage() {
     queryFn: listTrackerDomains,
     enabled: canManageDomains && domainModalOpen,
   });
+  const observedDomainsQuery = useQuery({
+    queryKey: trackerKeys.observedDomains(),
+    queryFn: listObservedTrackerDomains,
+    enabled: canManageDomains && domainModalOpen,
+  });
+  const filteredObservedDomains = useMemo(() => {
+    const keyword = observedDomainSearch.trim().toLowerCase();
+    const items = observedDomainsQuery.data ?? [];
+    if (!keyword) {
+      return items;
+    }
+    return items.filter((item) => {
+      const searchable = [item.domain, item.category, item.rule_source, item.matched_pattern ?? ""]
+        .join(" ")
+        .toLowerCase();
+      return searchable.includes(keyword);
+    });
+  }, [observedDomainSearch, observedDomainsQuery.data]);
+  const selectedObservedDomainSet = useMemo(() => new Set(selectedObservedDomains), [selectedObservedDomains]);
+  const allVisibleObservedDomainsSelected =
+    filteredObservedDomains.length > 0 && filteredObservedDomains.every((item) => selectedObservedDomainSet.has(item.domain));
 
   useEffect(() => {
     if (!consentQuery.isLoading && consentQuery.data?.consented && extensionInstalled !== false) {
@@ -180,25 +223,42 @@ function OperationalTrackerPage() {
             is_productive: domainForm.isProductive,
           }),
     onSuccess: async () => {
-      toast.success(editingDomain ? "Domain diperbarui" : "Domain ditambahkan");
-      setDomainModalOpen(false);
+      toast.success(editingDomain ? "Rule domain diperbarui" : "Rule domain ditambahkan");
       setEditingDomain(null);
       resetDomainForm();
-      await queryClient.invalidateQueries({ queryKey: trackerKeys.domains() });
+      await queryClient.invalidateQueries({ queryKey: ["operational", "tracker"] });
     },
     onError: () => {
-      toast.error("Gagal menyimpan domain tracker");
+      toast.error("Gagal menyimpan rule domain tracker");
     },
   });
   const deleteDomainMutation = useMutation({
     mutationFn: (domainId: string) => deleteTrackerDomain(domainId),
     onSuccess: async () => {
-      toast.success("Domain tracker dihapus");
+      toast.success("Rule domain dihapus");
       setDeletingDomain(null);
-      await queryClient.invalidateQueries({ queryKey: trackerKeys.domains() });
+      await queryClient.invalidateQueries({ queryKey: ["operational", "tracker"] });
     },
     onError: () => {
-      toast.error("Gagal menghapus domain tracker");
+      toast.error("Gagal menghapus rule domain tracker");
+    },
+  });
+  const bulkClassifyObservedDomainsMutation = useMutation({
+    mutationFn: ({ isProductive }: { isProductive: boolean }) =>
+      bulkClassifyObservedTrackerDomains({
+        domains: selectedObservedDomains,
+        is_productive: isProductive,
+      }),
+    onSuccess: async (result, variables) => {
+      toast.success(
+        variables.isProductive ? "Domain ditandai productive" : "Domain ditandai unproductive",
+        `${result.updated_count} domain ter-track berhasil diperbarui.`,
+      );
+      setSelectedObservedDomains([]);
+      await queryClient.invalidateQueries({ queryKey: ["operational", "tracker"] });
+    },
+    onError: () => {
+      toast.error("Gagal memperbarui domain ter-track");
     },
   });
 
@@ -466,6 +526,7 @@ function OperationalTrackerPage() {
             onClick={(event) => {
               event.stopPropagation();
               setEditingDomain(row);
+              setDomainManagementTab("rules");
               setDomainForm({
                 domainPattern: row.domain_pattern,
                 category: row.category,
@@ -613,8 +674,7 @@ function OperationalTrackerPage() {
             <Button
               type="button"
               onClick={() => {
-                setEditingDomain(null);
-                resetDomainForm();
+                resetDomainManagementState();
                 setDomainModalOpen(true);
               }}
             >
@@ -797,67 +857,298 @@ function OperationalTrackerPage() {
         </DialogContent>
       </Dialog>
 
-      <FormModal
-        isOpen={domainModalOpen}
-        onClose={() => {
-          setDomainModalOpen(false);
-          setEditingDomain(null);
-          resetDomainForm();
+      <Dialog
+        open={domainModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDomainManagementModal();
+          }
         }}
-        onSubmit={(event) => {
-          event.preventDefault();
-          saveDomainMutation.mutate();
-        }}
-        title={editingDomain ? "Edit domain category" : "Tambah domain category"}
-        subtitle="Gunakan domain pattern untuk mengelompokkan aktivitas extension ke kategori produktif atau non-produktif."
-        submitLabel={editingDomain ? "Simpan Perubahan" : "Simpan Domain"}
-        isLoading={saveDomainMutation.isPending}
-        submitDisabled={!domainForm.domainPattern.trim()}
-        size="xl"
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm font-medium text-text-primary">
-            Domain pattern
-            <Input
-              className="mt-1.5"
-              placeholder="contoh: github.com"
-              value={domainForm.domainPattern}
-              onChange={(event) => setDomainForm((current) => ({ ...current, domainPattern: event.target.value }))}
-            />
-          </label>
-          <label className="text-sm font-medium text-text-primary">
-            Kategori
-            <select
-              className="mt-1.5 h-10 w-full rounded-[6px] border-[1.5px] border-transparent bg-surface-muted px-3 text-sm text-text-primary outline-none focus:border-[#4C9AFF] focus:bg-surface focus:shadow-focus"
-              value={domainForm.category}
-              onChange={(event) => setDomainForm((current) => ({ ...current, category: event.target.value }))}
-            >
-              {["development", "documentation", "communication", "design", "social_media", "entertainment", "other", "uncategorized"].map((option) => (
-                <option key={option} value={option}>
-                  {option.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="inline-flex items-center gap-3 text-sm font-medium text-text-primary">
-          <input
-            type="checkbox"
-            checked={domainForm.isProductive}
-            onChange={(event) => setDomainForm((current) => ({ ...current, isProductive: event.target.checked }))}
-          />
-          Tandai sebagai productive domain
-        </label>
-        <DataTable
-          columns={domainColumns}
-          data={domainsQuery.data ?? []}
-          emptyDescription="Tambahkan pattern domain agar aktivitas extension punya kategori yang konsisten."
-          emptyTitle="Belum ada domain categories"
-          getRowId={(row) => row.id}
-          loading={domainsQuery.isLoading}
-        />
-      </FormModal>
-
+        <DialogContent size="xl">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <DialogHeader className="flex items-start justify-between gap-4">
+              <div>
+                <DialogTitle>Kelola Domain Tracker</DialogTitle>
+                <DialogDescription>
+                  Pilih domain yang sudah ter-track untuk bulk update, atau pindah ke tab Rules Manual untuk mengatur exact rule secara langsung.
+                </DialogDescription>
+              </div>
+              <DialogClose />
+            </DialogHeader>
+            <div className="border-b border-border px-4 py-3 sm:px-6">
+              <div className="inline-flex rounded-full border border-border bg-surface-muted/70 p-1">
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition",
+                    domainManagementTab === "observed"
+                      ? "bg-surface text-text-primary shadow-sm"
+                      : "text-text-secondary hover:text-text-primary",
+                  )}
+                  onClick={() => setDomainManagementTab("observed")}
+                >
+                  Domain Ter-track
+                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
+                    {observedDomainsQuery.data?.length ?? 0}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition",
+                    domainManagementTab === "rules"
+                      ? "bg-surface text-text-primary shadow-sm"
+                      : "text-text-secondary hover:text-text-primary",
+                  )}
+                  onClick={() => setDomainManagementTab("rules")}
+                >
+                  Rules Manual
+                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
+                    {domainsQuery.data?.length ?? 0}
+                  </span>
+                </button>
+              </div>
+            </div>
+            <DialogBody className="space-y-6">
+              {domainManagementTab === "observed" ? (
+                <section className="space-y-4 rounded-2xl border border-border/70 bg-surface p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-text-primary">Semua domain yang sudah ter-track</p>
+                    <p className="text-sm leading-6 text-text-secondary">
+                      List ini diambil dari data tracker yang benar-benar pernah masuk. Bulk action di bawah akan membuat exact override rule untuk domain yang dipilih.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <Input
+                      className="xl:max-w-sm"
+                      placeholder="Cari domain, kategori, atau sumber rule..."
+                      value={observedDomainSearch}
+                      onChange={(event) => setObservedDomainSearch(event.target.value)}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-surface-muted px-3 py-1 text-xs font-semibold text-text-secondary">
+                        {selectedObservedDomains.length} dipilih
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={toggleAllObservedDomains}
+                        disabled={filteredObservedDomains.length === 0}
+                      >
+                        {allVisibleObservedDomainsSelected ? "Batal pilih semua hasil" : "Pilih semua hasil"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={selectedObservedDomains.length === 0 || bulkClassifyObservedDomainsMutation.isPending}
+                        onClick={() => bulkClassifyObservedDomainsMutation.mutate({ isProductive: true })}
+                      >
+                        Tandai Productive
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={selectedObservedDomains.length === 0 || bulkClassifyObservedDomainsMutation.isPending}
+                        onClick={() => bulkClassifyObservedDomainsMutation.mutate({ isProductive: false })}
+                      >
+                        Tandai Unproductive
+                      </Button>
+                    </div>
+                  </div>
+                  {observedDomainsQuery.isLoading ? (
+                    <div className="rounded-2xl border border-border/70 bg-surface-muted/50 px-4 py-8 text-center text-sm text-text-secondary">
+                      Memuat domain yang sudah ter-track...
+                    </div>
+                  ) : filteredObservedDomains.length === 0 ? (
+                    <EmptyState
+                      icon={Globe2}
+                      title="Belum ada domain tracker"
+                      description="Domain baru akan muncul di sini setelah extension mengirim aktivitas browser ke sistem."
+                    />
+                  ) : (
+                    <div className="overflow-hidden rounded-2xl border border-border/70">
+                      <div className="hidden grid-cols-[36px_minmax(0,1.7fr)_160px_150px_130px_170px] gap-3 border-b border-border bg-surface-muted/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary md:grid">
+                        <span />
+                        <span>Domain</span>
+                        <span>Kategori</span>
+                        <span>Produktivitas</span>
+                        <span>Sumber Rule</span>
+                        <span>Terakhir Dilihat</span>
+                      </div>
+                      <div className="max-h-[420px] overflow-y-auto">
+                        {filteredObservedDomains.map((item) => {
+                          const isSelected = selectedObservedDomainSet.has(item.domain);
+                          return (
+                            <label key={item.domain} className="block border-t border-border/70 first:border-t-0">
+                              <div className="flex items-start gap-3 px-4 py-4">
+                                <input
+                                  className="mt-1 h-4 w-4 rounded border-border"
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleObservedDomainSelection(item.domain)}
+                                />
+                                <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1.7fr)_160px_150px_130px_170px]">
+                                  <div className="min-w-0">
+                                    <p className="truncate font-mono text-[13px] text-text-primary">{item.domain}</p>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+                                      <span>{item.entry_count} entry</span>
+                                      <span aria-hidden="true">•</span>
+                                      <span>{formatDuration(item.total_duration_seconds)}</span>
+                                      {item.matched_pattern ? (
+                                        <>
+                                          <span aria-hidden="true">•</span>
+                                          <span className="font-mono">match: {item.matched_pattern}</span>
+                                        </>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary md:hidden">Kategori</p>
+                                    <p className="text-sm text-text-primary">{formatDomainCategoryLabel(item.category)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary md:hidden">Produktivitas</p>
+                                    <StatusBadge status={item.is_productive ? "productive" : "unproductive"} />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary md:hidden">Sumber Rule</p>
+                                    <span
+                                      className={cn(
+                                        "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em]",
+                                        getObservedDomainRuleSourceClass(item.rule_source),
+                                      )}
+                                    >
+                                      {formatObservedDomainRuleSource(item.rule_source)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-tertiary md:hidden">Terakhir Dilihat</p>
+                                    <p className="text-sm text-text-primary">{formatDateTime(item.last_seen_at)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              ) : (
+                <form
+                  id="tracker-domain-rule-form"
+                  className="space-y-6"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!domainForm.domainPattern.trim()) {
+                      return;
+                    }
+                    saveDomainMutation.mutate();
+                  }}
+                >
+                  <section className="space-y-4 rounded-2xl border border-border/70 bg-surface p-4">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-text-primary">{editingDomain ? "Edit rule domain" : "Tambah rule domain"}</p>
+                      <p className="text-sm leading-6 text-text-secondary">
+                        Rule manual dipakai untuk memberi kategori tetap ke domain tertentu. Exact rule di sini akan meng-override pattern yang lebih umum.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+                      <label className="text-sm font-medium text-text-primary">
+                        Domain pattern
+                        <Input
+                          className="mt-1.5"
+                          placeholder="contoh: github.com atau docs.google.com"
+                          value={domainForm.domainPattern}
+                          onChange={(event) => setDomainForm((current) => ({ ...current, domainPattern: event.target.value }))}
+                        />
+                      </label>
+                      <label className="text-sm font-medium text-text-primary">
+                        Kategori
+                        <Select
+                          aria-label="Kategori domain"
+                          className="mt-1.5"
+                          onValueChange={(value) => setDomainForm((current) => ({ ...current, category: value }))}
+                          options={DOMAIN_CATEGORY_OPTIONS}
+                          value={domainForm.category}
+                        />
+                      </label>
+                    </div>
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <label className="inline-flex items-center gap-3 text-sm font-medium text-text-primary">
+                        <input
+                          className="h-4 w-4 rounded border-border"
+                          type="checkbox"
+                          checked={domainForm.isProductive}
+                          onChange={(event) => setDomainForm((current) => ({ ...current, isProductive: event.target.checked }))}
+                        />
+                        Tandai sebagai productive domain
+                      </label>
+                      {editingDomain ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingDomain(null);
+                            resetDomainForm();
+                          }}
+                        >
+                          Batal edit
+                        </Button>
+                      ) : null}
+                    </div>
+                  </section>
+                  <section className="space-y-4 rounded-2xl border border-border/70 bg-surface p-4">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-text-primary">Rules manual aktif</p>
+                      <p className="text-sm leading-6 text-text-secondary">
+                        Exact rule di bawah akan diprioritaskan saat sistem mengklasifikasikan domain tracker baru.
+                      </p>
+                    </div>
+                    <DataTable
+                      columns={domainColumns}
+                      data={domainsQuery.data ?? []}
+                      emptyDescription="Tambahkan pattern domain agar aktivitas extension punya kategori yang konsisten."
+                      emptyTitle="Belum ada rule domain"
+                      getRowId={(row) => row.id}
+                      loading={domainsQuery.isLoading}
+                    />
+                  </section>
+                </form>
+              )}
+            </DialogBody>
+            <DialogFooter>
+              {domainManagementTab === "observed" ? (
+                <>
+                  <Button type="button" variant="ghost" onClick={closeDomainManagementModal}>
+                    Tutup
+                  </Button>
+                  <Button type="button" onClick={() => setDomainManagementTab("rules")}>
+                    Kelola Rules Manual
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" variant="ghost" onClick={closeDomainManagementModal}>
+                    Tutup
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setDomainManagementTab("observed")}>
+                    Lihat Domain Ter-track
+                  </Button>
+                  <Button
+                    form="tracker-domain-rule-form"
+                    type="submit"
+                    disabled={saveDomainMutation.isPending || !domainForm.domainPattern.trim()}
+                  >
+                    {saveDomainMutation.isPending ? "Menyimpan..." : editingDomain ? "Perbarui Rule" : "Simpan Rule"}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         isOpen={Boolean(deletingDomain)}
         onClose={() => setDeletingDomain(null)}
@@ -906,8 +1197,68 @@ function OperationalTrackerPage() {
       isProductive: true,
     });
   }
+
+  function closeDomainManagementModal() {
+    setDomainModalOpen(false);
+    resetDomainManagementState();
+  }
+
+  function resetDomainManagementState() {
+    setEditingDomain(null);
+    setDomainManagementTab("observed");
+    resetDomainForm();
+    setObservedDomainSearch("");
+    setSelectedObservedDomains([]);
+  }
+
+  function toggleObservedDomainSelection(domain: string) {
+    setSelectedObservedDomains((current) =>
+      current.includes(domain) ? current.filter((item) => item !== domain) : [...current, domain],
+    );
+  }
+
+  function toggleAllObservedDomains() {
+    setSelectedObservedDomains((current) => {
+      if (allVisibleObservedDomainsSelected) {
+        const visible = new Set(filteredObservedDomains.map((item) => item.domain));
+        return current.filter((item) => !visible.has(item));
+      }
+      const merged = new Set(current);
+      for (const item of filteredObservedDomains) {
+        merged.add(item.domain);
+      }
+      return Array.from(merged);
+    });
+  }
 }
 
+function formatDomainCategoryLabel(category: string) {
+  return category
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatObservedDomainRuleSource(source: TrackerObservedDomain["rule_source"]) {
+  switch (source) {
+    case "exact":
+      return "Exact";
+    case "pattern":
+      return "Pattern";
+    default:
+      return "Fallback";
+  }
+}
+
+function getObservedDomainRuleSourceClass(source: TrackerObservedDomain["rule_source"]) {
+  switch (source) {
+    case "exact":
+      return "bg-success/15 text-success";
+    case "pattern":
+      return "bg-warning/15 text-warning";
+    default:
+      return "bg-surface-muted text-text-secondary";
+  }
+}
 function TrackerSetupTab({
   consented,
   extensionInstalled,
@@ -1381,3 +1732,10 @@ function formatTooltipDuration(value: unknown) {
   const normalized = Array.isArray(value) ? value[0] : value;
   return formatDuration(Number(normalized ?? 0));
 }
+
+
+
+
+
+
+
