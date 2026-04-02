@@ -42,6 +42,7 @@ const EMPLOYEE_ROLE_OPTIONS = [
   "Part Time",
   "Internship",
   "Project Based",
+  "Outsourcing",
 ] as const;
 
 function normalizeEmployeeRole(value?: string) {
