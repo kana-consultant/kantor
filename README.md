@@ -389,7 +389,7 @@ This project is licensed under the MIT License &mdash; see the [LICENSE](LICENSE
 
 **KANTOR** &mdash; Operational. HRIS. Marketing. All in one.
 
-Made with care by [PERFECT10](https://perfect10.bot)
+Made with care by [PERFECT10](https://perfect10.id)
 
 [Back to Top](#kantor)
 
