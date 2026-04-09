@@ -18,6 +18,13 @@ type WAMessageTemplate struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
+type WADefaultTemplatesSeedResult struct {
+	InsertedCount int      `json:"inserted_count"`
+	ExistingCount int      `json:"existing_count"`
+	TotalCount    int      `json:"total_count"`
+	InsertedSlugs []string `json:"inserted_slugs,omitempty"`
+}
+
 type WABroadcastSchedule struct {
 	ID             string     `json:"id"`
 	Name           string     `json:"name"`

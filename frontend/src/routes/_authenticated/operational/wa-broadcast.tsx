@@ -43,6 +43,7 @@ import {
   startWASession,
   stopWASession,
   listTemplates,
+  generateDefaultTemplates,
   createTemplate,
   updateTemplate,
   deleteTemplate,
@@ -60,10 +61,12 @@ import {
   updateWAConfig,
   type WAConfig,
   type WABroadcastLog,
+  type WADefaultTemplatesSeedResult,
   type WATemplate,
   type WASchedule,
   type WALogFilters,
 } from "@/services/wa-broadcast";
+import { toast } from "@/stores/toast-store";
 
 export const Route = createFileRoute("/_authenticated/operational/wa-broadcast")({
   beforeLoad: async () => {
@@ -450,6 +453,24 @@ function TemplatesTab() {
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: waKeys.all }); },
   });
 
+  const generateDefaultsMutation = useMutation({
+    mutationFn: generateDefaultTemplates,
+    onSuccess: async (result: WADefaultTemplatesSeedResult) => {
+      await queryClient.invalidateQueries({ queryKey: waKeys.all });
+      if (result.inserted_count > 0) {
+        toast.success(
+          "Template default berhasil dibuat",
+          `${result.inserted_count} template default ditambahkan untuk tenant ini.`,
+        );
+        return;
+      }
+      toast.success("Template default sudah lengkap", "Tenant ini sudah memiliki semua template default.");
+    },
+    onError: () => {
+      toast.error("Gagal membuat template default");
+    },
+  });
+
   const previewMutation = useMutation({
     mutationFn: previewTemplate,
   });
@@ -581,12 +602,31 @@ function TemplatesTab() {
             value={triggerFilter}
           />
         </div>
-        {canManage && (
-          <Button className="w-full sm:w-auto" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> Buat Template
-          </Button>
-        )}
+        {canManage ? (
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button
+              className="w-full sm:w-auto"
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={() => generateDefaultsMutation.mutate()}
+              disabled={generateDefaultsMutation.isPending}
+            >
+              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", generateDefaultsMutation.isPending && "animate-spin")} />
+              {generateDefaultsMutation.isPending ? "Membuat Default..." : "Generate Template Default"}
+            </Button>
+            <Button className="w-full sm:w-auto" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Buat Template
+            </Button>
+          </div>
+        ) : null}
       </div>
+
+      {canManage ? (
+        <p className="text-xs text-text-secondary">
+          Tombol generate hanya menambahkan template system yang masih belum ada di tenant ini. Template yang sudah ada tidak akan di-overwrite.
+        </p>
+      ) : null}
 
       <DataTable
         columns={columns}

@@ -42,6 +42,7 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 
 	// Templates
 	router.With(platformmiddleware.RequirePermission("operational:wa:view")).Get("/templates", h.listTemplates)
+	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/templates/generate-defaults", h.generateDefaultTemplates)
 	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Post("/templates", h.createTemplate)
 	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Put("/templates/{templateID}", h.updateTemplate)
 	router.With(platformmiddleware.RequirePermission("operational:wa:manage")).Delete("/templates/{templateID}", h.deleteTemplate)
@@ -235,6 +236,17 @@ func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "operational", "wa_template", result.ID, nil, result)
 	response.WriteJSON(w, http.StatusCreated, result, nil)
+}
+
+func (h *Handler) generateDefaultTemplates(w http.ResponseWriter, r *http.Request) {
+	result, err := h.service.EnsureDefaultTemplates(r.Context())
+	if err != nil {
+		h.writeInternalError(w, err)
+		return
+	}
+
+	platformmiddleware.AuditLog(r.Context(), "generate_defaults", "operational", "wa_template", "", nil, result)
+	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
 func (h *Handler) updateTemplate(w http.ResponseWriter, r *http.Request) {

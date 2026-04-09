@@ -198,6 +198,10 @@ func (s *Service) CreateTemplate(ctx context.Context, params warepo.CreateTempla
 	return s.repo.CreateTemplate(ctx, params)
 }
 
+func (s *Service) EnsureDefaultTemplates(ctx context.Context) (model.WADefaultTemplatesSeedResult, error) {
+	return s.repo.EnsureDefaultTemplates(ctx)
+}
+
 func (s *Service) UpdateTemplate(ctx context.Context, id string, params warepo.UpdateTemplateParams) (model.WAMessageTemplate, error) {
 	existing, err := s.repo.GetTemplateByID(ctx, id)
 	if errors.Is(err, warepo.ErrTemplateNotFound) {

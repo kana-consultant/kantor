@@ -95,12 +95,18 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	// Seed RBAC defaults and finance categories per-tenant.
 	financeRepositoryForSeed := hrisrepo.NewFinanceRepository(pool)
+	waRepositoryForSeed := warepo.New(pool)
 	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {
 		if err := rbac.SeedDefaults(tCtx, pool); err != nil {
 			return fmt.Errorf("seed rbac defaults for tenant %s: %w", t.Slug, err)
 		}
 		if err := financeRepositoryForSeed.SeedDefaultCategories(tCtx); err != nil {
 			return fmt.Errorf("seed finance categories for tenant %s: %w", t.Slug, err)
+		}
+		if result, err := waRepositoryForSeed.EnsureDefaultTemplates(tCtx); err != nil {
+			return fmt.Errorf("seed wa templates for tenant %s: %w", t.Slug, err)
+		} else if result.InsertedCount > 0 {
+			slog.Info("seeded wa templates", "tenant", t.Slug, "inserted", result.InsertedCount, "slugs", result.InsertedSlugs)
 		}
 		return nil
 	}); err != nil {

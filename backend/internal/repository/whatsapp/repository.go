@@ -117,6 +117,93 @@ type UpdateTemplateParams struct {
 	IsActive           bool
 }
 
+type defaultTemplateSeed struct {
+	Name               string
+	Slug               string
+	Category           string
+	TriggerType        string
+	BodyTemplate       string
+	Description        string
+	AvailableVariables []string
+}
+
+var defaultTemplateSeeds = []defaultTemplateSeed{
+	{
+		Name:        "Task Jatuh Tempo Hari Ini",
+		Slug:        "task_due_today",
+		Category:    "operational",
+		TriggerType: "auto_scheduled",
+		BodyTemplate: "Halo {{name}}, task *{{task_title}}* di project *{{project_name}}* jatuh tempo hari ini dan belum selesai. " +
+			"Segera diselesaikan ya!\n\nAkses KANTOR: {{app_url}}",
+		Description:        "Dikirim otomatis setiap pagi untuk task yang due date hari ini",
+		AvailableVariables: []string{"name", "task_title", "project_name", "due_date", "app_url"},
+	},
+	{
+		Name:        "Task Overdue",
+		Slug:        "task_overdue",
+		Category:    "operational",
+		TriggerType: "auto_scheduled",
+		BodyTemplate: "Halo {{name}}, task *{{task_title}}* di project *{{project_name}}* sudah melewati deadline ({{due_date}}). " +
+			"Mohon segera update progress.\n\nAkses KANTOR: {{app_url}}",
+		Description:        "Dikirim otomatis setiap pagi untuk task yang sudah melewati deadline",
+		AvailableVariables: []string{"name", "task_title", "project_name", "due_date", "app_url"},
+	},
+	{
+		Name:        "Task Baru Di-Assign",
+		Slug:        "task_assigned",
+		Category:    "operational",
+		TriggerType: "event_triggered",
+		BodyTemplate: "Halo {{name}}, kamu di-assign ke task baru:\n\n" +
+			"- {{task_title}}\n" +
+			"- Project: {{project_name}}\n" +
+			"- Deadline: {{due_date}}\n" +
+			"- Prioritas: {{priority}}\n\n" +
+			"Cek detail di KANTOR: {{app_url}}",
+		Description:        "Dikirim saat task di-assign ke seseorang (manual atau auto-assign)",
+		AvailableVariables: []string{"name", "task_title", "project_name", "due_date", "priority", "app_url"},
+	},
+	{
+		Name:        "Project Deadline H-3",
+		Slug:        "project_deadline_h3",
+		Category:    "operational",
+		TriggerType: "auto_scheduled",
+		BodyTemplate: "Reminder: Project *{{project_name}}* deadline dalam 3 hari ({{deadline}}).\n\n" +
+			"Status saat ini: {{project_status}}\n" +
+			"Task belum selesai: {{open_tasks_count}} dari {{total_tasks_count}}\n\n" +
+			"Pastikan semua task terselesaikan tepat waktu. Akses: {{app_url}}",
+		Description:        "Dikirim otomatis H-3 sebelum deadline project ke semua member project",
+		AvailableVariables: []string{"name", "project_name", "deadline", "project_status", "open_tasks_count", "total_tasks_count", "app_url"},
+	},
+	{
+		Name:        "Weekly Digest",
+		Slug:        "weekly_digest",
+		Category:    "operational",
+		TriggerType: "auto_scheduled",
+		BodyTemplate: "Weekly Digest KANTOR ({{week_start}} - {{week_end}})\n\n" +
+			"Halo {{name}}, ini ringkasan minggu lalu:\n\n" +
+			"- Task selesai: {{completed_count}}\n" +
+			"- Task masih open: {{open_count}}\n" +
+			"- Task overdue: {{overdue_count}}\n\n" +
+			"Semangat untuk minggu ini!\nAkses: {{app_url}}",
+		Description:        "Dikirim setiap Senin pagi, ringkasan task per user untuk minggu sebelumnya",
+		AvailableVariables: []string{"name", "week_start", "week_end", "completed_count", "open_count", "overdue_count", "app_url"},
+	},
+	{
+		Name:        "Reimbursement Status Update",
+		Slug:        "reimbursement_status",
+		Category:    "hris",
+		TriggerType: "event_triggered",
+		BodyTemplate: "Halo {{name}}, update status reimbursement kamu:\n\n" +
+			"- {{reimbursement_title}}\n" +
+			"- Nominal: {{amount}}\n" +
+			"- Status: {{new_status}}\n" +
+			"{{reviewer_notes_section}}\n\n" +
+			"Cek detail di KANTOR: {{app_url}}",
+		Description:        "Dikirim saat status reimbursement berubah (approved/rejected/paid)",
+		AvailableVariables: []string{"name", "reimbursement_title", "amount", "new_status", "reviewer_notes_section", "app_url"},
+	},
+}
+
 func (r *Repository) ListTemplates(ctx context.Context, category string, triggerType string) ([]model.WAMessageTemplate, error) {
 	query := `SELECT id, name, slug, category, trigger_type, body_template, description,
 		available_variables, is_active, is_system, created_by, created_at, updated_at
@@ -244,6 +331,56 @@ func (r *Repository) UpdateTemplate(ctx context.Context, id string, params Updat
 		return t, ErrTemplateNotFound
 	}
 	return t, err
+}
+
+func (r *Repository) EnsureDefaultTemplates(ctx context.Context) (model.WADefaultTemplatesSeedResult, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	result := model.WADefaultTemplatesSeedResult{
+		TotalCount: len(defaultTemplateSeeds),
+	}
+
+	for _, template := range defaultTemplateSeeds {
+		var insertedSlug string
+		err := repository.DB(ctx, r.db).QueryRow(ctx, `
+			WITH inserted AS (
+				INSERT INTO wa_message_templates (
+					name, slug, category, trigger_type, body_template, description,
+					available_variables, is_active, is_system, created_by
+				)
+				SELECT $1, $2, $3, $4, $5, $6, $7, true, true, NULL
+				WHERE NOT EXISTS (
+					SELECT 1
+					FROM wa_message_templates
+					WHERE slug = ANY($8::text[])
+				)
+				ON CONFLICT (tenant_id, slug) DO NOTHING
+				RETURNING slug
+			)
+			SELECT COALESCE((SELECT slug FROM inserted), '')
+		`,
+			template.Name,
+			template.Slug,
+			template.Category,
+			template.TriggerType,
+			template.BodyTemplate,
+			template.Description,
+			template.AvailableVariables,
+			templateSlugCandidates(template.Slug),
+		).Scan(&insertedSlug)
+		if err != nil {
+			return model.WADefaultTemplatesSeedResult{}, fmt.Errorf("ensure default template %q: %w", template.Slug, err)
+		}
+
+		if insertedSlug != "" {
+			result.InsertedCount++
+			result.InsertedSlugs = append(result.InsertedSlugs, insertedSlug)
+		}
+	}
+
+	result.ExistingCount = result.TotalCount - result.InsertedCount
+	return result, nil
 }
 
 func (r *Repository) DeleteTemplate(ctx context.Context, id string) error {

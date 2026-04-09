@@ -49,6 +49,13 @@ export interface WATemplate {
   updated_at: string;
 }
 
+export interface WADefaultTemplatesSeedResult {
+  inserted_count: number;
+  existing_count: number;
+  total_count: number;
+  inserted_slugs?: string[];
+}
+
 export interface WASchedule {
   id: string;
   name: string;
@@ -192,6 +199,10 @@ export function deleteTemplate(id: string) {
 
 export function previewTemplate(id: string) {
   return authPostJSON<{ preview: string }, undefined>(`/wa/templates/${id}/preview`, undefined);
+}
+
+export function generateDefaultTemplates() {
+  return authPostJSON<WADefaultTemplatesSeedResult, undefined>("/wa/templates/generate-defaults", undefined);
 }
 
 // Schedules
