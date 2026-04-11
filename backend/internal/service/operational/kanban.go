@@ -7,6 +7,7 @@ import (
 	"time"
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
+	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 )
@@ -49,7 +50,7 @@ type kanbanProjectsRepository interface {
 type KanbanService struct {
 	repo         kanbanRepository
 	projectsRepo kanbanProjectsRepository
-	notifier     TaskAssignNotifier
+	notifiers    []TaskAssignNotifier
 }
 
 func NewKanbanService(repo kanbanRepository, projectsRepo kanbanProjectsRepository) *KanbanService {
@@ -57,7 +58,9 @@ func NewKanbanService(repo kanbanRepository, projectsRepo kanbanProjectsReposito
 }
 
 func (s *KanbanService) SetTaskAssignNotifier(n TaskAssignNotifier) {
-	s.notifier = n
+	if n != nil {
+		s.notifiers = append(s.notifiers, n)
+	}
 }
 
 func (s *KanbanService) CreateDefaultColumns(ctx context.Context, projectID string) error {
@@ -153,8 +156,8 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 	}
 
 	// Notify assignee (skip self-assign)
-	if task.AssigneeID != nil && *task.AssigneeID != createdBy && s.notifier != nil {
-		go s.notifier.SendTaskAssignedNotification(context.Background(), task.ID, *task.AssigneeID)
+	if task.AssigneeID != nil && *task.AssigneeID != createdBy {
+		s.dispatchTaskAssignedNotification(ctx, task.ID, *task.AssigneeID)
 	}
 
 	return task, nil
@@ -196,10 +199,10 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 	}
 
 	// Notify new assignee if changed and not self-assign
-	if s.notifier != nil && task.AssigneeID != nil {
+	if task.AssigneeID != nil {
 		newAssigneeID := *task.AssigneeID
 		if newAssigneeID != oldAssigneeID && newAssigneeID != actorID {
-			go s.notifier.SendTaskAssignedNotification(context.Background(), task.ID, newAssigneeID)
+			s.dispatchTaskAssignedNotification(ctx, task.ID, newAssigneeID)
 		}
 	}
 
@@ -299,4 +302,19 @@ func normalizeStringPointer(value *string) *string {
 
 	trimmed := strings.TrimSpace(*value)
 	return &trimmed
+}
+
+func (s *KanbanService) dispatchTaskAssignedNotification(ctx context.Context, taskID string, assigneeID string) {
+	if len(s.notifiers) == 0 {
+		return
+	}
+
+	notificationCtx := platformmiddleware.DetachTenantContext(ctx)
+	for _, notifier := range s.notifiers {
+		if notifier == nil {
+			continue
+		}
+		currentNotifier := notifier
+		go currentNotifier.SendTaskAssignedNotification(notificationCtx, taskID, assigneeID)
+	}
 }

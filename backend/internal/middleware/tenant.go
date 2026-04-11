@@ -62,6 +62,22 @@ func tenantPoolFromContext(ctx context.Context) (*pgxpool.Pool, bool) {
 	return pool, ok && pool != nil
 }
 
+// DetachTenantContext creates a fresh background context that preserves tenant
+// identity and tenant pool access without carrying a request-scoped DB
+// connection. Use this before launching background goroutines from a request.
+func DetachTenantContext(ctx context.Context) context.Context {
+	detached := context.Background()
+
+	if info, ok := tenant.FromContext(ctx); ok {
+		detached = tenant.WithInfo(detached, info)
+	}
+	if pool, ok := tenantPoolFromContext(ctx); ok {
+		detached = withTenantPool(detached, pool)
+	}
+
+	return detached
+}
+
 // WithScopedTenantConn ensures the callback runs with a tenant-scoped
 // connection. If the context already carries a tenant-scoped DB handle, it is
 // reused as-is.

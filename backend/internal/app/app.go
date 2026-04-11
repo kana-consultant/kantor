@@ -226,10 +226,13 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	// WhatsApp Broadcast (per-tenant: client loaded from DB config on demand)
 	waRepository := warepo.New(pool)
 	whatsappService := waservice.NewService(waRepository, cfg, notificationsService)
+	emailDeliveryService := notificationsservice.NewEmailDeliveryService(authRepository, waRepository, encrypter, cfg)
 
 	// Wire event triggers
 	kanbanService.SetTaskAssignNotifier(whatsappService)
+	kanbanService.SetTaskAssignNotifier(emailDeliveryService)
 	reimbursementsService.SetWANotifier(whatsappService)
+	reimbursementsService.SetWANotifier(emailDeliveryService)
 
 	application := &App{cfg: cfg, db: pool, permissionCache: permissionCache, tenantResolver: tenantResolver}
 	application.router = application.buildRouter(
@@ -255,7 +258,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		fileshandler.New(filesService),
 		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(subscriptionsService, trackerService, whatsappService)
+	application.startBackgroundJobs(subscriptionsService, trackerService, whatsappService, emailDeliveryService)
 
 	return application, nil
 }
@@ -449,7 +452,7 @@ func (a *App) buildRouter(
 	return router
 }
 
-func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, whatsappService *waservice.Service) {
+func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -519,6 +522,26 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			case tickAt := <-ticker.C:
 				runPerTenant("wa_scheduler", func(tCtx context.Context, t tenant.Info) error {
 					return whatsappService.RunCronJobs(tCtx, tickAt)
+				})
+			}
+		}
+	})
+
+	runBackground("email_scheduler", func() {
+		runPerTenant("email_scheduler", func(tCtx context.Context, t tenant.Info) error {
+			return emailDeliveryService.RunCronJobs(tCtx, time.Now())
+		})
+
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickAt := <-ticker.C:
+				runPerTenant("email_scheduler", func(tCtx context.Context, t tenant.Info) error {
+					return emailDeliveryService.RunCronJobs(tCtx, tickAt)
 				})
 			}
 		}

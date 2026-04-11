@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
+	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
@@ -389,74 +390,84 @@ func normalizeValidatedPhone(phone string) (string, error) {
 // SendTaskAssignedNotification sends a WA notification when a task is assigned.
 // Should be called from kanban service via goroutine.
 func (s *Service) SendTaskAssignedNotification(ctx context.Context, taskID string, assigneeID string) {
-	task, err := s.repo.GetTaskWithProject(ctx, taskID)
-	if err != nil || task == nil {
-		slog.Error("failed to get task for WA notification", "task_id", taskID, "error", err)
-		return
-	}
+	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
+		task, err := s.repo.GetTaskWithProject(scopedCtx, taskID)
+		if err != nil || task == nil {
+			slog.Error("failed to get task for WA notification", "task_id", taskID, "error", err)
+			return struct{}{}, nil
+		}
 
-	if task.UserPhone == nil || strings.TrimSpace(*task.UserPhone) == "" {
-		s.logSkipped(ctx, "task_assigned", &task.TaskID, &assigneeID, "", "skipped_no_phone")
-		return
-	}
+		if task.UserPhone == nil || strings.TrimSpace(*task.UserPhone) == "" {
+			s.logSkipped(scopedCtx, "task_assigned", &task.TaskID, &assigneeID, "", "skipped_no_phone")
+			return struct{}{}, nil
+		}
 
-	tmpl, err := s.repo.GetTemplateBySlug(ctx, "task_assigned")
-	if err != nil {
-		slog.Error("failed to get task_assigned template", "error", err)
-		return
-	}
-	if !tmpl.IsActive {
-		return
-	}
+		tmpl, err := s.repo.GetTemplateBySlug(scopedCtx, "task_assigned")
+		if err != nil {
+			slog.Error("failed to get task_assigned template", "error", err)
+			return struct{}{}, nil
+		}
+		if !tmpl.IsActive {
+			return struct{}{}, nil
+		}
 
-	vars := map[string]string{
-		"name":         task.UserName,
-		"task_title":   task.TaskTitle,
-		"project_name": task.ProjectName,
-		"due_date":     task.DueDate,
-		"priority":     task.Priority,
-		"app_url":      s.cfg.AppURL,
-	}
-	body := RenderTemplate(tmpl.BodyTemplate, vars)
+		vars := map[string]string{
+			"name":         task.UserName,
+			"task_title":   task.TaskTitle,
+			"project_name": task.ProjectName,
+			"due_date":     task.DueDate,
+			"priority":     task.Priority,
+			"app_url":      s.cfg.AppURL,
+		}
+		body := RenderTemplate(tmpl.BodyTemplate, vars)
 
-	s.sendAndLog(ctx, *task.UserPhone, body, "event_triggered", &tmpl.ID, &tmpl.Slug,
-		&assigneeID, stringPtr("task"), &task.TaskID)
+		s.sendAndLog(scopedCtx, *task.UserPhone, body, "event_triggered", &tmpl.ID, &tmpl.Slug,
+			&assigneeID, stringPtr("task"), &task.TaskID)
+		return struct{}{}, nil
+	}); err != nil {
+		slog.Error("failed to send task assigned WA notification", "task_id", taskID, "error", err)
+	}
 }
 
 // SendReimbursementStatusNotification sends a WA notification on reimbursement status change.
 func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimbursementID string, newStatus string, reviewerNotes string) {
-	info, err := s.repo.GetReimbursementWithSubmitter(ctx, reimbursementID)
-	if err != nil || info == nil {
-		slog.Error("failed to get reimbursement for WA notification", "reimbursement_id", reimbursementID, "error", err)
-		return
-	}
+	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
+		info, err := s.repo.GetReimbursementWithSubmitter(scopedCtx, reimbursementID)
+		if err != nil || info == nil {
+			slog.Error("failed to get reimbursement for WA notification", "reimbursement_id", reimbursementID, "error", err)
+			return struct{}{}, nil
+		}
 
-	if info.SubmitterPhone == nil || strings.TrimSpace(*info.SubmitterPhone) == "" {
-		s.logSkipped(ctx, "reimbursement_status", &reimbursementID, &info.SubmitterID, "", "skipped_no_phone")
-		return
-	}
+		if info.SubmitterPhone == nil || strings.TrimSpace(*info.SubmitterPhone) == "" {
+			s.logSkipped(scopedCtx, "reimbursement_status", &reimbursementID, &info.SubmitterID, "", "skipped_no_phone")
+			return struct{}{}, nil
+		}
 
-	tmpl, err := s.repo.GetTemplateBySlug(ctx, "reimbursement_status")
-	if err != nil {
-		slog.Error("failed to get reimbursement_status template", "error", err)
-		return
-	}
-	if !tmpl.IsActive {
-		return
-	}
+		tmpl, err := s.repo.GetTemplateBySlug(scopedCtx, "reimbursement_status")
+		if err != nil {
+			slog.Error("failed to get reimbursement_status template", "error", err)
+			return struct{}{}, nil
+		}
+		if !tmpl.IsActive {
+			return struct{}{}, nil
+		}
 
-	vars := map[string]string{
-		"name":                   info.SubmitterName,
-		"reimbursement_title":    info.Title,
-		"amount":                 formatRupiah(info.Amount),
-		"new_status":             newStatus,
-		"reviewer_notes_section": BuildReviewerNotesSection(reviewerNotes),
-		"app_url":                s.cfg.AppURL,
-	}
-	body := RenderTemplate(tmpl.BodyTemplate, vars)
+		vars := map[string]string{
+			"name":                   info.SubmitterName,
+			"reimbursement_title":    info.Title,
+			"amount":                 formatRupiah(info.Amount),
+			"new_status":             newStatus,
+			"reviewer_notes_section": BuildReviewerNotesSection(reviewerNotes),
+			"app_url":                s.cfg.AppURL,
+		}
+		body := RenderTemplate(tmpl.BodyTemplate, vars)
 
-	s.sendAndLog(ctx, *info.SubmitterPhone, body, "event_triggered", &tmpl.ID, &tmpl.Slug,
-		&info.SubmitterID, stringPtr("reimbursement"), &reimbursementID)
+		s.sendAndLog(scopedCtx, *info.SubmitterPhone, body, "event_triggered", &tmpl.ID, &tmpl.Slug,
+			&info.SubmitterID, stringPtr("reimbursement"), &reimbursementID)
+		return struct{}{}, nil
+	}); err != nil {
+		slog.Error("failed to send reimbursement WA notification", "reimbursement_id", reimbursementID, "error", err)
+	}
 }
 
 func (s *Service) sendAndLog(ctx context.Context, phone string, body string, triggerType string,

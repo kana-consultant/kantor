@@ -560,7 +560,7 @@ function AdminSettingsPage() {
                 <div>
                   <p className="text-sm font-semibold text-text-primary">Siapkan notifikasi email</p>
                   <p className="text-xs text-text-secondary">
-                    Menandai tenant ini siap memakai fitur notifikasi email berikutnya.
+                    Mengaktifkan email untuk task assigned, status reimbursement, dan weekly digest.
                   </p>
                 </div>
                 <input
@@ -578,6 +578,7 @@ function AdminSettingsPage() {
                   <p>Email aktif: {mailDeliveryEnabled ? "Ya" : "Belum"}</p>
                   <p>API key: {settingsQuery.data?.mail_delivery.has_api_key && !clearMailAPIKey ? "Tersimpan" : mailAPIKey.trim() ? "Baru diisi" : "Belum ada"}</p>
                   <p>Reset password: {passwordResetEnabled ? "Aktif" : "Off"}</p>
+                  <p>Notifikasi email: {notificationEnabled ? "Aktif" : "Off"}</p>
                 </div>
               </div>
             </div>

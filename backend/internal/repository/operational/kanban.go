@@ -385,6 +385,9 @@ func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]m
 		); err != nil {
 			return nil, err
 		}
+		task.AssigneeID = normalizeOptionalString(task.AssigneeID)
+		task.AssigneeName = normalizeOptionalString(task.AssigneeName)
+		task.AvatarURL = normalizeOptionalString(task.AvatarURL)
 		tasks = append(tasks, task)
 	}
 
@@ -423,6 +426,9 @@ func (r *KanbanRepository) GetTask(ctx context.Context, projectID string, taskID
 	if errors.Is(err, pgx.ErrNoRows) {
 		return task, ErrKanbanTaskNotFound
 	}
+	task.AssigneeID = normalizeOptionalString(task.AssigneeID)
+	task.AssigneeName = normalizeOptionalString(task.AssigneeName)
+	task.AvatarURL = normalizeOptionalString(task.AvatarURL)
 	return task, err
 }
 
@@ -495,6 +501,10 @@ func (r *KanbanRepository) CreateTask(ctx context.Context, projectID string, par
 		return model.KanbanTask{}, err
 	}
 
+	task.AssigneeID = normalizeOptionalString(task.AssigneeID)
+	task.AssigneeName = normalizeOptionalString(task.AssigneeName)
+	task.AvatarURL = normalizeOptionalString(task.AvatarURL)
+
 	if task.AssigneeID != nil {
 		assignName, avatarURL, loadErr := r.lookupAssignee(ctx, tx, *task.AssigneeID)
 		if loadErr != nil {
@@ -565,6 +575,10 @@ func (r *KanbanRepository) UpdateTask(ctx context.Context, projectID string, tas
 
 		return model.KanbanTask{}, err
 	}
+
+	task.AssigneeID = normalizeOptionalString(task.AssigneeID)
+	task.AssigneeName = normalizeOptionalString(task.AssigneeName)
+	task.AvatarURL = normalizeOptionalString(task.AvatarURL)
 
 	if task.AssigneeID != nil {
 		assignName, avatarURL, loadErr := r.lookupAssignee(ctx, r.db, *task.AssigneeID)
@@ -840,6 +854,11 @@ func (r *KanbanRepository) maxTaskPosition(ctx context.Context, tx queryRowExecu
 }
 
 func (r *KanbanRepository) lookupAssignee(ctx context.Context, tx queryRowExecutor, assigneeID string) (*string, *string, error) {
+	assigneeID = strings.TrimSpace(assigneeID)
+	if assigneeID == "" {
+		return nil, nil, nil
+	}
+
 	var fullName *string
 	var avatarURL *string
 	err := tx.QueryRow(ctx, `SELECT full_name, avatar_url FROM users WHERE id = $1::uuid`, assigneeID).Scan(&fullName, &avatarURL)
@@ -869,8 +888,21 @@ func nullableText(value *string) interface{} {
 
 func nullableUUID(value *string) interface{} {
 	if value == nil || strings.TrimSpace(*value) == "" {
-		return ""
+		return nil
 	}
 
 	return strings.TrimSpace(*value)
+}
+
+func normalizeOptionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
 }

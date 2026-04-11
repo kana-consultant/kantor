@@ -78,6 +78,15 @@ func (setting MailDeliverySettingRecord) ForgotPasswordEnabled() bool {
 		normalized.APIKeyEncrypted != ""
 }
 
+func (setting MailDeliverySettingRecord) NotificationEmailsEnabled() bool {
+	normalized := normalizeMailDeliverySettingRecord(setting)
+	return normalized.Enabled &&
+		normalized.Provider == "resend" &&
+		normalized.NotificationEnabled &&
+		normalized.SenderEmail != "" &&
+		normalized.APIKeyEncrypted != ""
+}
+
 func (r *Repository) GetMailDeliveryRecord(ctx context.Context) (MailDeliverySettingRecord, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -127,4 +136,26 @@ func (r *Repository) GetPublicAuthOptions(ctx context.Context) (PublicAuthOption
 	return PublicAuthOptions{
 		ForgotPasswordEnabled: setting.ForgotPasswordEnabled(),
 	}, nil
+}
+
+func (r *Repository) GetTenantPrimaryDomain(ctx context.Context) (string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	var domain string
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT domain
+		FROM tenant_domains
+		WHERE tenant_id = current_setting('app.current_tenant', true)::uuid
+		ORDER BY is_primary DESC, created_at ASC
+		LIMIT 1
+	`).Scan(&domain)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return strings.TrimSpace(domain), nil
 }

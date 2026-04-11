@@ -725,6 +725,7 @@ type TaskDueInfo struct {
 	ProjectName string
 	AssigneeID  string
 	UserName    string
+	UserEmail   string
 	UserPhone   *string
 	DueDate     string
 	Priority    string
@@ -803,7 +804,7 @@ func (r *Repository) GetTasksOverdue(ctx context.Context) ([]TaskDueInfo, error)
 }
 
 func (r *Repository) queryTasksByDue(ctx context.Context, dateCondition string) ([]TaskDueInfo, error) {
-	query := fmt.Sprintf(`SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.phone,
+	query := fmt.Sprintf(`SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.email, u.phone,
 		COALESCE(to_char(kt.due_date, 'YYYY-MM-DD'), ''), kt.priority
 		FROM kanban_tasks kt
 		JOIN kanban_columns kc ON kc.id = kt.column_id
@@ -822,7 +823,7 @@ func (r *Repository) queryTasksByDue(ctx context.Context, dateCondition string) 
 	for rows.Next() {
 		var t TaskDueInfo
 		if err := rows.Scan(&t.TaskID, &t.TaskTitle, &t.ProjectID, &t.ProjectName,
-			&t.AssigneeID, &t.UserName, &t.UserPhone, &t.DueDate, &t.Priority); err != nil {
+			&t.AssigneeID, &t.UserName, &t.UserEmail, &t.UserPhone, &t.DueDate, &t.Priority); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		tasks = append(tasks, t)
@@ -954,6 +955,7 @@ func (r *Repository) getProjectMembersByProjectIDs(ctx context.Context, projectI
 type WeeklyDigestInfo struct {
 	UserID         string
 	UserName       string
+	UserEmail      string
 	Phone          *string
 	CompletedCount int
 	OpenCount      int
@@ -961,7 +963,7 @@ type WeeklyDigestInfo struct {
 }
 
 func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInfo, error) {
-	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT u.id, u.full_name, u.phone,
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `SELECT u.id, u.full_name, u.email, u.phone,
 		COALESCE(SUM(CASE WHEN LOWER(kc.name) = 'done' AND kt.updated_at >= (CURRENT_DATE - INTERVAL '7 days') THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN LOWER(kc.name) NOT IN ('done', 'archived') AND kt.due_date < CURRENT_DATE THEN 1 ELSE 0 END), 0)
@@ -969,7 +971,7 @@ func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInf
 		JOIN kanban_tasks kt ON kt.assignee_id = u.id
 		JOIN kanban_columns kc ON kc.id = kt.column_id
 		WHERE u.is_active = true
-		GROUP BY u.id, u.full_name, u.phone
+		GROUP BY u.id, u.full_name, u.email, u.phone
 		HAVING SUM(1) > 0`)
 	if err != nil {
 		return nil, fmt.Errorf("query weekly digest: %w", err)
@@ -979,7 +981,7 @@ func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInf
 	var items []WeeklyDigestInfo
 	for rows.Next() {
 		var d WeeklyDigestInfo
-		if err := rows.Scan(&d.UserID, &d.UserName, &d.Phone,
+		if err := rows.Scan(&d.UserID, &d.UserName, &d.UserEmail, &d.Phone,
 			&d.CompletedCount, &d.OpenCount, &d.OverdueCount); err != nil {
 			return nil, fmt.Errorf("scan digest: %w", err)
 		}
@@ -991,14 +993,14 @@ func (r *Repository) GetWeeklyDigestData(ctx context.Context) ([]WeeklyDigestInf
 // GetTaskWithProject returns task and project info for a single task.
 func (r *Repository) GetTaskWithProject(ctx context.Context, taskID string) (*TaskDueInfo, error) {
 	var t TaskDueInfo
-	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.phone,
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT kt.id, kt.title, p.id, p.name, u.id, u.full_name, u.email, u.phone,
 		COALESCE(to_char(kt.due_date, 'YYYY-MM-DD'), ''), kt.priority
 		FROM kanban_tasks kt
 		JOIN projects p ON p.id = kt.project_id
 		JOIN users u ON u.id = kt.assignee_id
 		WHERE kt.id = $1`, taskID).Scan(
 		&t.TaskID, &t.TaskTitle, &t.ProjectID, &t.ProjectName,
-		&t.AssigneeID, &t.UserName, &t.UserPhone, &t.DueDate, &t.Priority)
+		&t.AssigneeID, &t.UserName, &t.UserEmail, &t.UserPhone, &t.DueDate, &t.Priority)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -1016,18 +1018,19 @@ type ReimbursementNotifyInfo struct {
 	Status          string
 	SubmitterID     string
 	SubmitterName   string
+	SubmitterEmail  string
 	SubmitterPhone  *string
 }
 
 func (r *Repository) GetReimbursementWithSubmitter(ctx context.Context, reimbursementID string) (*ReimbursementNotifyInfo, error) {
 	var info ReimbursementNotifyInfo
 	err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT r.id, r.title, r.amount, r.status,
-		u.id, u.full_name, u.phone
+		u.id, u.full_name, u.email, u.phone
 		FROM reimbursements r
 		JOIN users u ON u.id = r.submitted_by
 		WHERE r.id = $1`, reimbursementID).Scan(
 		&info.ReimbursementID, &info.Title, &info.Amount, &info.Status,
-		&info.SubmitterID, &info.SubmitterName, &info.SubmitterPhone)
+		&info.SubmitterID, &info.SubmitterName, &info.SubmitterEmail, &info.SubmitterPhone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

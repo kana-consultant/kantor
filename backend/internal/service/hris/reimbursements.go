@@ -10,6 +10,7 @@ import (
 
 	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
+	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	"github.com/kana-consultant/kantor/backend/internal/repository"
@@ -61,7 +62,7 @@ type ReimbursementsService struct {
 	employeesRepo        reimbursementsEmployeesRepository
 	authRepo             reimbursementsAuthRepository
 	notificationsService reimbursementsNotificationsService
-	waNotifier           ReimbursementStatusNotifier
+	statusNotifiers      []ReimbursementStatusNotifier
 	financeService       *FinanceService
 }
 
@@ -82,7 +83,9 @@ func NewReimbursementsService(
 }
 
 func (s *ReimbursementsService) SetWANotifier(n ReimbursementStatusNotifier) {
-	s.waNotifier = n
+	if n != nil {
+		s.statusNotifiers = append(s.statusNotifiers, n)
+	}
 }
 
 func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.CreateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
@@ -249,13 +252,11 @@ func (s *ReimbursementsService) ManagerReview(ctx context.Context, reimbursement
 	}
 
 	// UC-6: WA notification
-	if s.waNotifier != nil {
-		notes := ""
-		if request.Notes != nil {
-			notes = *request.Notes
-		}
-		go s.waNotifier.SendReimbursementStatusNotification(context.Background(), reimbursementID, updated.Status, notes)
+	notes := ""
+	if request.Notes != nil {
+		notes = *request.Notes
 	}
+	s.dispatchStatusNotification(ctx, reimbursementID, updated.Status, notes)
 
 	return updated, nil
 }
@@ -305,13 +306,11 @@ func (s *ReimbursementsService) MarkPaid(ctx context.Context, reimbursementID st
 	}
 
 	// UC-6: WA notification
-	if s.waNotifier != nil {
-		n := ""
-		if notes != nil {
-			n = *notes
-		}
-		go s.waNotifier.SendReimbursementStatusNotification(context.Background(), reimbursementID, updated.Status, n)
+	n := ""
+	if notes != nil {
+		n = *notes
 	}
+	s.dispatchStatusNotification(ctx, reimbursementID, updated.Status, n)
 
 	return updated, nil
 }
@@ -330,6 +329,11 @@ func (s *ReimbursementsService) BulkReview(ctx context.Context, request hrisdto.
 	}
 	for _, item := range updated {
 		_ = s.notifyRequester(ctx, item, "reimbursement.reviewed", "Reimbursement review updated")
+		note := ""
+		if request.Notes != nil {
+			note = *request.Notes
+		}
+		s.dispatchStatusNotification(ctx, item.ID, item.Status, note)
 	}
 	return len(updated), nil
 }
@@ -373,6 +377,11 @@ func (s *ReimbursementsService) BulkMarkPaid(ctx context.Context, request hrisdt
 
 	for _, item := range updated {
 		_ = s.notifyRequester(ctx, item, "reimbursement.paid", "Reimbursement has been marked as paid")
+		note := ""
+		if request.Notes != nil {
+			note = *request.Notes
+		}
+		s.dispatchStatusNotification(ctx, item.ID, item.Status, note)
 	}
 	return len(updated), nil
 }
@@ -439,6 +448,21 @@ func (s *ReimbursementsService) notifyApproversForSubmission(ctx context.Context
 func (s *ReimbursementsService) notifyRequester(ctx context.Context, item model.Reimbursement, notificationType string, title string) error {
 	requesterID := item.SubmittedBy
 	return s.sendNotifications(ctx, []string{requesterID}, notificationType, title, item.Title+" is now "+item.Status, "reimbursement", &item.ID)
+}
+
+func (s *ReimbursementsService) dispatchStatusNotification(ctx context.Context, reimbursementID string, status string, notes string) {
+	if len(s.statusNotifiers) == 0 {
+		return
+	}
+
+	notificationCtx := platformmiddleware.DetachTenantContext(ctx)
+	for _, notifier := range s.statusNotifiers {
+		if notifier == nil {
+			continue
+		}
+		currentNotifier := notifier
+		go currentNotifier.SendReimbursementStatusNotification(notificationCtx, reimbursementID, status, notes)
+	}
 }
 
 func (s *ReimbursementsService) sendNotifications(ctx context.Context, userIDs []string, notificationType string, title string, message string, referenceType string, referenceID *string) error {
