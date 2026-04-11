@@ -34,6 +34,7 @@ import {
   updateReimbursement,
   uploadReimbursementAttachments,
 } from "@/services/hris-reimbursements";
+import { toast } from "@/stores/toast-store";
 import type { Reimbursement, ReimbursementFilters, ReimbursementFormValues } from "@/types/hris";
 
 const reimbursementSchema = z.object({
@@ -65,6 +66,10 @@ const defaultFilters: ReimbursementFilters = {
   sortBy: "created_at",
   sortOrder: "desc",
 };
+
+const maxReimbursementAttachmentFiles = 5;
+const maxReimbursementAttachmentSizeBytes = 10 * 1024 * 1024;
+const acceptedReimbursementAttachmentTypes = "image/*,application/pdf";
 
 export const Route = createFileRoute("/_authenticated/hris/reimbursements/")({
   beforeLoad: async () => {
@@ -153,12 +158,19 @@ function ReimbursementsPage() {
   const createMutation = useMutation({
     mutationFn: async (values: ReimbursementFormValues) => {
       const created = await createReimbursement(values);
+      let attachmentUploadWarning: string | null = null;
       if (files.length > 0) {
-        await uploadReimbursementAttachments(created.id, files);
+        try {
+          await uploadReimbursementAttachments(created.id, files);
+        } catch (error) {
+          attachmentUploadWarning = error instanceof Error
+            ? error.message
+            : "Reimbursement berhasil dibuat, tetapi upload lampiran gagal.";
+        }
       }
-      return created;
+      return { created, attachmentUploadWarning };
     },
-    onSuccess: async () => {
+    onSuccess: async ({ attachmentUploadWarning }) => {
       form.reset({
         employee_id: "",
         title: "",
@@ -170,22 +182,45 @@ function ReimbursementsPage() {
       setFiles([]);
       setShowForm(false);
       await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
+      if (attachmentUploadWarning) {
+        toast.warning("Reimbursement berhasil dibuat", attachmentUploadWarning);
+        return;
+      }
+      toast.success("Reimbursement berhasil dibuat");
+    },
+    onError: (error) => {
+      toast.error("Gagal membuat reimbursement", error instanceof Error ? error.message : undefined);
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async (values: EditReimbursementFormValues) => {
       const updated = await updateReimbursement(editingReimbursement!.id, values, keptAttachments);
+      let attachmentUploadWarning: string | null = null;
       if (editFiles.length > 0) {
-        await uploadReimbursementAttachments(updated.id, editFiles);
+        try {
+          await uploadReimbursementAttachments(updated.id, editFiles);
+        } catch (error) {
+          attachmentUploadWarning = error instanceof Error
+            ? error.message
+            : "Perubahan berhasil disimpan, tetapi upload lampiran baru gagal.";
+        }
       }
-      return updated;
+      return { updated, attachmentUploadWarning };
     },
-    onSuccess: async () => {
+    onSuccess: async ({ attachmentUploadWarning }) => {
       setEditingReimbursement(null);
       setKeptAttachments([]);
       setEditFiles([]);
       await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
+      if (attachmentUploadWarning) {
+        toast.warning("Perubahan reimbursement tersimpan", attachmentUploadWarning);
+        return;
+      }
+      toast.success("Reimbursement berhasil diperbarui");
+    },
+    onError: (error) => {
+      toast.error("Gagal memperbarui reimbursement", error instanceof Error ? error.message : undefined);
     },
   });
 
@@ -194,6 +229,10 @@ function ReimbursementsPage() {
     onSuccess: async () => {
       setReimbursementToDelete(null);
       await queryClient.invalidateQueries({ queryKey: reimbursementsKeys.all });
+      toast.success("Reimbursement berhasil dihapus");
+    },
+    onError: (error) => {
+      toast.error("Gagal menghapus reimbursement", error instanceof Error ? error.message : undefined);
     },
   });
 
@@ -247,26 +286,15 @@ function ReimbursementsPage() {
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleFiles = (incomingFiles: FileList | File[]) => {
-    const nextFiles = Array.from(incomingFiles).filter((file) => {
-      const validType = file.type.startsWith("image/") || file.type === "application/pdf";
-      const validSize = file.size <= 10 * 1024 * 1024;
-      return validType && validSize;
-    });
-    setFiles(nextFiles);
+    const result = mergeAttachmentFiles(files, incomingFiles, 0);
+    setFiles(result.files);
+    reportAttachmentWarnings(result.warnings);
   };
 
-  const fileSummary = useMemo(
-    () => files.map((file) => `${file.name} (${Math.round(file.size / 1024)} KB)`),
-    [files],
-  );
-
   const handleEditFiles = (incomingFiles: FileList | File[]) => {
-    const nextFiles = Array.from(incomingFiles).filter((file) => {
-      const validType = file.type.startsWith("image/") || file.type === "application/pdf";
-      const validSize = file.size <= 10 * 1024 * 1024;
-      return validType && validSize;
-    });
-    setEditFiles(nextFiles);
+    const result = mergeAttachmentFiles(editFiles, incomingFiles, keptAttachments.length);
+    setEditFiles(result.files);
+    reportAttachmentWarnings(result.warnings);
   };
 
   const columns: Array<DataTableColumn<Reimbursement>> = [
@@ -553,40 +581,14 @@ function ReimbursementsPage() {
             <Input {...form.register("description")} placeholder="Deskripsi (opsional)" />
             {form.formState.errors.description ? <p className="mt-1 text-[12px] font-[500] text-priority-high">{form.formState.errors.description.message}</p> : null}
           </div>
-          <div
-            className="lg:col-span-2 rounded-md border border-dashed border-border bg-surface-muted p-6"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              handleFiles(event.dataTransfer.files);
-            }}
-          >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="font-semibold text-text-primary">Attachment drop zone</p>
-                <p className="text-xs text-text-secondary">
-                  Drag image or PDF files here. Maximum 10MB per file.
-                </p>
-              </div>
-              <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted">
-                Choose files
-                <input
-                  className="hidden"
-                  multiple
-                  onChange={(event) => handleFiles(event.target.files ?? [])}
-                  type="file"
-                />
-              </label>
-            </div>
-            {fileSummary.length > 0 ? (
-              <div className="mt-4 space-y-2">
-                {fileSummary.map((item) => (
-                  <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-text-secondary" key={item}>
-                    {item}
-                  </div>
-                ))}
-              </div>
-            ) : null}
+          <div className="lg:col-span-2">
+            <AttachmentPicker
+              files={files}
+              helper="Tambahkan bukti reimbursement dalam bentuk gambar atau PDF. Maksimal 5 file dan 10MB per file."
+              onFilesSelected={handleFiles}
+              onRemoveFile={(signature) => setFiles((current) => current.filter((file) => fileSignature(file) !== signature))}
+              title="Lampiran reimbursement"
+            />
           </div>
         </div>
       </FormModal>
@@ -651,10 +653,13 @@ function ReimbursementsPage() {
           <div className="lg:col-span-2">
             <label className="mb-1 block text-sm font-medium text-text-primary">Lampiran saat ini</label>
             {keptAttachments.length > 0 ? (
-              <div className="mt-1 space-y-2">
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
                 {keptAttachments.map((path) => (
-                  <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-2" key={path}>
-                    <span className="truncate text-sm text-text-secondary">{path.split("/").pop()}</span>
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3" key={path}>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-text-primary">{path.split("/").pop()}</p>
+                      <p className="text-xs text-text-secondary">Tetap disimpan</p>
+                    </div>
                     <Button
                       className="ml-3 h-7 shrink-0 text-xs"
                       onClick={() => setKeptAttachments((prev) => prev.filter((p) => p !== path))}
@@ -671,38 +676,15 @@ function ReimbursementsPage() {
               <p className="mt-1 text-sm text-text-secondary">Tidak ada lampiran.</p>
             )}
           </div>
-          <div
-            className="lg:col-span-2 rounded-md border border-dashed border-border bg-surface-muted p-6"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              handleEditFiles(event.dataTransfer.files);
-            }}
-          >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="font-semibold text-text-primary">Tambah lampiran baru</p>
-                <p className="text-xs text-text-secondary">Drag image atau PDF. Maksimal 10MB per file.</p>
-              </div>
-              <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition hover:bg-surface-muted">
-                Pilih file
-                <input
-                  className="hidden"
-                  multiple
-                  onChange={(event) => handleEditFiles(event.target.files ?? [])}
-                  type="file"
-                />
-              </label>
-            </div>
-            {editFiles.length > 0 ? (
-              <div className="mt-4 space-y-2">
-                {editFiles.map((file) => (
-                  <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-text-secondary" key={file.name}>
-                    {file.name} ({Math.round(file.size / 1024)} KB)
-                  </div>
-                ))}
-              </div>
-            ) : null}
+          <div className="lg:col-span-2">
+            <AttachmentPicker
+              existingCount={keptAttachments.length}
+              files={editFiles}
+              helper="Slot lampiran yang tersedia mengikuti file lama yang masih disimpan. Maksimal total 5 file per reimbursement."
+              onFilesSelected={handleEditFiles}
+              onRemoveFile={(signature) => setEditFiles((current) => current.filter((file) => fileSignature(file) !== signature))}
+              title="Tambah lampiran baru"
+            />
           </div>
         </div>
       </FormModal>
@@ -834,6 +816,148 @@ function ReimbursementsPage() {
       />
     </div>
   );
+}
+
+function AttachmentPicker({
+  title,
+  helper,
+  files,
+  existingCount = 0,
+  onFilesSelected,
+  onRemoveFile,
+}: {
+  title: string;
+  helper: string;
+  files: File[];
+  existingCount?: number;
+  onFilesSelected: (files: FileList | File[]) => void;
+  onRemoveFile: (signature: string) => void;
+}) {
+  const usedSlots = existingCount + files.length;
+  const slotsRemaining = Math.max(maxReimbursementAttachmentFiles - usedSlots, 0);
+  const inputDisabled = slotsRemaining === 0;
+
+  return (
+    <div
+      className="rounded-md border border-dashed border-border bg-surface-muted p-6"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        if (!inputDisabled) {
+          onFilesSelected(event.dataTransfer.files);
+        }
+      }}
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="font-semibold text-text-primary">{title}</p>
+          <p className="mt-1 text-xs text-text-secondary">{helper}</p>
+          <p className="mt-2 text-xs font-medium text-text-secondary">
+            {usedSlots}/{maxReimbursementAttachmentFiles} file digunakan
+          </p>
+        </div>
+        <label className={`inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-semibold transition ${
+          inputDisabled
+            ? "cursor-not-allowed border-border bg-surface text-text-tertiary"
+            : "cursor-pointer border-border bg-surface text-text-primary hover:bg-surface-muted"
+        }`}>
+          Pilih file
+          <input
+            accept={acceptedReimbursementAttachmentTypes}
+            className="hidden"
+            disabled={inputDisabled}
+            multiple
+            onChange={(event) => onFilesSelected(event.target.files ?? [])}
+            type="file"
+          />
+        </label>
+      </div>
+
+      {files.length > 0 ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {files.map((file) => (
+            <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3" key={fileSignature(file)}>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-text-primary">{file.name}</p>
+                <p className="text-xs text-text-secondary">{formatAttachmentSize(file.size)}</p>
+              </div>
+              <Button
+                className="h-7 w-7 shrink-0 p-0"
+                onClick={() => onRemoveFile(fileSignature(file))}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-error" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-md border border-border bg-surface px-4 py-3 text-sm text-text-secondary">
+          {inputDisabled
+            ? "Batas lampiran sudah penuh. Hapus lampiran yang ada dulu jika ingin menambah file baru."
+            : "Drag gambar/PDF ke area ini atau pilih file secara manual."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function mergeAttachmentFiles(current: File[], incoming: FileList | File[], existingCount: number) {
+  const warnings: string[] = [];
+  const nextFiles = [...current];
+  const seen = new Set(nextFiles.map(fileSignature));
+
+  for (const file of Array.from(incoming)) {
+    const signature = fileSignature(file);
+    if (seen.has(signature)) {
+      warnings.push(`File ${file.name} sudah dipilih.`);
+      continue;
+    }
+    if (!(file.type.startsWith("image/") || file.type === "application/pdf")) {
+      warnings.push(`File ${file.name} harus berupa gambar atau PDF.`);
+      continue;
+    }
+    if (file.size > maxReimbursementAttachmentSizeBytes) {
+      warnings.push(`File ${file.name} melebihi 10MB.`);
+      continue;
+    }
+    if (existingCount + nextFiles.length >= maxReimbursementAttachmentFiles) {
+      warnings.push(`Maksimal ${maxReimbursementAttachmentFiles} lampiran per reimbursement.`);
+      break
+    }
+
+    seen.add(signature);
+    nextFiles.push(file);
+  }
+
+  return {
+    files: nextFiles,
+    warnings,
+  };
+}
+
+function reportAttachmentWarnings(warnings: string[]) {
+  if (warnings.length === 0) {
+    return;
+  }
+
+  toast.warning(
+    "Sebagian lampiran tidak ditambahkan",
+    warnings.slice(0, 2).join(" "),
+  );
+}
+
+function fileSignature(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function formatAttachmentSize(size: number) {
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.round(size / 1024)} KB`;
 }
 
 function BulkConfirmDialog({

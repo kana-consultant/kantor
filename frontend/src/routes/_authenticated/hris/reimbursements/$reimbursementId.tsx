@@ -103,9 +103,9 @@ function ReimbursementDetailPage() {
           <Card className="p-6">
             <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Attachments</p>
             <h4 className="mt-2 text-2xl font-bold">Proof files</h4>
-            <div className="mt-5 grid gap-4">
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
               {item.attachments.length === 0 ? (
-                <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-6 text-sm text-muted-foreground">
+                <div className="rounded-[22px] border border-dashed border-border/70 bg-background/70 p-6 text-sm text-muted-foreground md:col-span-2">
                   Belum ada attachment.
                 </div>
               ) : (
@@ -265,7 +265,9 @@ function AttachmentPreview({
           {previewError}
         </div>
       ) : previewUrl ? (
-        <img alt={attachment} className="max-h-[420px] w-full rounded-2xl object-cover" src={previewUrl} />
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/70">
+          <img alt={attachment} className="h-[260px] w-full object-contain bg-surface-muted" src={previewUrl} />
+        </div>
       ) : (
         <div className="h-[220px] animate-pulse rounded-2xl bg-muted" />
       )}

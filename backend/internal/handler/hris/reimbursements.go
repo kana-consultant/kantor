@@ -31,6 +31,12 @@ type ReimbursementsHandler struct {
 	uploadsDir string
 }
 
+const (
+	maxReimbursementAttachmentFiles   = 5
+	maxReimbursementAttachmentSize    = 10 << 20
+	maxReimbursementMultipartMaxBytes = 50 << 20
+)
+
 func NewReimbursementsHandler(service *hrisservice.ReimbursementsService, uploadsDir string, users exportutil.UserLookup) *ReimbursementsHandler {
 	return &ReimbursementsHandler{
 		service:    service,
@@ -134,11 +140,12 @@ func (h *ReimbursementsHandler) update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	item, err := h.service.Update(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
+	item, removedAttachments, err := h.service.Update(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	removeSavedAttachments(h.uploadsDir, removedAttachments)
 	platformmiddleware.AuditLog(r.Context(), "update", "hris", "reimbursement", reimbursementID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
@@ -154,10 +161,12 @@ func (h *ReimbursementsHandler) deleteReimbursement(w http.ResponseWriter, r *ht
 	if !ok {
 		return
 	}
-	if err := h.service.Delete(r.Context(), reimbursementID, principal.UserID, principal.Cached); err != nil {
+	removedAttachments, err := h.service.Delete(r.Context(), reimbursementID, principal.UserID, principal.Cached)
+	if err != nil {
 		h.writeError(w, err)
 		return
 	}
+	removeSavedAttachments(h.uploadsDir, removedAttachments)
 	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "reimbursement", reimbursementID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"deleted": true}, nil)
 }
@@ -169,7 +178,7 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := r.ParseMultipartForm(20 << 20); err != nil {
+	if err := r.ParseMultipartForm(maxReimbursementMultipartMaxBytes); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "INVALID_MULTIPART", "Attachment upload must use multipart form data", nil)
 		return
 	}
@@ -177,6 +186,10 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 	files := r.MultipartForm.File["files"]
 	if len(files) == 0 {
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "At least one file is required", map[string]string{"files": "required"})
+		return
+	}
+	if len(files) > maxReimbursementAttachmentFiles {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", fmt.Sprintf("Maximum %d files can be uploaded at once", maxReimbursementAttachmentFiles), map[string]string{"files": "too_many_files"})
 		return
 	}
 
@@ -371,6 +384,8 @@ func (h *ReimbursementsHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusConflict, "INVALID_STATE", "Only submitted reimbursements can be modified", nil)
 	case errors.Is(err, hrisservice.ErrReimbursementInvalidAttachment):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"kept_attachments": "contains attachment outside this reimbursement"})
+	case errors.Is(err, hrisservice.ErrReimbursementAttachmentLimit):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"attachments": "attachment_limit_exceeded"})
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"employee_id": "not found"})
 	default:
@@ -392,7 +407,7 @@ func saveAttachments(baseUploadsDir string, files []*multipart.FileHeader) ([]st
 
 	paths := make([]string, 0, len(files))
 	for _, file := range files {
-		if file.Size > 10<<20 {
+		if file.Size > maxReimbursementAttachmentSize {
 			return nil, fmt.Errorf("%w: each file must be smaller than 10MB", errAttachmentValidation)
 		}
 

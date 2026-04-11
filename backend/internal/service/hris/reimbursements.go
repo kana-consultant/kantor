@@ -23,7 +23,10 @@ var (
 	ErrReimbursementForbidden         = errors.New("reimbursement access is forbidden")
 	ErrReimbursementInvalidState      = errors.New("reimbursement status transition is invalid")
 	ErrReimbursementInvalidAttachment = errors.New("reimbursement attachment is invalid")
+	ErrReimbursementAttachmentLimit   = errors.New("reimbursement can only keep up to 5 attachments")
 )
+
+const maxReimbursementAttachments = 5
 
 // ReimbursementStatusNotifier is called when a reimbursement status changes.
 type ReimbursementStatusNotifier interface {
@@ -173,28 +176,32 @@ func (s *ReimbursementsService) Get(ctx context.Context, reimbursementID string,
 	return item, nil
 }
 
-func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID string, request hrisdto.UpdateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
+func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID string, request hrisdto.UpdateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, []string, error) {
 	transactionDate, err := shareddto.ParseDateOnly(request.TransactionDate)
 	if err != nil {
-		return model.Reimbursement{}, err
+		return model.Reimbursement{}, nil, err
 	}
 	item, err := s.repo.GetByID(ctx, reimbursementID)
 	if err != nil {
-		return model.Reimbursement{}, mapReimbursementError(err)
+		return model.Reimbursement{}, nil, mapReimbursementError(err)
 	}
 	if err := s.ensureEditable(ctx, item, actorID, perms); err != nil {
-		return model.Reimbursement{}, err
+		return model.Reimbursement{}, nil, err
 	}
 	if item.Status != "submitted" {
-		return model.Reimbursement{}, ErrReimbursementInvalidState
+		return model.Reimbursement{}, nil, ErrReimbursementInvalidState
 	}
 	keptAttachments := item.Attachments
 	if request.KeptAttachments != nil {
 		keptAttachments, err = filterKeptAttachments(item.Attachments, request.KeptAttachments)
 		if err != nil {
-			return model.Reimbursement{}, err
+			return model.Reimbursement{}, nil, err
 		}
 	}
+	if len(keptAttachments) > maxReimbursementAttachments {
+		return model.Reimbursement{}, nil, ErrReimbursementAttachmentLimit
+	}
+	removedAttachments := diffAttachmentPaths(item.Attachments, keptAttachments)
 	updated, err := s.repo.Update(ctx, reimbursementID, hrisrepo.UpdateReimbursementParams{
 		Title:           strings.TrimSpace(request.Title),
 		Category:        strings.TrimSpace(request.Category),
@@ -204,23 +211,26 @@ func (s *ReimbursementsService) Update(ctx context.Context, reimbursementID stri
 		Attachments:     keptAttachments,
 	})
 	if err != nil {
-		return model.Reimbursement{}, mapReimbursementError(err)
+		return model.Reimbursement{}, nil, mapReimbursementError(err)
 	}
-	return updated, nil
+	return updated, removedAttachments, nil
 }
 
-func (s *ReimbursementsService) Delete(ctx context.Context, reimbursementID string, actorID string, perms *rbac.CachedPermissions) error {
+func (s *ReimbursementsService) Delete(ctx context.Context, reimbursementID string, actorID string, perms *rbac.CachedPermissions) ([]string, error) {
 	item, err := s.repo.GetByID(ctx, reimbursementID)
 	if err != nil {
-		return mapReimbursementError(err)
+		return nil, mapReimbursementError(err)
 	}
 	if err := s.ensureEditable(ctx, item, actorID, perms); err != nil {
-		return err
+		return nil, err
 	}
 	if item.Status != "submitted" {
-		return ErrReimbursementInvalidState
+		return nil, ErrReimbursementInvalidState
 	}
-	return mapReimbursementError(s.repo.Delete(ctx, reimbursementID))
+	if err := mapReimbursementError(s.repo.Delete(ctx, reimbursementID)); err != nil {
+		return nil, err
+	}
+	return item.Attachments, nil
 }
 
 func (s *ReimbursementsService) AddAttachments(ctx context.Context, reimbursementID string, attachments []string, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {
@@ -230,6 +240,9 @@ func (s *ReimbursementsService) AddAttachments(ctx context.Context, reimbursemen
 	}
 	if err := s.ensureEditable(ctx, item, actorID, perms); err != nil {
 		return model.Reimbursement{}, err
+	}
+	if len(item.Attachments)+len(attachments) > maxReimbursementAttachments {
+		return model.Reimbursement{}, ErrReimbursementAttachmentLimit
 	}
 	updated, err := s.repo.AddAttachments(ctx, reimbursementID, attachments)
 	return updated, mapReimbursementError(err)
@@ -533,6 +546,31 @@ func filterKeptAttachments(existing []string, requested []string) ([]string, err
 
 func normalizeAttachmentPath(value string) string {
 	return filepath.ToSlash(strings.TrimSpace(value))
+}
+
+func diffAttachmentPaths(existing []string, kept []string) []string {
+	keptSet := make(map[string]struct{}, len(kept))
+	for _, attachment := range kept {
+		normalized := normalizeAttachmentPath(attachment)
+		if normalized == "" {
+			continue
+		}
+		keptSet[normalized] = struct{}{}
+	}
+
+	removed := make([]string, 0)
+	for _, attachment := range existing {
+		normalized := normalizeAttachmentPath(attachment)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := keptSet[normalized]; ok {
+			continue
+		}
+		removed = append(removed, normalized)
+	}
+
+	return removed
 }
 
 func mapReimbursementError(err error) error {
