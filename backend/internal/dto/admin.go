@@ -48,3 +48,16 @@ type UpdateAutoCreateEmployeeRequest struct {
 	Enabled             bool    `json:"enabled"`
 	DefaultDepartmentID *string `json:"default_department_id"`
 }
+
+type UpdateMailDeliveryRequest struct {
+	Enabled                    bool    `json:"enabled"`
+	Provider                   string  `json:"provider" validate:"omitempty,oneof=resend"`
+	SenderName                 string  `json:"sender_name" validate:"omitempty,max=120"`
+	SenderEmail                string  `json:"sender_email" validate:"omitempty,email,max=160"`
+	ReplyToEmail               *string `json:"reply_to_email" validate:"omitempty,email,max=160"`
+	APIKey                     *string `json:"api_key" validate:"omitempty,max=500"`
+	ClearAPIKey                bool    `json:"clear_api_key"`
+	PasswordResetEnabled       bool    `json:"password_reset_enabled"`
+	PasswordResetExpiryMinutes int     `json:"password_reset_expiry_minutes" validate:"min=5,max=1440"`
+	NotificationEnabled        bool    `json:"notification_enabled"`
+}

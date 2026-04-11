@@ -206,6 +206,25 @@ export function updateAutoCreateEmployee(payload: {
   });
 }
 
+export function updateMailDelivery(payload: {
+  enabled: boolean;
+  provider: string;
+  sender_name: string;
+  sender_email: string;
+  reply_to_email: string | null;
+  api_key: string | null;
+  clear_api_key: boolean;
+  password_reset_enabled: boolean;
+  password_reset_expiry_minutes: number;
+  notification_enabled: boolean;
+}) {
+  return authRequestJSON<AdminSettings>("/admin/settings/mail-delivery", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listModules() {
   return authGetJSON<ModuleItem[]>("/modules");
 }

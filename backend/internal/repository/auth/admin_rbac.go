@@ -100,6 +100,7 @@ type AdminUserDetail struct {
 type SettingsResponse struct {
 	DefaultRoles       map[string]*RoleReference `json:"default_roles"`
 	AutoCreateEmployee AutoCreateEmployeeSetting `json:"auto_create_employee"`
+	MailDelivery       MailDeliverySetting       `json:"mail_delivery"`
 }
 
 type RoleReference struct {
@@ -111,6 +112,34 @@ type RoleReference struct {
 type AutoCreateEmployeeSetting struct {
 	Enabled             bool    `json:"enabled"`
 	DefaultDepartmentID *string `json:"default_department_id"`
+}
+
+type MailDeliverySetting struct {
+	Enabled                    bool    `json:"enabled"`
+	Provider                   string  `json:"provider"`
+	SenderName                 string  `json:"sender_name"`
+	SenderEmail                string  `json:"sender_email"`
+	ReplyToEmail               *string `json:"reply_to_email,omitempty"`
+	HasAPIKey                  bool    `json:"has_api_key"`
+	PasswordResetEnabled       bool    `json:"password_reset_enabled"`
+	PasswordResetExpiryMinutes int     `json:"password_reset_expiry_minutes"`
+	NotificationEnabled        bool    `json:"notification_enabled"`
+}
+
+type MailDeliverySettingRecord struct {
+	Enabled                    bool    `json:"enabled"`
+	Provider                   string  `json:"provider"`
+	SenderName                 string  `json:"sender_name"`
+	SenderEmail                string  `json:"sender_email"`
+	ReplyToEmail               *string `json:"reply_to_email,omitempty"`
+	APIKeyEncrypted            string  `json:"api_key_encrypted,omitempty"`
+	PasswordResetEnabled       bool    `json:"password_reset_enabled"`
+	PasswordResetExpiryMinutes int     `json:"password_reset_expiry_minutes"`
+	NotificationEnabled        bool    `json:"notification_enabled"`
+}
+
+type PublicAuthOptions struct {
+	ForgotPasswordEnabled bool `json:"forgot_password_enabled"`
 }
 
 func (r *Repository) ListSettingsDepartments(ctx context.Context) ([]model.Department, error) {
@@ -716,6 +745,12 @@ func (r *Repository) GetSettings(ctx context.Context) (SettingsResponse, error) 
 	if err := json.Unmarshal(autoCreateRaw, &settings.AutoCreateEmployee); err != nil {
 		return SettingsResponse{}, err
 	}
+
+	mailDelivery, err := r.GetMailDeliveryRecord(ctx)
+	if err != nil {
+		return SettingsResponse{}, err
+	}
+	settings.MailDelivery = mailDelivery.publicView()
 
 	return settings, nil
 }

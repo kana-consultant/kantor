@@ -186,6 +186,21 @@ func seedSettings(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) err
 		return fmt.Errorf("marshal auto create employee setting: %w", err)
 	}
 
+	mailDeliveryJSON, err := json.Marshal(map[string]any{
+		"enabled":                       false,
+		"provider":                      "resend",
+		"sender_name":                   "",
+		"sender_email":                  "",
+		"reply_to_email":                nil,
+		"api_key_encrypted":             "",
+		"password_reset_enabled":        false,
+		"password_reset_expiry_minutes": 30,
+		"notification_enabled":          false,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal mail delivery setting: %w", err)
+	}
+
 	query := `
 		INSERT INTO system_settings (key, value, description)
 		VALUES ($1, $2::jsonb, $3)
@@ -210,6 +225,16 @@ func seedSettings(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) err
 		"Otomatis buat record employee saat user baru register",
 	); err != nil {
 		return fmt.Errorf("seed auto_create_employee setting: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		query,
+		"mail_delivery",
+		string(mailDeliveryJSON),
+		"Konfigurasi pengiriman email tenant",
+	); err != nil {
+		return fmt.Errorf("seed mail_delivery setting: %w", err)
 	}
 
 	return nil

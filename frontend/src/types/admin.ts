@@ -100,7 +100,20 @@ export interface AutoCreateEmployeeSetting {
   default_department_id: string | null;
 }
 
+export interface MailDeliverySetting {
+  enabled: boolean;
+  provider: string;
+  sender_name: string;
+  sender_email: string;
+  reply_to_email: string | null;
+  has_api_key: boolean;
+  password_reset_enabled: boolean;
+  password_reset_expiry_minutes: number;
+  notification_enabled: boolean;
+}
+
 export interface AdminSettings {
   default_roles: Record<string, RoleReference>;
   auto_create_employee: AutoCreateEmployeeSetting;
+  mail_delivery: MailDeliverySetting;
 }

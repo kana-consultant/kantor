@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, Settings2, UserRoundPlus } from "lucide-react";
+import { Mail, Save, Settings2, UserRoundPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useRBAC } from "@/hooks/use-rbac";
 import { ensureModuleAccess, ensurePermission } from "@/lib/rbac";
@@ -19,6 +20,7 @@ import {
   listRoles,
   updateAutoCreateEmployee,
   updateDefaultRoles,
+  updateMailDelivery,
 } from "@/services/admin-rbac";
 import { toast } from "@/stores/toast-store";
 
@@ -37,6 +39,15 @@ function AdminSettingsPage() {
   const [selectedDefaultRoleID, setSelectedDefaultRoleID] = useState("");
   const [autoCreateEmployeeEnabled, setAutoCreateEmployeeEnabled] = useState(true);
   const [defaultDepartmentID, setDefaultDepartmentID] = useState<string | null>(null);
+  const [mailDeliveryEnabled, setMailDeliveryEnabled] = useState(false);
+  const [senderName, setSenderName] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [replyToEmail, setReplyToEmail] = useState("");
+  const [mailAPIKey, setMailAPIKey] = useState("");
+  const [clearMailAPIKey, setClearMailAPIKey] = useState(false);
+  const [passwordResetEnabled, setPasswordResetEnabled] = useState(false);
+  const [passwordResetExpiryMinutes, setPasswordResetExpiryMinutes] = useState(30);
+  const [notificationEnabled, setNotificationEnabled] = useState(false);
 
   const settingsQuery = useQuery({
     queryKey: adminRbacKeys.settings(),
@@ -90,6 +101,15 @@ function AdminSettingsPage() {
     setDefaultDepartmentID(
       settingsQuery.data.auto_create_employee.default_department_id ?? null,
     );
+    setMailDeliveryEnabled(settingsQuery.data.mail_delivery.enabled);
+    setSenderName(settingsQuery.data.mail_delivery.sender_name);
+    setSenderEmail(settingsQuery.data.mail_delivery.sender_email);
+    setReplyToEmail(settingsQuery.data.mail_delivery.reply_to_email ?? "");
+    setMailAPIKey("");
+    setClearMailAPIKey(false);
+    setPasswordResetEnabled(settingsQuery.data.mail_delivery.password_reset_enabled);
+    setPasswordResetExpiryMinutes(settingsQuery.data.mail_delivery.password_reset_expiry_minutes);
+    setNotificationEnabled(settingsQuery.data.mail_delivery.notification_enabled);
   }, [settingsQuery.data]);
 
   const permissionModuleMap = useMemo(() => {
@@ -144,6 +164,22 @@ function AdminSettingsPage() {
     onError: (error) => {
       toast.error(
         "Gagal memperbarui pengaturan employee",
+        error instanceof Error ? error.message : undefined,
+      );
+    },
+  });
+
+  const mailDeliveryMutation = useMutation({
+    mutationFn: updateMailDelivery,
+    onSuccess: async () => {
+      toast.success("Pengaturan email tenant berhasil diperbarui");
+      setMailAPIKey("");
+      setClearMailAPIKey(false);
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.settings() });
+    },
+    onError: (error) => {
+      toast.error(
+        "Gagal memperbarui pengaturan email tenant",
         error instanceof Error ? error.message : undefined,
       );
     },
@@ -345,6 +381,229 @@ function AdminSettingsPage() {
             >
               <Save className="h-4 w-4" />
               Simpan Pengaturan
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="space-y-5 p-6 xl:col-span-2">
+          <div className="flex items-start gap-3">
+            <div className="rounded-md bg-error-light p-3 text-error">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-display text-[18px] font-[700] text-text-primary">
+                Email Tenant
+              </h2>
+              <p className="mt-1 text-sm text-text-secondary">
+                Konfigurasi provider email untuk reset kata sandi dan notifikasi tenant ini.
+                Jika belum diisi lengkap, fitur email akan tetap nonaktif dan link lupa kata sandi
+                tidak akan muncul di halaman login.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+            <div className="space-y-4">
+              <div className="rounded-md border border-border bg-surface-muted/60 p-4">
+                <label className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">
+                      Aktifkan email tenant
+                    </p>
+                    <p className="text-xs text-text-secondary">
+                      Saat nonaktif, semua fitur email tenant dianggap off.
+                    </p>
+                  </div>
+                  <input
+                    checked={mailDeliveryEnabled}
+                    className="h-5 w-5 accent-[var(--module-primary)]"
+                    disabled={!canManageSettings}
+                    onChange={(event) => setMailDeliveryEnabled(event.target.checked)}
+                    type="checkbox"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-[13px] font-[600] text-text-primary" htmlFor="mail-provider">
+                    Provider
+                  </label>
+                  <Input
+                    className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px]"
+                    disabled
+                    id="mail-provider"
+                    value="Resend"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[13px] font-[600] text-text-primary" htmlFor="mail-sender-name">
+                    Sender Name
+                  </label>
+                  <Input
+                    className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
+                    disabled={!canManageSettings}
+                    id="mail-sender-name"
+                    onChange={(event) => setSenderName(event.target.value)}
+                    placeholder="Kantor"
+                    value={senderName}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[13px] font-[600] text-text-primary" htmlFor="mail-sender-email">
+                    Sender Email
+                  </label>
+                  <Input
+                    className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
+                    disabled={!canManageSettings}
+                    id="mail-sender-email"
+                    onChange={(event) => setSenderEmail(event.target.value)}
+                    placeholder="no-reply@sentinelhub.ai"
+                    type="email"
+                    value={senderEmail}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[13px] font-[600] text-text-primary" htmlFor="mail-reply-to">
+                    Reply-To Email
+                  </label>
+                  <Input
+                    className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
+                    disabled={!canManageSettings}
+                    id="mail-reply-to"
+                    onChange={(event) => setReplyToEmail(event.target.value)}
+                    placeholder="ops@sentinelhub.ai"
+                    type="email"
+                    value={replyToEmail}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-[600] text-text-primary" htmlFor="mail-api-key">
+                  Resend API Key
+                </label>
+                <Input
+                  className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
+                  disabled={!canManageSettings || clearMailAPIKey}
+                  id="mail-api-key"
+                  onChange={(event) => setMailAPIKey(event.target.value)}
+                  placeholder={
+                    settingsQuery.data?.mail_delivery.has_api_key
+                      ? "Kosongkan untuk mempertahankan API key saat ini"
+                      : "re_xxxxxxxxx"
+                  }
+                  type="password"
+                  value={mailAPIKey}
+                />
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-text-secondary">
+                  <span>
+                    {settingsQuery.data?.mail_delivery.has_api_key
+                      ? "API key sudah tersimpan. Isi lagi hanya jika ingin mengganti."
+                      : "API key belum tersimpan untuk tenant ini."}
+                  </span>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      checked={clearMailAPIKey}
+                      className="h-4 w-4 accent-[var(--module-primary)]"
+                      disabled={!canManageSettings || !settingsQuery.data?.mail_delivery.has_api_key}
+                      onChange={(event) => setClearMailAPIKey(event.target.checked)}
+                      type="checkbox"
+                    />
+                    Hapus API key tersimpan
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-md border border-border bg-surface-muted/40 p-4">
+              <div className="rounded-md border border-border bg-surface px-4 py-3">
+                <p className="text-sm font-semibold text-text-primary">Kesiapan fitur publik</p>
+                <p className="mt-1 text-xs text-text-secondary">
+                  Link lupa kata sandi hanya muncul kalau email tenant aktif, API key ada,
+                  sender email terisi, dan reset password diaktifkan.
+                </p>
+              </div>
+
+              <label className="flex items-center justify-between gap-4 rounded-md border border-border bg-surface px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Aktifkan reset password</p>
+                  <p className="text-xs text-text-secondary">
+                    Mengizinkan tenant ini mengirim email reset kata sandi.
+                  </p>
+                </div>
+                <input
+                  checked={passwordResetEnabled}
+                  className="h-5 w-5 accent-[var(--module-primary)]"
+                  disabled={!canManageSettings || !mailDeliveryEnabled}
+                  onChange={(event) => setPasswordResetEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+              </label>
+
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-[600] text-text-primary" htmlFor="reset-expiry">
+                  Masa Berlaku Link Reset (menit)
+                </label>
+                <Input
+                  className="h-10 rounded-[6px] border-transparent bg-surface px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
+                  disabled={!canManageSettings || !passwordResetEnabled || !mailDeliveryEnabled}
+                  id="reset-expiry"
+                  min={5}
+                  onChange={(event) => setPasswordResetExpiryMinutes(Number(event.target.value) || 30)}
+                  type="number"
+                  value={passwordResetExpiryMinutes}
+                />
+              </div>
+
+              <label className="flex items-center justify-between gap-4 rounded-md border border-border bg-surface px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Siapkan notifikasi email</p>
+                  <p className="text-xs text-text-secondary">
+                    Menandai tenant ini siap memakai fitur notifikasi email berikutnya.
+                  </p>
+                </div>
+                <input
+                  checked={notificationEnabled}
+                  className="h-5 w-5 accent-[var(--module-primary)]"
+                  disabled={!canManageSettings || !mailDeliveryEnabled}
+                  onChange={(event) => setNotificationEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+              </label>
+
+              <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm">
+                <p className="font-semibold text-text-primary">Status saat ini</p>
+                <div className="mt-2 space-y-1 text-text-secondary">
+                  <p>Email aktif: {mailDeliveryEnabled ? "Ya" : "Belum"}</p>
+                  <p>API key: {settingsQuery.data?.mail_delivery.has_api_key && !clearMailAPIKey ? "Tersimpan" : mailAPIKey.trim() ? "Baru diisi" : "Belum ada"}</p>
+                  <p>Reset password: {passwordResetEnabled ? "Aktif" : "Off"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              disabled={!canManageSettings || mailDeliveryMutation.isPending || settingsQuery.isLoading}
+              onClick={() =>
+                mailDeliveryMutation.mutate({
+                  enabled: mailDeliveryEnabled,
+                  provider: "resend",
+                  sender_name: senderName.trim(),
+                  sender_email: senderEmail.trim(),
+                  reply_to_email: replyToEmail.trim() ? replyToEmail.trim() : null,
+                  api_key: clearMailAPIKey ? null : mailAPIKey.trim() || null,
+                  clear_api_key: clearMailAPIKey,
+                  password_reset_enabled: passwordResetEnabled,
+                  password_reset_expiry_minutes: passwordResetExpiryMinutes,
+                  notification_enabled: notificationEnabled,
+                })
+              }
+              type="button"
+            >
+              <Save className="h-4 w-4" />
+              Simpan Pengaturan Email
             </Button>
           </div>
         </Card>

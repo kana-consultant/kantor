@@ -2,8 +2,12 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,6 +17,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	"github.com/kana-consultant/kantor/backend/internal/security"
 	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
 
@@ -31,14 +36,19 @@ var (
 	ErrExpiredRefreshToken    = errors.New("refresh token sudah kedaluwarsa")
 	ErrPasswordUnchanged      = errors.New("kata sandi baru harus berbeda dari kata sandi saat ini")
 	ErrEmailUnchanged         = errors.New("email baru harus berbeda dari email saat ini")
+	ErrInvalidResetToken      = errors.New("tautan reset kata sandi tidak valid")
+	ErrExpiredResetToken      = errors.New("tautan reset kata sandi sudah kedaluwarsa")
+	ErrPasswordResetDisabled  = errors.New("fitur lupa kata sandi belum tersedia")
 )
 
 type authRepository interface {
 	UpdateUserClientContext(ctx context.Context, userID string, params authrepo.UpdateUserClientContextParams) error
 	EnsureUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
 	CreateUserWithRoles(ctx context.Context, params authrepo.CreateUserParams, roles []rbac.RoleKey) (model.User, error)
+	CreatePasswordResetToken(ctx context.Context, params authrepo.CreatePasswordResetTokenParams) error
 	GetUserByEmail(ctx context.Context, email string) (model.User, error)
 	GetUserByID(ctx context.Context, userID string) (model.User, error)
+	GetPasswordResetTokenByHash(ctx context.Context, tokenHash string) (model.PasswordResetToken, error)
 	GetDefaultRoleAssignments(ctx context.Context) ([]rbac.RoleKey, error)
 	GetUserModuleRoles(ctx context.Context, userID string) (map[string]rbac.ModuleRole, error)
 	GetEffectivePermissions(ctx context.Context, userID string) ([]string, error)
@@ -72,11 +82,15 @@ type authRepository interface {
 	ReplaceUserModuleRoles(ctx context.Context, userID string, moduleRoles []dto.SetUserModuleRoleRequest) error
 	SetUserSuperAdmin(ctx context.Context, userID string, enabled bool) error
 	GetSettings(ctx context.Context) (authrepo.SettingsResponse, error)
+	GetMailDeliveryRecord(ctx context.Context) (authrepo.MailDeliverySettingRecord, error)
+	GetPublicAuthOptions(ctx context.Context) (authrepo.PublicAuthOptions, error)
 	UpdateDefaultRoles(ctx context.Context, updatedBy string, mapping map[string]*string) error
 	UpdateAutoCreateEmployee(ctx context.Context, updatedBy string, setting authrepo.AutoCreateEmployeeSetting) error
+	UpdateMailDelivery(ctx context.Context, updatedBy string, setting authrepo.MailDeliverySettingRecord) error
 	ListModules(ctx context.Context) ([]authrepo.ModuleItem, error)
 	ListSettingsDepartments(ctx context.Context) ([]model.Department, error)
 	EnsureEmployeeProfileForUser(ctx context.Context, userID string) (model.Employee, error)
+	UsePasswordResetToken(ctx context.Context, tokenID string, userID string, passwordHash string) error
 }
 
 type authEmployeesRepository interface {
@@ -101,6 +115,9 @@ type Service struct {
 	employeeRepo    authEmployeesRepository
 	tokenManager    *backendauth.TokenManager
 	permissionCache *rbac.PermissionCache
+	passwordMailer  passwordResetMailer
+	encrypter       *security.Encrypter
+	fallbackAppURL  string
 }
 
 type AuthResult struct {
@@ -111,12 +128,29 @@ type AuthResult struct {
 	Tokens       dto.TokenPair
 }
 
-func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config, permissionCache *rbac.PermissionCache) *Service {
+type PasswordResetRequestMeta struct {
+	PublicBaseURL string
+	UserAgent     string
+	IPAddress     string
+}
+
+type mailDeliveryRuntimeConfig struct {
+	SenderName           string
+	SenderEmail          string
+	ReplyToEmail         *string
+	APIKey               string
+	PasswordResetTTL     time.Duration
+}
+
+func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config, permissionCache *rbac.PermissionCache, encrypter *security.Encrypter) *Service {
 	return &Service{
 		repo:            repo,
 		employeeRepo:    employeeRepo,
 		tokenManager:    backendauth.NewTokenManager(cfg.JWTSecret, cfg.JWTAccessExpiry, cfg.JWTRefreshExpiry),
 		permissionCache: permissionCache,
+		passwordMailer:  newResendMailer(),
+		encrypter:       encrypter,
+		fallbackAppURL:  strings.TrimRight(strings.TrimSpace(cfg.AppURL), "/"),
 	}
 }
 
@@ -266,6 +300,138 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, currentPass
 	}
 
 	return s.repo.ChangePasswordAndRevokeTokens(ctx, userID, newHash)
+}
+
+func (s *Service) RequestPasswordReset(ctx context.Context, email string, meta PasswordResetRequestMeta) error {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	if normalizedEmail == "" {
+		return nil
+	}
+
+	mailConfig, err := s.getMailDeliveryRuntimeConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	user, err := s.repo.GetUserByEmail(ctx, normalizedEmail)
+	if err != nil {
+		if errors.Is(err, authrepo.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	if !user.IsActive {
+		return nil
+	}
+
+	baseURL := strings.TrimRight(strings.TrimSpace(meta.PublicBaseURL), "/")
+	if baseURL == "" {
+		baseURL = s.fallbackAppURL
+	}
+	if baseURL == "" {
+		return ErrPasswordResetDisabled
+	}
+
+	rawToken, tokenHash, err := generatePasswordResetToken()
+	if err != nil {
+		return err
+	}
+
+	expiresAt := time.Now().UTC().Add(mailConfig.PasswordResetTTL)
+	if err := s.repo.CreatePasswordResetToken(ctx, authrepo.CreatePasswordResetTokenParams{
+		UserID:      user.ID,
+		TokenHash:   tokenHash,
+		ExpiresAt:   expiresAt,
+		RequestedIP: meta.IPAddress,
+		UserAgent:   meta.UserAgent,
+	}); err != nil {
+		return err
+	}
+
+	tenantName := "Kantor"
+	if info, ok := tenant.FromContext(ctx); ok && strings.TrimSpace(info.Name) != "" {
+		tenantName = info.Name
+	}
+
+	resetURL := baseURL + "/reset-password?token=" + url.QueryEscape(rawToken)
+	if err := s.passwordMailer.SendPasswordReset(ctx, resendMailConfig{
+		APIKey:       mailConfig.APIKey,
+		SenderName:   mailConfig.SenderName,
+		SenderEmail:  mailConfig.SenderEmail,
+		ReplyToEmail: mailConfig.ReplyToEmail,
+	}, passwordResetEmail{
+		ToEmail:    user.Email,
+		ToName:     user.FullName,
+		TenantName: tenantName,
+		ResetURL:   resetURL,
+		ExpiresIn:  mailConfig.PasswordResetTTL,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) ValidatePasswordResetToken(ctx context.Context, rawToken string) error {
+	token, err := s.repo.GetPasswordResetTokenByHash(ctx, hashPasswordResetToken(rawToken))
+	if err != nil {
+		if errors.Is(err, authrepo.ErrNotFound) {
+			return ErrInvalidResetToken
+		}
+		return err
+	}
+
+	if token.UsedAt != nil {
+		return ErrInvalidResetToken
+	}
+
+	if token.ExpiresAt.Before(time.Now().UTC()) {
+		return ErrExpiredResetToken
+	}
+
+	return nil
+}
+
+func (s *Service) ResetPasswordWithToken(ctx context.Context, rawToken string, newPassword string) (string, error) {
+	token, err := s.repo.GetPasswordResetTokenByHash(ctx, hashPasswordResetToken(rawToken))
+	if err != nil {
+		if errors.Is(err, authrepo.ErrNotFound) {
+			return "", ErrInvalidResetToken
+		}
+		return "", err
+	}
+
+	if token.UsedAt != nil {
+		return "", ErrInvalidResetToken
+	}
+
+	if token.ExpiresAt.Before(time.Now().UTC()) {
+		return "", ErrExpiredResetToken
+	}
+
+	user, err := s.repo.GetUserByID(ctx, token.UserID)
+	if err != nil {
+		if errors.Is(err, authrepo.ErrNotFound) {
+			return "", ErrInvalidResetToken
+		}
+		return "", err
+	}
+
+	if backendauth.ComparePassword(user.PasswordHash, newPassword) == nil {
+		return "", ErrPasswordUnchanged
+	}
+
+	newHash, err := backendauth.HashPassword(newPassword)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.repo.UsePasswordResetToken(ctx, token.ID, token.UserID, newHash); err != nil {
+		return "", err
+	}
+
+	return token.UserID, nil
 }
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) (string, error) {
@@ -539,6 +705,10 @@ func (s *Service) GetSettings(ctx context.Context) (authrepo.SettingsResponse, e
 	return s.repo.GetSettings(ctx)
 }
 
+func (s *Service) GetPublicAuthOptions(ctx context.Context) (authrepo.PublicAuthOptions, error) {
+	return s.repo.GetPublicAuthOptions(ctx)
+}
+
 func (s *Service) UpdateDefaultRoles(ctx context.Context, updatedBy string, mapping map[string]*string) error {
 	return s.repo.UpdateDefaultRoles(ctx, updatedBy, mapping)
 }
@@ -547,12 +717,87 @@ func (s *Service) UpdateAutoCreateEmployee(ctx context.Context, updatedBy string
 	return s.repo.UpdateAutoCreateEmployee(ctx, updatedBy, setting)
 }
 
+func (s *Service) UpdateMailDelivery(ctx context.Context, updatedBy string, input dto.UpdateMailDeliveryRequest) error {
+	existing, err := s.repo.GetMailDeliveryRecord(ctx)
+	if err != nil {
+		return err
+	}
+
+	updated := existing
+	updated.Enabled = input.Enabled
+	updated.Provider = strings.ToLower(strings.TrimSpace(input.Provider))
+	if updated.Provider == "" {
+		updated.Provider = "resend"
+	}
+	updated.SenderName = strings.TrimSpace(input.SenderName)
+	updated.SenderEmail = strings.ToLower(strings.TrimSpace(input.SenderEmail))
+	updated.PasswordResetEnabled = input.PasswordResetEnabled
+	updated.PasswordResetExpiryMinutes = input.PasswordResetExpiryMinutes
+	updated.NotificationEnabled = input.NotificationEnabled
+
+	if input.ReplyToEmail != nil {
+		trimmed := strings.ToLower(strings.TrimSpace(*input.ReplyToEmail))
+		if trimmed == "" {
+			updated.ReplyToEmail = nil
+		} else {
+			updated.ReplyToEmail = &trimmed
+		}
+	}
+
+	if input.ClearAPIKey {
+		updated.APIKeyEncrypted = ""
+	} else if input.APIKey != nil {
+		trimmedKey := strings.TrimSpace(*input.APIKey)
+		if trimmedKey != "" {
+			if s.encrypter == nil {
+				return errors.New("mail encrypter is not configured")
+			}
+			ciphertext, err := s.encrypter.EncryptString(trimmedKey)
+			if err != nil {
+				return err
+			}
+			updated.APIKeyEncrypted = ciphertext
+		}
+	}
+
+	return s.repo.UpdateMailDelivery(ctx, updatedBy, updated)
+}
+
 func (s *Service) ListModules(ctx context.Context) ([]authrepo.ModuleItem, error) {
 	return s.repo.ListModules(ctx)
 }
 
 func (s *Service) ListSettingsDepartments(ctx context.Context) ([]model.Department, error) {
 	return s.repo.ListSettingsDepartments(ctx)
+}
+
+func (s *Service) getMailDeliveryRuntimeConfig(ctx context.Context) (mailDeliveryRuntimeConfig, error) {
+	setting, err := s.repo.GetMailDeliveryRecord(ctx)
+	if err != nil {
+		return mailDeliveryRuntimeConfig{}, err
+	}
+	if !setting.ForgotPasswordEnabled() {
+		return mailDeliveryRuntimeConfig{}, ErrPasswordResetDisabled
+	}
+	if s.encrypter == nil {
+		return mailDeliveryRuntimeConfig{}, ErrPasswordResetDisabled
+	}
+
+	apiKey, err := s.encrypter.DecryptString(setting.APIKeyEncrypted)
+	if err != nil {
+		return mailDeliveryRuntimeConfig{}, err
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		return mailDeliveryRuntimeConfig{}, ErrPasswordResetDisabled
+	}
+
+	return mailDeliveryRuntimeConfig{
+		SenderName:       setting.SenderName,
+		SenderEmail:      setting.SenderEmail,
+		ReplyToEmail:     setting.ReplyToEmail,
+		APIKey:           apiKey,
+		PasswordResetTTL: time.Duration(setting.PasswordResetExpiryMinutes) * time.Minute,
+	}, nil
 }
 
 func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldTokenHash string, userAgent string, ipAddress string) (AuthResult, error) {
@@ -618,4 +863,19 @@ func toModuleRoleDTOs(items map[string]rbac.ModuleRole) map[string]dto.ModuleRol
 		}
 	}
 	return moduleRoles
+}
+
+func generatePasswordResetToken() (string, string, error) {
+	entropy := make([]byte, 32)
+	if _, err := rand.Read(entropy); err != nil {
+		return "", "", err
+	}
+
+	rawToken := base64.RawURLEncoding.EncodeToString(entropy)
+	return rawToken, hashPasswordResetToken(rawToken), nil
+}
+
+func hashPasswordResetToken(rawToken string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(rawToken)))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
 }

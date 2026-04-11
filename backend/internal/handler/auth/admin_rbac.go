@@ -278,6 +278,44 @@ func (h *Handler) UpdateAutoCreateEmployee(w http.ResponseWriter, r *http.Reques
 	response.WriteJSON(w, http.StatusOK, settings, nil)
 }
 
+func (h *Handler) UpdateMailDelivery(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	previous, err := h.service.GetSettings(r.Context())
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load current settings", nil)
+		return
+	}
+
+	var input dto.UpdateMailDeliveryRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
+		return
+	}
+	if err := h.validator.Struct(input); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", validationDetails(err))
+		return
+	}
+
+	if err := h.service.UpdateMailDelivery(r.Context(), principal.UserID, input); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update mail delivery setting", nil)
+		return
+	}
+
+	settings, err := h.service.GetSettings(r.Context())
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Setting updated but failed to fetch settings", nil)
+		return
+	}
+
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "system_setting", "mail_delivery", previous.MailDelivery, settings.MailDelivery)
+	response.WriteJSON(w, http.StatusOK, settings, nil)
+}
+
 func (h *Handler) ListModules(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListModules(r.Context())
 	if err != nil {

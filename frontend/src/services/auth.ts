@@ -1,4 +1,4 @@
-import { authPostJSON, postJSON } from "@/lib/api-client";
+import { authPostJSON, getJSON, postJSON } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { AuthPayload, AuthSession } from "@/types/auth";
 
@@ -22,6 +22,27 @@ interface ChangePasswordResponse {
   message: string;
 }
 
+interface ForgotPasswordRequest {
+  email: string;
+}
+
+interface ForgotPasswordResponse {
+  message: string;
+}
+
+interface ResetPasswordRequest {
+  token: string;
+  new_password: string;
+}
+
+interface ResetPasswordResponse {
+  message: string;
+}
+
+export interface AuthPublicOptions {
+  forgot_password_enabled: boolean;
+}
+
 export function login(payload: LoginRequest) {
   return postJSON<AuthPayload, LoginRequest>("/auth/login", payload);
 }
@@ -39,6 +60,28 @@ export function changePassword(payload: ChangePasswordRequest) {
     "/auth/change-password",
     payload,
   );
+}
+
+export function forgotPassword(payload: ForgotPasswordRequest) {
+  return postJSON<ForgotPasswordResponse, ForgotPasswordRequest>(
+    "/auth/forgot-password",
+    payload,
+  );
+}
+
+export function validateResetPasswordToken(token: string) {
+  return getJSON<{ valid: boolean }>(`/auth/reset-password/validate?token=${encodeURIComponent(token)}`);
+}
+
+export function resetPassword(payload: ResetPasswordRequest) {
+  return postJSON<ResetPasswordResponse, ResetPasswordRequest>(
+    "/auth/reset-password",
+    payload,
+  );
+}
+
+export function getAuthPublicOptions() {
+  return getJSON<AuthPublicOptions>("/auth/public-options");
 }
 
 export function revokeRefreshToken() {

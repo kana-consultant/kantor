@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
 import { getDefaultAuthorizedPath } from "@/lib/rbac";
-import { getValidStoredSession, login } from "@/services/auth";
+import { getAuthPublicOptions, getValidStoredSession, login } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth-store";
 
 const loginSchema = z.object({
@@ -33,6 +33,12 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const setSession = useAuthStore((state) => state.setSession);
+  const authPublicOptionsQuery = useQuery({
+    queryKey: ["auth", "public-options"],
+    queryFn: getAuthPublicOptions,
+    retry: false,
+    staleTime: 60_000,
+  });
   const {
     register,
     handleSubmit,
@@ -109,6 +115,13 @@ function LoginPage() {
             />
             {errors.password ? (
               <p className="mt-1 text-[12px] text-error">{errors.password.message}</p>
+            ) : null}
+            {authPublicOptionsQuery.data?.forgot_password_enabled ? (
+              <div className="flex justify-end pt-1">
+                <Link className="text-[12px] font-[600] text-ops hover:underline" to="/forgot-password">
+                  Lupa kata sandi?
+                </Link>
+              </div>
             ) : null}
           </div>
 

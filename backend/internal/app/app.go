@@ -120,7 +120,16 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	authRepository := authrepo.New(pool)
 	permissionCache := rbac.NewPermissionCache(pool, 5*time.Minute)
 	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
-	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache)
+	var previousKeys []string
+	if cfg.DataEncryptionKeyPrevious != "" {
+		previousKeys = append(previousKeys, cfg.DataEncryptionKeyPrevious)
+	}
+	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey, previousKeys...)
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("configure data encryption: %w", err)
+	}
+	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter)
 
 	// Seed super admin and demo users per-tenant.
 	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {
@@ -194,15 +203,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	leadsRepository := marketingrepo.NewLeadsRepository(pool)
 	marketingOverviewRepository := marketingrepo.NewOverviewRepository(pool)
 	notificationsRepository := notificationsrepo.New(pool)
-	var previousKeys []string
-	if cfg.DataEncryptionKeyPrevious != "" {
-		previousKeys = append(previousKeys, cfg.DataEncryptionKeyPrevious)
-	}
-	encrypter, err := security.NewEncrypter(cfg.DataEncryptionKey, previousKeys...)
-	if err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("configure data encryption: %w", err)
-	}
 
 	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
 	kanbanService := operationalservice.NewKanbanService(kanbanRepository, projectsRepository)
@@ -394,6 +394,7 @@ func (a *App) buildRouter(
 					admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings/departments", authHandler.ListSettingsDepartments)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/default-roles", authHandler.UpdateDefaultRoles)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/auto-create-employee", authHandler.UpdateAutoCreateEmployee)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/mail-delivery", authHandler.UpdateMailDelivery)
 				})
 
 				protected.Route("/operational", func(module chi.Router) {

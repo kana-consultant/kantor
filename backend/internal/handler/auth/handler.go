@@ -3,8 +3,10 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -46,6 +48,16 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.NewIPRateLimit(10, time.Minute,
 		"AUTH_RATE_LIMITED", "Terlalu banyak percobaan login. Coba lagi nanti.",
 	)).Post("/login", h.login)
+	router.Get("/public-options", h.publicOptions)
+	router.With(platformmiddleware.NewIPRateLimit(5, time.Minute,
+		"AUTH_RATE_LIMITED", "Terlalu banyak permintaan reset kata sandi. Coba lagi nanti.",
+	)).Post("/forgot-password", h.forgotPassword)
+	router.With(platformmiddleware.NewIPRateLimit(20, time.Minute,
+		"AUTH_RATE_LIMITED", "Terlalu banyak validasi link reset. Coba lagi nanti.",
+	)).Get("/reset-password/validate", h.validateResetPassword)
+	router.With(platformmiddleware.NewIPRateLimit(10, time.Minute,
+		"AUTH_RATE_LIMITED", "Terlalu banyak percobaan reset kata sandi. Coba lagi nanti.",
+	)).Post("/reset-password", h.resetPassword)
 	router.With(platformmiddleware.NewIPRateLimit(30, time.Minute,
 		"AUTH_RATE_LIMITED", "Terlalu banyak percobaan refresh token. Coba lagi nanti.",
 	)).Post("/refresh", h.refresh)
@@ -212,6 +224,16 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"revoked": true}, nil)
 }
 
+func (h *Handler) publicOptions(w http.ResponseWriter, r *http.Request) {
+	options, err := h.service.GetPublicAuthOptions(r.Context())
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memuat opsi auth tenant", nil)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, options, nil)
+}
+
 func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshTokenCookie,
@@ -222,6 +244,62 @@ func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
 		Secure:   h.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
+	var input dto.ForgotPasswordRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	if err := h.service.RequestPasswordReset(r.Context(), input.Email, authservice.PasswordResetRequestMeta{
+		PublicBaseURL: requestPublicBaseURL(r, h.cookieSecure),
+		UserAgent:     r.UserAgent(),
+		IPAddress:     clientIP(r),
+	}); err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": "Jika email ditemukan pada tenant ini, link reset kata sandi akan dikirim.",
+	}, nil)
+}
+
+func (h *Handler) validateResetPassword(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	if token == "" {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Token reset wajib diisi", map[string]string{"token": "required"})
+		return
+	}
+
+	if err := h.service.ValidatePasswordResetToken(r.Context(), token); err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]bool{"valid": true}, nil)
+}
+
+func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
+	var input dto.ResetPasswordRequest
+	if !h.decodeAndValidate(w, r, &input) {
+		return
+	}
+
+	userID, err := h.service.ResetPasswordWithToken(r.Context(), input.Token, input.NewPassword)
+	if err != nil {
+		h.writeAuthError(w, err)
+		return
+	}
+
+	platformmiddleware.AuditLogWithUser(r.Context(), userID, "reset_password", "admin", "auth", userID, nil, map[string]any{
+		"reset_via_email": true,
+	})
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{
+		"message": "Kata sandi berhasil diatur ulang. Silakan masuk dengan kata sandi baru.",
+	}, nil)
 }
 
 func (h *Handler) clearRefreshTokenCookie(w http.ResponseWriter) {
@@ -272,6 +350,12 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusTooManyRequests, "ACCOUNT_LOCKED", err.Error(), nil)
 	case errors.Is(err, authservice.ErrInvalidRefreshToken), errors.Is(err, authservice.ErrExpiredRefreshToken):
 		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", err.Error(), nil)
+	case errors.Is(err, authservice.ErrInvalidResetToken):
+		response.WriteError(w, http.StatusBadRequest, "INVALID_RESET_TOKEN", err.Error(), nil)
+	case errors.Is(err, authservice.ErrExpiredResetToken):
+		response.WriteError(w, http.StatusBadRequest, "EXPIRED_RESET_TOKEN", err.Error(), nil)
+	case errors.Is(err, authservice.ErrPasswordResetDisabled):
+		response.WriteError(w, http.StatusServiceUnavailable, "PASSWORD_RESET_DISABLED", err.Error(), nil)
 	case errors.Is(err, authservice.ErrPasswordUnchanged):
 		response.WriteError(w, http.StatusBadRequest, "PASSWORD_UNCHANGED", err.Error(), nil)
 	default:
@@ -301,4 +385,27 @@ func clientIP(r *http.Request) string {
 	}
 
 	return r.RemoteAddr
+}
+
+func requestPublicBaseURL(r *http.Request, secureCookie bool) string {
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		return ""
+	}
+
+	forwardedProto := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])
+	switch {
+	case forwardedProto != "":
+		return fmt.Sprintf("%s://%s", forwardedProto, host)
+	case r.TLS != nil:
+		return fmt.Sprintf("https://%s", host)
+	case secureCookie:
+		return fmt.Sprintf("https://%s", host)
+	case strings.Contains(strings.ToLower(host), "localhost"):
+		return fmt.Sprintf("http://%s", host)
+	case strings.Contains(host, ".local"):
+		return fmt.Sprintf("http://%s", host)
+	default:
+		return fmt.Sprintf("https://%s", host)
+	}
 }
