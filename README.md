@@ -305,12 +305,16 @@ TENANTS=Company A|company-a|kantor.company-a.com;Company B|company-b|kantor.comp
 - [x] CSV/Excel export
 - [x] Multi-tenancy with PostgreSQL RLS
 - [x] Notification center (in-app + browser)
-- [ ] Email notifications
+- [x] Email notifications (forgot password, task assignment, reimbursement status, weekly digest)
+- [x] Protected file access
 - [ ] Dashboard analytics with custom widgets
 - [ ] API documentation (OpenAPI/Swagger)
 - [ ] Automated test suite
 - [ ] Mobile responsive improvements
-- [ ] Plugin/extension system
+- [ ] Self-service tenant onboarding and settings
+- [ ] Localization and timezone preferences
+- [ ] Better production extension distribution/update flow
+- [ ] Plugin/integration system
 
 ---
 

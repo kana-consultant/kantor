@@ -28,18 +28,6 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time, emp
 		return model.HrisOverview{}, err
 	}
 
-	// Non-fatal: if salaries table doesn't exist or has no data, use 0
-	_ = repository.DB(ctx, r.db).QueryRow(ctx, `
-		SELECT COALESCE(SUM(latest.net_salary), 0)::bigint
-		FROM (
-			SELECT DISTINCT ON (s.employee_id) s.net_salary
-			FROM salaries s
-			INNER JOIN employees e ON e.id = s.employee_id
-			WHERE e.employment_status = 'active'
-			ORDER BY s.employee_id, s.effective_date DESC, s.created_at DESC
-		) latest
-	`).Scan(&overview.TotalMonthlyPayroll)
-
 	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
 		SELECT
 			COUNT(*)::bigint,
@@ -83,6 +71,37 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time, emp
 	overview.RecentReimbursements = recentReimbursements
 
 	return overview, nil
+}
+
+func (r *OverviewRepository) ListLatestActivePayrollCiphertexts(ctx context.Context) ([]string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		SELECT latest.net_salary
+		FROM (
+			SELECT DISTINCT ON (s.employee_id) s.net_salary
+			FROM salaries s
+			INNER JOIN employees e ON e.id = s.employee_id
+			WHERE e.employment_status = 'active'
+			ORDER BY s.employee_id, s.effective_date DESC, s.created_at DESC
+		) latest
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ciphertexts := make([]string, 0)
+	for rows.Next() {
+		var ciphertext string
+		if err := rows.Scan(&ciphertext); err != nil {
+			return nil, err
+		}
+		ciphertexts = append(ciphertexts, ciphertext)
+	}
+
+	return ciphertexts, rows.Err()
 }
 
 func (r *OverviewRepository) financeSeries(ctx context.Context, now time.Time) ([]model.FinanceOverviewPoint, int64, error) {
