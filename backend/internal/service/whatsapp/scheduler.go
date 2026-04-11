@@ -42,6 +42,12 @@ func (s *Service) RunWeeklyDigest(ctx context.Context) {
 		return
 	}
 
+	baseURL, err := s.resolveTenantBaseURL(ctx)
+	if err != nil {
+		slog.Error("failed to resolve tenant app url for weekly digest", "error", err)
+		return
+	}
+
 	now := time.Now()
 	weekEnd := now.AddDate(0, 0, -int(now.Weekday()))
 	weekStart := weekEnd.AddDate(0, 0, -6)
@@ -62,7 +68,7 @@ func (s *Service) RunWeeklyDigest(ctx context.Context) {
 			"completed_count": fmt.Sprintf("%d", item.CompletedCount),
 			"open_count":      fmt.Sprintf("%d", item.OpenCount),
 			"overdue_count":   fmt.Sprintf("%d", item.OverdueCount),
-			"app_url":         s.cfg.AppURL,
+			"app_url":         baseURL,
 		}
 		body := RenderTemplate(tmpl.BodyTemplate, vars)
 		s.sendAndLog(ctx, *item.Phone, body, "auto_scheduled", &tmpl.ID, &tmpl.Slug,
@@ -132,12 +138,18 @@ func (s *Service) sendTaskReminder(ctx context.Context, task warepo.TaskDueInfo,
 		return
 	}
 
+	baseURL, err := s.resolveTenantBaseURL(ctx)
+	if err != nil {
+		slog.Error("failed to resolve tenant app url for task reminder", "task_id", task.TaskID, "error", err)
+		return
+	}
+
 	vars := map[string]string{
 		"name":         task.UserName,
 		"task_title":   task.TaskTitle,
 		"project_name": task.ProjectName,
 		"due_date":     task.DueDate,
-		"app_url":      s.cfg.AppURL,
+		"app_url":      baseURL,
 	}
 	body := RenderTemplate(tmpl.BodyTemplate, vars)
 	s.sendAndLog(ctx, *task.UserPhone, body, "auto_scheduled", &tmpl.ID, &tmpl.Slug,
@@ -157,6 +169,12 @@ func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
 	projects, err := s.repo.GetProjectsDeadlineIn3Days(ctx)
 	if err != nil {
 		slog.Error("failed to get projects deadline in 3 days", "error", err)
+		return
+	}
+
+	baseURL, err := s.resolveTenantBaseURL(ctx)
+	if err != nil {
+		slog.Error("failed to resolve tenant app url for project deadline reminder", "error", err)
 		return
 	}
 
@@ -184,7 +202,7 @@ func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
 				"project_status":    project.Status,
 				"open_tasks_count":  fmt.Sprintf("%d", project.OpenTaskCount),
 				"total_tasks_count": fmt.Sprintf("%d", project.TotalTaskCount),
-				"app_url":           s.cfg.AppURL,
+				"app_url":           baseURL,
 			}
 			body := RenderTemplate(tmpl.BodyTemplate, vars)
 			s.sendAndLog(ctx, *member.Phone, body, "auto_scheduled", &tmpl.ID, &tmpl.Slug,

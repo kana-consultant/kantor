@@ -83,6 +83,7 @@ type authRepository interface {
 	SetUserSuperAdmin(ctx context.Context, userID string, enabled bool) error
 	GetSettings(ctx context.Context) (authrepo.SettingsResponse, error)
 	GetMailDeliveryRecord(ctx context.Context) (authrepo.MailDeliverySettingRecord, error)
+	GetTenantPrimaryDomain(ctx context.Context) (string, error)
 	GetPublicAuthOptions(ctx context.Context) (authrepo.PublicAuthOptions, error)
 	UpdateDefaultRoles(ctx context.Context, updatedBy string, mapping map[string]*string) error
 	UpdateAutoCreateEmployee(ctx context.Context, updatedBy string, setting authrepo.AutoCreateEmployeeSetting) error
@@ -327,7 +328,10 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string, meta P
 
 	baseURL := strings.TrimRight(strings.TrimSpace(meta.PublicBaseURL), "/")
 	if baseURL == "" {
-		baseURL = s.fallbackAppURL
+		baseURL, err = tenant.ResolveBaseURL(ctx, s.repo, s.fallbackAppURL)
+		if err != nil {
+			return err
+		}
 	}
 	if baseURL == "" {
 		return ErrPasswordResetDisabled

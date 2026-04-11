@@ -93,6 +93,28 @@ func (r *Repository) UpsertWAConfig(ctx context.Context, cfg WAConfig) error {
 	return err
 }
 
+func (r *Repository) GetTenantPrimaryDomain(ctx context.Context) (string, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	var domain string
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT domain
+		FROM tenant_domains
+		WHERE tenant_id = current_setting('app.current_tenant', true)::uuid
+		ORDER BY is_primary DESC, created_at ASC
+		LIMIT 1
+	`).Scan(&domain)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("load tenant primary domain: %w", err)
+	}
+
+	return strings.TrimSpace(domain), nil
+}
+
 // --------------- Templates ---------------
 
 type CreateTemplateParams struct {

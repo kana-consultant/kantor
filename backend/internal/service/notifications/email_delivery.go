@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html"
 	"log/slog"
-	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -269,14 +268,7 @@ func (s *EmailDeliveryService) loadRuntimeConfig(ctx context.Context) (emailRunt
 }
 
 func (s *EmailDeliveryService) resolveTenantBaseURL(ctx context.Context) (string, error) {
-	domain, err := s.settingsRepo.GetTenantPrimaryDomain(ctx)
-	if err != nil {
-		return "", err
-	}
-	if domain != "" {
-		return baseURLFromDomain(domain), nil
-	}
-	return s.fallbackAppURL, nil
+	return tenant.ResolveBaseURL(ctx, s.settingsRepo, s.fallbackAppURL)
 }
 
 func (s *EmailDeliveryService) shouldRunWeeklyDigest(ctx context.Context, now time.Time) bool {
@@ -367,32 +359,6 @@ func renderWeeklyDigestText(item warepo.WeeklyDigestInfo, weekStart time.Time, w
 	)
 }
 
-func baseURLFromDomain(domain string) string {
-	trimmed := strings.TrimRight(strings.TrimSpace(domain), "/")
-	if trimmed == "" {
-		return trimmed
-	}
-	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
-		return trimmed
-	}
-
-	host := trimmed
-	hostWithoutPort := host
-	if parsedHost, parsedPort, err := net.SplitHostPort(host); err == nil && parsedHost != "" && parsedPort != "" {
-		hostWithoutPort = parsedHost
-	}
-
-	switch {
-	case hostWithoutPort == "localhost",
-		hostWithoutPort == "127.0.0.1",
-		hostWithoutPort == "::1",
-		strings.HasSuffix(hostWithoutPort, ".local"):
-		return "http://" + host
-	default:
-		return "https://" + host
-	}
-}
-
 func tenantDisplayName(ctx context.Context) string {
 	if info, ok := tenant.FromContext(ctx); ok && strings.TrimSpace(info.Name) != "" {
 		return strings.TrimSpace(info.Name)
@@ -421,4 +387,3 @@ func humanizeStatus(status string) string {
 		return strings.TrimSpace(status)
 	}
 }
-

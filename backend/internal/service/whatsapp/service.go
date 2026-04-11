@@ -238,7 +238,11 @@ func (s *Service) PreviewTemplate(ctx context.Context, id string) (string, error
 	if err != nil {
 		return "", err
 	}
-	return RenderTemplate(t.BodyTemplate, SampleVars(s.cfg.AppURL)), nil
+	baseURL, err := s.resolveTenantBaseURL(ctx)
+	if err != nil {
+		return "", err
+	}
+	return RenderTemplate(t.BodyTemplate, SampleVars(baseURL)), nil
 }
 
 // --------------- Schedules ---------------
@@ -377,6 +381,10 @@ func (s *Service) GetUserPhone(ctx context.Context, userID string) (*string, err
 	return s.repo.GetUserPhone(ctx, userID)
 }
 
+func (s *Service) resolveTenantBaseURL(ctx context.Context) (string, error) {
+	return tenant.ResolveBaseURL(ctx, s.repo, s.cfg.AppURL)
+}
+
 func normalizeValidatedPhone(phone string) (string, error) {
 	normalized := NormalizePhone(phone)
 	if !IsValidPhone(normalized) {
@@ -411,13 +419,18 @@ func (s *Service) SendTaskAssignedNotification(ctx context.Context, taskID strin
 			return struct{}{}, nil
 		}
 
+		baseURL, err := s.resolveTenantBaseURL(scopedCtx)
+		if err != nil {
+			return struct{}{}, err
+		}
+
 		vars := map[string]string{
 			"name":         task.UserName,
 			"task_title":   task.TaskTitle,
 			"project_name": task.ProjectName,
 			"due_date":     task.DueDate,
 			"priority":     task.Priority,
-			"app_url":      s.cfg.AppURL,
+			"app_url":      baseURL,
 		}
 		body := RenderTemplate(tmpl.BodyTemplate, vars)
 
@@ -452,13 +465,18 @@ func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimb
 			return struct{}{}, nil
 		}
 
+		baseURL, err := s.resolveTenantBaseURL(scopedCtx)
+		if err != nil {
+			return struct{}{}, err
+		}
+
 		vars := map[string]string{
 			"name":                   info.SubmitterName,
 			"reimbursement_title":    info.Title,
 			"amount":                 formatRupiah(info.Amount),
 			"new_status":             newStatus,
 			"reviewer_notes_section": BuildReviewerNotesSection(reviewerNotes),
-			"app_url":                s.cfg.AppURL,
+			"app_url":                baseURL,
 		}
 		body := RenderTemplate(tmpl.BodyTemplate, vars)
 
@@ -681,6 +699,11 @@ func (s *Service) runSchedule(ctx context.Context, schedule model.WABroadcastSch
 		return nil
 	}
 
+	baseURL, err := s.resolveTenantBaseURL(ctx)
+	if err != nil {
+		return err
+	}
+
 	recipients, err := s.resolveScheduleRecipients(ctx, schedule)
 	if err != nil {
 		return err
@@ -694,7 +717,7 @@ func (s *Service) runSchedule(ctx context.Context, schedule model.WABroadcastSch
 
 		body := RenderTemplate(template.BodyTemplate, map[string]string{
 			"name":    recipient.UserName,
-			"app_url": s.cfg.AppURL,
+			"app_url": baseURL,
 		})
 		s.sendAndLogWithSchedule(ctx, &schedule.ID, *recipient.Phone, body, triggerType, &template.ID, &template.Slug, &recipient.UserID, nil, nil)
 	}
