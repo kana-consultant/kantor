@@ -181,6 +181,21 @@ docker compose logs -f backend
 docker compose up --build -d backend
 ```
 
+### Automated Verification
+
+```bash
+# Backend unit tests
+cd backend
+go test ./...
+
+# Frontend production build smoke check
+cd ../frontend
+npm ci
+npm run build
+```
+
+See [Testing Guide](docs/testing.md) for the current automated coverage and CI workflow.
+
 ---
 
 ## Project Structure
@@ -282,7 +297,7 @@ TENANTS=Company A|company-a|kantor.company-a.com;Company B|company-b|kantor.comp
 | -------------------------------------- | ----------------------------------------------------------------------- |
 | [Architecture Overview](docs/architecture.md) | Runtime architecture, multi-tenancy, notifications, extension, and WA integration |
 | [Deployment Guide](docs/deployment.md) | Production deployment with Docker, TLS, backups, and security checklist |
-| [QA Remediation & Tests](QA_REMEDIATION_AND_TESTS.md) | Summary of QA fixes and manual verification steps |
+| [Testing Guide](docs/testing.md) | Automated backend test coverage, frontend smoke checks, and CI workflow |
 | [Contributing](CONTRIBUTING.md)        | Development setup, project rules, PR guidelines, and commit style       |
 | [Security Policy](SECURITY.md)         | Vulnerability reporting instructions                                    |
 | [Code of Conduct](CODE_OF_CONDUCT.md)  | Community standards (Contributor Covenant v2.1)                         |
@@ -309,7 +324,7 @@ TENANTS=Company A|company-a|kantor.company-a.com;Company B|company-b|kantor.comp
 - [x] Protected file access
 - [ ] Dashboard analytics with custom widgets
 - [ ] API documentation (OpenAPI/Swagger)
-- [ ] Automated test suite
+- [x] Automated test suite
 - [ ] Mobile responsive improvements
 - [ ] Self-service tenant onboarding and settings
 - [ ] Localization and timezone preferences
@@ -340,7 +355,7 @@ docker compose up --build -d
 - **New Features** &mdash; Propose and implement new modules or enhancements
 - **Documentation** &mdash; Improve guides, add examples, translate
 - **UI/UX** &mdash; Design improvements, accessibility, mobile responsiveness
-- **Testing** &mdash; Add unit tests, integration tests, E2E tests
+- **Testing** &mdash; Extend unit tests, integration tests, and browser regression coverage beyond the current automated suite
 - **Translations** &mdash; Localization support
 
 ---
