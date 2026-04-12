@@ -488,6 +488,50 @@ func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimb
 	}
 }
 
+func (s *Service) SendReimbursementReminder(ctx context.Context, recipient model.ReimbursementReminderRecipient, digest model.ReimbursementReminderDigest) {
+	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
+		slug := "reimbursement_review_reminder"
+		statusQuery := "submitted"
+		if strings.TrimSpace(digest.Kind) == "payment" {
+			slug = "reimbursement_payment_reminder"
+			statusQuery = "approved"
+		}
+		if recipient.Phone == nil || strings.TrimSpace(*recipient.Phone) == "" {
+			s.logSkipped(scopedCtx, slug, nil, &recipient.UserID, "", "skipped_no_phone")
+			return struct{}{}, nil
+		}
+
+		tmpl, err := s.repo.GetTemplateBySlug(scopedCtx, slug)
+		if err != nil {
+			slog.Error("failed to get reimbursement reminder template", "slug", slug, "error", err)
+			return struct{}{}, nil
+		}
+		if !tmpl.IsActive {
+			return struct{}{}, nil
+		}
+
+		baseURL, err := s.resolveTenantBaseURL(scopedCtx)
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		vars := map[string]string{
+			"name":          recipient.UserName,
+			"pending_count": strconv.Itoa(digest.PendingCount),
+			"total_amount":  formatRupiah(digest.TotalAmount),
+			"oldest_date":   reminderOldestDate(digest.OldestCreatedAt),
+			"items_summary": reminderItemsSummary(digest),
+			"app_url":       baseURL,
+		}
+		body := RenderTemplate(tmpl.BodyTemplate, vars)
+		referenceType := "reimbursement_reminder_" + statusQuery
+		s.sendAndLog(scopedCtx, *recipient.Phone, body, "auto_scheduled", &tmpl.ID, &tmpl.Slug, &recipient.UserID, &referenceType, nil)
+		return struct{}{}, nil
+	}); err != nil {
+		slog.Error("failed to send reimbursement reminder WA", "user_id", recipient.UserID, "kind", digest.Kind, "error", err)
+	}
+}
+
 func (s *Service) sendAndLog(ctx context.Context, phone string, body string, triggerType string,
 	templateID *string, templateSlug *string, userID *string, refType *string, refID *string) {
 	s.sendAndLogWithSchedule(ctx, nil, phone, body, triggerType, templateID, templateSlug, userID, refType, refID)
@@ -860,4 +904,23 @@ func formatRupiah(amount int64) string {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func reminderItemsSummary(digest model.ReimbursementReminderDigest) string {
+	if len(digest.Items) == 0 {
+		return "- Belum ada detail item"
+	}
+
+	lines := make([]string, 0, len(digest.Items))
+	for _, item := range digest.Items {
+		lines = append(lines, "- "+item.EmployeeName+": "+item.Title+" ("+formatRupiah(item.Amount)+")")
+	}
+	return strings.Join(lines, "\n")
+}
+
+func reminderOldestDate(value *time.Time) string {
+	if value == nil {
+		return "-"
+	}
+	return value.In(time.Local).Format("2006-01-02 15:04")
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
@@ -45,6 +46,7 @@ type reimbursementsRepository interface {
 	MarkPaid(ctx context.Context, reimbursementID string, actorID string, notes *string) (model.Reimbursement, error)
 	BulkMarkPaid(ctx context.Context, ids []string, actorID string, notes *string) ([]model.Reimbursement, error)
 	Summary(ctx context.Context, month int, year int, employeeID string, department string) (model.ReimbursementSummary, error)
+	GetReminderDigest(ctx context.Context, status string, limit int) (model.ReimbursementReminderDigest, error)
 }
 
 type reimbursementsEmployeesRepository interface {
@@ -54,10 +56,16 @@ type reimbursementsEmployeesRepository interface {
 
 type reimbursementsAuthRepository interface {
 	ListUserIDsByPermission(ctx context.Context, permissionID string) ([]string, error)
+	ListUserReminderRecipients(ctx context.Context, userIDs []string) ([]model.ReimbursementReminderRecipient, error)
+	GetReimbursementReminderSetting(ctx context.Context) (model.ReimbursementReminderSetting, error)
 }
 
 type reimbursementsNotificationsService interface {
 	CreateMany(ctx context.Context, params []notificationsrepo.CreateParams) error
+}
+
+type ReimbursementReminderSender interface {
+	SendReimbursementReminder(ctx context.Context, recipient model.ReimbursementReminderRecipient, digest model.ReimbursementReminderDigest)
 }
 
 type ReimbursementsService struct {
@@ -66,7 +74,11 @@ type ReimbursementsService struct {
 	authRepo             reimbursementsAuthRepository
 	notificationsService reimbursementsNotificationsService
 	statusNotifiers      []ReimbursementStatusNotifier
+	reminderEmailSender  ReimbursementReminderSender
+	reminderWASender     ReimbursementReminderSender
 	financeService       *FinanceService
+	reminderMu           sync.Mutex
+	lastReminderRuns     map[string]time.Time
 }
 
 func NewReimbursementsService(
@@ -82,6 +94,7 @@ func NewReimbursementsService(
 		authRepo:             authRepo,
 		notificationsService: notificationsService,
 		financeService:       financeService,
+		lastReminderRuns:     make(map[string]time.Time),
 	}
 }
 
@@ -89,6 +102,14 @@ func (s *ReimbursementsService) SetWANotifier(n ReimbursementStatusNotifier) {
 	if n != nil {
 		s.statusNotifiers = append(s.statusNotifiers, n)
 	}
+}
+
+func (s *ReimbursementsService) SetReminderEmailSender(sender ReimbursementReminderSender) {
+	s.reminderEmailSender = sender
+}
+
+func (s *ReimbursementsService) SetReminderWASender(sender ReimbursementReminderSender) {
+	s.reminderWASender = sender
 }
 
 func (s *ReimbursementsService) Create(ctx context.Context, request hrisdto.CreateReimbursementRequest, actorID string, perms *rbac.CachedPermissions) (model.Reimbursement, error) {

@@ -233,6 +233,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	kanbanService.SetTaskAssignNotifier(emailDeliveryService)
 	reimbursementsService.SetWANotifier(whatsappService)
 	reimbursementsService.SetWANotifier(emailDeliveryService)
+	reimbursementsService.SetReminderWASender(whatsappService)
+	reimbursementsService.SetReminderEmailSender(emailDeliveryService)
 
 	application := &App{cfg: cfg, db: pool, permissionCache: permissionCache, tenantResolver: tenantResolver}
 	application.router = application.buildRouter(
@@ -258,7 +260,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		fileshandler.New(filesService),
 		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(subscriptionsService, trackerService, whatsappService, emailDeliveryService)
+	application.startBackgroundJobs(subscriptionsService, trackerService, reimbursementsService, whatsappService, emailDeliveryService)
 
 	return application, nil
 }
@@ -398,6 +400,7 @@ func (a *App) buildRouter(
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/default-roles", authHandler.UpdateDefaultRoles)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/auto-create-employee", authHandler.UpdateAutoCreateEmployee)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/mail-delivery", authHandler.UpdateMailDelivery)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/reimbursement-reminder", authHandler.UpdateReimbursementReminder)
 				})
 
 				protected.Route("/operational", func(module chi.Router) {
@@ -452,7 +455,7 @@ func (a *App) buildRouter(
 	return router
 }
 
-func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
+func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -542,6 +545,26 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			case tickAt := <-ticker.C:
 				runPerTenant("email_scheduler", func(tCtx context.Context, t tenant.Info) error {
 					return emailDeliveryService.RunCronJobs(tCtx, tickAt)
+				})
+			}
+		}
+	})
+
+	runBackground("reimbursement_reminder_scheduler", func() {
+		runPerTenant("reimbursement_reminder_scheduler", func(tCtx context.Context, t tenant.Info) error {
+			return reimbursementsService.RunReminderJobs(tCtx, time.Now())
+		})
+
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickAt := <-ticker.C:
+				runPerTenant("reimbursement_reminder_scheduler", func(tCtx context.Context, t tenant.Info) error {
+					return reimbursementsService.RunReminderJobs(tCtx, tickAt)
 				})
 			}
 		}

@@ -83,11 +83,13 @@ type authRepository interface {
 	SetUserSuperAdmin(ctx context.Context, userID string, enabled bool) error
 	GetSettings(ctx context.Context) (authrepo.SettingsResponse, error)
 	GetMailDeliveryRecord(ctx context.Context) (authrepo.MailDeliverySettingRecord, error)
+	GetReimbursementReminderSetting(ctx context.Context) (model.ReimbursementReminderSetting, error)
 	GetTenantPrimaryDomain(ctx context.Context) (string, error)
 	GetPublicAuthOptions(ctx context.Context) (authrepo.PublicAuthOptions, error)
 	UpdateDefaultRoles(ctx context.Context, updatedBy string, mapping map[string]*string) error
 	UpdateAutoCreateEmployee(ctx context.Context, updatedBy string, setting authrepo.AutoCreateEmployeeSetting) error
 	UpdateMailDelivery(ctx context.Context, updatedBy string, setting authrepo.MailDeliverySettingRecord) error
+	UpdateReimbursementReminder(ctx context.Context, updatedBy string, setting model.ReimbursementReminderSetting) error
 	ListModules(ctx context.Context) ([]authrepo.ModuleItem, error)
 	ListSettingsDepartments(ctx context.Context) ([]model.Department, error)
 	EnsureEmployeeProfileForUser(ctx context.Context, userID string) (model.Employee, error)
@@ -136,11 +138,11 @@ type PasswordResetRequestMeta struct {
 }
 
 type mailDeliveryRuntimeConfig struct {
-	SenderName           string
-	SenderEmail          string
-	ReplyToEmail         *string
-	APIKey               string
-	PasswordResetTTL     time.Duration
+	SenderName       string
+	SenderEmail      string
+	ReplyToEmail     *string
+	APIKey           string
+	PasswordResetTTL time.Duration
 }
 
 func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config, permissionCache *rbac.PermissionCache, encrypter *security.Encrypter) *Service {
@@ -765,6 +767,32 @@ func (s *Service) UpdateMailDelivery(ctx context.Context, updatedBy string, inpu
 	}
 
 	return s.repo.UpdateMailDelivery(ctx, updatedBy, updated)
+}
+
+func (s *Service) UpdateReimbursementReminder(ctx context.Context, updatedBy string, input dto.UpdateReimbursementReminderRequest) error {
+	setting := model.ReimbursementReminderSetting{
+		Enabled: input.Enabled,
+		Review: model.ReimbursementReminderRule{
+			Enabled: input.Review.Enabled,
+			Cron:    strings.TrimSpace(input.Review.Cron),
+			Channels: model.ReminderChannels{
+				InApp:    input.Review.Channels.InApp,
+				Email:    input.Review.Channels.Email,
+				WhatsApp: input.Review.Channels.WhatsApp,
+			},
+		},
+		Payment: model.ReimbursementReminderRule{
+			Enabled: input.Payment.Enabled,
+			Cron:    strings.TrimSpace(input.Payment.Cron),
+			Channels: model.ReminderChannels{
+				InApp:    input.Payment.Channels.InApp,
+				Email:    input.Payment.Channels.Email,
+				WhatsApp: input.Payment.Channels.WhatsApp,
+			},
+		},
+	}
+
+	return s.repo.UpdateReimbursementReminder(ctx, updatedBy, setting)
 }
 
 func (s *Service) ListModules(ctx context.Context) ([]authrepo.ModuleItem, error) {

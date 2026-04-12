@@ -224,6 +224,32 @@ var defaultTemplateSeeds = []defaultTemplateSeed{
 		Description:        "Dikirim saat status reimbursement berubah (approved/rejected/paid)",
 		AvailableVariables: []string{"name", "reimbursement_title", "amount", "new_status", "reviewer_notes_section", "app_url"},
 	},
+	{
+		Name:        "Reminder Review Reimbursement",
+		Slug:        "reimbursement_review_reminder",
+		Category:    "hris",
+		TriggerType: "auto_scheduled",
+		BodyTemplate: "Halo {{name}}, ada {{pending_count}} reimbursement menunggu review.\n\n" +
+			"Total nominal: {{total_amount}}\n" +
+			"Item terlama: {{oldest_date}}\n" +
+			"Contoh item:\n{{items_summary}}\n\n" +
+			"Tindak lanjuti di KANTOR: {{app_url}}/hris/reimbursements?status=submitted",
+		Description:        "Dikirim terjadwal ke approver reimbursement yang memiliki akses view_all",
+		AvailableVariables: []string{"name", "pending_count", "total_amount", "oldest_date", "items_summary", "app_url"},
+	},
+	{
+		Name:        "Reminder Pembayaran Reimbursement",
+		Slug:        "reimbursement_payment_reminder",
+		Category:    "hris",
+		TriggerType: "auto_scheduled",
+		BodyTemplate: "Halo {{name}}, ada {{pending_count}} reimbursement approved yang menunggu pembayaran.\n\n" +
+			"Total nominal: {{total_amount}}\n" +
+			"Item terlama: {{oldest_date}}\n" +
+			"Contoh item:\n{{items_summary}}\n\n" +
+			"Tindak lanjuti di KANTOR: {{app_url}}/hris/reimbursements?status=approved",
+		Description:        "Dikirim terjadwal ke user yang memiliki akses mark_paid dan view_all",
+		AvailableVariables: []string{"name", "pending_count", "total_amount", "oldest_date", "items_summary", "app_url"},
+	},
 }
 
 func (r *Repository) ListTemplates(ctx context.Context, category string, triggerType string) ([]model.WAMessageTemplate, error) {

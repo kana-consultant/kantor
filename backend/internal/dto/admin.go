@@ -61,3 +61,21 @@ type UpdateMailDeliveryRequest struct {
 	PasswordResetExpiryMinutes int     `json:"password_reset_expiry_minutes" validate:"min=5,max=1440"`
 	NotificationEnabled        bool    `json:"notification_enabled"`
 }
+
+type ReminderChannelsRequest struct {
+	InApp    bool `json:"in_app"`
+	Email    bool `json:"email"`
+	WhatsApp bool `json:"whatsapp"`
+}
+
+type ReimbursementReminderRuleRequest struct {
+	Enabled  bool                    `json:"enabled"`
+	Cron     string                  `json:"cron" validate:"omitempty,max=100"`
+	Channels ReminderChannelsRequest `json:"channels"`
+}
+
+type UpdateReimbursementReminderRequest struct {
+	Enabled bool                             `json:"enabled"`
+	Review  ReimbursementReminderRuleRequest `json:"review"`
+	Payment ReimbursementReminderRuleRequest `json:"payment"`
+}

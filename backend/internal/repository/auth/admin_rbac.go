@@ -98,9 +98,10 @@ type AdminUserDetail struct {
 }
 
 type SettingsResponse struct {
-	DefaultRoles       map[string]*RoleReference `json:"default_roles"`
-	AutoCreateEmployee AutoCreateEmployeeSetting `json:"auto_create_employee"`
-	MailDelivery       MailDeliverySetting       `json:"mail_delivery"`
+	DefaultRoles          map[string]*RoleReference          `json:"default_roles"`
+	AutoCreateEmployee    AutoCreateEmployeeSetting          `json:"auto_create_employee"`
+	MailDelivery          MailDeliverySetting                `json:"mail_delivery"`
+	ReimbursementReminder model.ReimbursementReminderSetting `json:"reimbursement_reminder"`
 }
 
 type RoleReference struct {
@@ -751,6 +752,12 @@ func (r *Repository) GetSettings(ctx context.Context) (SettingsResponse, error) 
 		return SettingsResponse{}, err
 	}
 	settings.MailDelivery = mailDelivery.publicView()
+
+	reimbursementReminder, err := r.GetReimbursementReminderSetting(ctx)
+	if err != nil {
+		return SettingsResponse{}, err
+	}
+	settings.ReimbursementReminder = reimbursementReminder
 
 	return settings, nil
 }

@@ -519,6 +519,63 @@ func (r *ReimbursementsRepository) MarkPaid(ctx context.Context, reimbursementID
 	return r.hydrateEmployeeName(ctx, item)
 }
 
+func (r *ReimbursementsRepository) GetReminderDigest(ctx context.Context, status string, limit int) (model.ReimbursementReminderDigest, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	trimmedStatus := strings.TrimSpace(status)
+	if limit <= 0 {
+		limit = 3
+	}
+
+	digest := model.ReimbursementReminderDigest{
+		Status: trimmedStatus,
+		Items:  make([]model.ReimbursementReminderItem, 0, limit),
+	}
+
+	var pendingCount int
+	var totalAmount int64
+	var oldestCreatedAt *time.Time
+	if err := repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT COUNT(*), COALESCE(SUM(amount), 0), MIN(created_at)
+		FROM reimbursements
+		WHERE status = $1
+	`, trimmedStatus).Scan(&pendingCount, &totalAmount, &oldestCreatedAt); err != nil {
+		return model.ReimbursementReminderDigest{}, err
+	}
+
+	digest.PendingCount = pendingCount
+	digest.TotalAmount = totalAmount
+	digest.OldestCreatedAt = oldestCreatedAt
+
+	if pendingCount == 0 {
+		return digest, nil
+	}
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		SELECT r.id::text, r.title, e.full_name, r.amount, r.created_at
+		FROM reimbursements r
+		INNER JOIN employees e ON e.id = r.employee_id
+		WHERE r.status = $1
+		ORDER BY r.created_at ASC
+		LIMIT $2
+	`, trimmedStatus, limit)
+	if err != nil {
+		return model.ReimbursementReminderDigest{}, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item model.ReimbursementReminderItem
+		if err := rows.Scan(&item.ReimbursementID, &item.Title, &item.EmployeeName, &item.Amount, &item.CreatedAt); err != nil {
+			return model.ReimbursementReminderDigest{}, err
+		}
+		digest.Items = append(digest.Items, item)
+	}
+
+	return digest, rows.Err()
+}
+
 func (r *ReimbursementsRepository) Summary(ctx context.Context, month int, year int, employeeID string, department string) (model.ReimbursementSummary, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()

@@ -26,7 +26,7 @@ func BuildReviewerNotesSection(notes string) string {
 	if trimmed == "" {
 		return ""
 	}
-	return "📎 Catatan: " + trimmed
+	return "[Catatan] " + trimmed
 }
 
 // SampleVars returns sample data for template preview.
@@ -49,7 +49,11 @@ func SampleVars(appURL string) map[string]string {
 		"reimbursement_title":    "Transport Meeting Client",
 		"amount":                 "Rp 250.000",
 		"new_status":             "approved",
-		"reviewer_notes_section": "📎 Catatan: Sudah sesuai policy",
+		"reviewer_notes_section": "[Catatan] Sudah sesuai policy",
+		"pending_count":          "4",
+		"total_amount":           "Rp 1.850.000",
+		"oldest_date":            "2026-04-08 09:00",
+		"items_summary":          "- Bensin Operasional (Rp 150.000)\n- Grab Meeting Client (Rp 320.000)",
 		"app_url":                appURL,
 	}
 }

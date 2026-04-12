@@ -112,8 +112,27 @@ export interface MailDeliverySetting {
   notification_enabled: boolean;
 }
 
+export interface ReminderChannelsSetting {
+  in_app: boolean;
+  email: boolean;
+  whatsapp: boolean;
+}
+
+export interface ReimbursementReminderRuleSetting {
+  enabled: boolean;
+  cron: string;
+  channels: ReminderChannelsSetting;
+}
+
+export interface ReimbursementReminderSetting {
+  enabled: boolean;
+  review: ReimbursementReminderRuleSetting;
+  payment: ReimbursementReminderRuleSetting;
+}
+
 export interface AdminSettings {
   default_roles: Record<string, RoleReference>;
   auto_create_employee: AutoCreateEmployeeSetting;
   mail_delivery: MailDeliverySetting;
+  reimbursement_reminder: ReimbursementReminderSetting;
 }

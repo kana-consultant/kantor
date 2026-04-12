@@ -21,6 +21,7 @@ import {
   updateAutoCreateEmployee,
   updateDefaultRoles,
   updateMailDelivery,
+  updateReimbursementReminder,
 } from "@/services/admin-rbac";
 import { toast } from "@/stores/toast-store";
 
@@ -31,6 +32,208 @@ export const Route = createFileRoute("/_authenticated/admin/settings")({
   },
   component: AdminSettingsPage,
 });
+
+type CronPreset = {
+  label: string;
+  value: string;
+  description: string;
+};
+
+const reviewReminderPresets: CronPreset[] = [
+  {
+    label: "Hari kerja 09:00",
+    value: "0 9 * * 1-5",
+    description: "Setiap hari kerja pukul 09:00.",
+  },
+  {
+    label: "Hari kerja 13:00",
+    value: "0 13 * * 1-5",
+    description: "Setiap hari kerja pukul 13:00.",
+  },
+  {
+    label: "Setiap hari 09:00",
+    value: "0 9 * * *",
+    description: "Setiap hari pukul 09:00.",
+  },
+  {
+    label: "Setiap 30 menit",
+    value: "*/30 * * * *",
+    description: "Setiap 30 menit sekali.",
+  },
+];
+
+const paymentReminderPresets: CronPreset[] = [
+  {
+    label: "Hari kerja 10:00",
+    value: "0 10 * * 1-5",
+    description: "Setiap hari kerja pukul 10:00.",
+  },
+  {
+    label: "Hari kerja 15:00",
+    value: "0 15 * * 1-5",
+    description: "Setiap hari kerja pukul 15:00.",
+  },
+  {
+    label: "Setiap hari 10:00",
+    value: "0 10 * * *",
+    description: "Setiap hari pukul 10:00.",
+  },
+  {
+    label: "Setiap 1 jam",
+    value: "0 * * * *",
+    description: "Setiap awal jam.",
+  },
+];
+
+const weekdayLabels: Record<string, string> = {
+  "0": "Minggu",
+  "1": "Senin",
+  "2": "Selasa",
+  "3": "Rabu",
+  "4": "Kamis",
+  "5": "Jumat",
+  "6": "Sabtu",
+  "7": "Minggu",
+  "1-5": "hari kerja",
+  "1,2,3,4,5": "hari kerja",
+  "0,6": "akhir pekan",
+  "6,0": "akhir pekan",
+};
+
+function padCronTime(value: string) {
+  return value.padStart(2, "0");
+}
+
+function describeCronExpression(expression: string) {
+  const parts = expression.trim().split(/\s+/);
+  if (parts.length !== 5) {
+    return "Gunakan format 5 bagian: menit jam tanggal bulan hari-minggu. Contoh: 0 9 * * 1-5.";
+  }
+
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+
+  if (
+    minute.startsWith("*/") &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    return `Dikirim setiap ${minute.slice(2)} menit sekali.`;
+  }
+
+  if (
+    /^\d+$/.test(minute) &&
+    hour === "*" &&
+    dayOfMonth === "*" &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    return `Dikirim setiap jam pada menit ke-${minute}.`;
+  }
+
+  if (
+    /^\d+$/.test(minute) &&
+    /^\d+$/.test(hour) &&
+    dayOfMonth === "*" &&
+    month === "*"
+  ) {
+    const timeLabel = `${padCronTime(hour)}:${padCronTime(minute)}`;
+    if (dayOfWeek === "*") {
+      return `Dikirim setiap hari pukul ${timeLabel}.`;
+    }
+    const weekday = weekdayLabels[dayOfWeek];
+    if (weekday) {
+      return `Dikirim setiap ${weekday} pukul ${timeLabel}.`;
+    }
+    return `Dikirim pada hari-minggu "${dayOfWeek}" pukul ${timeLabel}.`;
+  }
+
+  if (
+    /^\d+$/.test(minute) &&
+    /^\d+$/.test(hour) &&
+    /^\d+$/.test(dayOfMonth) &&
+    month === "*" &&
+    dayOfWeek === "*"
+  ) {
+    return `Dikirim tiap bulan tanggal ${dayOfMonth} pukul ${padCronTime(hour)}:${padCronTime(minute)}.`;
+  }
+
+  return "Format cron valid, tetapi pola ini cukup spesifik. Gunakan preset jika ingin jadwal yang lebih mudah dipahami.";
+}
+
+type ReminderCronFieldProps = {
+  currentValue: string;
+  disabled: boolean;
+  id: string;
+  label: string;
+  onChange: (value: string) => void;
+  presets: CronPreset[];
+};
+
+function ReminderCronField({
+  currentValue,
+  disabled,
+  id,
+  label,
+  onChange,
+  presets,
+}: ReminderCronFieldProps) {
+  const description = useMemo(
+    () => describeCronExpression(currentValue),
+    [currentValue],
+  );
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-surface-muted/40 p-4">
+      <div className="space-y-1.5">
+        <label className="text-[13px] font-[600] text-text-primary" htmlFor={id}>
+          {label}
+        </label>
+        <Input
+          className="h-10 rounded-[6px] border-transparent bg-surface px-3 font-mono text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
+          disabled={disabled}
+          id={id}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="0 9 * * 1-5"
+          value={currentValue}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
+          Preset cepat
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {presets.map((preset) => (
+            <button
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                currentValue.trim() === preset.value
+                  ? "border-ops bg-ops/10 text-ops"
+                  : "border-border bg-surface text-text-secondary hover:border-ops/40 hover:text-text-primary",
+              )}
+              disabled={disabled}
+              key={preset.value}
+              onClick={() => onChange(preset.value)}
+              type="button"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm">
+        <p className="font-semibold text-text-primary">Arti jadwal</p>
+        <p className="mt-1 text-text-secondary">{description}</p>
+        <p className="mt-2 text-xs text-text-secondary">
+          Format: <code>menit jam tanggal bulan hari-minggu</code>. Contoh <code>0 9 * * 1-5</code> berarti setiap hari kerja pukul 09:00.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function AdminSettingsPage() {
   const queryClient = useQueryClient();
@@ -48,6 +251,17 @@ function AdminSettingsPage() {
   const [passwordResetEnabled, setPasswordResetEnabled] = useState(false);
   const [passwordResetExpiryMinutes, setPasswordResetExpiryMinutes] = useState(30);
   const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [reimbursementReminderEnabled, setReimbursementReminderEnabled] = useState(false);
+  const [reviewReminderEnabled, setReviewReminderEnabled] = useState(true);
+  const [reviewReminderCron, setReviewReminderCron] = useState("0 9 * * 1-5");
+  const [reviewReminderInApp, setReviewReminderInApp] = useState(true);
+  const [reviewReminderEmail, setReviewReminderEmail] = useState(false);
+  const [reviewReminderWhatsApp, setReviewReminderWhatsApp] = useState(false);
+  const [paymentReminderEnabled, setPaymentReminderEnabled] = useState(true);
+  const [paymentReminderCron, setPaymentReminderCron] = useState("0 10 * * 1-5");
+  const [paymentReminderInApp, setPaymentReminderInApp] = useState(true);
+  const [paymentReminderEmail, setPaymentReminderEmail] = useState(false);
+  const [paymentReminderWhatsApp, setPaymentReminderWhatsApp] = useState(false);
 
   const settingsQuery = useQuery({
     queryKey: adminRbacKeys.settings(),
@@ -110,6 +324,17 @@ function AdminSettingsPage() {
     setPasswordResetEnabled(settingsQuery.data.mail_delivery.password_reset_enabled);
     setPasswordResetExpiryMinutes(settingsQuery.data.mail_delivery.password_reset_expiry_minutes);
     setNotificationEnabled(settingsQuery.data.mail_delivery.notification_enabled);
+    setReimbursementReminderEnabled(settingsQuery.data.reimbursement_reminder.enabled);
+    setReviewReminderEnabled(settingsQuery.data.reimbursement_reminder.review.enabled);
+    setReviewReminderCron(settingsQuery.data.reimbursement_reminder.review.cron);
+    setReviewReminderInApp(settingsQuery.data.reimbursement_reminder.review.channels.in_app);
+    setReviewReminderEmail(settingsQuery.data.reimbursement_reminder.review.channels.email);
+    setReviewReminderWhatsApp(settingsQuery.data.reimbursement_reminder.review.channels.whatsapp);
+    setPaymentReminderEnabled(settingsQuery.data.reimbursement_reminder.payment.enabled);
+    setPaymentReminderCron(settingsQuery.data.reimbursement_reminder.payment.cron);
+    setPaymentReminderInApp(settingsQuery.data.reimbursement_reminder.payment.channels.in_app);
+    setPaymentReminderEmail(settingsQuery.data.reimbursement_reminder.payment.channels.email);
+    setPaymentReminderWhatsApp(settingsQuery.data.reimbursement_reminder.payment.channels.whatsapp);
   }, [settingsQuery.data]);
 
   const permissionModuleMap = useMemo(() => {
@@ -180,6 +405,20 @@ function AdminSettingsPage() {
     onError: (error) => {
       toast.error(
         "Gagal memperbarui pengaturan email tenant",
+        error instanceof Error ? error.message : undefined,
+      );
+    },
+  });
+
+  const reimbursementReminderMutation = useMutation({
+    mutationFn: updateReimbursementReminder,
+    onSuccess: async () => {
+      toast.success("Pengaturan reminder reimbursement berhasil diperbarui");
+      await queryClient.invalidateQueries({ queryKey: adminRbacKeys.settings() });
+    },
+    onError: (error) => {
+      toast.error(
+        "Gagal memperbarui reminder reimbursement",
         error instanceof Error ? error.message : undefined,
       );
     },
@@ -605,6 +844,221 @@ function AdminSettingsPage() {
             >
               <Save className="h-4 w-4" />
               Simpan Pengaturan Email
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="space-y-5 p-6 xl:col-span-2">
+          <div className="flex items-start gap-3">
+            <div className="rounded-md bg-error-light p-3 text-error">
+              <Settings2 className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="font-display text-[18px] font-[700] text-text-primary">
+                Reminder Reimbursement
+              </h2>
+              <p className="mt-1 text-sm text-text-secondary">
+                Reminder dikirim otomatis ke user tenant yang punya permission tindakan reimbursement
+                dan juga akses <code>view_all</code>. Review memakai
+                <code> hris:reimbursement:approve</code>, pembayaran memakai
+                <code> hris:reimbursement:mark_paid</code>.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-border bg-surface-muted/60 p-4">
+            <label className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-text-primary">
+                  Aktifkan reminder reimbursement
+                </p>
+                <p className="text-xs text-text-secondary">
+                  Saat nonaktif, scheduler reimbursement reminder tenant ini tidak akan mengirim apapun.
+                </p>
+              </div>
+              <input
+                checked={reimbursementReminderEnabled}
+                className="h-5 w-5 accent-[var(--module-primary)]"
+                disabled={!canManageSettings}
+                onChange={(event) => setReimbursementReminderEnabled(event.target.checked)}
+                type="checkbox"
+              />
+            </label>
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <div className="space-y-4 rounded-md border border-border p-4">
+              <div>
+                <p className="text-sm font-semibold text-text-primary">Reminder Review</p>
+                <p className="mt-1 text-xs text-text-secondary">
+                  Untuk reimbursement status <code>submitted</code>. Recipient otomatis:
+                  permission <code>approve</code> + <code>view_all</code>.
+                </p>
+              </div>
+
+              <label className="flex items-center justify-between gap-4 rounded-md border border-border bg-surface-muted/50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Aktifkan reminder review</p>
+                  <p className="text-xs text-text-secondary">Digest pending review akan dikirim sesuai cron.</p>
+                </div>
+                <input
+                  checked={reviewReminderEnabled}
+                  className="h-5 w-5 accent-[var(--module-primary)]"
+                  disabled={!canManageSettings || !reimbursementReminderEnabled}
+                  onChange={(event) => setReviewReminderEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+              </label>
+
+              <ReminderCronField
+                currentValue={reviewReminderCron}
+                disabled={!canManageSettings || !reimbursementReminderEnabled || !reviewReminderEnabled}
+                id="review-reminder-cron"
+                label="Jadwal Reminder Review"
+                onChange={setReviewReminderCron}
+                presets={reviewReminderPresets}
+              />
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary">
+                  <input
+                    checked={reviewReminderInApp}
+                    className="h-4 w-4 accent-[var(--module-primary)]"
+                    disabled={!canManageSettings || !reimbursementReminderEnabled || !reviewReminderEnabled}
+                    onChange={(event) => setReviewReminderInApp(event.target.checked)}
+                    type="checkbox"
+                  />
+                  In-app
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary">
+                  <input
+                    checked={reviewReminderEmail}
+                    className="h-4 w-4 accent-[var(--module-primary)]"
+                    disabled={!canManageSettings || !reimbursementReminderEnabled || !reviewReminderEnabled}
+                    onChange={(event) => setReviewReminderEmail(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Email
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary">
+                  <input
+                    checked={reviewReminderWhatsApp}
+                    className="h-4 w-4 accent-[var(--module-primary)]"
+                    disabled={!canManageSettings || !reimbursementReminderEnabled || !reviewReminderEnabled}
+                    onChange={(event) => setReviewReminderWhatsApp(event.target.checked)}
+                    type="checkbox"
+                  />
+                  WhatsApp
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-md border border-border p-4">
+              <div>
+                <p className="text-sm font-semibold text-text-primary">Reminder Pembayaran</p>
+                <p className="mt-1 text-xs text-text-secondary">
+                  Untuk reimbursement status <code>approved</code>. Recipient otomatis:
+                  permission <code>mark_paid</code> + <code>view_all</code>.
+                </p>
+              </div>
+
+              <label className="flex items-center justify-between gap-4 rounded-md border border-border bg-surface-muted/50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Aktifkan reminder pembayaran</p>
+                  <p className="text-xs text-text-secondary">Digest approved-not-paid akan dikirim sesuai cron.</p>
+                </div>
+                <input
+                  checked={paymentReminderEnabled}
+                  className="h-5 w-5 accent-[var(--module-primary)]"
+                  disabled={!canManageSettings || !reimbursementReminderEnabled}
+                  onChange={(event) => setPaymentReminderEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+              </label>
+
+              <ReminderCronField
+                currentValue={paymentReminderCron}
+                disabled={!canManageSettings || !reimbursementReminderEnabled || !paymentReminderEnabled}
+                id="payment-reminder-cron"
+                label="Jadwal Reminder Pembayaran"
+                onChange={setPaymentReminderCron}
+                presets={paymentReminderPresets}
+              />
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary">
+                  <input
+                    checked={paymentReminderInApp}
+                    className="h-4 w-4 accent-[var(--module-primary)]"
+                    disabled={!canManageSettings || !reimbursementReminderEnabled || !paymentReminderEnabled}
+                    onChange={(event) => setPaymentReminderInApp(event.target.checked)}
+                    type="checkbox"
+                  />
+                  In-app
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary">
+                  <input
+                    checked={paymentReminderEmail}
+                    className="h-4 w-4 accent-[var(--module-primary)]"
+                    disabled={!canManageSettings || !reimbursementReminderEnabled || !paymentReminderEnabled}
+                    onChange={(event) => setPaymentReminderEmail(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Email
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary">
+                  <input
+                    checked={paymentReminderWhatsApp}
+                    className="h-4 w-4 accent-[var(--module-primary)]"
+                    disabled={!canManageSettings || !reimbursementReminderEnabled || !paymentReminderEnabled}
+                    onChange={(event) => setPaymentReminderWhatsApp(event.target.checked)}
+                    type="checkbox"
+                  />
+                  WhatsApp
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-border bg-surface-muted/40 px-4 py-3 text-sm text-text-secondary">
+            <p className="font-semibold text-text-primary">Catatan channel</p>
+            <ul className="mt-2 space-y-1">
+              <li>In-app akan tetap jalan tanpa konfigurasi email/WA.</li>
+              <li>Email butuh Email Tenant aktif dan notifikasi email aktif.</li>
+              <li>WhatsApp butuh WA Broadcast tenant aktif dan template default reminder tersedia.</li>
+            </ul>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              disabled={!canManageSettings || reimbursementReminderMutation.isPending || settingsQuery.isLoading}
+              onClick={() =>
+                reimbursementReminderMutation.mutate({
+                  enabled: reimbursementReminderEnabled,
+                  review: {
+                    enabled: reviewReminderEnabled,
+                    cron: reviewReminderCron.trim(),
+                    channels: {
+                      in_app: reviewReminderInApp,
+                      email: reviewReminderEmail,
+                      whatsapp: reviewReminderWhatsApp,
+                    },
+                  },
+                  payment: {
+                    enabled: paymentReminderEnabled,
+                    cron: paymentReminderCron.trim(),
+                    channels: {
+                      in_app: paymentReminderInApp,
+                      email: paymentReminderEmail,
+                      whatsapp: paymentReminderWhatsApp,
+                    },
+                  },
+                })
+              }
+              type="button"
+            >
+              <Save className="h-4 w-4" />
+              Simpan Reminder Reimbursement
             </Button>
           </div>
         </Card>

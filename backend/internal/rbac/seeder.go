@@ -201,6 +201,31 @@ func seedSettings(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) err
 		return fmt.Errorf("marshal mail delivery setting: %w", err)
 	}
 
+	reimbursementReminderJSON, err := json.Marshal(map[string]any{
+		"enabled": false,
+		"review": map[string]any{
+			"enabled": true,
+			"cron":    "0 9 * * 1-5",
+			"channels": map[string]any{
+				"in_app":   true,
+				"email":    false,
+				"whatsapp": false,
+			},
+		},
+		"payment": map[string]any{
+			"enabled": true,
+			"cron":    "0 10 * * 1-5",
+			"channels": map[string]any{
+				"in_app":   true,
+				"email":    false,
+				"whatsapp": false,
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("marshal reimbursement reminder setting: %w", err)
+	}
+
 	query := `
 		INSERT INTO system_settings (key, value, description)
 		VALUES ($1, $2::jsonb, $3)
@@ -235,6 +260,16 @@ func seedSettings(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) err
 		"Konfigurasi pengiriman email tenant",
 	); err != nil {
 		return fmt.Errorf("seed mail_delivery setting: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		query,
+		"reimbursement_reminder",
+		string(reimbursementReminderJSON),
+		"Konfigurasi reminder reimbursement tenant",
+	); err != nil {
+		return fmt.Errorf("seed reimbursement_reminder setting: %w", err)
 	}
 
 	return nil

@@ -14,6 +14,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	"github.com/kana-consultant/kantor/backend/internal/model"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
 	"github.com/kana-consultant/kantor/backend/internal/security"
@@ -75,6 +76,14 @@ func (s *EmailDeliveryService) SendReimbursementStatusNotification(ctx context.C
 		return struct{}{}, s.sendReimbursementStatusNotification(scopedCtx, reimbursementID, newStatus, reviewerNotes)
 	}); err != nil && !errors.Is(err, ErrNotificationEmailsDisabled) {
 		slog.Error("failed to send reimbursement status email", "reimbursement_id", reimbursementID, "error", err)
+	}
+}
+
+func (s *EmailDeliveryService) SendReimbursementReminder(ctx context.Context, recipient model.ReimbursementReminderRecipient, digest model.ReimbursementReminderDigest) {
+	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
+		return struct{}{}, s.sendReimbursementReminder(scopedCtx, recipient, digest)
+	}); err != nil && !errors.Is(err, ErrNotificationEmailsDisabled) {
+		slog.Error("failed to send reimbursement reminder email", "user_id", recipient.UserID, "kind", digest.Kind, "error", err)
 	}
 }
 
@@ -198,6 +207,29 @@ func (s *EmailDeliveryService) sendReimbursementStatusNotification(ctx context.C
 		Subject: fmt.Sprintf("Update reimbursement: %s", humanizeStatus(newStatus)),
 		HTML:    renderEventEmailHTML(content),
 		Text:    renderEventEmailText(content),
+	})
+}
+
+func (s *EmailDeliveryService) sendReimbursementReminder(ctx context.Context, recipient model.ReimbursementReminderRecipient, digest model.ReimbursementReminderDigest) error {
+	cfg, err := s.loadRuntimeConfig(ctx)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(recipient.UserEmail) == "" {
+		return nil
+	}
+
+	baseURL, err := s.resolveTenantBaseURL(ctx)
+	if err != nil {
+		return err
+	}
+
+	content := reimbursementReminderEmailContent(recipient, digest, baseURL)
+	return s.sender.Send(ctx, cfg, tenantDisplayName(ctx), resendEmail{
+		ToEmail: recipient.UserEmail,
+		Subject: content.Subject,
+		HTML:    content.HTML,
+		Text:    content.Text,
 	})
 }
 
@@ -357,6 +389,50 @@ func renderWeeklyDigestText(item warepo.WeeklyDigestInfo, weekStart time.Time, w
 		"",
 		"Buka overview operasional: "+baseURL+"/operational/overview",
 	)
+}
+
+type reimbursementReminderEmailPayload struct {
+	Subject string
+	HTML    string
+	Text    string
+}
+
+func reimbursementReminderEmailContent(recipient model.ReimbursementReminderRecipient, digest model.ReimbursementReminderDigest, baseURL string) reimbursementReminderEmailPayload {
+	actionLabel := "menunggu review"
+	ctaLabel := "Buka reimbursement untuk review"
+	statusQuery := "submitted"
+	if strings.TrimSpace(digest.Kind) == "payment" {
+		actionLabel = "approved dan menunggu pembayaran"
+		ctaLabel = "Buka reimbursement untuk pembayaran"
+		statusQuery = "approved"
+	}
+
+	highlights := []string{
+		fmt.Sprintf("Total item: %d", digest.PendingCount),
+		"Total nominal: " + exportutil.FormatIDR(digest.TotalAmount),
+	}
+	if digest.OldestCreatedAt != nil {
+		highlights = append(highlights, "Item terlama: "+digest.OldestCreatedAt.In(time.Local).Format("02 Jan 2006 15:04"))
+	}
+	for _, item := range digest.Items {
+		highlights = append(highlights, fmt.Sprintf("%s · %s · %s", item.EmployeeName, item.Title, exportutil.FormatIDR(item.Amount)))
+	}
+
+	ctaURL := baseURL + "/hris/reimbursements?status=" + statusQuery
+	content := eventEmailContent{
+		Eyebrow:    "Reminder reimbursement",
+		Title:      digest.Title,
+		Intro:      fmt.Sprintf("Halo %s, ada %d reimbursement %s yang perlu ditindaklanjuti.", recipient.UserName, digest.PendingCount, actionLabel),
+		Highlights: highlights,
+		CTAURL:     ctaURL,
+		CTALabel:   ctaLabel,
+	}
+
+	return reimbursementReminderEmailPayload{
+		Subject: fmt.Sprintf("%s (%d item)", digest.Title, digest.PendingCount),
+		HTML:    renderEventEmailHTML(content),
+		Text:    renderEventEmailText(content),
+	}
 }
 
 func tenantDisplayName(ctx context.Context) string {
