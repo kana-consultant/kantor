@@ -225,6 +225,34 @@ export function updateMailDelivery(payload: {
   });
 }
 
+export function updateReimbursementReminder(payload: {
+  enabled: boolean;
+  review: {
+    enabled: boolean;
+    cron: string;
+    channels: {
+      in_app: boolean;
+      email: boolean;
+      whatsapp: boolean;
+    };
+  };
+  payment: {
+    enabled: boolean;
+    cron: string;
+    channels: {
+      in_app: boolean;
+      email: boolean;
+      whatsapp: boolean;
+    };
+  };
+}) {
+  return authRequestJSON<AdminSettings>("/admin/settings/reimbursement-reminder", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listModules() {
   return authGetJSON<ModuleItem[]>("/modules");
 }
