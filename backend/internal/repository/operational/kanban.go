@@ -61,6 +61,12 @@ type KanbanSnapshot struct {
 	Tasks   []model.KanbanTask   `json:"tasks"`
 }
 
+type kanbanColumnSeed struct {
+	Name       string
+	Color      string
+	ColumnType string
+}
+
 func NewKanbanRepository(db repository.DBTX) *KanbanRepository {
 	return &KanbanRepository{db: db}
 }
@@ -68,16 +74,7 @@ func NewKanbanRepository(db repository.DBTX) *KanbanRepository {
 func (r *KanbanRepository) CreateDefaultColumns(ctx context.Context, projectID string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	defaults := []struct {
-		Name  string
-		Color string
-	}{
-		{Name: "Backlog", Color: "#94A3B8"},
-		{Name: "To Do", Color: "#38BDF8"},
-		{Name: "In Progress", Color: "#F59E0B"},
-		{Name: "Review", Color: "#8B5CF6"},
-		{Name: "Done", Color: "#22C55E"},
-	}
+	defaults := defaultKanbanColumns()
 
 	db := repository.DB(ctx, r.db)
 	if tx, ok := db.(pgx.Tx); ok {
@@ -105,7 +102,7 @@ func (r *KanbanRepository) ListColumns(ctx context.Context, projectID string) ([
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	rows, err := repository.DB(ctx, r.db).Query(ctx, `
-		SELECT id::text, project_id::text, name, position, color, created_at
+		SELECT id::text, project_id::text, name, column_type, position, color, created_at
 		FROM kanban_columns
 		WHERE project_id = $1::uuid
 		ORDER BY position ASC, created_at ASC
@@ -122,6 +119,7 @@ func (r *KanbanRepository) ListColumns(ctx context.Context, projectID string) ([
 			&column.ID,
 			&column.ProjectID,
 			&column.Name,
+			&column.ColumnType,
 			&column.Position,
 			&column.Color,
 			&column.CreatedAt,
@@ -165,18 +163,20 @@ func (r *KanbanRepository) CreateColumn(ctx context.Context, projectID string, p
 	err = tx.QueryRow(
 		ctx,
 		`
-			INSERT INTO kanban_columns (project_id, name, position, color)
-			VALUES ($1::uuid, $2, $3, NULLIF($4, ''))
-			RETURNING id::text, project_id::text, name, position, color, created_at
+			INSERT INTO kanban_columns (project_id, name, column_type, position, color)
+			VALUES ($1::uuid, $2, $3, $4, NULLIF($5, ''))
+			RETURNING id::text, project_id::text, name, column_type, position, color, created_at
 		`,
 		projectID,
 		params.Name,
+		model.KanbanColumnTypeCustom,
 		position,
 		nullableText(params.Color),
 	).Scan(
 		&column.ID,
 		&column.ProjectID,
 		&column.Name,
+		&column.ColumnType,
 		&column.Position,
 		&column.Color,
 		&column.CreatedAt,
@@ -202,7 +202,7 @@ func (r *KanbanRepository) UpdateColumn(ctx context.Context, projectID string, c
 			UPDATE kanban_columns
 			SET name = $3, color = NULLIF($4, '')
 			WHERE project_id = $1::uuid AND id = $2::uuid
-			RETURNING id::text, project_id::text, name, position, color, created_at
+			RETURNING id::text, project_id::text, name, column_type, position, color, created_at
 		`,
 		projectID,
 		columnID,
@@ -212,6 +212,7 @@ func (r *KanbanRepository) UpdateColumn(ctx context.Context, projectID string, c
 		&column.ID,
 		&column.ProjectID,
 		&column.Name,
+		&column.ColumnType,
 		&column.Position,
 		&column.Color,
 		&column.CreatedAt,
@@ -808,16 +809,14 @@ func (r *KanbanRepository) resolveColumnInsertPosition(ctx context.Context, tx p
 	return *requested, nil
 }
 
-func (r *KanbanRepository) insertDefaultColumns(ctx context.Context, tx pgx.Tx, projectID string, defaults []struct {
-	Name  string
-	Color string
-}) error {
+func (r *KanbanRepository) insertDefaultColumns(ctx context.Context, tx pgx.Tx, projectID string, defaults []kanbanColumnSeed) error {
 	for index, column := range defaults {
 		if _, err := tx.Exec(
 			ctx,
-			`INSERT INTO kanban_columns (project_id, name, position, color) VALUES ($1::uuid, $2, $3, $4)`,
+			`INSERT INTO kanban_columns (project_id, name, column_type, position, color) VALUES ($1::uuid, $2, $3, $4, $5)`,
 			projectID,
 			column.Name,
+			column.ColumnType,
 			index+1,
 			column.Color,
 		); err != nil {
@@ -826,6 +825,16 @@ func (r *KanbanRepository) insertDefaultColumns(ctx context.Context, tx pgx.Tx, 
 	}
 
 	return nil
+}
+
+func defaultKanbanColumns() []kanbanColumnSeed {
+	return []kanbanColumnSeed{
+		{Name: "Backlog", Color: "#94A3B8", ColumnType: model.KanbanColumnTypeTodo},
+		{Name: "To Do", Color: "#38BDF8", ColumnType: model.KanbanColumnTypeTodo},
+		{Name: "In Progress", Color: "#F59E0B", ColumnType: model.KanbanColumnTypeInProgress},
+		{Name: "Review", Color: "#8B5CF6", ColumnType: model.KanbanColumnTypeCustom},
+		{Name: "Done", Color: "#22C55E", ColumnType: model.KanbanColumnTypeDone},
+	}
 }
 
 func (r *KanbanRepository) ensureColumnBelongsToProject(ctx context.Context, tx queryRowExecutor, projectID string, columnID string) error {

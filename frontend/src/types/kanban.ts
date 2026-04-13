@@ -4,6 +4,7 @@ export interface KanbanColumn {
   id: string;
   project_id: string;
   name: string;
+  column_type: "todo" | "in_progress" | "done" | "custom";
   position: number;
   color?: string | null;
   created_at: string;
