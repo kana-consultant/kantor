@@ -62,6 +62,7 @@ export interface HrisRecentReimbursement {
 
 export interface HrisOverview {
   total_employees: number;
+  total_monthly_payroll: number;
   active_subscriptions: number;
   active_subscription_monthly_cost: number;
   monthly_net: number;
