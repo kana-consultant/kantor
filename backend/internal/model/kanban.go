@@ -2,13 +2,21 @@ package model
 
 import "time"
 
+const (
+	KanbanColumnTypeTodo       = "todo"
+	KanbanColumnTypeInProgress = "in_progress"
+	KanbanColumnTypeDone       = "done"
+	KanbanColumnTypeCustom     = "custom"
+)
+
 type KanbanColumn struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"project_id"`
-	Name      string    `json:"name"`
-	Position  int       `json:"position"`
-	Color     *string   `json:"color,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         string    `json:"id"`
+	ProjectID  string    `json:"project_id"`
+	Name       string    `json:"name"`
+	ColumnType string    `json:"column_type"`
+	Position   int       `json:"position"`
+	Color      *string   `json:"color,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type KanbanTask struct {

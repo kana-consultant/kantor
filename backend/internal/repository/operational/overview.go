@@ -29,7 +29,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 		SELECT COUNT(*)
 		FROM kanban_tasks
 		INNER JOIN kanban_columns ON kanban_columns.id = kanban_tasks.column_id
-		WHERE LOWER(REPLACE(kanban_columns.name, ' ', '_')) = 'in_progress'
+		WHERE kanban_columns.column_type = 'in_progress'
 	`).Scan(&overview.ActiveTasks); err != nil {
 		return model.OperationalOverview{}, err
 	}
@@ -40,7 +40,7 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time) (mo
 		INNER JOIN kanban_columns ON kanban_columns.id = kanban_tasks.column_id
 		WHERE kanban_tasks.due_date IS NOT NULL
 		  AND kanban_tasks.due_date < $1
-		  AND LOWER(REPLACE(kanban_columns.name, ' ', '_')) <> 'done'
+		  AND kanban_columns.column_type <> 'done'
 	`, now).Scan(&overview.OverdueTasks); err != nil {
 		return model.OperationalOverview{}, err
 	}
@@ -72,7 +72,7 @@ func (r *OverviewRepository) listCompletedByWeek(ctx context.Context, now time.T
 		SELECT DATE_TRUNC('week', kanban_tasks.updated_at)::date AS week_start, COUNT(*)::bigint
 		FROM kanban_tasks
 		INNER JOIN kanban_columns ON kanban_columns.id = kanban_tasks.column_id
-		WHERE LOWER(REPLACE(kanban_columns.name, ' ', '_')) = 'done'
+		WHERE kanban_columns.column_type = 'done'
 		  AND kanban_tasks.updated_at >= $1
 		GROUP BY week_start
 		ORDER BY week_start ASC
