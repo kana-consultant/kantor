@@ -3,6 +3,8 @@ package operational
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -37,7 +39,6 @@ type kanbanRepository interface {
 	MoveTask(ctx context.Context, projectID string, taskID string, destinationColumnID string, destinationPosition int) error
 	Snapshot(ctx context.Context, projectID string) (operationalrepo.KanbanSnapshot, error)
 	GetTask(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error)
-	SetAssignedVia(ctx context.Context, projectID string, taskID string, via string) error
 }
 
 type kanbanProjectsRepository interface {
@@ -139,6 +140,7 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 		DueDate:     normalizeTimePointer(request.DueDate),
 		Priority:    request.Priority,
 		Label:       normalizeStringPointer(request.Label),
+		AssignedVia: createAssignedVia(request.AssigneeID, assigneeID),
 		CreatedBy:   createdBy,
 	})
 	switch {
@@ -149,14 +151,16 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 		return task, err
 	}
 
-	// If auto-assigned, mark assigned_via = auto
-	if request.AssigneeID == nil && task.AssigneeID != nil {
-		_ = s.repo.SetAssignedVia(ctx, projectID, task.ID, "auto")
-		task.AssignedVia = "auto"
-	}
-
 	// Notify assignee (skip self-assign)
 	if task.AssigneeID != nil && *task.AssigneeID != createdBy {
+		slog.Info(
+			"dispatching task assigned notification",
+			"task_id", task.ID,
+			"assignee_id", *task.AssigneeID,
+			"assigned_via", task.AssignedVia,
+			"source", "create",
+			"notifier_count", len(s.notifiers),
+		)
 		s.dispatchTaskAssignedNotification(ctx, task.ID, *task.AssigneeID)
 	}
 
@@ -189,6 +193,7 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 		DueDate:     normalizeTimePointer(request.DueDate),
 		Priority:    request.Priority,
 		Label:       normalizeStringPointer(request.Label),
+		AssignedVia: updateAssignedVia(request.AssigneeID, assigneeID, oldAssigneeID),
 	})
 	switch {
 	case errors.Is(err, operationalrepo.ErrKanbanTaskNotFound):
@@ -202,6 +207,15 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 	if task.AssigneeID != nil {
 		newAssigneeID := *task.AssigneeID
 		if newAssigneeID != oldAssigneeID && newAssigneeID != actorID {
+			slog.Info(
+				"dispatching task assigned notification",
+				"task_id", task.ID,
+				"assignee_id", newAssigneeID,
+				"previous_assignee_id", oldAssigneeID,
+				"assigned_via", task.AssignedVia,
+				"source", "update",
+				"notifier_count", len(s.notifiers),
+			)
 			s.dispatchTaskAssignedNotification(ctx, task.ID, newAssigneeID)
 		}
 	}
@@ -306,6 +320,7 @@ func normalizeStringPointer(value *string) *string {
 
 func (s *KanbanService) dispatchTaskAssignedNotification(ctx context.Context, taskID string, assigneeID string) {
 	if len(s.notifiers) == 0 {
+		slog.Warn("task assigned notification skipped because no notifier is registered", "task_id", taskID, "assignee_id", assigneeID)
 		return
 	}
 
@@ -315,6 +330,47 @@ func (s *KanbanService) dispatchTaskAssignedNotification(ctx context.Context, ta
 			continue
 		}
 		currentNotifier := notifier
-		go currentNotifier.SendTaskAssignedNotification(notificationCtx, taskID, assigneeID)
+		go func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					slog.Error(
+						"task assigned notifier panicked",
+						"task_id", taskID,
+						"assignee_id", assigneeID,
+						"notifier_type", fmt.Sprintf("%T", currentNotifier),
+						"panic", recovered,
+					)
+				}
+			}()
+			currentNotifier.SendTaskAssignedNotification(notificationCtx, taskID, assigneeID)
+		}()
 	}
+}
+
+func createAssignedVia(requestAssigneeID *string, resolvedAssigneeID *string) string {
+	if isBlankStringPointer(requestAssigneeID) && !isBlankStringPointer(resolvedAssigneeID) {
+		return model.KanbanTaskAssignedViaAuto
+	}
+	return model.KanbanTaskAssignedViaManual
+}
+
+func updateAssignedVia(requestAssigneeID *string, resolvedAssigneeID *string, oldAssigneeID string) string {
+	if isBlankStringPointer(resolvedAssigneeID) || valueOrEmpty(resolvedAssigneeID) == oldAssigneeID {
+		return model.KanbanTaskAssignedViaManual
+	}
+	if isBlankStringPointer(requestAssigneeID) {
+		return model.KanbanTaskAssignedViaAuto
+	}
+	return model.KanbanTaskAssignedViaManual
+}
+
+func isBlankStringPointer(value *string) bool {
+	return value == nil || strings.TrimSpace(*value) == ""
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }
