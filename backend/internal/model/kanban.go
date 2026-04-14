@@ -7,6 +7,9 @@ const (
 	KanbanColumnTypeInProgress = "in_progress"
 	KanbanColumnTypeDone       = "done"
 	KanbanColumnTypeCustom     = "custom"
+
+	KanbanTaskAssignedViaManual = "manual"
+	KanbanTaskAssignedViaAuto   = "auto"
 )
 
 type KanbanColumn struct {

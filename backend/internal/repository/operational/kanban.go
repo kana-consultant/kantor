@@ -40,6 +40,7 @@ type CreateKanbanTaskParams struct {
 	DueDate     *string
 	Priority    string
 	Label       *string
+	AssignedVia string
 	CreatedBy   string
 }
 
@@ -50,6 +51,7 @@ type UpdateKanbanTaskParams struct {
 	DueDate     *string
 	Priority    string
 	Label       *string
+	AssignedVia string
 }
 
 type queryRowExecutor interface {
@@ -468,7 +470,7 @@ func (r *KanbanRepository) CreateTask(ctx context.Context, projectID string, par
 				column_id, project_id, title, description, assignee_id, due_date, priority, label, assigned_via, position, created_by
 			)
 			VALUES (
-				$1::uuid, $2::uuid, $3, NULLIF($4, ''), NULLIF($5, '')::uuid, $6::timestamptz, $7, NULLIF($8, ''), 'manual', $9, $10::uuid
+				$1::uuid, $2::uuid, $3, NULLIF($4, ''), NULLIF($5, '')::uuid, $6::timestamptz, $7, NULLIF($8, ''), $9, $10, $11::uuid
 			)
 			RETURNING id::text, column_id::text, project_id::text, title, description, assignee_id::text, due_date, priority, label, assigned_via, position, created_by::text, created_at, updated_at
 		`,
@@ -480,6 +482,7 @@ func (r *KanbanRepository) CreateTask(ctx context.Context, projectID string, par
 		nullableTimestampString(params.DueDate),
 		params.Priority,
 		nullableText(params.Label),
+		defaultAssignedVia(params.AssignedVia),
 		position,
 		params.CreatedBy,
 	).Scan(
@@ -538,7 +541,7 @@ func (r *KanbanRepository) UpdateTask(ctx context.Context, projectID string, tas
 				priority = $7,
 				label = NULLIF($8, ''),
 				assigned_via = CASE
-					WHEN NULLIF($5, '')::uuid IS DISTINCT FROM assignee_id THEN 'manual'
+					WHEN NULLIF($5, '')::uuid IS DISTINCT FROM assignee_id THEN $9
 					ELSE assigned_via
 				END,
 				updated_at = NOW()
@@ -553,6 +556,7 @@ func (r *KanbanRepository) UpdateTask(ctx context.Context, projectID string, tas
 		nullableTimestampString(params.DueDate),
 		params.Priority,
 		nullableText(params.Label),
+		defaultAssignedVia(params.AssignedVia),
 	).Scan(
 		&task.ID,
 		&task.ColumnID,
@@ -582,7 +586,7 @@ func (r *KanbanRepository) UpdateTask(ctx context.Context, projectID string, tas
 	task.AvatarURL = normalizeOptionalString(task.AvatarURL)
 
 	if task.AssigneeID != nil {
-		assignName, avatarURL, loadErr := r.lookupAssignee(ctx, r.db, *task.AssigneeID)
+		assignName, avatarURL, loadErr := r.lookupAssignee(ctx, repository.DB(ctx, r.db), *task.AssigneeID)
 		if loadErr != nil {
 			return model.KanbanTask{}, loadErr
 		}
@@ -758,13 +762,6 @@ func (r *KanbanRepository) MoveTask(ctx context.Context, projectID string, taskI
 	return tx.Commit(ctx)
 }
 
-func (r *KanbanRepository) SetAssignedVia(ctx context.Context, projectID string, taskID string, via string) error {
-	_, err := repository.DB(ctx, r.db).Exec(ctx,
-		`UPDATE kanban_tasks SET assigned_via = $3, updated_at = NOW() WHERE project_id = $1::uuid AND id = $2::uuid`,
-		projectID, taskID, via)
-	return err
-}
-
 func (r *KanbanRepository) Snapshot(ctx context.Context, projectID string) (KanbanSnapshot, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -914,4 +911,14 @@ func normalizeOptionalString(value *string) *string {
 	}
 
 	return &trimmed
+}
+
+func defaultAssignedVia(value string) string {
+	trimmed := strings.TrimSpace(value)
+	switch trimmed {
+	case model.KanbanTaskAssignedViaAuto:
+		return model.KanbanTaskAssignedViaAuto
+	default:
+		return model.KanbanTaskAssignedViaManual
+	}
 }

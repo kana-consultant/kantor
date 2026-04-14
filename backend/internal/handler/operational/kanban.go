@@ -3,6 +3,7 @@ package operational
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -283,6 +284,7 @@ func (h *KanbanHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, operationalservice.ErrKanbanTaskAssigneeNotMember):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"assignee_id": "must belong to the project"})
 	default:
+		slog.Error("unexpected kanban handler error", "error", err)
 		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
 	}
 }

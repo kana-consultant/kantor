@@ -57,7 +57,7 @@ func (s *Service) RunWeeklyDigest(ctx context.Context) {
 			continue
 		}
 		if item.Phone == nil || strings.TrimSpace(*item.Phone) == "" {
-			s.logSkipped(ctx, "weekly_digest", nil, &item.UserID, "", "skipped_no_phone")
+			s.logSkipped(ctx, "auto_scheduled", "weekly_digest", nil, &item.UserID, "", "skipped_no_phone")
 			continue
 		}
 
@@ -124,7 +124,7 @@ func (s *Service) sendTaskOverdueReminders(ctx context.Context) {
 
 func (s *Service) sendTaskReminder(ctx context.Context, task warepo.TaskDueInfo, tmpl model.WAMessageTemplate) {
 	if task.UserPhone == nil || strings.TrimSpace(*task.UserPhone) == "" {
-		s.logSkipped(ctx, tmpl.Slug, &task.TaskID, &task.AssigneeID, "", "skipped_no_phone")
+		s.logSkipped(ctx, "auto_scheduled", tmpl.Slug, &task.TaskID, &task.AssigneeID, "", "skipped_no_phone")
 		return
 	}
 
@@ -182,7 +182,7 @@ func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
 	for _, project := range projects {
 		for _, member := range project.Members {
 			if member.Phone == nil || strings.TrimSpace(*member.Phone) == "" {
-				s.logSkipped(ctx, tmpl.Slug, &project.ProjectID, &member.UserID, "", "skipped_no_phone")
+				s.logSkipped(ctx, "auto_scheduled", tmpl.Slug, &project.ProjectID, &member.UserID, "", "skipped_no_phone")
 				continue
 			}
 

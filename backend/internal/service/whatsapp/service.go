@@ -406,7 +406,7 @@ func (s *Service) SendTaskAssignedNotification(ctx context.Context, taskID strin
 		}
 
 		if task.UserPhone == nil || strings.TrimSpace(*task.UserPhone) == "" {
-			s.logSkipped(scopedCtx, "task_assigned", &task.TaskID, &assigneeID, "", "skipped_no_phone")
+			s.logSkipped(scopedCtx, "event_triggered", "task_assigned", &task.TaskID, &assigneeID, "", "skipped_no_phone")
 			return struct{}{}, nil
 		}
 
@@ -452,7 +452,7 @@ func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimb
 		}
 
 		if info.SubmitterPhone == nil || strings.TrimSpace(*info.SubmitterPhone) == "" {
-			s.logSkipped(scopedCtx, "reimbursement_status", &reimbursementID, &info.SubmitterID, "", "skipped_no_phone")
+			s.logSkipped(scopedCtx, "event_triggered", "reimbursement_status", &reimbursementID, &info.SubmitterID, "", "skipped_no_phone")
 			return struct{}{}, nil
 		}
 
@@ -497,7 +497,7 @@ func (s *Service) SendReimbursementReminder(ctx context.Context, recipient model
 			statusQuery = "approved"
 		}
 		if recipient.Phone == nil || strings.TrimSpace(*recipient.Phone) == "" {
-			s.logSkipped(scopedCtx, slug, nil, &recipient.UserID, "", "skipped_no_phone")
+			s.logSkipped(scopedCtx, "auto_scheduled", slug, nil, &recipient.UserID, "", "skipped_no_phone")
 			return struct{}{}, nil
 		}
 
@@ -583,15 +583,15 @@ func (s *Service) sendAndLogWithSchedule(ctx context.Context, scheduleID *string
 	}
 }
 
-func (s *Service) logSkipped(ctx context.Context, slug string, refID *string, userID *string, phone string, status string) {
-	s.logSkippedWithSchedule(ctx, nil, slug, refID, userID, phone, status)
+func (s *Service) logSkipped(ctx context.Context, triggerType string, slug string, refID *string, userID *string, phone string, status string) {
+	s.logSkippedWithSchedule(ctx, nil, triggerType, slug, refID, userID, phone, status)
 }
 
-func (s *Service) logSkippedWithSchedule(ctx context.Context, scheduleID *string, slug string, refID *string, userID *string, phone string, status string) {
+func (s *Service) logSkippedWithSchedule(ctx context.Context, scheduleID *string, triggerType string, slug string, refID *string, userID *string, phone string, status string) {
 	_, err := s.repo.CreateLog(ctx, warepo.CreateLogParams{
 		ScheduleID:      scheduleID,
 		TemplateSlug:    &slug,
-		TriggerType:     "event_triggered",
+		TriggerType:     triggerType,
 		RecipientUserID: userID,
 		RecipientPhone:  phone,
 		MessageBody:     "",
@@ -755,7 +755,7 @@ func (s *Service) runSchedule(ctx context.Context, schedule model.WABroadcastSch
 
 	for _, recipient := range recipients {
 		if recipient.Phone == nil || strings.TrimSpace(*recipient.Phone) == "" {
-			s.logSkippedWithSchedule(ctx, &schedule.ID, template.Slug, nil, &recipient.UserID, "", "skipped_no_phone")
+			s.logSkippedWithSchedule(ctx, &schedule.ID, triggerType, template.Slug, nil, &recipient.UserID, "", "skipped_no_phone")
 			continue
 		}
 
