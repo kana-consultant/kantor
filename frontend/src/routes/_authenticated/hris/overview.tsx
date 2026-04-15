@@ -44,6 +44,8 @@ function HrisOverviewPage() {
   const { hasPermission } = useRBAC();
   const canViewFinance = hasPermission(permissions.hrisFinanceView);
   const canViewReimbursement = hasPermission(permissions.hrisReimbursementView);
+  const canViewSalary = hasPermission(permissions.hrisSalaryView);
+  const canViewSubscription = hasPermission(permissions.hrisSubscriptionView);
 
   const overviewQuery = useQuery({
     queryKey: overviewKeys.hris(),
@@ -68,6 +70,9 @@ function HrisOverviewPage() {
 
   const overview = overviewQuery.data;
   const monthlyNetTone = overview.monthly_net >= 0 ? "success" : "error";
+  const hasFinanceSeriesData = overview.income_vs_outcome.some(
+    (point) => point.income !== 0 || point.outcome !== 0,
+  );
 
   return (
     <div className="space-y-6">
@@ -104,16 +109,22 @@ function HrisOverviewPage() {
           tone="hr"
           value={overview.total_employees.toLocaleString("id-ID")}
         />
+        {canViewSalary && (
+          <StatCard
+            helper="Total gaji bersih per bulan seluruh karyawan aktif."
+            icon={Wallet}
+            label="Total Payroll"
+            mono
+            tone="hr"
+            value={formatIDR(overview.total_monthly_payroll)}
+          />
+        )}
         <StatCard
-          helper="Total gaji bersih per bulan seluruh karyawan aktif."
-          icon={Wallet}
-          label="Total Payroll"
-          mono
-          tone="hr"
-          value={formatIDR(overview.total_monthly_payroll)}
-        />
-        <StatCard
-          helper={`${formatIDR(overview.active_subscription_monthly_cost)} per bulan`}
+          helper={
+            canViewSubscription
+              ? `${formatIDR(overview.active_subscription_monthly_cost)} per bulan`
+              : "Subscription aktif saat ini."
+          }
           icon={CreditCard}
           label="Active Subscriptions"
           tone="hr"
@@ -131,7 +142,7 @@ function HrisOverviewPage() {
         )}
         {canViewReimbursement && (
           <StatCard
-            helper="Reimbursement yang masih menunggu review."
+            helper={`${formatIDR(overview.monthly_reimbursement_total)} diajukan bulan ini`}
             icon={Receipt}
             label="Pending Reimbursements"
             tone="warning"
@@ -152,29 +163,37 @@ function HrisOverviewPage() {
               </h2>
             </div>
             <div className="mt-6 h-[320px]">
-              <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
-                <BarChart data={overview.income_vs_outcome}>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
-                  <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke="hsl(var(--text-tertiary))"
-                    tickFormatter={(value) => compactCurrency(value)}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--surface))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
-                      boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
-                    }}
-                    formatter={(value) => formatIDR(Number(value))}
-                  />
-                  <Bar dataKey="income" fill="#36B37E" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="outcome" fill="#FF5630" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {hasFinanceSeriesData ? (
+                <ResponsiveContainer height="100%" minHeight={240} minWidth={1} width="100%">
+                  <BarChart data={overview.income_vs_outcome}>
+                    <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="4 4" vertical={false} />
+                    <XAxis dataKey="label" stroke="hsl(var(--text-tertiary))" tickLine={false} axisLine={false} />
+                    <YAxis
+                      stroke="hsl(var(--text-tertiary))"
+                      tickFormatter={(value) => compactCurrency(value)}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--surface))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: 8,
+                        boxShadow: "0 4px 8px -2px rgba(23,43,77,0.08), 0 2px 4px -2px rgba(23,43,77,0.06)",
+                      }}
+                      formatter={(value) => formatIDR(Number(value))}
+                    />
+                    <Bar dataKey="income" fill="#36B37E" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="outcome" fill="#FF5630" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState
+                  description="Belum ada data finance dalam 6 bulan terakhir."
+                  icon={Landmark}
+                  title="Belum ada transaksi"
+                />
+              )}
             </div>
           </Card>
         )}
@@ -206,7 +225,9 @@ function HrisOverviewPage() {
                     </div>
                     <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
                       <span>{formatCalendarDate(item.renewal_date)}</span>
-                      <span className="font-mono tabular-nums">{formatIDR(item.cost_amount)}</span>
+                      {canViewSubscription && (
+                        <span className="font-mono tabular-nums">{formatIDR(item.cost_amount)}</span>
+                      )}
                     </div>
                   </div>
                 ))

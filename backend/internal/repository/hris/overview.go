@@ -58,6 +58,12 @@ func (r *OverviewRepository) GetOverview(ctx context.Context, now time.Time, emp
 	}
 	overview.PendingReimbursements = pendingCount
 
+	monthlyReimbursementTotal, err := r.sumMonthlyReimbursements(ctx, now, employeeFilter)
+	if err != nil {
+		return model.HrisOverview{}, err
+	}
+	overview.MonthlyReimbursementTotal = monthlyReimbursementTotal
+
 	upcomingRenewals, err := r.listUpcomingRenewals(ctx, now)
 	if err != nil {
 		return model.HrisOverview{}, err
@@ -104,18 +110,88 @@ func (r *OverviewRepository) ListLatestActivePayrollCiphertexts(ctx context.Cont
 	return ciphertexts, rows.Err()
 }
 
+func (r *OverviewRepository) ListActivePayrollHistoryRows(ctx context.Context) ([]model.HrisOverviewSalaryHistoryRow, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		SELECT s.employee_id::text, s.effective_date, s.net_salary
+		FROM salaries s
+		INNER JOIN employees e ON e.id = s.employee_id
+		WHERE e.employment_status = 'active'
+		ORDER BY s.employee_id ASC, s.effective_date ASC, s.created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.HrisOverviewSalaryHistoryRow, 0)
+	for rows.Next() {
+		var item model.HrisOverviewSalaryHistoryRow
+		if err := rows.Scan(&item.EmployeeID, &item.EffectiveDate, &item.NetSalaryEncrypted); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
+func (r *OverviewRepository) ListActiveSubscriptionsForOverview(ctx context.Context) ([]model.HrisOverviewSubscriptionRow, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		SELECT start_date, billing_cycle, cost_amount
+		FROM subscriptions
+		WHERE status = 'active'
+		ORDER BY start_date ASC, created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.HrisOverviewSubscriptionRow, 0)
+	for rows.Next() {
+		var item model.HrisOverviewSubscriptionRow
+		if err := rows.Scan(&item.StartDate, &item.BillingCycle, &item.CostAmount); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
 func (r *OverviewRepository) financeSeries(ctx context.Context, now time.Time) ([]model.FinanceOverviewPoint, int64, error) {
 	startMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, -5, 0)
 	endMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, 1, 0)
 
 	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
-			DATE_TRUNC('month', record_date)::date AS month_start,
-			COALESCE(SUM(CASE WHEN type = 'income' AND approval_status = 'approved' THEN amount ELSE 0 END), 0)::bigint AS income,
-			COALESCE(SUM(CASE WHEN type = 'outcome' AND approval_status = 'approved' THEN amount ELSE 0 END), 0)::bigint AS outcome
+			DATE_TRUNC('month', finance_records.record_date)::date AS month_start,
+			COALESCE(SUM(
+				CASE
+					WHEN finance_records.type = 'income' AND finance_records.approval_status = 'approved'
+						THEN finance_records.amount
+					ELSE 0
+				END
+			), 0)::bigint AS income,
+			COALESCE(SUM(
+				CASE
+					WHEN finance_records.type = 'outcome'
+						AND finance_records.approval_status = 'approved'
+						AND LOWER(COALESCE(finance_categories.name, '')) NOT IN ('subscription', 'gaji')
+						THEN finance_records.amount
+					ELSE 0
+				END
+			), 0)::bigint AS outcome
 		FROM finance_records
-		WHERE record_date >= $1::date
-		  AND record_date < $2::date
+		INNER JOIN finance_categories ON finance_categories.id = finance_records.category_id
+		WHERE finance_records.record_date >= $1::date
+		  AND finance_records.record_date < $2::date
 		GROUP BY month_start
 		ORDER BY month_start ASC
 	`, startMonth, endMonth)
@@ -208,6 +284,31 @@ func (r *OverviewRepository) listUpcomingRenewals(ctx context.Context, now time.
 	}
 
 	return items, rows.Err()
+}
+
+func (r *OverviewRepository) sumMonthlyReimbursements(ctx context.Context, now time.Time, employeeFilter string) (int64, error) {
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	monthEnd := monthStart.AddDate(0, 1, 0)
+
+	var total int64
+	var err error
+	if employeeFilter != "" {
+		err = repository.DB(ctx, r.db).QueryRow(ctx, `
+			SELECT COALESCE(SUM(amount), 0)::bigint
+			FROM reimbursements
+			WHERE transaction_date >= $1::date
+			  AND transaction_date < $2::date
+			  AND employee_id = $3::uuid
+		`, monthStart, monthEnd, employeeFilter).Scan(&total)
+	} else {
+		err = repository.DB(ctx, r.db).QueryRow(ctx, `
+			SELECT COALESCE(SUM(amount), 0)::bigint
+			FROM reimbursements
+			WHERE transaction_date >= $1::date
+			  AND transaction_date < $2::date
+		`, monthStart, monthEnd).Scan(&total)
+	}
+	return total, err
 }
 
 func (r *OverviewRepository) countPendingReimbursements(ctx context.Context, employeeFilter string) (int64, error) {

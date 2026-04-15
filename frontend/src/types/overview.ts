@@ -67,6 +67,7 @@ export interface HrisOverview {
   active_subscription_monthly_cost: number;
   monthly_net: number;
   pending_reimbursements: number;
+  monthly_reimbursement_total: number;
   income_vs_outcome: FinanceOverviewPoint[];
   upcoming_renewals: HrisUpcomingRenewal[];
   recent_reimbursements: HrisRecentReimbursement[];

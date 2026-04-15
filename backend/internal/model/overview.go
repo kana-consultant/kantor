@@ -49,6 +49,18 @@ type HrisUpcomingRenewal struct {
 	PICEmployeeName *string   `json:"pic_employee_name,omitempty"`
 }
 
+type HrisOverviewSalaryHistoryRow struct {
+	EmployeeID         string
+	EffectiveDate      time.Time
+	NetSalaryEncrypted string
+}
+
+type HrisOverviewSubscriptionRow struct {
+	StartDate    time.Time
+	BillingCycle string
+	CostAmount   int64
+}
+
 type HrisOverview struct {
 	TotalEmployees                int64                  `json:"total_employees"`
 	TotalMonthlyPayroll           int64                  `json:"total_monthly_payroll"`
@@ -56,6 +68,7 @@ type HrisOverview struct {
 	ActiveSubscriptionMonthlyCost int64                  `json:"active_subscription_monthly_cost"`
 	MonthlyNet                    int64                  `json:"monthly_net"`
 	PendingReimbursements         int64                  `json:"pending_reimbursements"`
+	MonthlyReimbursementTotal     int64                  `json:"monthly_reimbursement_total"`
 	IncomeVsOutcome               []FinanceOverviewPoint `json:"income_vs_outcome"`
 	UpcomingRenewals              []HrisUpcomingRenewal  `json:"upcoming_renewals"`
 	RecentReimbursements          []Reimbursement        `json:"recent_reimbursements"`
