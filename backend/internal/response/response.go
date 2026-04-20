@@ -1,7 +1,9 @@
 package response
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 )
 
@@ -35,6 +37,15 @@ func WriteError(w http.ResponseWriter, status int, code string, message string, 
 			Details: details,
 		},
 	})
+}
+
+// WriteInternalError logs the underlying error with the request context and
+// returns a 500 response with the standard INTERNAL_ERROR envelope. Handlers
+// MUST use this for unexpected/unhandled failures so server-side observability
+// captures every 500.
+func WriteInternalError(ctx context.Context, w http.ResponseWriter, err error, message string) {
+	slog.ErrorContext(ctx, "internal server error", "error", err, "user_message", message)
+	WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", message, nil)
 }
 
 func write(w http.ResponseWriter, status int, payload Envelope) {

@@ -1,6 +1,7 @@
 package marketing
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -59,7 +60,7 @@ func (h *LeadsHandler) createLead(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.service.CreateLead(r.Context(), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *LeadsHandler) listLeads(w http.ResponseWriter, r *http.Request) {
 
 	items, total, page, perPage, err := h.service.ListLeads(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -89,7 +90,7 @@ func (h *LeadsHandler) listLeads(w http.ResponseWriter, r *http.Request) {
 func (h *LeadsHandler) getLead(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.GetLead(r.Context(), chi.URLParam(r, "leadID"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
@@ -110,7 +111,7 @@ func (h *LeadsHandler) updateLead(w http.ResponseWriter, r *http.Request) {
 	leadID := chi.URLParam(r, "leadID")
 	item, err := h.service.UpdateLead(r.Context(), leadID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -121,7 +122,7 @@ func (h *LeadsHandler) updateLead(w http.ResponseWriter, r *http.Request) {
 func (h *LeadsHandler) deleteLead(w http.ResponseWriter, r *http.Request) {
 	leadID := chi.URLParam(r, "leadID")
 	if err := h.service.DeleteLead(r.Context(), leadID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "lead", leadID, nil, nil)
@@ -131,7 +132,7 @@ func (h *LeadsHandler) deleteLead(w http.ResponseWriter, r *http.Request) {
 func (h *LeadsHandler) pipeline(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.Pipeline(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -152,7 +153,7 @@ func (h *LeadsHandler) moveStatus(w http.ResponseWriter, r *http.Request) {
 	leadID := chi.URLParam(r, "leadID")
 	item, err := h.service.MoveStatus(r.Context(), leadID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "move_status", "marketing", "lead", leadID, nil, input)
@@ -162,7 +163,7 @@ func (h *LeadsHandler) moveStatus(w http.ResponseWriter, r *http.Request) {
 func (h *LeadsHandler) listActivities(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListActivities(r.Context(), chi.URLParam(r, "leadID"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -183,7 +184,7 @@ func (h *LeadsHandler) createActivity(w http.ResponseWriter, r *http.Request) {
 	leadID := chi.URLParam(r, "leadID")
 	item, err := h.service.CreateActivity(r.Context(), leadID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "marketing", "lead_activity", item.ID, nil, input)
@@ -211,7 +212,7 @@ func (h *LeadsHandler) importCSV(w http.ResponseWriter, r *http.Request) {
 
 	summary, err := h.service.ImportCSV(r.Context(), file, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -222,7 +223,7 @@ func (h *LeadsHandler) importCSV(w http.ResponseWriter, r *http.Request) {
 func (h *LeadsHandler) summary(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.Summary(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
@@ -264,7 +265,7 @@ func (h *LeadsHandler) parseListQuery(w http.ResponseWriter, r *http.Request) (m
 	return query, true
 }
 
-func (h *LeadsHandler) writeError(w http.ResponseWriter, err error) {
+func (h *LeadsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, marketingservice.ErrLeadNotFound):
 		response.WriteError(w, http.StatusNotFound, "LEAD_NOT_FOUND", err.Error(), nil)
@@ -277,6 +278,6 @@ func (h *LeadsHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, marketingservice.ErrLeadImportLimitExceeded):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"file": "maximum 10000 rows per import"})
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }

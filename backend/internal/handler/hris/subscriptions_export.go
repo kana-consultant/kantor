@@ -15,12 +15,12 @@ import (
 func (h *SubscriptionsHandler) export(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListSubscriptions(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	summary, err := h.service.Summary(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -48,7 +48,7 @@ func (h *SubscriptionsHandler) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 

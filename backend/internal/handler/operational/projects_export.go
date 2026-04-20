@@ -25,7 +25,7 @@ func (h *ProjectsHandler) exportList(w http.ResponseWriter, r *http.Request) {
 
 	items, _, _, _, err := h.service.ListProjects(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *ProjectsHandler) exportList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -71,24 +71,24 @@ func (h *ProjectsHandler) exportDetail(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "projectID")
 	detail, err := h.service.GetProject(r.Context(), projectID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
 	columns, err := h.kanban.ListColumns(r.Context(), projectID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	tasks, err := h.kanban.ListTasks(r.Context(), projectID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
 	payload, err := renderProjectDetailPDF(detail.Project, detail.Members, columns, tasks, exportutil.ResolveGeneratedBy(r.Context(), h.users))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 

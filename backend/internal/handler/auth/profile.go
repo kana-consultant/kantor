@@ -49,7 +49,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	employee, err := h.service.UpdateProfile(r.Context(), principal.UserID, input)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update profile", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to update profile")
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *Handler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, authservice.ErrEmailUnchanged):
 			response.WriteError(w, http.StatusBadRequest, "EMAIL_UNCHANGED", err.Error(), nil)
 		default:
-			response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to change email", nil)
+			response.WriteInternalError(r.Context(), w, err, "Failed to change email")
 		}
 		return
 	}
@@ -120,7 +120,7 @@ func (h *Handler) UploadProfileAvatar(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.UpdateProfileAvatar(r.Context(), principal.UserID, avatarPath); err != nil {
 		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(avatarPath)))
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menyimpan avatar", nil)
+		response.WriteInternalError(r.Context(), w, err, "Gagal menyimpan avatar")
 		return
 	}
 

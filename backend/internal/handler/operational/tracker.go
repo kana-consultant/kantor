@@ -1,6 +1,7 @@
 package operational
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -63,7 +64,7 @@ func (h *TrackerHandler) getConsent(w http.ResponseWriter, r *http.Request) {
 
 	consent, err := h.service.GetConsent(r.Context(), principal.UserID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load tracker consent", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load tracker consent")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, consent, nil)
@@ -79,7 +80,7 @@ func (h *TrackerHandler) giveConsent(w http.ResponseWriter, r *http.Request) {
 	consent, err := h.service.GiveConsent(r.Context(), principal.UserID, platformmiddleware.ClientIPFromContext(r.Context()), time.Now())
 	if err != nil {
 		platformmiddleware.LoggerFromContext(r.Context()).Error("tracker give consent failed", "error", err, "user_id", principal.UserID)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to save tracker consent", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to save tracker consent")
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "tracker_consent", principal.UserID, nil, consent)
@@ -96,7 +97,7 @@ func (h *TrackerHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 	consent, err := h.service.RevokeConsent(r.Context(), principal.UserID, platformmiddleware.ClientIPFromContext(r.Context()), time.Now())
 	if err != nil {
 		platformmiddleware.LoggerFromContext(r.Context()).Error("tracker revoke consent failed", "error", err, "user_id", principal.UserID)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to revoke tracker consent", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to revoke tracker consent")
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "tracker_consent", principal.UserID, nil, consent)
@@ -119,7 +120,7 @@ func (h *TrackerHandler) startSession(w http.ResponseWriter, r *http.Request) {
 
 	session, err := h.service.StartSession(r.Context(), principal.UserID, request, time.Now())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusCreated, map[string]string{"session_id": session.ID}, nil)
@@ -146,7 +147,7 @@ func (h *TrackerHandler) endSession(w http.ResponseWriter, r *http.Request) {
 
 	session, err := h.service.EndSession(r.Context(), principal.UserID, chi.URLParam(r, "sessionID"), endedAt)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, session, nil)
@@ -166,7 +167,7 @@ func (h *TrackerHandler) heartbeat(w http.ResponseWriter, r *http.Request) {
 
 	entry, session, err := h.service.RecordHeartbeat(r.Context(), principal.UserID, request)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -190,7 +191,7 @@ func (h *TrackerHandler) batchEntries(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.RecordBatch(r.Context(), principal.UserID, request)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -212,7 +213,7 @@ func (h *TrackerHandler) getMyActivity(w http.ResponseWriter, r *http.Request) {
 	activity, err := h.service.GetMyActivity(r.Context(), principal.UserID, dateFrom, dateTo)
 	if err != nil {
 		slog.Error("failed to load tracker activity", "error", err, "userID", principal.UserID)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load tracker activity", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load tracker activity")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, activity, nil)
@@ -246,7 +247,7 @@ func (h *TrackerHandler) getTeamActivity(w http.ResponseWriter, r *http.Request)
 
 	activity, err := h.service.GetTeamActivity(r.Context(), dateFrom, dateTo, userID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load team tracker activity", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load team tracker activity")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, activity, nil)
@@ -260,7 +261,7 @@ func (h *TrackerHandler) getUserActivity(w http.ResponseWriter, r *http.Request)
 
 	activity, err := h.service.GetUserActivity(r.Context(), chi.URLParam(r, "userID"), dateFrom, dateTo)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load user tracker activity", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load user tracker activity")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, activity, nil)
@@ -279,7 +280,7 @@ func (h *TrackerHandler) getSummary(w http.ResponseWriter, r *http.Request) {
 
 	summary, err := h.service.GetDailySummary(r.Context(), date)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load tracker summary", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load tracker summary")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, summary, nil)
@@ -288,7 +289,7 @@ func (h *TrackerHandler) getSummary(w http.ResponseWriter, r *http.Request) {
 func (h *TrackerHandler) listDomains(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListDomainCategories(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list tracker domains", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list tracker domains")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -297,7 +298,7 @@ func (h *TrackerHandler) listDomains(w http.ResponseWriter, r *http.Request) {
 func (h *TrackerHandler) listObservedDomains(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListObservedDomains(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list tracked domains", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list tracked domains")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -306,7 +307,7 @@ func (h *TrackerHandler) listObservedDomains(w http.ResponseWriter, r *http.Requ
 func (h *TrackerHandler) listConsentAudit(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListConsentAudit(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load tracker consent audit", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load tracker consent audit")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -320,7 +321,7 @@ func (h *TrackerHandler) createDomain(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.service.CreateDomainCategory(r.Context(), request)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create tracker domain", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to create tracker domain")
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "operational", "tracker_domain", item.ID, nil, item)
@@ -335,7 +336,7 @@ func (h *TrackerHandler) bulkClassifyObservedDomains(w http.ResponseWriter, r *h
 
 	result, err := h.service.BulkClassifyObservedDomains(r.Context(), request)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to bulk classify tracker domains", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to bulk classify tracker domains")
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "tracker_observed_domains", strings.Join(result.Domains, ","), nil, result)
@@ -350,7 +351,7 @@ func (h *TrackerHandler) updateDomain(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.service.UpdateDomainCategory(r.Context(), chi.URLParam(r, "domainID"), request)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "tracker_domain", item.ID, nil, item)
@@ -360,7 +361,7 @@ func (h *TrackerHandler) updateDomain(w http.ResponseWriter, r *http.Request) {
 func (h *TrackerHandler) deleteDomain(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	if err := h.service.DeleteDomainCategory(r.Context(), domainID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "operational", "tracker_domain", domainID, nil, nil)
@@ -371,7 +372,7 @@ func (h *TrackerHandler) decodeAndValidate(w http.ResponseWriter, r *http.Reques
 	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
 
-func (h *TrackerHandler) writeError(w http.ResponseWriter, err error) {
+func (h *TrackerHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, operationalservice.ErrConsentRequired):
 		response.WriteError(w, http.StatusForbidden, "CONSENT_REQUIRED", err.Error(), nil)
@@ -380,7 +381,7 @@ func (h *TrackerHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, operationalservice.ErrDomainCategoryNotFound):
 		response.WriteError(w, http.StatusNotFound, "DOMAIN_CATEGORY_NOT_FOUND", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 

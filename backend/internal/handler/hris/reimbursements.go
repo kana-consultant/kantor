@@ -1,6 +1,7 @@
 package hris
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -75,7 +76,7 @@ func (h *ReimbursementsHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Create(r.Context(), input, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "hris", "reimbursement", result.ID, nil, input)
@@ -96,7 +97,7 @@ func (h *ReimbursementsHandler) list(w http.ResponseWriter, r *http.Request) {
 
 	items, total, page, perPage, err := h.service.List(r.Context(), query, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, map[string]int64{
@@ -118,7 +119,7 @@ func (h *ReimbursementsHandler) get(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.service.Get(r.Context(), reimbursementID, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
@@ -142,7 +143,7 @@ func (h *ReimbursementsHandler) update(w http.ResponseWriter, r *http.Request) {
 	}
 	item, removedAttachments, err := h.service.Update(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	removeSavedAttachments(h.uploadsDir, removedAttachments)
@@ -163,7 +164,7 @@ func (h *ReimbursementsHandler) deleteReimbursement(w http.ResponseWriter, r *ht
 	}
 	removedAttachments, err := h.service.Delete(r.Context(), reimbursementID, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	removeSavedAttachments(h.uploadsDir, removedAttachments)
@@ -212,7 +213,7 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 	item, err := h.service.AddAttachments(r.Context(), reimbursementID, paths, principal.UserID, principal.Cached)
 	if err != nil {
 		removeSavedAttachments(h.uploadsDir, paths)
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "upload_attachments", "hris", "reimbursement", reimbursementID, nil, nil)
@@ -237,7 +238,7 @@ func (h *ReimbursementsHandler) markPaid(w http.ResponseWriter, r *http.Request)
 	}
 	item, err := h.service.MarkPaid(r.Context(), reimbursementID, input.Notes, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "mark_paid", "hris", "reimbursement", reimbursementID, nil, input)
@@ -255,7 +256,7 @@ func (h *ReimbursementsHandler) summary(w http.ResponseWriter, r *http.Request) 
 	year, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("year")))
 	item, err := h.service.Summary(r.Context(), month, year, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
@@ -275,7 +276,7 @@ func (h *ReimbursementsHandler) bulkReview(w http.ResponseWriter, r *http.Reques
 
 	count, err := h.service.BulkReview(r.Context(), input, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "bulk_review", "hris", "reimbursement", "", nil, input)
@@ -296,7 +297,7 @@ func (h *ReimbursementsHandler) bulkMarkPaid(w http.ResponseWriter, r *http.Requ
 
 	count, err := h.service.BulkMarkPaid(r.Context(), input, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "bulk_mark_paid", "hris", "reimbursement", "", nil, input)
@@ -321,7 +322,7 @@ func (h *ReimbursementsHandler) review(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.service.ManagerReview(r.Context(), reimbursementID, input, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "review", "hris", "reimbursement", reimbursementID, nil, input)
@@ -374,7 +375,7 @@ func (h *ReimbursementsHandler) parseListQuery(w http.ResponseWriter, r *http.Re
 	return query, true
 }
 
-func (h *ReimbursementsHandler) writeError(w http.ResponseWriter, err error) {
+func (h *ReimbursementsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrReimbursementNotFound):
 		response.WriteError(w, http.StatusNotFound, "REIMBURSEMENT_NOT_FOUND", err.Error(), nil)
@@ -390,7 +391,7 @@ func (h *ReimbursementsHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"employee_id": "not found"})
 	default:
 		slog.Error("unexpected reimbursement error", "error", err)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 

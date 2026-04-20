@@ -24,7 +24,7 @@ func (h *EmployeesHandler) exportList(w http.ResponseWriter, r *http.Request) {
 
 	items, _, _, _, err := h.service.ListEmployees(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (h *EmployeesHandler) exportList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -75,24 +75,24 @@ func (h *EmployeesHandler) exportDetail(w http.ResponseWriter, r *http.Request) 
 	employeeID := chi.URLParam(r, "employeeID")
 	item, err := h.service.GetEmployee(r.Context(), employeeID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
 	salaries, err := h.compensation.ListSalaries(r.Context(), employeeID, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	bonuses, err := h.compensation.ListBonuses(r.Context(), employeeID, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
 	payload, err := renderEmployeeDetailPDF(item, salaries, bonuses, exportutil.ResolveGeneratedBy(r.Context(), h.users))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 

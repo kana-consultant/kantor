@@ -1,6 +1,7 @@
 package hris
 
 import (
+	"context"
 	"bytes"
 	"encoding/csv"
 	"errors"
@@ -62,7 +63,7 @@ func (h *FinanceHandler) createCategory(w http.ResponseWriter, r *http.Request) 
 	}
 	result, err := h.service.CreateCategory(r.Context(), input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "hris", "finance_category", result.ID, nil, input)
@@ -72,7 +73,7 @@ func (h *FinanceHandler) createCategory(w http.ResponseWriter, r *http.Request) 
 func (h *FinanceHandler) listCategories(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListCategories(r.Context(), r.URL.Query().Get("type"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -89,7 +90,7 @@ func (h *FinanceHandler) updateCategory(w http.ResponseWriter, r *http.Request) 
 	categoryID := chi.URLParam(r, "categoryID")
 	result, err := h.service.UpdateCategory(r.Context(), categoryID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "hris", "finance_category", categoryID, nil, input)
@@ -102,7 +103,7 @@ func (h *FinanceHandler) deleteCategory(w http.ResponseWriter, r *http.Request) 
 	}
 	categoryID := chi.URLParam(r, "categoryID")
 	if err := h.service.DeleteCategory(r.Context(), categoryID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "finance_category", categoryID, nil, nil)
@@ -139,7 +140,7 @@ func (h *FinanceHandler) createRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.service.CreateRecord(r.Context(), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "hris", "finance_record", result.ID, nil, input)
@@ -158,7 +159,7 @@ func (h *FinanceHandler) listRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	items, total, page, perPage, err := h.service.ListRecords(r.Context(), query, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, map[string]int64{
@@ -176,7 +177,7 @@ func (h *FinanceHandler) getRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.service.GetRecord(r.Context(), chi.URLParam(r, "recordID"), principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, result, nil)
@@ -195,7 +196,7 @@ func (h *FinanceHandler) updateRecord(w http.ResponseWriter, r *http.Request) {
 	recordID := chi.URLParam(r, "recordID")
 	result, err := h.service.UpdateRecord(r.Context(), recordID, input, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "hris", "finance_record", recordID, nil, input)
@@ -210,7 +211,7 @@ func (h *FinanceHandler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	recordID := chi.URLParam(r, "recordID")
 	if err := h.service.DeleteRecord(r.Context(), recordID, principal.UserID, principal.Cached); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "finance_record", recordID, nil, nil)
@@ -226,7 +227,7 @@ func (h *FinanceHandler) submitRecord(w http.ResponseWriter, r *http.Request) {
 	recordID := chi.URLParam(r, "recordID")
 	result, err := h.service.SubmitRecord(r.Context(), recordID, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "submit", "hris", "finance_record", recordID, nil, result)
@@ -246,7 +247,7 @@ func (h *FinanceHandler) reviewRecord(w http.ResponseWriter, r *http.Request) {
 	recordID := chi.URLParam(r, "recordID")
 	result, err := h.service.ReviewRecord(r.Context(), recordID, input.Decision, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "review", "hris", "finance_record", recordID, nil, input)
@@ -260,7 +261,7 @@ func (h *FinanceHandler) summary(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.service.Summary(r.Context(), year)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, result, nil)
@@ -282,7 +283,7 @@ func (h *FinanceHandler) exportRecords(w http.ResponseWriter, r *http.Request) {
 
 	items, _, _, _, err := h.service.ListRecords(r.Context(), query, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -292,7 +293,7 @@ func (h *FinanceHandler) exportRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	summary, err := h.service.Summary(r.Context(), selectedYear)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -325,7 +326,7 @@ func (h *FinanceHandler) exportRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -389,7 +390,7 @@ func (h *FinanceHandler) parseListQuery(w http.ResponseWriter, r *http.Request) 
 	return query, true
 }
 
-func (h *FinanceHandler) writeError(w http.ResponseWriter, err error) {
+func (h *FinanceHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrFinanceCategoryNotFound):
 		response.WriteError(w, http.StatusNotFound, "FINANCE_CATEGORY_NOT_FOUND", err.Error(), nil)
@@ -400,7 +401,7 @@ func (h *FinanceHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, hrisservice.ErrFinanceForbidden):
 		response.WriteError(w, http.StatusForbidden, "FINANCE_FORBIDDEN", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 

@@ -23,7 +23,7 @@ func (h *AdsMetricsHandler) export(w http.ResponseWriter, r *http.Request) {
 
 	items, _, _, _, err := h.service.ListMetrics(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -55,7 +55,7 @@ func (h *AdsMetricsHandler) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 

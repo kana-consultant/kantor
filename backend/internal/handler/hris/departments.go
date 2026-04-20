@@ -1,6 +1,7 @@
 package hris
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -41,7 +42,7 @@ func (h *DepartmentsHandler) createDepartment(w http.ResponseWriter, r *http.Req
 
 	result, err := h.service.CreateDepartment(r.Context(), input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -52,7 +53,7 @@ func (h *DepartmentsHandler) createDepartment(w http.ResponseWriter, r *http.Req
 func (h *DepartmentsHandler) listDepartments(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.ListDepartments(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -62,7 +63,7 @@ func (h *DepartmentsHandler) listDepartments(w http.ResponseWriter, r *http.Requ
 func (h *DepartmentsHandler) getDepartment(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.GetDepartment(r.Context(), chi.URLParam(r, "departmentID"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -78,7 +79,7 @@ func (h *DepartmentsHandler) updateDepartment(w http.ResponseWriter, r *http.Req
 	departmentID := chi.URLParam(r, "departmentID")
 	result, err := h.service.UpdateDepartment(r.Context(), departmentID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -89,7 +90,7 @@ func (h *DepartmentsHandler) updateDepartment(w http.ResponseWriter, r *http.Req
 func (h *DepartmentsHandler) deleteDepartment(w http.ResponseWriter, r *http.Request) {
 	departmentID := chi.URLParam(r, "departmentID")
 	if err := h.service.DeleteDepartment(r.Context(), departmentID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -97,7 +98,7 @@ func (h *DepartmentsHandler) deleteDepartment(w http.ResponseWriter, r *http.Req
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Department deleted successfully"}, nil)
 }
 
-func (h *DepartmentsHandler) writeError(w http.ResponseWriter, err error) {
+func (h *DepartmentsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrDepartmentNotFound):
 		response.WriteError(w, http.StatusNotFound, "DEPARTMENT_NOT_FOUND", err.Error(), nil)
@@ -106,6 +107,6 @@ func (h *DepartmentsHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, hrisservice.ErrDepartmentHeadMissing):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"head_id": "employee not found"})
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }

@@ -1,6 +1,7 @@
 package operational
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -58,7 +59,7 @@ func (h *KanbanHandler) createColumn(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.CreateColumn(r.Context(), projectID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -74,7 +75,7 @@ func (h *KanbanHandler) listColumns(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.ListColumns(r.Context(), projectID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -98,7 +99,7 @@ func (h *KanbanHandler) updateColumn(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.UpdateColumn(r.Context(), projectID, columnID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -117,7 +118,7 @@ func (h *KanbanHandler) deleteColumn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteColumn(r.Context(), projectID, columnID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -137,7 +138,7 @@ func (h *KanbanHandler) reorderColumns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.ReorderColumns(r.Context(), projectID, input); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -164,7 +165,7 @@ func (h *KanbanHandler) createTask(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.CreateTask(r.Context(), projectID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -180,7 +181,7 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.ListTasks(r.Context(), projectID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -210,7 +211,7 @@ func (h *KanbanHandler) updateTask(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.UpdateTask(r.Context(), projectID, taskID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -229,7 +230,7 @@ func (h *KanbanHandler) deleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteTask(r.Context(), projectID, taskID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -253,7 +254,7 @@ func (h *KanbanHandler) moveTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.MoveTask(r.Context(), projectID, taskID, input); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -265,7 +266,7 @@ func (h *KanbanHandler) decodeAndValidate(w http.ResponseWriter, r *http.Request
 	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
 
-func (h *KanbanHandler) writeError(w http.ResponseWriter, err error) {
+func (h *KanbanHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, operationalservice.ErrKanbanColumnNotFound):
 		response.WriteError(w, http.StatusNotFound, "KANBAN_COLUMN_NOT_FOUND", err.Error(), nil)
@@ -275,7 +276,7 @@ func (h *KanbanHandler) writeError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"assignee_id": "must belong to the project"})
 	default:
 		slog.Error("unexpected kanban handler error", "error", err)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 

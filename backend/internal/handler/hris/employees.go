@@ -1,6 +1,7 @@
 package hris
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -65,7 +66,7 @@ func (h *EmployeesHandler) createEmployee(w http.ResponseWriter, r *http.Request
 
 	result, err := h.service.CreateEmployee(r.Context(), input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -81,7 +82,7 @@ func (h *EmployeesHandler) listEmployees(w http.ResponseWriter, r *http.Request)
 
 	result, total, page, perPage, err := h.service.ListEmployees(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -101,7 +102,7 @@ func (h *EmployeesHandler) getMyEmployee(w http.ResponseWriter, r *http.Request)
 
 	result, err := h.service.GetMyEmployee(r.Context(), principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -111,7 +112,7 @@ func (h *EmployeesHandler) getMyEmployee(w http.ResponseWriter, r *http.Request)
 func (h *EmployeesHandler) getEmployee(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.GetEmployee(r.Context(), chi.URLParam(r, "employeeID"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -127,7 +128,7 @@ func (h *EmployeesHandler) updateEmployee(w http.ResponseWriter, r *http.Request
 	employeeID := chi.URLParam(r, "employeeID")
 	result, err := h.service.UpdateEmployee(r.Context(), employeeID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -156,7 +157,7 @@ func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) 
 	employeeID := chi.URLParam(r, "employeeID")
 	current, err := h.service.GetEmployee(r.Context(), employeeID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -174,7 +175,7 @@ func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) 
 	result, err := h.service.UpdateEmployeeAvatar(r.Context(), employeeID, avatarPath)
 	if err != nil {
 		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(avatarPath)))
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -196,7 +197,7 @@ func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) 
 func (h *EmployeesHandler) deleteEmployee(w http.ResponseWriter, r *http.Request) {
 	employeeID := chi.URLParam(r, "employeeID")
 	if err := h.service.DeleteEmployee(r.Context(), employeeID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -237,7 +238,7 @@ func (h *EmployeesHandler) parseListQuery(w http.ResponseWriter, r *http.Request
 	return query, true
 }
 
-func (h *EmployeesHandler) writeError(w http.ResponseWriter, err error) {
+func (h *EmployeesHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusNotFound, "EMPLOYEE_NOT_FOUND", err.Error(), nil)
@@ -246,7 +247,7 @@ func (h *EmployeesHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, hrisservice.ErrEmployeeUserLinkedTwice):
 		response.WriteError(w, http.StatusConflict, "EMPLOYEE_USER_ALREADY_LINKED", err.Error(), map[string]string{"user_id": "already linked"})
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 

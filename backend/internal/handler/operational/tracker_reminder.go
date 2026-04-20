@@ -39,7 +39,7 @@ func (h *TrackerReminderHandler) getConfig(w http.ResponseWriter, r *http.Reques
 	cfg, err := h.service.GetConfig(r.Context())
 	if err != nil {
 		platformmiddleware.LoggerFromContext(r.Context()).Error("tracker reminder get config failed", "error", err)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load reminder config", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load reminder config")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, h.toResponse(cfg), nil)
@@ -67,7 +67,7 @@ func (h *TrackerReminderHandler) updateConfig(w http.ResponseWriter, r *http.Req
 			return
 		}
 		platformmiddleware.LoggerFromContext(r.Context()).Error("tracker reminder update config failed", "error", err)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update reminder config", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to update reminder config")
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "tracker_reminder_config", cfg.TenantID, before, cfg)
@@ -83,7 +83,7 @@ func (h *TrackerReminderHandler) sendTest(w http.ResponseWriter, r *http.Request
 	inApp, wa, waErr, err := h.service.SendTestReminder(r.Context(), principal.UserID)
 	if err != nil {
 		platformmiddleware.LoggerFromContext(r.Context()).Error("tracker reminder test dispatch failed", "error", err, "user_id", principal.UserID)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to send test reminder", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to send test reminder")
 		return
 	}
 	res := operationaldto.TrackerReminderTestResponse{

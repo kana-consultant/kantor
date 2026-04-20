@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -78,7 +79,7 @@ func (h *Handler) UpdateClientContext(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.service.UpdateClientContext(r.Context(), principal.UserID, input)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal menyimpan konteks browser", nil)
+		response.WriteInternalError(r.Context(), w, err, "Gagal menyimpan konteks browser")
 		return
 	}
 
@@ -96,7 +97,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.GetSession(r.Context(), principal.UserID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan yang tidak terduga", nil)
+		response.WriteInternalError(r.Context(), w, err, "Terjadi kesalahan yang tidak terduga")
 		return
 	}
 
@@ -121,7 +122,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.ChangePassword(r.Context(), principal.UserID, input.CurrentPassword, input.NewPassword); err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
@@ -142,7 +143,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Register(r.Context(), input, r.UserAgent(), clientIP(r))
 	if err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
@@ -169,7 +170,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Login(r.Context(), input, r.UserAgent(), clientIP(r))
 	if err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
@@ -196,7 +197,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Refresh(r.Context(), refreshToken, r.UserAgent(), clientIP(r))
 	if err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
@@ -227,7 +228,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) publicOptions(w http.ResponseWriter, r *http.Request) {
 	options, err := h.service.GetPublicAuthOptions(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memuat opsi auth tenant", nil)
+		response.WriteInternalError(r.Context(), w, err, "Gagal memuat opsi auth tenant")
 		return
 	}
 
@@ -257,7 +258,7 @@ func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
 		UserAgent:     r.UserAgent(),
 		IPAddress:     clientIP(r),
 	}); err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
@@ -274,7 +275,7 @@ func (h *Handler) validateResetPassword(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.service.ValidatePasswordResetToken(r.Context(), token); err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
@@ -289,7 +290,7 @@ func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := h.service.ResetPasswordWithToken(r.Context(), input.Token, input.NewPassword)
 	if err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
@@ -326,7 +327,7 @@ func (h *Handler) decodeAndValidate(w http.ResponseWriter, r *http.Request, targ
 	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
 
-func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
+func (h *Handler) writeAuthError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authservice.ErrEmailAlreadyExists):
 		response.WriteError(w, http.StatusConflict, "EMAIL_ALREADY_EXISTS", err.Error(), nil)
@@ -349,7 +350,7 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 	case errors.Is(err, authservice.ErrPasswordUnchanged):
 		response.WriteError(w, http.StatusBadRequest, "PASSWORD_UNCHANGED", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan yang tidak terduga", nil)
+		response.WriteInternalError(ctx, w, err, "Terjadi kesalahan yang tidak terduga")
 	}
 }
 

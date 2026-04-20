@@ -1,6 +1,7 @@
 package hris
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -52,7 +53,7 @@ func (h *SubscriptionsHandler) createSubscription(w http.ResponseWriter, r *http
 	}
 	result, err := h.service.CreateSubscription(r.Context(), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "hris", "subscription", result.ID, nil, input)
@@ -62,7 +63,7 @@ func (h *SubscriptionsHandler) createSubscription(w http.ResponseWriter, r *http
 func (h *SubscriptionsHandler) listSubscriptions(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.ListSubscriptions(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, result, nil)
@@ -71,7 +72,7 @@ func (h *SubscriptionsHandler) listSubscriptions(w http.ResponseWriter, r *http.
 func (h *SubscriptionsHandler) getSubscription(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.GetSubscription(r.Context(), chi.URLParam(r, "subscriptionID"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, result, nil)
@@ -90,7 +91,7 @@ func (h *SubscriptionsHandler) updateSubscription(w http.ResponseWriter, r *http
 	subscriptionID := chi.URLParam(r, "subscriptionID")
 	result, err := h.service.UpdateSubscription(r.Context(), subscriptionID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "hris", "subscription", subscriptionID, nil, input)
@@ -100,7 +101,7 @@ func (h *SubscriptionsHandler) updateSubscription(w http.ResponseWriter, r *http
 func (h *SubscriptionsHandler) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 	subscriptionID := chi.URLParam(r, "subscriptionID")
 	if err := h.service.DeleteSubscription(r.Context(), subscriptionID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "subscription", subscriptionID, nil, nil)
@@ -110,7 +111,7 @@ func (h *SubscriptionsHandler) deleteSubscription(w http.ResponseWriter, r *http
 func (h *SubscriptionsHandler) summary(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.Summary(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, result, nil)
@@ -119,7 +120,7 @@ func (h *SubscriptionsHandler) summary(w http.ResponseWriter, r *http.Request) {
 func (h *SubscriptionsHandler) listAlerts(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.ListAlerts(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, result, nil)
@@ -127,13 +128,13 @@ func (h *SubscriptionsHandler) listAlerts(w http.ResponseWriter, r *http.Request
 
 func (h *SubscriptionsHandler) markAlertRead(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.MarkAlertRead(r.Context(), chi.URLParam(r, "alertID")); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Alert marked as read"}, nil)
 }
 
-func (h *SubscriptionsHandler) writeError(w http.ResponseWriter, err error) {
+func (h *SubscriptionsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrSubscriptionNotFound):
 		response.WriteError(w, http.StatusNotFound, "SUBSCRIPTION_NOT_FOUND", err.Error(), nil)
@@ -142,6 +143,6 @@ func (h *SubscriptionsHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"pic_employee_id": "employee not found"})
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }

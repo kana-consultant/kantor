@@ -25,7 +25,7 @@ func (h *OverviewHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.GetOverview(r.Context(), principal.UserID, principal.Cached)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(r.Context(), w, err, "An unexpected error occurred")
 		return
 	}
 
