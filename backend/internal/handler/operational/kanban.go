@@ -1,7 +1,6 @@
 package operational
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
+	"github.com/kana-consultant/kantor/backend/internal/httputil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
@@ -262,17 +262,7 @@ func (h *KanbanHandler) moveTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {
-	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
-		return false
-	}
-
-	if err := h.validator.Struct(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", validationDetails(err))
-		return false
-	}
-
-	return true
+	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
 
 func (h *KanbanHandler) writeError(w http.ResponseWriter, err error) {
