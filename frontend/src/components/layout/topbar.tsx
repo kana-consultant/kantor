@@ -581,6 +581,10 @@ function formatPhone(phone: string) {
 }
 
 function resolveNotificationHref(item: NotificationItem) {
+  if (item.type === "tracker_reminder") {
+    return "/operational/tracker";
+  }
+
   if (!item.reference_id || !item.reference_type) {
     return null;
   }

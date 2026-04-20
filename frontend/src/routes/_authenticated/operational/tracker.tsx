@@ -36,6 +36,7 @@ import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/shared/drawer";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { ReminderSettingsCard } from "@/components/tracker-reminder/reminder-settings-card";
 import { OverviewSkeleton } from "@/components/shared/skeletons";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -106,6 +107,7 @@ function OperationalTrackerPage() {
   const canViewTeam = hasPermission(permissions.operationalTrackerViewTeam);
   const canAuditConsent = hasPermission(permissions.operationalTrackerViewTeam);
   const canManageDomains = hasPermission(permissions.operationalTrackerDomainManage);
+  const canManageReminder = hasPermission(permissions.operationalTrackerReminderManage);
 
   const today = formatDateInput(new Date());
   const [activeTab, setActiveTab] = useState<"setup" | "my" | "team">("setup");
@@ -769,20 +771,23 @@ function OperationalTrackerPage() {
       ) : null}
 
       {activeTab === "setup" ? (
-        <TrackerSetupTab
-          consented={consented}
-          extensionInstalled={extensionInstalled}
-          isConnectingExtension={isConnectingExtension}
-          isDownloadingExtension={isDownloadingExtension}
-          onDownloadExtension={() => void handleExtensionDownload()}
-          onCheckExtension={() => void handleExtensionConnect(false)}
-          onEnableTracking={() => void handleExtensionConnect(true)}
-          onOpenConsent={() => setConsentDialogOpen(true)}
-          showAdminAuditHint={canAuditConsent}
-          browserTimezone={browserTimezone}
-          extensionVersion={extensionVersion}
-          extensionReportedAt={extensionReportedAt}
-        />
+        <div className="space-y-6">
+          <TrackerSetupTab
+            consented={consented}
+            extensionInstalled={extensionInstalled}
+            isConnectingExtension={isConnectingExtension}
+            isDownloadingExtension={isDownloadingExtension}
+            onDownloadExtension={() => void handleExtensionDownload()}
+            onCheckExtension={() => void handleExtensionConnect(false)}
+            onEnableTracking={() => void handleExtensionConnect(true)}
+            onOpenConsent={() => setConsentDialogOpen(true)}
+            showAdminAuditHint={canAuditConsent}
+            browserTimezone={browserTimezone}
+            extensionVersion={extensionVersion}
+            extensionReportedAt={extensionReportedAt}
+          />
+          {canManageReminder ? <ReminderSettingsCard /> : null}
+        </div>
       ) : activeTab === "my" ? (
         <MyActivityTab data={myActivityQuery.data} isLoading={myActivityQuery.isLoading} topDomainColumns={topDomainColumns} />
       ) : (

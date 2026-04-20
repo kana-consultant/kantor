@@ -143,6 +143,7 @@ func DefaultPermissions() []PermissionDefinition {
 		{ID: "operational:tracker:view", ModuleID: ModuleOperational, Resource: "tracker", Action: "view", Description: "Melihat aktivitas tracker sendiri"},
 		{ID: "operational:tracker:view_team", ModuleID: ModuleOperational, Resource: "tracker", Action: "view_team", Description: "Melihat aktivitas tracker seluruh tim", IsSensitive: true},
 		{ID: "operational:tracker:manage_domains", ModuleID: ModuleOperational, Resource: "tracker", Action: "manage_domains", Description: "Mengelola domain categories tracker"},
+		{ID: "operational:tracker-reminder:manage", ModuleID: ModuleOperational, Resource: "tracker_reminder", Action: "manage", Description: "Mengelola pengaturan reminder activity tracker"},
 		{ID: "operational:wa:view", ModuleID: ModuleOperational, Resource: "wa_broadcast", Action: "view", Description: "Melihat dashboard dan log WA broadcast"},
 		{ID: "operational:wa:manage", ModuleID: ModuleOperational, Resource: "wa_broadcast", Action: "manage", Description: "Mengelola template schedule dan pengiriman WA"},
 
@@ -252,6 +253,10 @@ func managerCanAccess(permission PermissionDefinition) bool {
 	}
 
 	if permission.ID == "hris:reimbursement:mark_paid" {
+		return false
+	}
+
+	if permission.ID == "operational:tracker-reminder:manage" {
 		return false
 	}
 

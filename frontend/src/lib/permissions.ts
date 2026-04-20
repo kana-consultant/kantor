@@ -17,6 +17,7 @@ export const permissions = {
   operationalTrackerView: "operational:tracker:view",
   operationalTrackerViewTeam: "operational:tracker:view_team",
   operationalTrackerDomainManage: "operational:tracker:manage_domains",
+  operationalTrackerReminderManage: "operational:tracker-reminder:manage",
   hrisOverview: "hris:employee:view",
   hrisEmployeeView: "hris:employee:view",
   hrisEmployeeCreate: "hris:employee:create",

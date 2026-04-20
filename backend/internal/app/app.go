@@ -192,6 +192,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
 	trackerRepository := operationalrepo.NewTrackerRepository(pool)
+	trackerReminderRepository := operationalrepo.NewTrackerReminderRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
 	compensationRepository := hrisrepo.NewCompensationRepository(pool)
 	financeRepository := hrisrepo.NewFinanceRepository(pool)
@@ -228,6 +229,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	whatsappService := waservice.NewService(waRepository, cfg, notificationsService)
 	emailDeliveryService := notificationsservice.NewEmailDeliveryService(authRepository, waRepository, encrypter, cfg)
 
+	trackerReminderService := operationalservice.NewTrackerReminderService(trackerReminderRepository, notificationsRepository, whatsappService)
+
 	// Wire event triggers
 	kanbanService.SetTaskAssignNotifier(whatsappService)
 	kanbanService.SetTaskAssignNotifier(emailDeliveryService)
@@ -245,6 +248,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		operationalhandler.NewProjectsHandler(projectsService, kanbanService, projectsRepository, authRepository),
 		operationalhandler.NewKanbanHandler(kanbanService),
 		operationalhandler.NewTrackerHandler(trackerService),
+		operationalhandler.NewTrackerReminderHandler(trackerReminderService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
 		hrishandler.NewEmployeesHandler(employeesService, compensationService, cfg.UploadsDir, authRepository),
 		hrishandler.NewDepartmentsHandler(departmentsService),
@@ -260,7 +264,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		fileshandler.New(filesService),
 		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(subscriptionsService, trackerService, reimbursementsService, whatsappService, emailDeliveryService)
+	application.startBackgroundJobs(subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService)
 
 	return application, nil
 }
@@ -290,6 +294,7 @@ func (a *App) buildRouter(
 	projectsHandler *operationalhandler.ProjectsHandler,
 	kanbanHandler *operationalhandler.KanbanHandler,
 	trackerHandler *operationalhandler.TrackerHandler,
+	trackerReminderHandler *operationalhandler.TrackerReminderHandler,
 	hrisOverviewHandler *hrishandler.OverviewHandler,
 	employeesHandler *hrishandler.EmployeesHandler,
 	departmentsHandler *hrishandler.DepartmentsHandler,
@@ -415,6 +420,7 @@ func (a *App) buildRouter(
 				protected.Route("/tracker", func(tracker chi.Router) {
 					tracker.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
 					trackerHandler.RegisterRoutes(tracker)
+					trackerReminderHandler.RegisterRoutes(tracker)
 				})
 
 				protected.Route("/hris", func(module chi.Router) {
@@ -455,7 +461,7 @@ func (a *App) buildRouter(
 	return router
 }
 
-func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
+func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -565,6 +571,22 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			case tickAt := <-ticker.C:
 				runPerTenant("reimbursement_reminder_scheduler", func(tCtx context.Context, t tenant.Info) error {
 					return reimbursementsService.RunReminderJobs(tCtx, tickAt)
+				})
+			}
+		}
+	})
+
+	runBackground("tracker_reminder_scheduler", func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickAt := <-ticker.C:
+				runPerTenant("tracker_reminder_scheduler", func(tCtx context.Context, t tenant.Info) error {
+					return trackerReminderService.RunReminderJobs(tCtx, tickAt)
 				})
 			}
 		}
@@ -715,6 +737,27 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 		waConn.Release()
 		if err != nil {
 			return fmt.Errorf("seed wa config for tenant %q: %w", tc.Slug, err)
+		}
+
+		// Ensure tracker_reminder_configs row exists (enabled by default, admin tunes via UI).
+		trConn, err := pool.Acquire(ctx)
+		if err != nil {
+			return fmt.Errorf("acquire conn for tracker reminder config seed: %w", err)
+		}
+		_, err = trConn.Exec(ctx, fmt.Sprintf("SET app.current_tenant = '%s'", tenantID))
+		if err != nil {
+			trConn.Release()
+			return fmt.Errorf("set tenant guc for tracker reminder config seed: %w", err)
+		}
+		_, err = trConn.Exec(ctx,
+			`INSERT INTO tracker_reminder_configs (tenant_id)
+			 VALUES ($1::uuid)
+			 ON CONFLICT (tenant_id) DO NOTHING`,
+			tenantID)
+		_, _ = trConn.Exec(ctx, "RESET ALL")
+		trConn.Release()
+		if err != nil {
+			return fmt.Errorf("seed tracker reminder config for tenant %q: %w", tc.Slug, err)
 		}
 
 		slog.Info("tenant seeded", "name", tc.Name, "slug", tc.Slug, "domains", tc.Domains)

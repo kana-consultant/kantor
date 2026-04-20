@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/kana-consultant/kantor/backend/internal/app"
 	"github.com/kana-consultant/kantor/backend/internal/config"
