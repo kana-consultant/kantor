@@ -36,7 +36,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("failed to list users", "error", err)
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list users")
 		return
 	}
 
@@ -99,14 +99,14 @@ func (h *Handler) UpdateUserRoles(w http.ResponseWriter, r *http.Request) {
 		case authrepo.ErrInvalidModuleRole:
 			response.WriteError(w, http.StatusBadRequest, "INVALID_MODULE_ROLE", "Role assignment is invalid", nil)
 		default:
-			response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update module roles", nil)
+			response.WriteInternalError(r.Context(), w, err, "Failed to update module roles")
 		}
 		return
 	}
 
 	result, err := h.service.GetAdminUserDetail(r.Context(), userID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Roles updated but failed to fetch user", nil)
+		response.WriteInternalError(r.Context(), w, err, "Roles updated but failed to fetch user")
 		return
 	}
 
@@ -133,7 +133,7 @@ func (h *Handler) ToggleUserActive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.SetUserActive(r.Context(), userID, input.Active); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update user status", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to update user status")
 		return
 	}
 
@@ -178,14 +178,14 @@ func (h *Handler) ToggleUserSuperAdmin(w http.ResponseWriter, r *http.Request) {
 		case authrepo.ErrCannotToggleSelf:
 			response.WriteError(w, http.StatusBadRequest, "CANNOT_TOGGLE_SELF", err.Error(), nil)
 		default:
-			response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update super admin status", nil)
+			response.WriteInternalError(r.Context(), w, err, "Failed to update super admin status")
 		}
 		return
 	}
 
 	result, err := h.service.GetAdminUserDetail(r.Context(), userID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Super admin updated but failed to fetch user", nil)
+		response.WriteInternalError(r.Context(), w, err, "Super admin updated but failed to fetch user")
 		return
 	}
 
@@ -211,7 +211,7 @@ func (h *Handler) EnsureUserEmployeeProfile(w http.ResponseWriter, r *http.Reque
 
 	result, err := h.service.EnsureEmployeeProfileForUser(r.Context(), previous.User.ID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create employee profile", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to create employee profile")
 		return
 	}
 

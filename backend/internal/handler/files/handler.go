@@ -39,7 +39,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, filesservice.ErrFileNotFound):
 			response.WriteError(w, http.StatusNotFound, "FILE_NOT_FOUND", "Requested file was not found", nil)
 		default:
-			response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+			response.WriteInternalError(r.Context(), w, err, "An unexpected error occurred")
 		}
 		return
 	}

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -31,7 +32,7 @@ func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
 		IsActive: isActive,
 	})
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list roles", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list roles")
 		return
 	}
 
@@ -72,7 +73,7 @@ func (h *Handler) CreateRole(w http.ResponseWriter, r *http.Request) {
 		PermissionIDs:  input.PermissionIDs,
 	}, principal.UserID)
 	if err != nil {
-		h.writeRoleError(w, err)
+		h.writeRoleError(r.Context(), w, err)
 		return
 	}
 
@@ -84,7 +85,7 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 	roleID := chi.URLParam(r, "roleID")
 	previous, previousErr := h.service.GetRoleDetail(r.Context(), roleID)
 	if previousErr != nil {
-		h.writeRoleError(w, previousErr)
+		h.writeRoleError(r.Context(), w, previousErr)
 		return
 	}
 
@@ -106,7 +107,7 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		PermissionIDs:  input.PermissionIDs,
 	})
 	if err != nil {
-		h.writeRoleError(w, err)
+		h.writeRoleError(r.Context(), w, err)
 		return
 	}
 
@@ -118,12 +119,12 @@ func (h *Handler) DeleteRole(w http.ResponseWriter, r *http.Request) {
 	roleID := chi.URLParam(r, "roleID")
 	previous, previousErr := h.service.GetRoleDetail(r.Context(), roleID)
 	if previousErr != nil {
-		h.writeRoleError(w, previousErr)
+		h.writeRoleError(r.Context(), w, previousErr)
 		return
 	}
 
 	if err := h.service.DeleteRole(r.Context(), roleID); err != nil {
-		h.writeRoleError(w, err)
+		h.writeRoleError(r.Context(), w, err)
 		return
 	}
 
@@ -135,13 +136,13 @@ func (h *Handler) ToggleRole(w http.ResponseWriter, r *http.Request) {
 	roleID := chi.URLParam(r, "roleID")
 	previous, previousErr := h.service.GetRoleDetail(r.Context(), roleID)
 	if previousErr != nil {
-		h.writeRoleError(w, previousErr)
+		h.writeRoleError(r.Context(), w, previousErr)
 		return
 	}
 
 	item, err := h.service.ToggleRole(r.Context(), roleID)
 	if err != nil {
-		h.writeRoleError(w, err)
+		h.writeRoleError(r.Context(), w, err)
 		return
 	}
 
@@ -158,7 +159,7 @@ func (h *Handler) DuplicateRole(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.service.DuplicateRole(r.Context(), chi.URLParam(r, "roleID"), principal.UserID)
 	if err != nil {
-		h.writeRoleError(w, err)
+		h.writeRoleError(r.Context(), w, err)
 		return
 	}
 
@@ -172,7 +173,7 @@ func (h *Handler) DuplicateRole(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListPermissionGroups(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list permissions", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list permissions")
 		return
 	}
 
@@ -182,7 +183,7 @@ func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load settings")
 		return
 	}
 
@@ -192,7 +193,7 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListSettingsDepartments(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListSettingsDepartments(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load departments", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load departments")
 		return
 	}
 
@@ -208,7 +209,7 @@ func (h *Handler) UpdateDefaultRoles(w http.ResponseWriter, r *http.Request) {
 
 	previous, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load current settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load current settings")
 		return
 	}
 
@@ -227,13 +228,13 @@ func (h *Handler) UpdateDefaultRoles(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusBadRequest, "INVALID_MODULE_ROLE", "Default role mapping contains an invalid role", nil)
 			return
 		}
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update default roles", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to update default roles")
 		return
 	}
 
 	settings, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Default roles updated but failed to fetch settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Default roles updated but failed to fetch settings")
 		return
 	}
 
@@ -250,7 +251,7 @@ func (h *Handler) UpdateAutoCreateEmployee(w http.ResponseWriter, r *http.Reques
 
 	previous, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load current settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load current settings")
 		return
 	}
 
@@ -264,13 +265,13 @@ func (h *Handler) UpdateAutoCreateEmployee(w http.ResponseWriter, r *http.Reques
 		Enabled:             input.Enabled,
 		DefaultDepartmentID: input.DefaultDepartmentID,
 	}); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update auto-create employee setting", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to update auto-create employee setting")
 		return
 	}
 
 	settings, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Setting updated but failed to fetch settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Setting updated but failed to fetch settings")
 		return
 	}
 
@@ -287,7 +288,7 @@ func (h *Handler) UpdateMailDelivery(w http.ResponseWriter, r *http.Request) {
 
 	previous, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load current settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load current settings")
 		return
 	}
 
@@ -302,13 +303,13 @@ func (h *Handler) UpdateMailDelivery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.UpdateMailDelivery(r.Context(), principal.UserID, input); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update mail delivery setting", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to update mail delivery setting")
 		return
 	}
 
 	settings, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Setting updated but failed to fetch settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Setting updated but failed to fetch settings")
 		return
 	}
 
@@ -325,7 +326,7 @@ func (h *Handler) UpdateReimbursementReminder(w http.ResponseWriter, r *http.Req
 
 	previous, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load current settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load current settings")
 		return
 	}
 
@@ -340,13 +341,13 @@ func (h *Handler) UpdateReimbursementReminder(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := h.service.UpdateReimbursementReminder(r.Context(), principal.UserID, input); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update reimbursement reminder setting", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to update reimbursement reminder setting")
 		return
 	}
 
 	settings, err := h.service.GetSettings(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Setting updated but failed to fetch settings", nil)
+		response.WriteInternalError(r.Context(), w, err, "Setting updated but failed to fetch settings")
 		return
 	}
 
@@ -357,13 +358,13 @@ func (h *Handler) UpdateReimbursementReminder(w http.ResponseWriter, r *http.Req
 func (h *Handler) ListModules(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListModules(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list modules", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list modules")
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
 }
 
-func (h *Handler) writeRoleError(w http.ResponseWriter, err error) {
+func (h *Handler) writeRoleError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch err {
 	case authrepo.ErrRoleNotFound:
 		response.WriteError(w, http.StatusNotFound, "ROLE_NOT_FOUND", err.Error(), nil)
@@ -376,6 +377,6 @@ func (h *Handler) writeRoleError(w http.ResponseWriter, err error) {
 	case authrepo.ErrRoleHasAssignments:
 		response.WriteError(w, http.StatusConflict, "ROLE_HAS_ASSIGNMENTS", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }

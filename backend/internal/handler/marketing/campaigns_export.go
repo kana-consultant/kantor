@@ -22,7 +22,7 @@ func (h *CampaignsHandler) export(w http.ResponseWriter, r *http.Request) {
 
 	items, _, _, _, err := h.service.ListCampaigns(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -50,7 +50,7 @@ func (h *CampaignsHandler) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 

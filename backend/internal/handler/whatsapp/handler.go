@@ -1,6 +1,7 @@
 package whatsapp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -73,7 +74,7 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 func (h *Handler) getWAConfig(w http.ResponseWriter, r *http.Request) {
 	cfg, err := h.service.GetWAConfig(r.Context())
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
@@ -108,7 +109,7 @@ func (h *Handler) updateWAConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.UpdateWAConfig(r.Context(), cfg); err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 
@@ -201,7 +202,7 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 
 	templates, err := h.service.ListTemplates(r.Context(), category, triggerType)
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, templates, nil)
@@ -231,7 +232,7 @@ func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:          &principal.UserID,
 	})
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "operational", "wa_template", result.ID, nil, result)
@@ -241,7 +242,7 @@ func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) generateDefaultTemplates(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.EnsureDefaultTemplates(r.Context())
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 
@@ -257,7 +258,7 @@ func (h *Handler) updateTemplate(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusNotFound, "TEMPLATE_NOT_FOUND", "Template not found", nil)
 			return
 		}
-		h.writeInternalError(w, previousErr)
+		h.writeInternalError(r.Context(), w, previousErr)
 		return
 	}
 
@@ -280,7 +281,7 @@ func (h *Handler) updateTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_template", id, previous, result)
@@ -291,7 +292,7 @@ func (h *Handler) deleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "templateID")
 	previous, previousErr := h.service.GetTemplate(r.Context(), id)
 	if previousErr != nil && !errors.Is(previousErr, waservice.ErrTemplateNotFound) {
-		h.writeInternalError(w, previousErr)
+		h.writeInternalError(r.Context(), w, previousErr)
 		return
 	}
 	err := h.service.DeleteTemplate(r.Context(), id)
@@ -301,7 +302,7 @@ func (h *Handler) deleteTemplate(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, waservice.ErrSystemTemplate):
 		response.WriteError(w, http.StatusForbidden, "SYSTEM_TEMPLATE", "Cannot delete system template", nil)
 	case err != nil:
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 	default:
 		platformmiddleware.AuditLog(r.Context(), "delete", "operational", "wa_template", id, previous, nil)
 		response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Template deleted"}, nil)
@@ -316,7 +317,7 @@ func (h *Handler) previewTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, map[string]string{"preview": preview}, nil)
@@ -327,7 +328,7 @@ func (h *Handler) previewTemplate(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listSchedules(w http.ResponseWriter, r *http.Request) {
 	schedules, err := h.service.ListSchedules(r.Context())
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, schedules, nil)
@@ -356,7 +357,7 @@ func (h *Handler) createSchedule(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:      &principal.UserID,
 	})
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "operational", "wa_schedule", result.ID, nil, result)
@@ -371,7 +372,7 @@ func (h *Handler) updateSchedule(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusNotFound, "SCHEDULE_NOT_FOUND", "Schedule not found", nil)
 			return
 		}
-		h.writeInternalError(w, previousErr)
+		h.writeInternalError(r.Context(), w, previousErr)
 		return
 	}
 
@@ -394,7 +395,7 @@ func (h *Handler) updateSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_schedule", id, previous, result)
@@ -405,7 +406,7 @@ func (h *Handler) deleteSchedule(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "scheduleID")
 	previous, previousErr := h.service.GetSchedule(r.Context(), id)
 	if previousErr != nil && !errors.Is(previousErr, waservice.ErrScheduleNotFound) {
-		h.writeInternalError(w, previousErr)
+		h.writeInternalError(r.Context(), w, previousErr)
 		return
 	}
 	err := h.service.DeleteSchedule(r.Context(), id)
@@ -414,7 +415,7 @@ func (h *Handler) deleteSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "operational", "wa_schedule", id, previous, nil)
@@ -451,7 +452,7 @@ func (h *Handler) toggleSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "operational", "wa_schedule", id, nil, result)
@@ -477,7 +478,7 @@ func (h *Handler) listLogs(w http.ResponseWriter, r *http.Request) {
 		Search:       q.Get("search"),
 	})
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 
@@ -499,7 +500,7 @@ func (h *Handler) getLogSummary(w http.ResponseWriter, r *http.Request) {
 	date := r.URL.Query().Get("date")
 	summary, err := h.service.GetLogSummary(r.Context(), date)
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, summary, nil)
@@ -549,7 +550,7 @@ func (h *Handler) getUserPhone(w http.ResponseWriter, r *http.Request) {
 
 	phone, err := h.service.GetUserPhone(r.Context(), principal.UserID)
 	if err != nil {
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{"phone": phone}, nil)
@@ -573,7 +574,7 @@ func (h *Handler) updateUserPhone(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"phone": "must use 08xx, 8xx, 628xx, or +628xx format"})
 			return
 		}
-		h.writeInternalError(w, err)
+		h.writeInternalError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Phone updated"}, nil)
@@ -593,8 +594,8 @@ func (h *Handler) decodeAndValidate(w http.ResponseWriter, r *http.Request, targ
 	return true
 }
 
-func (h *Handler) writeInternalError(w http.ResponseWriter, _ error) {
-	response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+func (h *Handler) writeInternalError(ctx context.Context, w http.ResponseWriter, err error) {
+	response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 }
 
 func validationDetails(err error) map[string]string {

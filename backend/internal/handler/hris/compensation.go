@@ -1,6 +1,7 @@
 package hris
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -50,7 +51,7 @@ func (h *CompensationHandler) createSalary(w http.ResponseWriter, r *http.Reques
 
 	result, err := h.service.CreateSalary(r.Context(), chi.URLParam(r, "employeeID"), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "hris", "salary", result.ID, nil, input)
@@ -66,7 +67,7 @@ func (h *CompensationHandler) listSalaries(w http.ResponseWriter, r *http.Reques
 
 	result, err := h.service.ListSalaries(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "view", "hris", "salary", chi.URLParam(r, "employeeID"), nil, map[string]any{
@@ -86,7 +87,7 @@ func (h *CompensationHandler) getCurrentSalary(w http.ResponseWriter, r *http.Re
 
 	result, err := h.service.GetCurrentSalary(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "view", "hris", "salary", chi.URLParam(r, "employeeID"), nil, map[string]any{
@@ -111,7 +112,7 @@ func (h *CompensationHandler) createBonus(w http.ResponseWriter, r *http.Request
 
 	result, err := h.service.CreateBonus(r.Context(), chi.URLParam(r, "employeeID"), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "hris", "bonus", result.ID, nil, input)
@@ -126,7 +127,7 @@ func (h *CompensationHandler) listBonuses(w http.ResponseWriter, r *http.Request
 	}
 	result, err := h.service.ListBonuses(r.Context(), chi.URLParam(r, "employeeID"), principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, result, nil)
@@ -141,7 +142,7 @@ func (h *CompensationHandler) ApproveBonus(w http.ResponseWriter, r *http.Reques
 	bonusID := chi.URLParam(r, "bonusID")
 	result, err := h.service.ApproveBonus(r.Context(), bonusID, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "approve", "hris", "bonus", bonusID, nil, result)
@@ -162,7 +163,7 @@ func (h *CompensationHandler) UpdateBonus(w http.ResponseWriter, r *http.Request
 	bonusID := chi.URLParam(r, "bonusID")
 	result, err := h.service.UpdateBonus(r.Context(), bonusID, input, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "hris", "bonus", bonusID, nil, input)
@@ -178,7 +179,7 @@ func (h *CompensationHandler) RejectBonus(w http.ResponseWriter, r *http.Request
 	bonusID := chi.URLParam(r, "bonusID")
 	result, err := h.service.RejectBonus(r.Context(), bonusID, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "reject", "hris", "bonus", bonusID, nil, result)
@@ -193,14 +194,14 @@ func (h *CompensationHandler) DeleteBonus(w http.ResponseWriter, r *http.Request
 	}
 	bonusID := chi.URLParam(r, "bonusID")
 	if err := h.service.DeleteBonus(r.Context(), bonusID, principal.UserID, principal.Cached); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "bonus", bonusID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Bonus deleted successfully"}, nil)
 }
 
-func (h *CompensationHandler) writeError(w http.ResponseWriter, err error) {
+func (h *CompensationHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusNotFound, "EMPLOYEE_NOT_FOUND", err.Error(), nil)
@@ -215,6 +216,6 @@ func (h *CompensationHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, hrisservice.ErrBonusForbidden):
 		response.WriteError(w, http.StatusForbidden, "BONUS_FORBIDDEN", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }

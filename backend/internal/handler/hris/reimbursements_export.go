@@ -28,13 +28,13 @@ func (h *ReimbursementsHandler) export(w http.ResponseWriter, r *http.Request) {
 
 	items, _, _, _, err := h.service.List(r.Context(), query, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
 	summary, err := h.service.Summary(r.Context(), query.Month, query.Year, principal.UserID, principal.Cached)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *ReimbursementsHandler) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 

@@ -37,7 +37,7 @@ func (h *AuditLogsHandler) list(w http.ResponseWriter, r *http.Request) {
 
 	items, total, err := h.service.ListLogs(r.Context(), params)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit logs", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list audit logs")
 		return
 	}
 
@@ -60,7 +60,7 @@ func (h *AuditLogsHandler) list(w http.ResponseWriter, r *http.Request) {
 func (h *AuditLogsHandler) summary(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.GetSummary(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load audit log summary", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load audit log summary")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *AuditLogsHandler) summary(w http.ResponseWriter, r *http.Request) {
 func (h *AuditLogsHandler) listUsers(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListActors(r.Context(), strings.TrimSpace(r.URL.Query().Get("search")))
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load audit log users", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to load audit log users")
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *AuditLogsHandler) exportCSV(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := h.service.ExportCSV(r.Context(), params)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to export audit logs", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to export audit logs")
 		return
 	}
 

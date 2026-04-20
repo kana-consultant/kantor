@@ -1,6 +1,7 @@
 package operational
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -68,7 +69,7 @@ func (h *ProjectsHandler) createProject(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.service.CreateProject(r.Context(), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -84,7 +85,7 @@ func (h *ProjectsHandler) listProjects(w http.ResponseWriter, r *http.Request) {
 
 	projects, total, page, perPage, err := h.service.ListProjects(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -103,7 +104,7 @@ func (h *ProjectsHandler) getProject(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.GetProject(r.Context(), projectID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -123,7 +124,7 @@ func (h *ProjectsHandler) updateProject(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.service.UpdateProject(r.Context(), projectID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -138,7 +139,7 @@ func (h *ProjectsHandler) deleteProject(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.service.DeleteProject(r.Context(), projectID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -161,7 +162,7 @@ func (h *ProjectsHandler) mutateMembers(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.service.MutateProjectMember(r.Context(), projectID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -172,7 +173,7 @@ func (h *ProjectsHandler) mutateMembers(w http.ResponseWriter, r *http.Request) 
 func (h *ProjectsHandler) listAvailableUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.repo.ListActiveUsers(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list available users", nil)
+		response.WriteInternalError(r.Context(), w, err, "Failed to list available users")
 		return
 	}
 
@@ -226,7 +227,7 @@ func (h *ProjectsHandler) parseListQuery(w http.ResponseWriter, r *http.Request)
 	return query, true
 }
 
-func (h *ProjectsHandler) writeError(w http.ResponseWriter, err error) {
+func (h *ProjectsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, operationalservice.ErrProjectNotFound):
 		response.WriteError(w, http.StatusNotFound, "PROJECT_NOT_FOUND", err.Error(), nil)
@@ -237,7 +238,7 @@ func (h *ProjectsHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, operationalservice.ErrProjectMemberNotFound):
 		response.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 

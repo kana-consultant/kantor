@@ -1,6 +1,7 @@
 package marketing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -77,7 +78,7 @@ func (h *CampaignsHandler) createCampaign(w http.ResponseWriter, r *http.Request
 
 	item, err := h.service.CreateCampaign(r.Context(), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -93,7 +94,7 @@ func (h *CampaignsHandler) listCampaigns(w http.ResponseWriter, r *http.Request)
 
 	items, total, page, perPage, err := h.service.ListCampaigns(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -107,7 +108,7 @@ func (h *CampaignsHandler) listCampaigns(w http.ResponseWriter, r *http.Request)
 func (h *CampaignsHandler) kanban(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListKanban(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -120,7 +121,7 @@ func (h *CampaignsHandler) getCampaign(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.service.GetCampaign(r.Context(), campaignID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, item, nil)
@@ -133,7 +134,7 @@ func (h *CampaignsHandler) listActivities(w http.ResponseWriter, r *http.Request
 	}
 	items, err := h.service.ListActivities(r.Context(), campaignID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -157,7 +158,7 @@ func (h *CampaignsHandler) updateCampaign(w http.ResponseWriter, r *http.Request
 	}
 	item, err := h.service.UpdateCampaign(r.Context(), campaignID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "campaign", campaignID, nil, input)
@@ -170,7 +171,7 @@ func (h *CampaignsHandler) deleteCampaign(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := h.service.DeleteCampaign(r.Context(), campaignID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "campaign", campaignID, nil, nil)
@@ -195,7 +196,7 @@ func (h *CampaignsHandler) moveCampaign(w http.ResponseWriter, r *http.Request) 
 	}
 	item, err := h.service.MoveCampaign(r.Context(), campaignID, input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "move", "marketing", "campaign", campaignID, nil, input)
@@ -258,7 +259,7 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 		for _, uploaded := range uploadedFiles {
 			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(uploaded.FilePath)))
 		}
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -273,7 +274,7 @@ func (h *CampaignsHandler) listAttachments(w http.ResponseWriter, r *http.Reques
 	}
 	items, err := h.service.ListAttachments(r.Context(), campaignID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -290,7 +291,7 @@ func (h *CampaignsHandler) deleteAttachment(w http.ResponseWriter, r *http.Reque
 	}
 	item, err := h.service.DeleteAttachment(r.Context(), campaignID, attachmentID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(item.FilePath)))
@@ -301,7 +302,7 @@ func (h *CampaignsHandler) deleteAttachment(w http.ResponseWriter, r *http.Reque
 func (h *CampaignsHandler) listColumns(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListColumns(r.Context())
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items, nil)
@@ -319,7 +320,7 @@ func (h *CampaignsHandler) createColumn(w http.ResponseWriter, r *http.Request) 
 
 	item, err := h.service.CreateColumn(r.Context(), input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "create", "marketing", "campaign_column", item.ID, nil, input)
@@ -339,7 +340,7 @@ func (h *CampaignsHandler) updateColumn(w http.ResponseWriter, r *http.Request) 
 	columnID := chi.URLParam(r, "columnID")
 	item, err := h.service.UpdateColumn(r.Context(), columnID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "campaign_column", columnID, nil, input)
@@ -353,7 +354,7 @@ func (h *CampaignsHandler) deleteColumn(w http.ResponseWriter, r *http.Request) 
 
 	columnID := chi.URLParam(r, "columnID")
 	if err := h.service.DeleteColumn(r.Context(), columnID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "campaign_column", columnID, nil, nil)
@@ -371,7 +372,7 @@ func (h *CampaignsHandler) reorderColumns(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := h.service.ReorderColumns(r.Context(), input); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 	platformmiddleware.AuditLog(r.Context(), "reorder", "marketing", "campaign_columns", "bulk", nil, input)
@@ -414,7 +415,7 @@ func (h *CampaignsHandler) parseListQuery(w http.ResponseWriter, r *http.Request
 	return query, true
 }
 
-func (h *CampaignsHandler) writeError(w http.ResponseWriter, err error) {
+func (h *CampaignsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, marketingservice.ErrCampaignNotFound):
 		response.WriteError(w, http.StatusNotFound, "CAMPAIGN_NOT_FOUND", err.Error(), nil)
@@ -427,7 +428,7 @@ func (h *CampaignsHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, marketingservice.ErrCampaignColumnInUse):
 		response.WriteError(w, http.StatusConflict, "CAMPAIGN_COLUMN_IN_USE", err.Error(), nil)
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 

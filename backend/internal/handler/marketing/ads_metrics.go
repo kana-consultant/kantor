@@ -1,6 +1,7 @@
 package marketing
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -55,7 +56,7 @@ func (h *AdsMetricsHandler) createMetric(w http.ResponseWriter, r *http.Request)
 
 	item, err := h.service.CreateMetric(r.Context(), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -77,7 +78,7 @@ func (h *AdsMetricsHandler) batchCreateMetrics(w http.ResponseWriter, r *http.Re
 
 	items, err := h.service.BatchCreateMetrics(r.Context(), input, principal.UserID)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -93,7 +94,7 @@ func (h *AdsMetricsHandler) listMetrics(w http.ResponseWriter, r *http.Request) 
 
 	items, total, page, perPage, err := h.service.ListMetrics(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -107,7 +108,7 @@ func (h *AdsMetricsHandler) listMetrics(w http.ResponseWriter, r *http.Request) 
 func (h *AdsMetricsHandler) getMetric(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.GetMetric(r.Context(), chi.URLParam(r, "metricID"))
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -123,7 +124,7 @@ func (h *AdsMetricsHandler) updateMetric(w http.ResponseWriter, r *http.Request)
 	metricID := chi.URLParam(r, "metricID")
 	item, err := h.service.UpdateMetric(r.Context(), metricID, input)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -134,7 +135,7 @@ func (h *AdsMetricsHandler) updateMetric(w http.ResponseWriter, r *http.Request)
 func (h *AdsMetricsHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
 	metricID := chi.URLParam(r, "metricID")
 	if err := h.service.DeleteMetric(r.Context(), metricID); err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -155,7 +156,7 @@ func (h *AdsMetricsHandler) summary(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.service.Summary(r.Context(), query)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -175,7 +176,7 @@ func (h *AdsMetricsHandler) exportCSV(w http.ResponseWriter, r *http.Request) {
 		strings.TrimSpace(r.URL.Query().Get("date_to")),
 	)
 	if err != nil {
-		h.writeError(w, err)
+		h.writeError(r.Context(), w, err)
 		return
 	}
 
@@ -219,7 +220,7 @@ func (h *AdsMetricsHandler) parseListQuery(w http.ResponseWriter, r *http.Reques
 	return query, true
 }
 
-func (h *AdsMetricsHandler) writeError(w http.ResponseWriter, err error) {
+func (h *AdsMetricsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, marketingservice.ErrAdsMetricNotFound):
 		response.WriteError(w, http.StatusNotFound, "ADS_METRIC_NOT_FOUND", err.Error(), nil)
@@ -230,7 +231,7 @@ func (h *AdsMetricsHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, marketingservice.ErrAdsMetricUnsupportedExport):
 		response.WriteError(w, http.StatusBadRequest, "UNSUPPORTED_EXPORT_FORMAT", err.Error(), map[string]string{"format": "must be csv"})
 	default:
-		response.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred", nil)
+		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }
 
