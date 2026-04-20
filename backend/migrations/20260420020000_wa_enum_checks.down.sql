@@ -1,0 +1,6 @@
+ALTER TABLE wa_broadcast_logs DROP CONSTRAINT IF EXISTS wa_broadcast_logs_trigger_type_check;
+ALTER TABLE wa_broadcast_logs DROP CONSTRAINT IF EXISTS wa_broadcast_logs_status_check;
+ALTER TABLE wa_broadcast_schedules DROP CONSTRAINT IF EXISTS wa_broadcast_schedules_target_type_check;
+ALTER TABLE wa_broadcast_schedules DROP CONSTRAINT IF EXISTS wa_broadcast_schedules_schedule_type_check;
+ALTER TABLE wa_message_templates DROP CONSTRAINT IF EXISTS wa_message_templates_trigger_type_check;
+ALTER TABLE wa_message_templates DROP CONSTRAINT IF EXISTS wa_message_templates_category_check;

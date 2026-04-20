@@ -88,7 +88,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	// Seed all tenants from env (TENANTS=name|slug|domains;...).
 	// Runs as superuser — no RLS needed for global tables.
-	if err := seedTenants(ctx, pool, cfg.Tenants); err != nil {
+	if err := seedTenants(ctx, pool, cfg.Tenants, cfg.WAHADefaults); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("seed tenants: %w", err)
 	}
@@ -315,6 +315,7 @@ func (a *App) buildRouter(
 
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
+	router.Use(platformmiddleware.AccessLogger)
 	router.Use(chimiddleware.Recoverer)
 	router.Use(platformmiddleware.AuditMiddleware(auditService))
 	router.Use(platformmiddleware.MaxBodySize(1 << 20)) // 1 MB default for JSON endpoints
@@ -672,7 +673,7 @@ const defaultTenantID = "00000000-0000-0000-0000-000000000001"
 // The first tenant reuses the well-known UUID created by the migration
 // (existing data is backfilled to it). Additional tenants are upserted by slug.
 // Runs as superuser — no RLS.
-func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.TenantConfig) error {
+func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.TenantConfig, waDefaults config.WAHADefaultsConfig) error {
 	for i, tc := range tenants {
 		var tenantID string
 
@@ -729,10 +730,18 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 			return fmt.Errorf("set tenant guc for wa config seed: %w", err)
 		}
 		_, err = waConn.Exec(ctx,
-			`INSERT INTO tenant_wa_configs (tenant_id)
-			 VALUES ($1::uuid)
+			`INSERT INTO tenant_wa_configs (
+				tenant_id, api_url, api_key, session_name, enabled,
+				max_daily_messages, min_delay_ms, max_delay_ms,
+				reminder_cron, weekly_digest_cron
+			 )
+			 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			 ON CONFLICT (tenant_id) DO NOTHING`,
-			tenantID)
+			tenantID,
+			waDefaults.APIURL, waDefaults.APIKey, waDefaults.SessionName, waDefaults.Enabled,
+			waDefaults.MaxDailyMessages, waDefaults.MinDelayMS, waDefaults.MaxDelayMS,
+			waDefaults.ReminderCron, waDefaults.WeeklyDigestCron,
+		)
 		_, _ = waConn.Exec(ctx, "RESET ALL")
 		waConn.Release()
 		if err != nil {

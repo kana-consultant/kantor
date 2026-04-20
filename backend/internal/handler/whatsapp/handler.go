@@ -11,6 +11,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	wadto "github.com/kana-consultant/kantor/backend/internal/dto/whatsapp"
+	"github.com/kana-consultant/kantor/backend/internal/httputil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
 	"github.com/kana-consultant/kantor/backend/internal/response"
@@ -583,28 +584,9 @@ func (h *Handler) updateUserPhone(w http.ResponseWriter, r *http.Request) {
 // --------------- Helpers ---------------
 
 func (h *Handler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {
-	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
-		return false
-	}
-	if err := h.validator.Struct(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", validationDetails(err))
-		return false
-	}
-	return true
+	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
 
 func (h *Handler) writeInternalError(ctx context.Context, w http.ResponseWriter, err error) {
 	response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
-}
-
-func validationDetails(err error) map[string]string {
-	details := make(map[string]string)
-	var validationErrors validator.ValidationErrors
-	if errors.As(err, &validationErrors) {
-		for _, fe := range validationErrors {
-			details[fe.Field()] = fe.Tag()
-		}
-	}
-	return details
 }

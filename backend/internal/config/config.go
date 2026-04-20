@@ -28,6 +28,22 @@ type Config struct {
 	SeedDemoUsers             SeedDemoUsersConfig
 	AppURL                    string
 	Tenants                   []TenantConfig
+	WAHADefaults              WAHADefaultsConfig
+}
+
+// WAHADefaultsConfig holds the WAHA (WhatsApp HTTP API) values used to seed a
+// tenant_wa_configs row when a tenant is first created. Existing rows are
+// untouched — operators tune live values via the in-app WhatsApp settings page.
+type WAHADefaultsConfig struct {
+	APIURL           string
+	APIKey           string
+	SessionName      string
+	Enabled          bool
+	MaxDailyMessages int
+	MinDelayMS       int
+	MaxDelayMS       int
+	ReminderCron     string
+	WeeklyDigestCron string
 }
 
 type SeedSuperAdminConfig struct {
@@ -88,6 +104,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	wahaDefaults, err := loadWAHADefaults()
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		AppEnv:                    appEnv,
 		Port:                      getEnv("PORT", "8080"),
@@ -102,6 +123,7 @@ func Load() (Config, error) {
 		TrackerRetentionDays:      parseIntEnv("TRACKER_RETENTION_DAYS", 90),
 		AppURL:                    getEnv("APP_URL", "http://localhost:3000"),
 		Tenants:                   parseTenants(getEnv("TENANTS", "Default|default|localhost")),
+		WAHADefaults:              wahaDefaults,
 		SeedSuperAdmin: SeedSuperAdminConfig{
 			Enabled:  seedEnabled,
 			Email:    getEnv("SEED_SUPERADMIN_EMAIL", "superadmin@kantor.local"),
@@ -248,6 +270,60 @@ func splitCSV(value string) []string {
 	}
 
 	return result
+}
+
+func loadWAHADefaults() (WAHADefaultsConfig, error) {
+	enabled, err := parseBool("WAHA_ENABLED", false)
+	if err != nil {
+		return WAHADefaultsConfig{}, err
+	}
+
+	maxDaily, err := parseIntEnvStrict("WAHA_MAX_DAILY_MESSAGES", 50)
+	if err != nil {
+		return WAHADefaultsConfig{}, err
+	}
+	minDelay, err := parseIntEnvStrict("WAHA_MIN_DELAY_MS", 2000)
+	if err != nil {
+		return WAHADefaultsConfig{}, err
+	}
+	maxDelay, err := parseIntEnvStrict("WAHA_MAX_DELAY_MS", 5000)
+	if err != nil {
+		return WAHADefaultsConfig{}, err
+	}
+
+	if maxDaily <= 0 {
+		return WAHADefaultsConfig{}, errors.New("WAHA_MAX_DAILY_MESSAGES must be greater than zero")
+	}
+	if minDelay < 0 || maxDelay < 0 {
+		return WAHADefaultsConfig{}, errors.New("WAHA_MIN_DELAY_MS and WAHA_MAX_DELAY_MS must be non-negative")
+	}
+	if minDelay > maxDelay {
+		return WAHADefaultsConfig{}, errors.New("WAHA_MIN_DELAY_MS must be less than or equal to WAHA_MAX_DELAY_MS")
+	}
+
+	return WAHADefaultsConfig{
+		APIURL:           getEnv("WAHA_API_URL", "http://localhost:3000"),
+		APIKey:           os.Getenv("WAHA_API_KEY"),
+		SessionName:      getEnv("WAHA_SESSION", "default"),
+		Enabled:          enabled,
+		MaxDailyMessages: maxDaily,
+		MinDelayMS:       minDelay,
+		MaxDelayMS:       maxDelay,
+		ReminderCron:     getEnv("WAHA_REMINDER_CRON", "0 8 * * 1-5"),
+		WeeklyDigestCron: getEnv("WAHA_WEEKLY_DIGEST_CRON", "0 8 * * 1"),
+	}, nil
+}
+
+func parseIntEnvStrict(key string, fallback int) (int, error) {
+	value, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return 0, fmt.Errorf("invalid integer for %s: %w", key, err)
+	}
+	return parsed, nil
 }
 
 func parseIntEnv(key string, fallback int) int {

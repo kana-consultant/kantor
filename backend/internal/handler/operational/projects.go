@@ -2,7 +2,6 @@ package operational
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
+	"github.com/kana-consultant/kantor/backend/internal/httputil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 	"github.com/kana-consultant/kantor/backend/internal/response"
@@ -181,17 +181,7 @@ func (h *ProjectsHandler) listAvailableUsers(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *ProjectsHandler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {
-	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
-		return false
-	}
-
-	if err := h.validator.Struct(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", validationDetails(err))
-		return false
-	}
-
-	return true
+	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
 
 func (h *ProjectsHandler) parseListQuery(w http.ResponseWriter, r *http.Request) (operationaldto.ListProjectsQuery, bool) {
@@ -243,18 +233,7 @@ func (h *ProjectsHandler) writeError(ctx context.Context, w http.ResponseWriter,
 }
 
 func validationDetails(err error) map[string]string {
-	details := map[string]string{}
-
-	validationErrors, ok := err.(validator.ValidationErrors)
-	if !ok {
-		return details
-	}
-
-	for _, validationErr := range validationErrors {
-		details[validationErr.Field()] = validationErr.Tag()
-	}
-
-	return details
+	return httputil.ValidationDetails(err)
 }
 
 func validateProjectIDParam(w http.ResponseWriter, projectID string) (string, bool) {

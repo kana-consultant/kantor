@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -18,6 +19,80 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), requestIDKey{}, reqID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// accessLogSkipPaths lists endpoints that are excluded from access logging
+// to keep the log volume manageable. Health probes are hit every few seconds
+// by container orchestrators and would otherwise dominate the log output.
+var accessLogSkipPaths = map[string]struct{}{
+	"/healthz":       {},
+	"/readyz":        {},
+	"/api/v1/health": {},
+}
+
+// AccessLogger emits a structured log line for every HTTP request after the
+// response is written. It captures method, path, status, latency, bytes,
+// remote IP, request_id, and (when authenticated) user_id and tenant_id.
+//
+// Mount this OUTSIDE Recoverer (i.e. before Recoverer in the .Use chain) so
+// that panics surfaced as 500s by Recoverer are still recorded.
+func AccessLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, skip := accessLogSkipPaths[r.URL.Path]; skip {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ww := chimiddleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		start := time.Now()
+
+		defer func() {
+			status := ww.Status()
+			if status == 0 {
+				status = http.StatusOK
+			}
+			latency := time.Since(start)
+
+			attrs := []any{
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.Int("status", status),
+				slog.Int("bytes", ww.BytesWritten()),
+				slog.Int64("latency_ms", latency.Milliseconds()),
+				slog.String("remote_ip", r.RemoteAddr),
+			}
+			if reqID := chimiddleware.GetReqID(r.Context()); reqID != "" {
+				attrs = append(attrs, slog.String("request_id", reqID))
+			}
+			if principal, ok := PrincipalFromContext(r.Context()); ok {
+				attrs = append(attrs, slog.String("user_id", principal.UserID))
+				if principal.TenantID != "" {
+					attrs = append(attrs, slog.String("tenant_id", principal.TenantID))
+				}
+			}
+
+			level := slog.LevelInfo
+			switch {
+			case status >= 500:
+				level = slog.LevelError
+			case status >= 400:
+				level = slog.LevelWarn
+			}
+			slog.Default().LogAttrs(r.Context(), level, "http_request", toSlogAttrs(attrs)...)
+		}()
+
+		next.ServeHTTP(ww, r)
+	})
+}
+
+func toSlogAttrs(values []any) []slog.Attr {
+	out := make([]slog.Attr, 0, len(values))
+	for _, v := range values {
+		if attr, ok := v.(slog.Attr); ok {
+			out = append(out, attr)
+		}
+	}
+	return out
 }
 
 // LoggerFromContext returns a logger enriched with the request_id

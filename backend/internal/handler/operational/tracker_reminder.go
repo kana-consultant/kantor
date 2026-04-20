@@ -1,7 +1,6 @@
 package operational
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
+	"github.com/kana-consultant/kantor/backend/internal/httputil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
@@ -118,13 +118,5 @@ func (h *TrackerReminderHandler) toResponse(cfg model.TrackerReminderConfig) ope
 }
 
 func (h *TrackerReminderHandler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {
-	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
-		return false
-	}
-	if err := h.validator.Struct(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", validationDetails(err))
-		return false
-	}
-	return true
+	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
