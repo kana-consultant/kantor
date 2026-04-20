@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	"github.com/kana-consultant/kantor/backend/internal/dto"
+	"github.com/kana-consultant/kantor/backend/internal/httputil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
@@ -323,17 +323,7 @@ func (h *Handler) readRefreshTokenCookie(r *http.Request) (string, error) {
 }
 
 func (h *Handler) decodeAndValidate(w http.ResponseWriter, r *http.Request, target interface{}) bool {
-	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Body request harus berupa JSON yang valid", nil)
-		return false
-	}
-
-	if err := h.validator.Struct(target); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Validasi request gagal", validationDetails(err))
-		return false
-	}
-
-	return true
+	return httputil.DecodeAndValidate(h.validator, w, r, target)
 }
 
 func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
@@ -364,18 +354,7 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 }
 
 func validationDetails(err error) map[string]string {
-	details := map[string]string{}
-
-	validationErrors, ok := err.(validator.ValidationErrors)
-	if !ok {
-		return details
-	}
-
-	for _, validationErr := range validationErrors {
-		details[validationErr.Field()] = validationErr.Tag()
-	}
-
-	return details
+	return httputil.ValidationDetails(err)
 }
 
 func clientIP(r *http.Request) string {
