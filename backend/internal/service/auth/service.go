@@ -61,6 +61,7 @@ type authRepository interface {
 	IncrementFailedLoginAttempts(ctx context.Context, userID string, maxAttempts int, lockDuration time.Duration) error
 	ResetFailedLoginAttempts(ctx context.Context, userID string) error
 	ChangePasswordAndRevokeTokens(ctx context.Context, userID string, passwordHash string) error
+	UpdatePasswordHash(ctx context.Context, userID string, passwordHash string) error
 	ListUsers(ctx context.Context, params authrepo.ListUsersParams) ([]authrepo.UserWithRoles, int64, error)
 	ReplaceUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error
 	SetUserActive(ctx context.Context, userID string, active bool) error
@@ -242,6 +243,14 @@ func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent s
 
 	if user.FailedLoginAttempts > 0 {
 		_ = s.repo.ResetFailedLoginAttempts(ctx, user.ID)
+	}
+
+	if backendauth.NeedsRehash(user.PasswordHash) {
+		if newHash, err := backendauth.HashPassword(input.Password); err == nil {
+			if err := s.repo.UpdatePasswordHash(ctx, user.ID, newHash); err != nil {
+				slog.Error("failed to upgrade password hash", "error", err, "user_id", user.ID)
+			}
+		}
 	}
 
 	return s.issueAuthResult(ctx, user, "", userAgent, ipAddress)
