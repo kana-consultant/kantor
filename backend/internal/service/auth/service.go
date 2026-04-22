@@ -87,6 +87,9 @@ type authRepository interface {
 	GetReimbursementReminderSetting(ctx context.Context) (model.ReimbursementReminderSetting, error)
 	GetTenantPrimaryDomain(ctx context.Context) (string, error)
 	GetPublicAuthOptions(ctx context.Context) (authrepo.PublicAuthOptions, error)
+	GetRegistrationSettings(ctx context.Context) (authrepo.RegistrationSettings, error)
+	UpdateRegistrationSettings(ctx context.Context, updatedBy string, setting authrepo.RegistrationSettings) error
+	ResolveUserFullName(ctx context.Context, userID string) (string, error)
 	UpdateDefaultRoles(ctx context.Context, updatedBy string, mapping map[string]*string) error
 	UpdateAutoCreateEmployee(ctx context.Context, updatedBy string, setting authrepo.AutoCreateEmployeeSetting) error
 	UpdateMailDelivery(ctx context.Context, updatedBy string, setting authrepo.MailDeliverySettingRecord) error
@@ -186,6 +189,11 @@ func (s *Service) EnsureSeedUserWithRoles(ctx context.Context, params authrepo.C
 }
 
 func (s *Service) Register(ctx context.Context, input dto.RegisterRequest, userAgent string, ipAddress string) (AuthResult, error) {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(input.Email))
+	if err := s.validateRegistrationPolicy(ctx, normalizedEmail, input.RegistrationCode); err != nil {
+		return AuthResult{}, err
+	}
+
 	defaultRoles, err := s.repo.GetDefaultRoleAssignments(ctx)
 	if err != nil {
 		return AuthResult{}, err
@@ -197,7 +205,7 @@ func (s *Service) Register(ctx context.Context, input dto.RegisterRequest, userA
 	}
 
 	user, err := s.repo.CreateUserWithRoles(ctx, authrepo.CreateUserParams{
-		Email:        strings.ToLower(strings.TrimSpace(input.Email)),
+		Email:        normalizedEmail,
 		PasswordHash: passwordHash,
 		FullName:     strings.TrimSpace(input.FullName),
 	}, defaultRoles)

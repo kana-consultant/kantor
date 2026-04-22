@@ -141,6 +141,7 @@ type MailDeliverySettingRecord struct {
 
 type PublicAuthOptions struct {
 	ForgotPasswordEnabled bool `json:"forgot_password_enabled"`
+	RegistrationEnabled   bool `json:"registration_enabled"`
 }
 
 func (r *Repository) ListSettingsDepartments(ctx context.Context) ([]model.Department, error) {

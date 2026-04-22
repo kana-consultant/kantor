@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -133,8 +134,21 @@ func (r *Repository) GetPublicAuthOptions(ctx context.Context) (PublicAuthOption
 		return PublicAuthOptions{}, err
 	}
 
+	registration, err := r.GetRegistrationSettings(ctx)
+	if err != nil {
+		return PublicAuthOptions{}, err
+	}
+
+	// Registration requires both the feature toggle and a live (non-expired) code
+	// so the UI never shows a register form the backend will reject outright.
+	registrationReady := registration.Enabled &&
+		strings.TrimSpace(registration.CodeEncrypted) != "" &&
+		registration.CodeExpiresAt != nil &&
+		registration.CodeExpiresAt.After(time.Now().UTC())
+
 	return PublicAuthOptions{
 		ForgotPasswordEnabled: setting.ForgotPasswordEnabled(),
+		RegistrationEnabled:   registrationReady,
 	}, nil
 }
 

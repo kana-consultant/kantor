@@ -264,7 +264,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		fileshandler.New(filesService),
 		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService)
+	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService)
 
 	return application, nil
 }
@@ -407,6 +407,10 @@ func (a *App) buildRouter(
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/auto-create-employee", authHandler.UpdateAutoCreateEmployee)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/mail-delivery", authHandler.UpdateMailDelivery)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/reimbursement-reminder", authHandler.UpdateReimbursementReminder)
+
+					admin.With(platformmiddleware.SuperAdminMiddleware()).Get("/settings/registration", authHandler.GetRegistrationSettings)
+					admin.With(platformmiddleware.SuperAdminMiddleware()).Put("/settings/registration", authHandler.UpdateRegistrationSettings)
+					admin.With(platformmiddleware.SuperAdminMiddleware()).Post("/settings/registration/roll", authHandler.RollRegistrationCode)
 				})
 
 				protected.Route("/operational", func(module chi.Router) {
@@ -462,7 +466,7 @@ func (a *App) buildRouter(
 	return router
 }
 
-func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
+func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -500,6 +504,10 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 			_, err := trackerService.PurgeOldData(tCtx, time.Now())
 			return err
 		})
+		runPerTenant("registration_auto_roll", func(tCtx context.Context, t tenant.Info) error {
+			_, _, err := authService.AutoRollRegistrationCodeIfExpired(tCtx, time.Now())
+			return err
+		})
 
 		for {
 			select {
@@ -511,6 +519,10 @@ func (a *App) startBackgroundJobs(subscriptionsService *hrisservice.Subscription
 				})
 				runPerTenant("tracker_retention", func(tCtx context.Context, t tenant.Info) error {
 					_, err := trackerService.PurgeOldData(tCtx, tickAt)
+					return err
+				})
+				runPerTenant("registration_auto_roll", func(tCtx context.Context, t tenant.Info) error {
+					_, _, err := authService.AutoRollRegistrationCodeIfExpired(tCtx, tickAt)
 					return err
 				})
 			}

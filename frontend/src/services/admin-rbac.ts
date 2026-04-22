@@ -256,3 +256,43 @@ export function updateReimbursementReminder(payload: {
 export function listModules() {
   return authGetJSON<ModuleItem[]>("/modules");
 }
+
+export interface RegistrationSettingsView {
+  enabled: boolean;
+  has_code: boolean;
+  code?: string | null;
+  code_expires_at: string | null;
+  last_rolled_by: string | null;
+  last_rolled_by_name: string | null;
+  last_rolled_at: string | null;
+  rotation_interval_days: number;
+  allowed_email_domains: string[];
+}
+
+export interface RollRegistrationCodeResponse {
+  code: string;
+  settings: RegistrationSettingsView;
+}
+
+export function getRegistrationSettings() {
+  return authGetJSON<RegistrationSettingsView>("/admin/settings/registration");
+}
+
+export function updateRegistrationSettings(payload: {
+  enabled: boolean;
+  rotation_interval_days: number;
+  allowed_email_domains: string[];
+}) {
+  return authRequestJSON<RegistrationSettingsView>("/admin/settings/registration", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function rollRegistrationCode() {
+  return authRequestJSON<RollRegistrationCodeResponse>(
+    "/admin/settings/registration/roll",
+    { method: "POST" },
+  );
+}

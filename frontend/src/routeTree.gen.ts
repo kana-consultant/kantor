@@ -35,6 +35,7 @@ import { Route as AuthenticatedHrisDepartmentsRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin/settings'
 import { Route as AuthenticatedAdminRolesRouteImport } from './routes/_authenticated/admin/roles'
+import { Route as AuthenticatedAdminRegistrationRouteImport } from './routes/_authenticated/admin/registration'
 import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin/audit-logs'
 import { Route as AuthenticatedOperationalProjectsIndexRouteImport } from './routes/_authenticated/operational/projects/index'
 import { Route as AuthenticatedHrisReimbursementsIndexRouteImport } from './routes/_authenticated/hris/reimbursements/index'
@@ -187,6 +188,12 @@ const AuthenticatedAdminRolesRoute = AuthenticatedAdminRolesRouteImport.update({
   path: '/admin/roles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminRegistrationRoute =
+  AuthenticatedAdminRegistrationRouteImport.update({
+    id: '/admin/registration',
+    path: '/admin/registration',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminAuditLogsRoute =
   AuthenticatedAdminAuditLogsRouteImport.update({
     id: '/admin/audit-logs',
@@ -239,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/forbidden': typeof AuthenticatedForbiddenRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
+  '/admin/registration': typeof AuthenticatedAdminRegistrationRoute
   '/admin/roles': typeof AuthenticatedAdminRolesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -273,6 +281,7 @@ export interface FileRoutesByTo {
   '/forbidden': typeof AuthenticatedForbiddenRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
+  '/admin/registration': typeof AuthenticatedAdminRegistrationRoute
   '/admin/roles': typeof AuthenticatedAdminRolesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -309,6 +318,7 @@ export interface FileRoutesById {
   '/_authenticated/forbidden': typeof AuthenticatedForbiddenRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
+  '/_authenticated/admin/registration': typeof AuthenticatedAdminRegistrationRoute
   '/_authenticated/admin/roles': typeof AuthenticatedAdminRolesRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -345,6 +355,7 @@ export interface FileRouteTypes {
     | '/forbidden'
     | '/profile'
     | '/admin/audit-logs'
+    | '/admin/registration'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/forbidden'
     | '/profile'
     | '/admin/audit-logs'
+    | '/admin/registration'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
@@ -414,6 +426,7 @@ export interface FileRouteTypes {
     | '/_authenticated/forbidden'
     | '/_authenticated/profile'
     | '/_authenticated/admin/audit-logs'
+    | '/_authenticated/admin/registration'
     | '/_authenticated/admin/roles'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
@@ -633,6 +646,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRolesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/registration': {
+      id: '/_authenticated/admin/registration'
+      path: '/admin/registration'
+      fullPath: '/admin/registration'
+      preLoaderRoute: typeof AuthenticatedAdminRegistrationRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/audit-logs': {
       id: '/_authenticated/admin/audit-logs'
       path: '/admin/audit-logs'
@@ -689,6 +709,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedForbiddenRoute: typeof AuthenticatedForbiddenRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute
+  AuthenticatedAdminRegistrationRoute: typeof AuthenticatedAdminRegistrationRoute
   AuthenticatedAdminRolesRoute: typeof AuthenticatedAdminRolesRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
@@ -719,6 +740,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedForbiddenRoute: AuthenticatedForbiddenRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedAdminAuditLogsRoute: AuthenticatedAdminAuditLogsRoute,
+  AuthenticatedAdminRegistrationRoute: AuthenticatedAdminRegistrationRoute,
   AuthenticatedAdminRolesRoute: AuthenticatedAdminRolesRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
