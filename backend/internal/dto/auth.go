@@ -1,9 +1,21 @@
 package dto
 
 type RegisterRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8"`
-	FullName string `json:"full_name" validate:"required,min=3,max=120"`
+	Email            string `json:"email" validate:"required,email"`
+	Password         string `json:"password" validate:"required,min=8"`
+	FullName         string `json:"full_name" validate:"required,min=3,max=120"`
+	RegistrationCode string `json:"registration_code" validate:"required,min=8,max=128"`
+}
+
+type UpdateRegistrationSettingsRequest struct {
+	Enabled              bool     `json:"enabled"`
+	RotationIntervalDays int      `json:"rotation_interval_days" validate:"omitempty,min=1,max=90"`
+	AllowedEmailDomains  []string `json:"allowed_email_domains"`
+}
+
+type RollRegistrationCodeResponse struct {
+	Code     string      `json:"code"`
+	Settings interface{} `json:"settings"`
 }
 
 type LoginRequest struct {

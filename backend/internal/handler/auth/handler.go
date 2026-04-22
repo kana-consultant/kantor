@@ -143,6 +143,26 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Register(r.Context(), input, r.UserAgent(), clientIP(r))
 	if err != nil {
+		// Audit failed attempts (no user ID available).
+		reason := ""
+		switch {
+		case errors.Is(err, authservice.ErrRegistrationDisabled):
+			reason = "registration_disabled"
+		case errors.Is(err, authservice.ErrRegistrationCodeMissing):
+			reason = "code_missing"
+		case errors.Is(err, authservice.ErrRegistrationCodeExpired):
+			reason = "code_expired"
+		case errors.Is(err, authservice.ErrRegistrationCodeInvalid):
+			reason = "code_invalid"
+		case errors.Is(err, authservice.ErrRegistrationDomainDeny):
+			reason = "domain_denied"
+		}
+		if reason != "" {
+			platformmiddleware.AuditLog(r.Context(), "register_denied", "admin", "auth", "register", nil, map[string]any{
+				"email":  strings.ToLower(strings.TrimSpace(input.Email)),
+				"reason": reason,
+			})
+		}
 		h.writeAuthError(r.Context(), w, err)
 		return
 	}
@@ -349,6 +369,16 @@ func (h *Handler) writeAuthError(ctx context.Context, w http.ResponseWriter, err
 		response.WriteError(w, http.StatusServiceUnavailable, "PASSWORD_RESET_DISABLED", err.Error(), nil)
 	case errors.Is(err, authservice.ErrPasswordUnchanged):
 		response.WriteError(w, http.StatusBadRequest, "PASSWORD_UNCHANGED", err.Error(), nil)
+	case errors.Is(err, authservice.ErrRegistrationDisabled):
+		response.WriteError(w, http.StatusForbidden, "REGISTRATION_DISABLED", err.Error(), nil)
+	case errors.Is(err, authservice.ErrRegistrationCodeMissing):
+		response.WriteError(w, http.StatusBadRequest, "REGISTRATION_CODE_REQUIRED", err.Error(), map[string]string{"registration_code": "required"})
+	case errors.Is(err, authservice.ErrRegistrationCodeExpired):
+		response.WriteError(w, http.StatusForbidden, "REGISTRATION_CODE_EXPIRED", err.Error(), nil)
+	case errors.Is(err, authservice.ErrRegistrationCodeInvalid):
+		response.WriteError(w, http.StatusForbidden, "REGISTRATION_CODE_INVALID", err.Error(), nil)
+	case errors.Is(err, authservice.ErrRegistrationDomainDeny):
+		response.WriteError(w, http.StatusForbidden, "REGISTRATION_DOMAIN_DENIED", err.Error(), map[string]string{"email": err.Error()})
 	default:
 		response.WriteInternalError(ctx, w, err, "Terjadi kesalahan yang tidak terduga")
 	}

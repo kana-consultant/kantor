@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
 import { getDefaultAuthorizedPath } from "@/lib/rbac";
-import { getValidStoredSession, register } from "@/services/auth";
+import { getAuthPublicOptions, getValidStoredSession, register } from "@/services/auth";
 import { toast } from "@/stores/toast-store";
 
 const registerSchema = z
@@ -19,6 +19,7 @@ const registerSchema = z
     email: z.email("Email wajib valid"),
     password: z.string().min(8, "Kata sandi minimal 8 karakter"),
     confirmPassword: z.string().min(8, "Konfirmasi kata sandi wajib diisi"),
+    registration_code: z.string().min(8, "Kode registrasi wajib diisi"),
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: "Konfirmasi kata sandi tidak sama",
@@ -34,6 +35,18 @@ export const Route = createFileRoute("/register")({
       throw redirect({
         to: getDefaultAuthorizedPath(session),
       });
+    }
+
+    try {
+      const options = await getAuthPublicOptions();
+      if (!options.registration_enabled) {
+        throw redirect({ to: "/login" });
+      }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw redirect({ to: "/login" });
+      }
+      throw error;
     }
   },
   component: RegisterPage,
@@ -52,6 +65,7 @@ function RegisterPage() {
       email: "",
       password: "",
       confirmPassword: "",
+      registration_code: "",
     },
   });
 
@@ -61,6 +75,7 @@ function RegisterPage() {
         email: values.email,
         password: values.password,
         full_name: values.full_name,
+        registration_code: values.registration_code,
       }),
     onSuccess: () => {
       toast.success("Akun berhasil dibuat", "Silakan masuk dengan akun yang baru Anda daftarkan.");
@@ -125,6 +140,14 @@ function RegisterPage() {
               autoComplete="new-password"
               placeholder="Ulangi kata sandi"
               type="password"
+              className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
+            />
+          </Field>
+          <Field label="Kode Registrasi" error={errors.registration_code?.message} required>
+            <Input
+              {...registerField("registration_code")}
+              autoComplete="off"
+              placeholder="Minta kode ke admin"
               className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
             />
           </Field>

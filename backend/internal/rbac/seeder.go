@@ -201,6 +201,19 @@ func seedSettings(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) err
 		return fmt.Errorf("marshal mail delivery setting: %w", err)
 	}
 
+	registrationJSON, err := json.Marshal(map[string]any{
+		"enabled":                false,
+		"code_hash":              "",
+		"code_expires_at":        nil,
+		"last_rolled_by":         nil,
+		"last_rolled_at":         nil,
+		"rotation_interval_days": 7,
+		"allowed_email_domains":  []string{},
+	})
+	if err != nil {
+		return fmt.Errorf("marshal registration setting: %w", err)
+	}
+
 	reimbursementReminderJSON, err := json.Marshal(map[string]any{
 		"enabled": false,
 		"review": map[string]any{
@@ -270,6 +283,16 @@ func seedSettings(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) err
 		"Konfigurasi reminder reimbursement tenant",
 	); err != nil {
 		return fmt.Errorf("seed reimbursement_reminder setting: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		query,
+		"registration",
+		string(registrationJSON),
+		"Konfigurasi self-registration: kode, domain allowlist, rotasi",
+	); err != nil {
+		return fmt.Errorf("seed registration setting: %w", err)
 	}
 
 	return nil

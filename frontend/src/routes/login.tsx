@@ -142,14 +142,16 @@ function LoginPage() {
           </div>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-[14px] text-text-secondary">
-            Belum punya akun?{" "}
-            <Link className="font-[600] text-ops hover:underline" to="/register">
-              Daftar
-            </Link>
-          </p>
-        </div>
+        {authPublicOptionsQuery.data?.registration_enabled ? (
+          <div className="mt-6 text-center">
+            <p className="text-[14px] text-text-secondary">
+              Belum punya akun?{" "}
+              <Link className="font-[600] text-ops hover:underline" to="/register">
+                Daftar
+              </Link>
+            </p>
+          </div>
+        ) : null}
       </Card>
     </div>
   );

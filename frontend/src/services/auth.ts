@@ -11,6 +11,7 @@ interface RegisterRequest {
   email: string;
   password: string;
   full_name: string;
+  registration_code: string;
 }
 
 interface ChangePasswordRequest {
@@ -41,6 +42,7 @@ interface ResetPasswordResponse {
 
 export interface AuthPublicOptions {
   forgot_password_enabled: boolean;
+  registration_enabled: boolean;
 }
 
 export function login(payload: LoginRequest) {

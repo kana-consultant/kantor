@@ -14,6 +14,7 @@ import {
   BarChart3,
   UserPlus,
   Shield,
+  ShieldCheck,
   ScrollText,
   Settings2,
 } from "lucide-react";
@@ -196,6 +197,15 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
         permission: permissions.adminSettingsView,
       },
     ].filter((item) => hasPermission(item.permission));
+
+    if (isSuperAdmin) {
+      adminItems.push({
+        to: "/admin/registration",
+        label: "Registrasi",
+        icon: ShieldCheck,
+        permission: "__super_admin__",
+      });
+    }
 
     if (adminItems.length > 0) {
       visibleSections.push({
