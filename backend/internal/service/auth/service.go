@@ -284,6 +284,14 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, userAgent st
 		return AuthResult{}, ErrExpiredRefreshToken
 	}
 
+	// Proof-of-possession: a refresh request from a different User-Agent than
+	// the one the cookie was issued to is treated as theft. Revoke the token
+	// to invalidate the active session and force the caller to log in again.
+	if !refreshUserAgentMatches(storedToken.UserAgent, userAgent) {
+		_ = s.repo.RevokeRefreshToken(ctx, tokenHash)
+		return AuthResult{}, ErrInvalidRefreshToken
+	}
+
 	user, err := s.repo.GetUserByID(ctx, storedToken.UserID)
 	if err != nil {
 		if errors.Is(err, authrepo.ErrNotFound) {
@@ -925,6 +933,62 @@ func toModuleRoleDTOs(items map[string]rbac.ModuleRole) map[string]dto.ModuleRol
 		}
 	}
 	return moduleRoles
+}
+
+// refreshUserAgentMatches checks whether the User-Agent presented on a refresh
+// request matches the one the refresh cookie was issued to. The match is
+// intentionally lenient — User-Agent strings drift on browser auto-update —
+// so we compare a canonical prefix rather than the raw string. An empty
+// stored value is treated as a match for backwards compatibility with rows
+// created before fingerprint binding existed.
+func refreshUserAgentMatches(stored *string, current string) bool {
+	if stored == nil || strings.TrimSpace(*stored) == "" {
+		return true
+	}
+	return userAgentFingerprint(*stored) == userAgentFingerprint(current)
+}
+
+// userAgentFingerprint reduces the User-Agent to a coarse vendor signature.
+// This keeps the binding strict enough to catch a stolen cookie replayed
+// from curl / a different browser, while tolerating point-release updates
+// of the same browser.
+func userAgentFingerprint(ua string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(ua))
+	if trimmed == "" {
+		return ""
+	}
+
+	tokens := []string{
+		"firefox",
+		"edg/",
+		"opr/",
+		"chrome",
+		"safari",
+		"mobile",
+		"android",
+		"iphone",
+		"ipad",
+		"linux",
+		"windows",
+		"macintosh",
+		"curl",
+		"go-http-client",
+	}
+	matched := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		if strings.Contains(trimmed, token) {
+			matched = append(matched, token)
+		}
+	}
+	if len(matched) == 0 {
+		// Fall back to the first whitespace-delimited segment of the UA so we
+		// at least bind to "something" rather than treating every UA equally.
+		if idx := strings.IndexAny(trimmed, " \t"); idx > 0 {
+			return trimmed[:idx]
+		}
+		return trimmed
+	}
+	return strings.Join(matched, "|")
 }
 
 func generatePasswordResetToken() (string, string, error) {

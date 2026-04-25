@@ -288,7 +288,7 @@ func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, user_id::text, token_hash, expires_at, revoked_at, created_at, last_used_at
+		SELECT id::text, user_id::text, token_hash, expires_at, revoked_at, created_at, last_used_at, user_agent
 		FROM refresh_tokens
 		WHERE token_hash = $1
 	`
@@ -302,6 +302,7 @@ func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string
 		&refreshToken.RevokedAt,
 		&refreshToken.CreatedAt,
 		&refreshToken.LastUsedAt,
+		&refreshToken.UserAgent,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
