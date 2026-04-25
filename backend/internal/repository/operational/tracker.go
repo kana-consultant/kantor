@@ -144,7 +144,7 @@ func (r *TrackerRepository) UpsertConsent(ctx context.Context, userID string, co
 		&consent.CreatedAt,
 	)
 	if err != nil {
-		slog.Error("tracker consent upsert query failed", "error", err, "user_id", userID, "consented", consented)
+		slog.ErrorContext(ctx, "tracker consent upsert query failed", "error", err, "user_id", userID, "consented", consented)
 		return model.ActivityConsent{}, err
 	}
 

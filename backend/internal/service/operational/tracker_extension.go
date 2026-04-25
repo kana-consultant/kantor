@@ -15,13 +15,13 @@ import (
 
 var ErrTrackerExtensionUnavailable = errors.New("tracker extension package is unavailable")
 
-func (s *TrackerService) BuildExtensionArchive(_ context.Context) ([]byte, string, error) {
+func (s *TrackerService) BuildExtensionArchive(ctx context.Context) ([]byte, string, error) {
 	extensionDir, err := resolveExtensionDir()
 	if err != nil {
-		slog.Error("failed to resolve extension directory", "error", err)
+		slog.ErrorContext(ctx, "failed to resolve extension directory", "error", err)
 		return nil, "", ErrTrackerExtensionUnavailable
 	}
-	slog.Info("resolved extension directory", "path", extensionDir)
+	slog.InfoContext(ctx, "resolved extension directory", "path", extensionDir)
 
 	buffer := bytes.NewBuffer(nil)
 	archive := zip.NewWriter(buffer)
@@ -58,7 +58,7 @@ func (s *TrackerService) BuildExtensionArchive(_ context.Context) ([]byte, strin
 		return nil
 	}); err != nil {
 		_ = archive.Close()
-		slog.Error("failed to walk extension directory", "error", err, "dir", extensionDir)
+		slog.ErrorContext(ctx, "failed to walk extension directory", "error", err, "dir", extensionDir)
 		return nil, "", fmt.Errorf("archive tracker extension: %w", err)
 	}
 

@@ -244,7 +244,7 @@ func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent s
 
 	if passwordErr != nil {
 		if err := s.repo.IncrementFailedLoginAttempts(ctx, user.ID, maxFailedLoginAttempts, accountLockDuration); err != nil {
-			slog.Error("failed to increment login attempts", "error", err, "user_id", user.ID)
+			slog.ErrorContext(ctx, "failed to increment login attempts", "error", err, "user_id", user.ID)
 		}
 		return AuthResult{}, ErrInvalidCredentials
 	}
@@ -256,7 +256,7 @@ func (s *Service) Login(ctx context.Context, input dto.LoginRequest, userAgent s
 	if backendauth.NeedsRehash(user.PasswordHash) {
 		if newHash, err := backendauth.HashPassword(input.Password); err == nil {
 			if err := s.repo.UpdatePasswordHash(ctx, user.ID, newHash); err != nil {
-				slog.Error("failed to upgrade password hash", "error", err, "user_id", user.ID)
+				slog.ErrorContext(ctx, "failed to upgrade password hash", "error", err, "user_id", user.ID)
 			}
 		}
 	}
@@ -580,7 +580,7 @@ func (s *Service) ChangeEmail(ctx context.Context, userID string, newEmail strin
 
 	// Also sync to employees table
 	if err := s.repo.UpdateEmployeeEmailByUserID(ctx, userID, newEmail); err != nil {
-		slog.Warn("failed to sync email to employee", "user_id", userID, "error", err)
+		slog.WarnContext(ctx, "failed to sync email to employee", "user_id", userID, "error", err)
 	}
 
 	return nil
@@ -589,7 +589,7 @@ func (s *Service) ChangeEmail(ctx context.Context, userID string, newEmail strin
 func (s *Service) UpdateProfileAvatar(ctx context.Context, userID string, avatarURL string) error {
 	// Update employee avatar
 	if err := s.repo.UpdateEmployeeAvatarByUserID(ctx, userID, avatarURL); err != nil {
-		slog.Warn("failed to sync avatar to employee", "user_id", userID, "error", err)
+		slog.WarnContext(ctx, "failed to sync avatar to employee", "user_id", userID, "error", err)
 	}
 	// Sync to users table
 	return s.repo.UpdateUserAvatar(ctx, userID, &avatarURL)

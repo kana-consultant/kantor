@@ -194,7 +194,7 @@ func (s *TrackerReminderService) RunReminderJobs(ctx context.Context, now time.T
 
 	loc, err := time.LoadLocation(cfg.Timezone)
 	if err != nil {
-		slog.Warn("tracker reminder falling back to UTC", "tenant_timezone", cfg.Timezone, "error", err)
+		slog.WarnContext(ctx, "tracker reminder falling back to UTC", "tenant_timezone", cfg.Timezone, "error", err)
 		loc = time.UTC
 	}
 	nowLocal := now.In(loc)
@@ -222,7 +222,7 @@ func (s *TrackerReminderService) RunReminderJobs(ctx context.Context, now time.T
 	for _, c := range candidates {
 		exists, err := s.repo.HasRecentReminder(ctx, c.UserID, dedupSince)
 		if err != nil {
-			slog.Error("tracker reminder dedup check failed", "user_id", c.UserID, "error", err)
+			slog.ErrorContext(ctx, "tracker reminder dedup check failed", "user_id", c.UserID, "error", err)
 			continue
 		}
 		if exists {
@@ -243,12 +243,12 @@ func (s *TrackerReminderService) RunReminderJobs(ctx context.Context, now time.T
 
 	if len(pendingInApp) > 0 {
 		if err := s.notifs.CreateMany(ctx, pendingInApp); err != nil {
-			slog.Error("tracker reminder in-app dispatch failed", "error", err, "count", len(pendingInApp))
+			slog.ErrorContext(ctx, "tracker reminder in-app dispatch failed", "error", err, "count", len(pendingInApp))
 		}
 	}
 	for _, c := range waTargets {
 		if err := s.wa.QuickSend(ctx, *c.Phone, trackerReminderWAMessage(c.FullName)); err != nil {
-			slog.Warn("tracker reminder WA dispatch failed", "user_id", c.UserID, "error", err)
+			slog.WarnContext(ctx, "tracker reminder WA dispatch failed", "user_id", c.UserID, "error", err)
 		}
 	}
 	return nil

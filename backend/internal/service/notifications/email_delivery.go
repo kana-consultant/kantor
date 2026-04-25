@@ -67,7 +67,7 @@ func (s *EmailDeliveryService) SendTaskAssignedNotification(ctx context.Context,
 	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
 		return struct{}{}, s.sendTaskAssignedNotification(scopedCtx, taskID)
 	}); err != nil && !errors.Is(err, ErrNotificationEmailsDisabled) {
-		slog.Error("failed to send task assigned email", "task_id", taskID, "assignee_id", assigneeID, "error", err)
+		slog.ErrorContext(ctx, "failed to send task assigned email", "task_id", taskID, "assignee_id", assigneeID, "error", err)
 	}
 }
 
@@ -75,7 +75,7 @@ func (s *EmailDeliveryService) SendReimbursementStatusNotification(ctx context.C
 	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
 		return struct{}{}, s.sendReimbursementStatusNotification(scopedCtx, reimbursementID, newStatus, reviewerNotes)
 	}); err != nil && !errors.Is(err, ErrNotificationEmailsDisabled) {
-		slog.Error("failed to send reimbursement status email", "reimbursement_id", reimbursementID, "error", err)
+		slog.ErrorContext(ctx, "failed to send reimbursement status email", "reimbursement_id", reimbursementID, "error", err)
 	}
 }
 
@@ -83,7 +83,7 @@ func (s *EmailDeliveryService) SendReimbursementReminder(ctx context.Context, re
 	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
 		return struct{}{}, s.sendReimbursementReminder(scopedCtx, recipient, digest)
 	}); err != nil && !errors.Is(err, ErrNotificationEmailsDisabled) {
-		slog.Error("failed to send reimbursement reminder email", "user_id", recipient.UserID, "kind", digest.Kind, "error", err)
+		slog.ErrorContext(ctx, "failed to send reimbursement reminder email", "user_id", recipient.UserID, "kind", digest.Kind, "error", err)
 	}
 }
 
@@ -266,7 +266,7 @@ func (s *EmailDeliveryService) sendWeeklyDigest(ctx context.Context, now time.Ti
 			HTML:    renderWeeklyDigestHTML(item, weekStart, weekEnd, baseURL),
 			Text:    renderWeeklyDigestText(item, weekStart, weekEnd, baseURL),
 		}); err != nil {
-			slog.Error("failed to send weekly digest email", "user_id", item.UserID, "error", err)
+			slog.ErrorContext(ctx, "failed to send weekly digest email", "user_id", item.UserID, "error", err)
 		}
 	}
 

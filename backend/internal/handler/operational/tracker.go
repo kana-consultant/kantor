@@ -212,7 +212,7 @@ func (h *TrackerHandler) getMyActivity(w http.ResponseWriter, r *http.Request) {
 
 	activity, err := h.service.GetMyActivity(r.Context(), principal.UserID, dateFrom, dateTo)
 	if err != nil {
-		slog.Error("failed to load tracker activity", "error", err, "userID", principal.UserID)
+		slog.ErrorContext(r.Context(), "failed to load tracker activity", "error", err, "userID", principal.UserID)
 		response.WriteInternalError(r.Context(), w, err, "Failed to load tracker activity")
 		return
 	}
@@ -222,7 +222,7 @@ func (h *TrackerHandler) getMyActivity(w http.ResponseWriter, r *http.Request) {
 func (h *TrackerHandler) downloadExtension(w http.ResponseWriter, r *http.Request) {
 	archiveBytes, filename, err := h.service.BuildExtensionArchive(r.Context())
 	if err != nil {
-		slog.Error("failed to build extension archive", "error", err)
+		slog.ErrorContext(r.Context(), "failed to build extension archive", "error", err)
 		response.WriteError(w, http.StatusInternalServerError, "TRACKER_EXTENSION_UNAVAILABLE", "Tracker extension package is not available right now", nil)
 		return
 	}
