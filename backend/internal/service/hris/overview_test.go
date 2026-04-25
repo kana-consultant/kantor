@@ -67,7 +67,7 @@ func TestOverviewServiceTotalMonthlyPayroll(t *testing.T) {
 
 	service := NewOverviewService(&overviewRepoStub{
 		payrollCiphertexts: []string{first, second},
-	}, &overviewEmployeesRepoStub{}, encrypter)
+	}, &overviewEmployeesRepoStub{}, encrypter, NewPayrollCache(0))
 
 	total, err := service.totalMonthlyPayroll(context.Background())
 	if err != nil {
@@ -105,7 +105,7 @@ func TestOverviewServiceGetOverviewScopesEmployeeWhenNotViewAll(t *testing.T) {
 	employeesRepo := &overviewEmployeesRepoStub{
 		employee: model.Employee{ID: "employee-123"},
 	}
-	service := NewOverviewService(repo, employeesRepo, encrypter)
+	service := NewOverviewService(repo, employeesRepo, encrypter, NewPayrollCache(0))
 
 	overview, err := service.GetOverview(context.Background(), "user-123", &rbac.CachedPermissions{
 		Permissions: map[string]bool{},
@@ -164,7 +164,7 @@ func TestOverviewServiceGetOverviewAddsRecurringPayrollAndSubscriptionToSeries(t
 			},
 		},
 	}
-	service := NewOverviewService(repo, &overviewEmployeesRepoStub{}, encrypter)
+	service := NewOverviewService(repo, &overviewEmployeesRepoStub{}, encrypter, NewPayrollCache(0))
 
 	overview, err := service.GetOverview(context.Background(), "user-123", &rbac.CachedPermissions{
 		Permissions: map[string]bool{

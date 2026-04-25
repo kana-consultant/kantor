@@ -27,10 +27,16 @@ type OverviewService struct {
 	repo          hrisOverviewRepository
 	employeesRepo overviewEmployeesRepository
 	encrypter     *security.Encrypter
+	payrollCache  *PayrollCache
 }
 
-func NewOverviewService(repo hrisOverviewRepository, employeesRepo overviewEmployeesRepository, encrypter *security.Encrypter) *OverviewService {
-	return &OverviewService{repo: repo, employeesRepo: employeesRepo, encrypter: encrypter}
+func NewOverviewService(repo hrisOverviewRepository, employeesRepo overviewEmployeesRepository, encrypter *security.Encrypter, payrollCache *PayrollCache) *OverviewService {
+	return &OverviewService{
+		repo:          repo,
+		employeesRepo: employeesRepo,
+		encrypter:     encrypter,
+		payrollCache:  payrollCache,
+	}
 }
 
 func (s *OverviewService) GetOverview(ctx context.Context, actorID string, perms *rbac.CachedPermissions) (model.HrisOverview, error) {
@@ -68,6 +74,10 @@ func (s *OverviewService) GetOverview(ctx context.Context, actorID string, perms
 }
 
 func (s *OverviewService) totalMonthlyPayroll(ctx context.Context) (int64, error) {
+	if cached, ok := s.payrollCache.Get(ctx); ok {
+		return cached, nil
+	}
+
 	ciphertexts, err := s.repo.ListLatestActivePayrollCiphertexts(ctx)
 	if err != nil {
 		return 0, err
@@ -86,6 +96,7 @@ func (s *OverviewService) totalMonthlyPayroll(ctx context.Context) (int64, error
 		total += value
 	}
 
+	s.payrollCache.Set(ctx, total)
 	return total, nil
 }
 
