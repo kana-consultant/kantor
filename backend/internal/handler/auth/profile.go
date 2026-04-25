@@ -10,13 +10,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
+	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
@@ -130,8 +130,8 @@ func (h *Handler) UploadProfileAvatar(w http.ResponseWriter, r *http.Request) {
 var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
 func saveProfileAvatar(baseDir string, userID string, file *multipart.FileHeader) (string, error) {
-	if file.Size > 5<<20 {
-		return "", fmt.Errorf("avatar harus lebih kecil dari 5MB")
+	if _, err := uploads.ValidateMultipartFile(uploads.KindAvatar, file); err != nil {
+		return "", fmt.Errorf("avatar tidak valid: %w", err)
 	}
 
 	src, err := file.Open()
@@ -139,20 +139,6 @@ func saveProfileAvatar(baseDir string, userID string, file *multipart.FileHeader
 		return "", fmt.Errorf("gagal membuka file: %w", err)
 	}
 	defer src.Close()
-
-	sniff := make([]byte, 512)
-	n, readErr := src.Read(sniff)
-	if readErr != nil && !errors.Is(readErr, io.EOF) {
-		return "", fmt.Errorf("gagal membaca file: %w", readErr)
-	}
-	if _, err := src.Seek(0, 0); err != nil {
-		return "", err
-	}
-
-	contentType := http.DetectContentType(sniff[:n])
-	if !strings.HasPrefix(contentType, "image/") {
-		return "", fmt.Errorf("file harus berupa gambar")
-	}
 
 	dir := filepath.Join(baseDir, "profiles", userID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

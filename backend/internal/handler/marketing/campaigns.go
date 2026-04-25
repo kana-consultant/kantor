@@ -23,6 +23,7 @@ import (
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
+	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
 type CampaignsHandler struct {
@@ -452,30 +453,15 @@ func saveCampaignAttachments(baseUploadsDir string, files []*multipart.FileHeade
 
 	items := make([]uploadedCampaignFile, 0, len(files))
 	for _, file := range files {
-		if file.Size > 25<<20 {
-			return nil, fmt.Errorf("%w: each file must be smaller than 25MB", errCampaignAttachmentValidation)
+		validation, err := uploads.ValidateMultipartFile(uploads.KindCampaignAttachment, file)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errCampaignAttachmentValidation, err)
 		}
+		contentType := validation.ContentType
 
 		src, err := file.Open()
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
-		}
-
-		sniff := make([]byte, 512)
-		n, readErr := src.Read(sniff)
-		if readErr != nil && !errors.Is(readErr, io.EOF) {
-			_ = src.Close()
-			return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, readErr)
-		}
-		if _, err := src.Seek(0, 0); err != nil {
-			_ = src.Close()
-			return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
-		}
-
-		contentType := http.DetectContentType(sniff[:n])
-		if !allowedCampaignAttachmentType(contentType) {
-			_ = src.Close()
-			return nil, fmt.Errorf("%w: unsupported file type", errCampaignAttachmentValidation)
 		}
 
 		filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitizeCampaignFilename(file.Filename)
@@ -505,27 +491,6 @@ func saveCampaignAttachments(baseUploadsDir string, files []*multipart.FileHeade
 	}
 
 	return items, nil
-}
-
-func allowedCampaignAttachmentType(contentType string) bool {
-	if strings.HasPrefix(contentType, "image/") || strings.HasPrefix(contentType, "video/") {
-		return true
-	}
-
-	switch contentType {
-	case "application/pdf",
-		"text/plain",
-		"text/plain; charset=utf-8",
-		"application/zip",
-		"application/x-zip-compressed",
-		"application/msword",
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-		"application/vnd.ms-powerpoint",
-		"application/vnd.openxmlformats-officedocument.presentationml.presentation":
-		return true
-	default:
-		return false
-	}
 }
 
 func sanitizeCampaignFilename(value string) string {
