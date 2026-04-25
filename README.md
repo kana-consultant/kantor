@@ -133,7 +133,7 @@ docker compose up --build -d
 http://localhost:3000
 ```
 
-Default credentials (when seed is enabled):
+Demo accounts (created by `cd backend && go run ./cmd/seed`):
 
 | Role             | Email                           | Password       |
 | ---------------- | ------------------------------- | -------------- |
@@ -143,7 +143,7 @@ Default credentials (when seed is enabled):
 | Marketing Staff  | `staff.marketing@kantor.local`  | `Password123!` |
 | Marketing Viewer | `viewer.marketing@kantor.local` | `Password123!` |
 
-> **Note:** Disable seed users in production by setting `SEED_SUPERADMIN_ENABLED=false` and `SEED_DEMO_USERS_ENABLED=false`.
+> **Note:** Run `cmd/seed` only against local/staging databases — the demo accounts use a publicly known password.
 
 ---
 
