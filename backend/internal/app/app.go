@@ -360,6 +360,13 @@ func (a *App) buildRouter(
 
 			r.Group(func(protected chi.Router) {
 				protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load))
+				// Per-user throttle so a single compromised token cannot hammer
+				// expensive endpoints (e.g. HRIS overview, exports). 240 req/min
+				// is high enough to leave normal UI navigation untouched.
+				protected.Use(platformmiddleware.NewUserRateLimit(240, time.Minute,
+					"AUTH_RATE_LIMITED",
+					"Terlalu banyak request. Coba lagi sebentar.",
+				))
 				protected.Get("/auth/me", authHandler.Me)
 				protected.Put("/auth/client-context", authHandler.UpdateClientContext)
 				protected.Get("/auth/profile", authHandler.GetProfile)

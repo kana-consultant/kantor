@@ -25,6 +25,25 @@ type rateLimitEntry struct {
 }
 
 func NewIPRateLimit(maxRequests int, window time.Duration, code string, message string) func(http.Handler) http.Handler {
+	return newRateLimit(maxRequests, window, code, message, func(r *http.Request) string {
+		return clientIPFromRequest(r)
+	})
+}
+
+// NewUserRateLimit returns a middleware that throttles authenticated traffic
+// by the authenticated user ID. When no principal is in the context (e.g. on
+// public routes accidentally wrapped with this middleware) it falls back to
+// the request IP so that anonymous traffic is still bounded.
+func NewUserRateLimit(maxRequests int, window time.Duration, code string, message string) func(http.Handler) http.Handler {
+	return newRateLimit(maxRequests, window, code, message, func(r *http.Request) string {
+		if principal, ok := PrincipalFromContext(r.Context()); ok && principal.UserID != "" {
+			return "user:" + principal.UserID
+		}
+		return "ip:" + clientIPFromRequest(r)
+	})
+}
+
+func newRateLimit(maxRequests int, window time.Duration, code string, message string, keyFn func(*http.Request) string) func(http.Handler) http.Handler {
 	limiter := &ipRateLimiter{
 		maxRequests: maxRequests,
 		window:      window,
@@ -33,7 +52,7 @@ func NewIPRateLimit(maxRequests int, window time.Duration, code string, message 
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			retryAfter := limiter.retryAfter(clientIPFromRequest(r), time.Now().UTC())
+			retryAfter := limiter.retryAfter(keyFn(r), time.Now().UTC())
 			if retryAfter > 0 {
 				retryAfterSeconds := int(math.Ceil(retryAfter.Seconds()))
 				if retryAfterSeconds < 1 {
