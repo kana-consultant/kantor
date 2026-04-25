@@ -17,6 +17,17 @@ type AccessClaims struct {
 	jwt.RegisteredClaims
 }
 
+// newJTI returns a 128-bit random identifier suitable for the standard `jti`
+// claim. It lets the auth middleware revoke a specific access token before
+// its natural expiry by adding the JTI to the in-memory blacklist.
+func newJTI() (string, error) {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
+
 type TokenManager struct {
 	secret        []byte
 	accessExpiry  time.Duration
@@ -33,10 +44,15 @@ func NewTokenManager(secret string, accessExpiry time.Duration, refreshExpiry ti
 
 func (m *TokenManager) GenerateAccessToken(userID string, tenantID string, now time.Time) (string, time.Time, error) {
 	expiresAt := now.Add(m.accessExpiry)
+	jti, err := newJTI()
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("generate jti: %w", err)
+	}
 	claims := AccessClaims{
 		Type:     "access",
 		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),

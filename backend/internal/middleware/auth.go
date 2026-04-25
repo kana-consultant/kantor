@@ -27,6 +27,7 @@ const principalContextKey contextKey = "principal"
 func AuthMiddleware(
 	parseToken func(string) (*backendauth.AccessClaims, error),
 	loadPermissions func(context.Context, string) (*rbac.CachedPermissions, error),
+	blacklist *backendauth.AccessTokenBlacklist,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +46,11 @@ func AuthMiddleware(
 			claims, err := parseToken(parts[1])
 			if err != nil {
 				response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Access token is invalid or expired", nil)
+				return
+			}
+
+			if blacklist != nil && blacklist.IsRevoked(claims.ID) {
+				response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Access token has been revoked", nil)
 				return
 			}
 

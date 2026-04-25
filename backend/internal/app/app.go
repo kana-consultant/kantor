@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	backendauth "github.com/kana-consultant/kantor/backend/internal/auth"
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	"github.com/kana-consultant/kantor/backend/internal/metrics"
 	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
@@ -57,13 +58,14 @@ import (
 )
 
 type App struct {
-	cfg              config.Config
-	db               *pgxpool.Pool
-	router           http.Handler
-	backgroundCancel context.CancelFunc
-	permissionCache  *rbac.PermissionCache
-	tenantResolver   *tenant.Resolver
-	metrics          *metrics.Registry
+	cfg                  config.Config
+	db                   *pgxpool.Pool
+	router               http.Handler
+	backgroundCancel     context.CancelFunc
+	permissionCache      *rbac.PermissionCache
+	tenantResolver       *tenant.Resolver
+	metrics              *metrics.Registry
+	accessTokenBlacklist *backendauth.AccessTokenBlacklist
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -135,7 +137,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("configure data encryption: %w", err)
 	}
-	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter)
+	accessTokenBlacklist := backendauth.NewAccessTokenBlacklist(time.Minute)
+	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter, accessTokenBlacklist)
 
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
@@ -190,11 +193,12 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	reimbursementsService.SetReminderEmailSender(emailDeliveryService)
 
 	application := &App{
-		cfg:             cfg,
-		db:              pool,
-		permissionCache: permissionCache,
-		tenantResolver:  tenantResolver,
-		metrics:         metrics.NewRegistry(),
+		cfg:                  cfg,
+		db:                   pool,
+		permissionCache:      permissionCache,
+		tenantResolver:       tenantResolver,
+		metrics:              metrics.NewRegistry(),
+		accessTokenBlacklist: accessTokenBlacklist,
 	}
 	application.router = application.buildRouter(
 		auditService,
@@ -236,6 +240,9 @@ func (a *App) DB() *pgxpool.Pool {
 func (a *App) Close() {
 	if a.backgroundCancel != nil {
 		a.backgroundCancel()
+	}
+	if a.accessTokenBlacklist != nil {
+		a.accessTokenBlacklist.Stop()
 	}
 	if a.db != nil {
 		a.db.Close()
@@ -326,7 +333,7 @@ func (a *App) buildRouter(
 			})
 
 			r.Group(func(protected chi.Router) {
-				protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load))
+				protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load, a.accessTokenBlacklist))
 				// Per-user throttle so a single compromised token cannot hammer
 				// expensive endpoints (e.g. HRIS overview, exports). 240 req/min
 				// is high enough to leave normal UI navigation untouched.
