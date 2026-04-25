@@ -25,6 +25,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/kana-consultant/kantor/backend/internal/config"
+	"github.com/kana-consultant/kantor/backend/internal/metrics"
 	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
@@ -62,6 +63,7 @@ type App struct {
 	backgroundCancel context.CancelFunc
 	permissionCache  *rbac.PermissionCache
 	tenantResolver   *tenant.Resolver
+	metrics          *metrics.Registry
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -187,7 +189,13 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	reimbursementsService.SetReminderWASender(whatsappService)
 	reimbursementsService.SetReminderEmailSender(emailDeliveryService)
 
-	application := &App{cfg: cfg, db: pool, permissionCache: permissionCache, tenantResolver: tenantResolver}
+	application := &App{
+		cfg:             cfg,
+		db:              pool,
+		permissionCache: permissionCache,
+		tenantResolver:  tenantResolver,
+		metrics:         metrics.NewRegistry(),
+	}
 	application.router = application.buildRouter(
 		auditService,
 		authService,
@@ -269,6 +277,7 @@ func (a *App) buildRouter(
 		return otelhttp.NewHandler(next, "http.request")
 	})
 	router.Use(platformmiddleware.AccessLogger)
+	router.Use(a.metrics.Middleware)
 	router.Use(chimiddleware.Recoverer)
 	router.Use(platformmiddleware.AuditMiddleware(auditService))
 	router.Use(platformmiddleware.MaxBodySize(1 << 20)) // 1 MB default for JSON endpoints
@@ -281,6 +290,11 @@ func (a *App) buildRouter(
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	// Prometheus scraping endpoint. No auth so a sidecar / kube probe can hit
+	// it; protect at the network layer (allowlist) if the deployment exposes
+	// the backend directly.
+	router.Handle("/metrics", a.metrics.Handler())
 
 	// Health checks are outside tenant middleware — no Host header required.
 	router.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
