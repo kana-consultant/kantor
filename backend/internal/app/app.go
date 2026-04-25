@@ -131,63 +131,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	}
 	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter)
 
-	// Seed super admin and demo users per-tenant.
-	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {
-		if cfg.SeedSuperAdmin.Enabled {
-			if err := authService.EnsureSeedSuperAdmin(
-				tCtx,
-				cfg.SeedSuperAdmin.Email,
-				cfg.SeedSuperAdmin.Password,
-				cfg.SeedSuperAdmin.FullName,
-			); err != nil {
-				return fmt.Errorf("seed super admin for tenant %s: %w", t.Slug, err)
-			}
-		}
-
-		if cfg.SeedDemoUsers.Enabled {
-			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
-				Email:      cfg.SeedDemoUsers.Staff.Email,
-				FullName:   cfg.SeedDemoUsers.Staff.FullName,
-				Department: stringPointer(cfg.SeedDemoUsers.Staff.Department),
-				Skills:     cfg.SeedDemoUsers.Staff.Skills,
-			}, []rbac.RoleKey{{Name: "staff", Module: "operational"}}, cfg.SeedDemoUsers.Staff.Password); err != nil {
-				return fmt.Errorf("seed staff user for tenant %s: %w", t.Slug, err)
-			}
-
-			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
-				Email:      cfg.SeedDemoUsers.Viewer.Email,
-				FullName:   cfg.SeedDemoUsers.Viewer.FullName,
-				Department: stringPointer(cfg.SeedDemoUsers.Viewer.Department),
-				Skills:     cfg.SeedDemoUsers.Viewer.Skills,
-			}, []rbac.RoleKey{{Name: "viewer", Module: "operational"}}, cfg.SeedDemoUsers.Viewer.Password); err != nil {
-				return fmt.Errorf("seed viewer user for tenant %s: %w", t.Slug, err)
-			}
-
-			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
-				Email:      cfg.SeedDemoUsers.MarketingStaff.Email,
-				FullName:   cfg.SeedDemoUsers.MarketingStaff.FullName,
-				Department: stringPointer(cfg.SeedDemoUsers.MarketingStaff.Department),
-				Skills:     cfg.SeedDemoUsers.MarketingStaff.Skills,
-			}, []rbac.RoleKey{{Name: "staff", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingStaff.Password); err != nil {
-				return fmt.Errorf("seed marketing staff user for tenant %s: %w", t.Slug, err)
-			}
-
-			if err := authService.EnsureSeedUserWithRoles(tCtx, authrepo.CreateUserParams{
-				Email:      cfg.SeedDemoUsers.MarketingViewer.Email,
-				FullName:   cfg.SeedDemoUsers.MarketingViewer.FullName,
-				Department: stringPointer(cfg.SeedDemoUsers.MarketingViewer.Department),
-				Skills:     cfg.SeedDemoUsers.MarketingViewer.Skills,
-			}, []rbac.RoleKey{{Name: "viewer", Module: "marketing"}}, cfg.SeedDemoUsers.MarketingViewer.Password); err != nil {
-				return fmt.Errorf("seed marketing viewer user for tenant %s: %w", t.Slug, err)
-			}
-		}
-
-		return nil
-	}); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("seed users: %w", err)
-	}
-
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
@@ -675,14 +618,6 @@ func ensureRuntimeDirectories(cfg config.Config) error {
 	}
 
 	return nil
-}
-
-func stringPointer(value string) *string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil
-	}
-	return &trimmed
 }
 
 const defaultTenantID = "00000000-0000-0000-0000-000000000001"

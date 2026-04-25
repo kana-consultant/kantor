@@ -61,14 +61,14 @@ Production environment variables no longer carry those tenant-level WA settings.
 
 ### Seed Users
 
-**Disable seed users in production:**
+Demo accounts are no longer seeded automatically at boot. Run them on demand from the backend directory:
 
-```env
-SEED_SUPERADMIN_ENABLED=false
-SEED_DEMO_USERS_ENABLED=false
+```bash
+cd backend
+go run ./cmd/seed
 ```
 
-If you need an initial admin account, enable the super admin seed on first deploy only, then disable it.
+The CLI seeds the demo super admin and four module accounts (defined in `internal/seed/data.go`) for every tenant in `TENANTS`. **Do not run it in production** — the fixtures use a publicly known password.
 
 ### Encryption Key Rotation
 
@@ -92,8 +92,6 @@ JWT_ACCESS_EXPIRY=15m
 JWT_REFRESH_EXPIRY=168h
 CORS_ORIGINS=https://your-domain.com
 APP_URL=https://your-domain.com
-SEED_SUPERADMIN_ENABLED=false
-SEED_DEMO_USERS_ENABLED=false
 VITE_API_BASE_URL=/api/v1
 ```
 
@@ -188,8 +186,7 @@ The Docker Compose healthcheck already uses `/readyz`. External monitoring shoul
 - [ ] `APP_ENV=production`
 - [ ] `JWT_SECRET` is at least 32 random characters (not `change-me`)
 - [ ] `DATA_ENCRYPTION_KEY` is a strong random value
-- [ ] `SEED_SUPERADMIN_ENABLED=false`
-- [ ] `SEED_DEMO_USERS_ENABLED=false`
+- [ ] `cmd/seed` is **not** run against the production database
 - [ ] `CORS_ORIGINS` is set to your actual domain (not `*` or `localhost`)
 - [ ] TLS is terminating before traffic reaches the app
 - [ ] Database is not exposed to the public internet

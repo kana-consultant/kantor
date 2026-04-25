@@ -24,8 +24,6 @@ type Config struct {
 	JWTRefreshExpiry          time.Duration
 	CORSOrigins               []string
 	TrackerRetentionDays      int
-	SeedSuperAdmin            SeedSuperAdminConfig
-	SeedDemoUsers             SeedDemoUsersConfig
 	AppURL                    string
 	Tenants                   []TenantConfig
 	WAHADefaults              WAHADefaultsConfig
@@ -44,29 +42,6 @@ type WAHADefaultsConfig struct {
 	MaxDelayMS       int
 	ReminderCron     string
 	WeeklyDigestCron string
-}
-
-type SeedSuperAdminConfig struct {
-	Enabled  bool
-	Email    string
-	Password string
-	FullName string
-}
-
-type SeedDemoUsersConfig struct {
-	Enabled         bool
-	Staff           SeedUserConfig
-	Viewer          SeedUserConfig
-	MarketingStaff  SeedUserConfig
-	MarketingViewer SeedUserConfig
-}
-
-type SeedUserConfig struct {
-	Email      string
-	Password   string
-	FullName   string
-	Department string
-	Skills     []string
 }
 
 // TenantConfig describes one tenant seeded at startup.
@@ -94,16 +69,6 @@ func Load() (Config, error) {
 	dataEncryptionKey := strings.TrimSpace(os.Getenv("DATA_ENCRYPTION_KEY"))
 	dataEncryptionKeyPrevious := strings.TrimSpace(os.Getenv("DATA_ENCRYPTION_KEY_PREVIOUS"))
 
-	seedEnabled, err := parseBool("SEED_SUPERADMIN_ENABLED", false)
-	if err != nil {
-		return Config{}, err
-	}
-
-	demoUsersEnabled, err := parseBool("SEED_DEMO_USERS_ENABLED", false)
-	if err != nil {
-		return Config{}, err
-	}
-
 	wahaDefaults, err := loadWAHADefaults()
 	if err != nil {
 		return Config{}, err
@@ -124,43 +89,6 @@ func Load() (Config, error) {
 		AppURL:                    getEnv("APP_URL", "http://localhost:3000"),
 		Tenants:                   parseTenants(getEnv("TENANTS", "Default|default|localhost")),
 		WAHADefaults:              wahaDefaults,
-		SeedSuperAdmin: SeedSuperAdminConfig{
-			Enabled:  seedEnabled,
-			Email:    getEnv("SEED_SUPERADMIN_EMAIL", "superadmin@kantor.local"),
-			Password: getEnv("SEED_SUPERADMIN_PASSWORD", "Password123!"),
-			FullName: getEnv("SEED_SUPERADMIN_FULL_NAME", "Seeded Super Admin"),
-		},
-		SeedDemoUsers: SeedDemoUsersConfig{
-			Enabled: demoUsersEnabled,
-			Staff: SeedUserConfig{
-				Email:      getEnv("SEED_STAFF_EMAIL", "staff.ops@kantor.local"),
-				Password:   getEnv("SEED_STAFF_PASSWORD", "Password123!"),
-				FullName:   getEnv("SEED_STAFF_FULL_NAME", "Operational Staff"),
-				Department: getEnv("SEED_STAFF_DEPARTMENT", "engineering"),
-				Skills:     splitCSV(getEnv("SEED_STAFF_SKILLS", "frontend,kanban")),
-			},
-			Viewer: SeedUserConfig{
-				Email:      getEnv("SEED_VIEWER_EMAIL", "viewer.ops@kantor.local"),
-				Password:   getEnv("SEED_VIEWER_PASSWORD", "Password123!"),
-				FullName:   getEnv("SEED_VIEWER_FULL_NAME", "Operational Viewer"),
-				Department: getEnv("SEED_VIEWER_DEPARTMENT", "finance"),
-				Skills:     splitCSV(getEnv("SEED_VIEWER_SKILLS", "qa,reporting")),
-			},
-			MarketingStaff: SeedUserConfig{
-				Email:      getEnv("SEED_MARKETING_STAFF_EMAIL", "staff.marketing@kantor.local"),
-				Password:   getEnv("SEED_MARKETING_STAFF_PASSWORD", "Password123!"),
-				FullName:   getEnv("SEED_MARKETING_STAFF_FULL_NAME", "Marketing Staff"),
-				Department: getEnv("SEED_MARKETING_STAFF_DEPARTMENT", "marketing"),
-				Skills:     splitCSV(getEnv("SEED_MARKETING_STAFF_SKILLS", "copywriting,ads,crm")),
-			},
-			MarketingViewer: SeedUserConfig{
-				Email:      getEnv("SEED_MARKETING_VIEWER_EMAIL", "viewer.marketing@kantor.local"),
-				Password:   getEnv("SEED_MARKETING_VIEWER_PASSWORD", "Password123!"),
-				FullName:   getEnv("SEED_MARKETING_VIEWER_FULL_NAME", "Marketing Viewer"),
-				Department: getEnv("SEED_MARKETING_VIEWER_DEPARTMENT", "marketing"),
-				Skills:     splitCSV(getEnv("SEED_MARKETING_VIEWER_SKILLS", "reporting")),
-			},
-		},
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -178,38 +106,6 @@ func Load() (Config, error) {
 	if cfg.AppEnv == "production" {
 		if len(cfg.JWTSecret) < 32 {
 			return Config{}, errors.New("JWT_SECRET must be at least 32 characters in production")
-		}
-	}
-
-	if cfg.SeedSuperAdmin.Enabled {
-		if strings.TrimSpace(cfg.SeedSuperAdmin.Email) == "" {
-			return Config{}, errors.New("SEED_SUPERADMIN_EMAIL is required when seed is enabled")
-		}
-
-		if strings.TrimSpace(cfg.SeedSuperAdmin.Password) == "" {
-			return Config{}, errors.New("SEED_SUPERADMIN_PASSWORD is required when seed is enabled")
-		}
-
-		if strings.TrimSpace(cfg.SeedSuperAdmin.FullName) == "" {
-			return Config{}, errors.New("SEED_SUPERADMIN_FULL_NAME is required when seed is enabled")
-		}
-	}
-
-	if cfg.SeedDemoUsers.Enabled {
-		if strings.TrimSpace(cfg.SeedDemoUsers.Staff.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Staff.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Staff.FullName) == "" {
-			return Config{}, errors.New("SEED_STAFF_EMAIL, SEED_STAFF_PASSWORD, and SEED_STAFF_FULL_NAME are required when demo seeds are enabled")
-		}
-
-		if strings.TrimSpace(cfg.SeedDemoUsers.Viewer.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Viewer.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.Viewer.FullName) == "" {
-			return Config{}, errors.New("SEED_VIEWER_EMAIL, SEED_VIEWER_PASSWORD, and SEED_VIEWER_FULL_NAME are required when demo seeds are enabled")
-		}
-
-		if strings.TrimSpace(cfg.SeedDemoUsers.MarketingStaff.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingStaff.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingStaff.FullName) == "" {
-			return Config{}, errors.New("SEED_MARKETING_STAFF_EMAIL, SEED_MARKETING_STAFF_PASSWORD, and SEED_MARKETING_STAFF_FULL_NAME are required when demo seeds are enabled")
-		}
-
-		if strings.TrimSpace(cfg.SeedDemoUsers.MarketingViewer.Email) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingViewer.Password) == "" || strings.TrimSpace(cfg.SeedDemoUsers.MarketingViewer.FullName) == "" {
-			return Config{}, errors.New("SEED_MARKETING_VIEWER_EMAIL, SEED_MARKETING_VIEWER_PASSWORD, and SEED_MARKETING_VIEWER_FULL_NAME are required when demo seeds are enabled")
 		}
 	}
 
