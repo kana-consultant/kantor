@@ -67,7 +67,7 @@ func run(ctx context.Context) error {
 	authRepository := authrepo.New(pool)
 	employeesRepository := hrisrepo.NewEmployeesRepository(pool)
 	permissionCache := rbac.NewPermissionCache(pool, 0)
-	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter)
+	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter, nil)
 
 	tenantsSeeded := 0
 	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {

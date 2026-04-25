@@ -124,6 +124,7 @@ type Service struct {
 	permissionCache *rbac.PermissionCache
 	passwordMailer  passwordResetMailer
 	encrypter       *security.Encrypter
+	tokenBlacklist  *backendauth.AccessTokenBlacklist
 	fallbackAppURL  string
 }
 
@@ -149,7 +150,7 @@ type mailDeliveryRuntimeConfig struct {
 	PasswordResetTTL time.Duration
 }
 
-func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config, permissionCache *rbac.PermissionCache, encrypter *security.Encrypter) *Service {
+func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config, permissionCache *rbac.PermissionCache, encrypter *security.Encrypter, tokenBlacklist *backendauth.AccessTokenBlacklist) *Service {
 	return &Service{
 		repo:            repo,
 		employeeRepo:    employeeRepo,
@@ -157,8 +158,29 @@ func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.C
 		permissionCache: permissionCache,
 		passwordMailer:  newResendMailer(),
 		encrypter:       encrypter,
+		tokenBlacklist:  tokenBlacklist,
 		fallbackAppURL:  strings.TrimRight(strings.TrimSpace(cfg.AppURL), "/"),
 	}
+}
+
+// RevokeAccessToken adds the JTI of the supplied access token to the in-memory
+// blacklist so subsequent requests carrying the same token are rejected before
+// they ever reach a handler. Best-effort: invalid or already-expired tokens
+// are silently ignored — the only goal here is to shorten the natural expiry
+// window for a token the user just signed off.
+func (s *Service) RevokeAccessToken(rawToken string) {
+	if s.tokenBlacklist == nil {
+		return
+	}
+	claims, err := s.tokenManager.ParseAccessToken(rawToken)
+	if err != nil || claims == nil || claims.ID == "" {
+		return
+	}
+	exp := time.Time{}
+	if claims.ExpiresAt != nil {
+		exp = claims.ExpiresAt.Time
+	}
+	s.tokenBlacklist.Revoke(claims.ID, exp)
 }
 
 func (s *Service) EnsureSeedSuperAdmin(ctx context.Context, email string, password string, fullName string) error {

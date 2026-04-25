@@ -275,6 +275,14 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Best-effort revoke the access token attached to the request so it cannot
+	// be replayed for the rest of its 15-minute window after sign-out.
+	if header := strings.TrimSpace(r.Header.Get("Authorization")); strings.HasPrefix(strings.ToLower(header), "bearer ") {
+		if raw := strings.TrimSpace(header[len("bearer "):]); raw != "" {
+			h.service.RevokeAccessToken(raw)
+		}
+	}
+
 	refreshToken, err := h.readRefreshTokenCookie(r)
 	if err == nil {
 		if userID, logoutErr := h.service.Logout(r.Context(), refreshToken); logoutErr == nil {
