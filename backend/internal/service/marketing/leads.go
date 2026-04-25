@@ -21,7 +21,27 @@ var (
 	ErrLeadCampaignNotFound     = errors.New("lead campaign not found")
 	ErrLeadContactRequired      = errors.New("lead must include at least phone or email")
 	ErrLeadImportLimitExceeded  = errors.New("lead import exceeds 10000 rows")
+	ErrLeadImportMissingHeader  = errors.New("lead CSV is missing required header columns")
 )
+
+// leadCSVRequiredHeaders are the header columns the importer needs to find in
+// the first row of the CSV. The importer is header-driven (not positional) so
+// callers can produce CSVs from any tool as long as the columns are named.
+var leadCSVRequiredHeaders = []string{"name", "source_channel", "pipeline_status"}
+
+// leadCSVKnownHeaders is the full set of columns the importer recognises.
+// Anything not in this list is ignored without an error.
+var leadCSVKnownHeaders = []string{
+	"name",
+	"phone",
+	"email",
+	"source_channel",
+	"pipeline_status",
+	"assigned_to",
+	"notes",
+	"company_name",
+	"estimated_value",
+}
 
 const maxLeadImportRows = 10000
 
@@ -161,6 +181,7 @@ func (s *LeadsService) CreateActivity(ctx context.Context, leadID string, reques
 func (s *LeadsService) ImportCSV(ctx context.Context, reader io.Reader, actorID string) (model.LeadImportSummary, error) {
 	csvReader := csv.NewReader(reader)
 	csvReader.TrimLeadingSpace = true
+	csvReader.FieldsPerRecord = -1
 
 	header, err := csvReader.Read()
 	if err != nil {
@@ -171,6 +192,11 @@ func (s *LeadsService) ImportCSV(ctx context.Context, reader io.Reader, actorID 
 	}
 	if len(header) == 0 {
 		return model.LeadImportSummary{}, nil
+	}
+
+	headerIndex, missing := buildLeadCSVHeaderIndex(header)
+	if len(missing) > 0 {
+		return model.LeadImportSummary{}, fmt.Errorf("%w: %s", ErrLeadImportMissingHeader, strings.Join(missing, ", "))
 	}
 
 	summary := model.LeadImportSummary{
@@ -198,7 +224,7 @@ func (s *LeadsService) ImportCSV(ctx context.Context, reader io.Reader, actorID 
 			return summary, ErrLeadImportLimitExceeded
 		}
 
-		request, parseErr := parseLeadCSVRow(row)
+		request, parseErr := parseLeadCSVRow(row, headerIndex)
 		if parseErr != nil {
 			summary.FailedCount++
 			summary.Errors = append(summary.Errors, model.LeadImportError{
@@ -221,6 +247,51 @@ func (s *LeadsService) ImportCSV(ctx context.Context, reader io.Reader, actorID 
 	}
 
 	return summary, nil
+}
+
+// buildLeadCSVHeaderIndex normalises the header row (lower-case, trimmed,
+// underscores instead of spaces/dashes) and returns a map from canonical
+// header name to column index. Unknown columns are kept in the map so the
+// caller can decide whether to ignore them. Required headers that are not
+// present are returned in `missing`.
+func buildLeadCSVHeaderIndex(header []string) (map[string]int, []string) {
+	known := make(map[string]struct{}, len(leadCSVKnownHeaders))
+	for _, name := range leadCSVKnownHeaders {
+		known[name] = struct{}{}
+	}
+
+	index := make(map[string]int, len(header))
+	for i, raw := range header {
+		key := normaliseLeadCSVHeader(raw)
+		if key == "" {
+			continue
+		}
+		if _, ok := known[key]; !ok {
+			continue
+		}
+		if _, exists := index[key]; exists {
+			continue
+		}
+		index[key] = i
+	}
+
+	missing := make([]string, 0, len(leadCSVRequiredHeaders))
+	for _, required := range leadCSVRequiredHeaders {
+		if _, ok := index[required]; !ok {
+			missing = append(missing, required)
+		}
+	}
+	return index, missing
+}
+
+func normaliseLeadCSVHeader(value string) string {
+	trimmed := strings.TrimSpace(strings.ToLower(value))
+	trimmed = strings.ReplaceAll(trimmed, "-", "_")
+	trimmed = strings.ReplaceAll(trimmed, " ", "_")
+	for strings.Contains(trimmed, "__") {
+		trimmed = strings.ReplaceAll(trimmed, "__", "_")
+	}
+	return trimmed
 }
 
 func isBlankLeadCSVRow(row []string) bool {
@@ -272,12 +343,17 @@ func mapLeadError(err error) error {
 	}
 }
 
-func parseLeadCSVRow(row []string) (marketingdto.CreateLeadRequest, error) {
-	columns := make([]string, 9)
-	copy(columns, row)
+func parseLeadCSVRow(row []string, headerIndex map[string]int) (marketingdto.CreateLeadRequest, error) {
+	get := func(key string) string {
+		idx, ok := headerIndex[key]
+		if !ok || idx < 0 || idx >= len(row) {
+			return ""
+		}
+		return row[idx]
+	}
 
 	estimatedValue := int64(0)
-	if value := strings.TrimSpace(columns[8]); value != "" {
+	if value := strings.TrimSpace(get("estimated_value")); value != "" {
 		parsed, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return marketingdto.CreateLeadRequest{}, errors.New("estimated_value must be a number")
@@ -286,15 +362,15 @@ func parseLeadCSVRow(row []string) (marketingdto.CreateLeadRequest, error) {
 	}
 
 	return marketingdto.CreateLeadRequest{
-		Name:           strings.TrimSpace(columns[0]),
-		Phone:          stringPointer(columns[1]),
-		Email:          stringPointer(columns[2]),
-		SourceChannel:  strings.TrimSpace(columns[3]),
-		PipelineStatus: strings.TrimSpace(columns[4]),
+		Name:           strings.TrimSpace(get("name")),
+		Phone:          stringPointer(get("phone")),
+		Email:          stringPointer(get("email")),
+		SourceChannel:  strings.TrimSpace(get("source_channel")),
+		PipelineStatus: strings.TrimSpace(get("pipeline_status")),
 		CampaignID:     nil,
-		AssignedTo:     stringPointer(columns[5]),
-		Notes:          stringPointer(columns[6]),
-		CompanyName:    stringPointer(columns[7]),
+		AssignedTo:     stringPointer(get("assigned_to")),
+		Notes:          stringPointer(get("notes")),
+		CompanyName:    stringPointer(get("company_name")),
 		EstimatedValue: estimatedValue,
 	}, nil
 }
