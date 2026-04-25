@@ -31,4 +31,5 @@ type RefreshToken struct {
 	RevokedAt  *time.Time
 	CreatedAt  time.Time
 	LastUsedAt *time.Time
+	UserAgent  *string
 }
