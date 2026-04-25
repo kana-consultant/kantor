@@ -319,7 +319,13 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, currentPass
 		return err
 	}
 
-	return s.repo.ChangePasswordAndRevokeTokens(ctx, userID, newHash)
+	if err := s.repo.ChangePasswordAndRevokeTokens(ctx, userID, newHash); err != nil {
+		return err
+	}
+	// Drop cached permissions so any compromised access token reissued
+	// before this point does not retain its old role set.
+	s.permissionCache.Invalidate(ctx, userID)
+	return nil
 }
 
 func (s *Service) RequestPasswordReset(ctx context.Context, email string, meta PasswordResetRequestMeta) error {
@@ -454,6 +460,7 @@ func (s *Service) ResetPasswordWithToken(ctx context.Context, rawToken string, n
 		return "", err
 	}
 
+	s.permissionCache.Invalidate(ctx, token.UserID)
 	return token.UserID, nil
 }
 
@@ -628,7 +635,13 @@ func (s *Service) UpdateUserRoles(ctx context.Context, userID string, roles []rb
 }
 
 func (s *Service) SetUserActive(ctx context.Context, userID string, active bool) error {
-	return s.repo.SetUserActive(ctx, userID, active)
+	if err := s.repo.SetUserActive(ctx, userID, active); err != nil {
+		return err
+	}
+	// Drop the cached permissions so a deactivated user loses access on the
+	// very next request instead of waiting up to TTL minutes.
+	s.permissionCache.Invalidate(ctx, userID)
+	return nil
 }
 
 func (s *Service) ListRoles(ctx context.Context, params authrepo.RoleListParams) ([]authrepo.RoleListItem, error) {

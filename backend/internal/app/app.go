@@ -118,7 +118,10 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	auditService := auditservice.NewService(auditRepository)
 
 	authRepository := authrepo.New(pool)
-	permissionCache := rbac.NewPermissionCache(pool, 5*time.Minute)
+	// Short TTL — a revoked token / deactivated user must lose access in seconds,
+	// not minutes. Mutating endpoints (role change, deactivate, password change,
+	// password reset) explicitly call Invalidate() but the TTL is the safety net.
+	permissionCache := rbac.NewPermissionCache(pool, 60*time.Second)
 	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
 	var previousKeys []string
 	if cfg.DataEncryptionKeyPrevious != "" {
