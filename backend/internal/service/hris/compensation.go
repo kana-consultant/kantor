@@ -45,13 +45,15 @@ type CompensationService struct {
 	repo          compensationRepository
 	employeesRepo compensationEmployeesRepository
 	encrypter     *security.Encrypter
+	payrollCache  *PayrollCache
 }
 
-func NewCompensationService(repo compensationRepository, employeesRepo compensationEmployeesRepository, encrypter *security.Encrypter) *CompensationService {
+func NewCompensationService(repo compensationRepository, employeesRepo compensationEmployeesRepository, encrypter *security.Encrypter, payrollCache *PayrollCache) *CompensationService {
 	return &CompensationService{
 		repo:          repo,
 		employeesRepo: employeesRepo,
 		encrypter:     encrypter,
+		payrollCache:  payrollCache,
 	}
 }
 
@@ -96,6 +98,7 @@ func (s *CompensationService) CreateSalary(ctx context.Context, employeeID strin
 		return model.SalaryRecord{}, err
 	}
 
+	s.payrollCache.Invalidate(ctx)
 	return s.mapSalaryRow(row)
 }
 
