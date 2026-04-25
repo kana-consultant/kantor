@@ -190,6 +190,13 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Login(r.Context(), input, r.UserAgent(), clientIP(r))
 	if err != nil {
+		reason := loginFailureReason(err)
+		if reason != "" {
+			platformmiddleware.AuditLog(r.Context(), "login_failed", "admin", "auth", "login", nil, map[string]any{
+				"email":  strings.ToLower(strings.TrimSpace(input.Email)),
+				"reason": reason,
+			})
+		}
 		h.writeAuthError(r.Context(), w, err)
 		return
 	}
@@ -211,17 +218,35 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := h.readRefreshTokenCookie(r)
 	if err != nil {
+		platformmiddleware.AuditLog(r.Context(), "token_refresh_failed", "admin", "auth", "refresh", nil, map[string]any{
+			"reason": "cookie_missing",
+		})
 		response.WriteError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Cookie refresh token tidak ditemukan", nil)
 		return
 	}
 
 	result, err := h.service.Refresh(r.Context(), refreshToken, r.UserAgent(), clientIP(r))
 	if err != nil {
+		reason := "unknown"
+		switch {
+		case errors.Is(err, authservice.ErrInvalidRefreshToken):
+			reason = "invalid_token"
+		case errors.Is(err, authservice.ErrExpiredRefreshToken):
+			reason = "expired_token"
+		case errors.Is(err, authservice.ErrInactiveUser):
+			reason = "inactive_user"
+		}
+		platformmiddleware.AuditLog(r.Context(), "token_refresh_failed", "admin", "auth", "refresh", nil, map[string]any{
+			"reason": reason,
+		})
 		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
 	h.setRefreshTokenCookie(w, result.Tokens.RefreshToken)
+	platformmiddleware.AuditLogWithUser(r.Context(), result.User.ID, "token_refresh", "admin", "auth", result.User.ID, nil, map[string]any{
+		"rotated": true,
+	})
 	response.WriteJSON(w, http.StatusOK, dto.AuthResponse{
 		User:         result.User,
 		ModuleRoles:  result.ModuleRoles,
@@ -273,15 +298,22 @@ func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	normalizedEmail := strings.ToLower(strings.TrimSpace(input.Email))
 	if err := h.service.RequestPasswordReset(r.Context(), input.Email, authservice.PasswordResetRequestMeta{
 		PublicBaseURL: requestPublicBaseURL(r, h.cookieSecure),
 		UserAgent:     r.UserAgent(),
 		IPAddress:     clientIP(r),
 	}); err != nil {
+		platformmiddleware.AuditLog(r.Context(), "password_reset_failed", "admin", "auth", "forgot_password", nil, map[string]any{
+			"email": normalizedEmail,
+		})
 		h.writeAuthError(r.Context(), w, err)
 		return
 	}
 
+	platformmiddleware.AuditLog(r.Context(), "password_reset_requested", "admin", "auth", "forgot_password", nil, map[string]any{
+		"email": normalizedEmail,
+	})
 	response.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "Jika email ditemukan pada tenant ini, link reset kata sandi akan dikirim.",
 	}, nil)
@@ -386,6 +418,22 @@ func (h *Handler) writeAuthError(ctx context.Context, w http.ResponseWriter, err
 
 func validationDetails(err error) map[string]string {
 	return httputil.ValidationDetails(err)
+}
+
+// loginFailureReason maps a service-layer auth error to a short audit code.
+// Errors that don't represent a real authentication failure (validation,
+// internal) return "" so the caller skips the audit entry.
+func loginFailureReason(err error) string {
+	switch {
+	case errors.Is(err, authservice.ErrInvalidCredentials):
+		return "invalid_credentials"
+	case errors.Is(err, authservice.ErrInactiveUser):
+		return "inactive_user"
+	case errors.Is(err, authservice.ErrAccountLocked):
+		return "account_locked"
+	default:
+		return ""
+	}
 }
 
 func clientIP(r *http.Request) string {
