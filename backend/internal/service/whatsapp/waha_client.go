@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type SessionStatus struct {
@@ -73,6 +75,10 @@ func newWAHAClient(cfg wahaClientConfig) *WAHAClient {
 		cfg: cfg,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+			// Wrap the default transport so each outbound WAHA call is
+			// captured as a child span and the W3C traceparent header is
+			// injected for the receiver.
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
 }
