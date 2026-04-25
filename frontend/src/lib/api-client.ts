@@ -53,6 +53,14 @@ export async function requestEnvelope<TData>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  // Always advertise XHR. The backend requires this header on cookie-only
+  // endpoints (/auth/refresh, /auth/logout) as a CSRF guard, and tagging
+  // every request keeps the header set even when callers go through
+  // requestEnvelope directly.
+  if (!headers.has("X-Requested-With")) {
+    headers.set("X-Requested-With", "XMLHttpRequest");
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
@@ -120,6 +128,10 @@ async function refreshAuthenticatedSession() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // CSRF guard — backend requires this header on /auth/refresh.
+          // Browsers cannot set it on cross-site form posts without a CORS
+          // preflight, so it shuts down navigation/CSRF replays of the cookie.
+          "X-Requested-With": "XMLHttpRequest",
         },
         body: JSON.stringify({}),
         credentials: "include",

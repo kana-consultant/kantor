@@ -216,6 +216,16 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
+	// /auth/refresh authenticates with a SameSite=Lax HTTP-only cookie. Lax
+	// blocks cross-site form posts but not top-level navigations and not
+	// custom-content-type submissions, so we add a CSRF guard: the request
+	// must carry a custom header that browsers cannot set on cross-origin
+	// non-fetch submissions without a CORS preflight.
+	if !hasCSRFHeader(r) {
+		response.WriteError(w, http.StatusForbidden, "CSRF_REQUIRED", "X-Requested-With header is required", nil)
+		return
+	}
+
 	refreshToken, err := h.readRefreshTokenCookie(r)
 	if err != nil {
 		platformmiddleware.AuditLog(r.Context(), "token_refresh_failed", "admin", "auth", "refresh", nil, map[string]any{
@@ -257,6 +267,14 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	// Logout is not destructive enough to be a real CSRF target, but it does
+	// rely on the same cookie as /refresh. Apply the same custom-header
+	// guard so an attacker cannot remotely sign a victim out either.
+	if !hasCSRFHeader(r) {
+		response.WriteError(w, http.StatusForbidden, "CSRF_REQUIRED", "X-Requested-With header is required", nil)
+		return
+	}
+
 	refreshToken, err := h.readRefreshTokenCookie(r)
 	if err == nil {
 		if userID, logoutErr := h.service.Logout(r.Context(), refreshToken); logoutErr == nil {
@@ -434,6 +452,21 @@ func loginFailureReason(err error) string {
 	default:
 		return ""
 	}
+}
+
+// hasCSRFHeader returns true when the caller proved the request originated
+// from a same-origin script. Browsers refuse to set custom headers on
+// cross-site form posts and image/iframe loads without a CORS preflight, so
+// the presence of either X-Requested-With or X-Csrf-Token is enough to
+// distinguish a legitimate fetch() from a CSRF-style submission.
+func hasCSRFHeader(r *http.Request) bool {
+	if strings.TrimSpace(r.Header.Get("X-Requested-With")) != "" {
+		return true
+	}
+	if strings.TrimSpace(r.Header.Get("X-Csrf-Token")) != "" {
+		return true
+	}
+	return false
 }
 
 func clientIP(r *http.Request) string {
