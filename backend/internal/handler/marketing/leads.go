@@ -277,6 +277,8 @@ func (h *LeadsHandler) writeError(ctx context.Context, w http.ResponseWriter, er
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"phone": "phone or email required", "email": "phone or email required"})
 	case errors.Is(err, marketingservice.ErrLeadImportLimitExceeded):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"file": "maximum 10000 rows per import"})
+	case errors.Is(err, marketingservice.ErrLeadImportMissingHeader):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"file": "missing required header columns"})
 	default:
 		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
