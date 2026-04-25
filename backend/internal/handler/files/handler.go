@@ -2,7 +2,9 @@ package files
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -49,8 +51,30 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Force browsers to download instead of render uploaded files. Combined
+	// with X-Content-Type-Options: nosniff this neutralises polyglot files
+	// that pass our magic-byte check but also embed executable HTML/JS.
+	disposition := "inline"
+	if shouldForceDownload(filename) {
+		disposition = "attachment"
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", disposition, filepath.Base(filename)))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store")
 	http.ServeFile(w, r, file.Path)
+}
+
+// shouldForceDownload returns true for filenames whose extension is not a
+// safe-to-render image. Documents, archives, scripts, and unknown types are
+// forced into a download rather than rendered inline.
+func shouldForceDownload(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp":
+		return false
+	default:
+		return true
+	}
 }
 
 func hasPermission(principal platformmiddleware.Principal, permission string, ownerUserID *string) bool {

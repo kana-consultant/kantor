@@ -21,6 +21,7 @@ import (
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
+	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
 type EmployeesHandler struct {
@@ -257,8 +258,8 @@ var (
 )
 
 func saveEmployeeAvatar(baseUploadsDir string, employeeID string, file *multipart.FileHeader) (string, error) {
-	if file.Size > 5<<20 {
-		return "", fmt.Errorf("%w: avatar image must be smaller than 5MB", errEmployeeAvatarValidation)
+	if _, err := uploads.ValidateMultipartFile(uploads.KindAvatar, file); err != nil {
+		return "", fmt.Errorf("%w: %w", errEmployeeAvatarValidation, err)
 	}
 
 	src, err := file.Open()
@@ -266,20 +267,6 @@ func saveEmployeeAvatar(baseUploadsDir string, employeeID string, file *multipar
 		return "", fmt.Errorf("%w: %w", errEmployeeAvatarStorage, err)
 	}
 	defer src.Close()
-
-	sniff := make([]byte, 512)
-	n, readErr := src.Read(sniff)
-	if readErr != nil && !errors.Is(readErr, io.EOF) {
-		return "", fmt.Errorf("%w: %w", errEmployeeAvatarStorage, readErr)
-	}
-	if _, err := src.Seek(0, 0); err != nil {
-		return "", fmt.Errorf("%w: %w", errEmployeeAvatarStorage, err)
-	}
-
-	contentType := http.DetectContentType(sniff[:n])
-	if !strings.HasPrefix(contentType, "image/") {
-		return "", fmt.Errorf("%w: avatar must be an image file", errEmployeeAvatarValidation)
-	}
 
 	dir := filepath.Join(baseUploadsDir, "employees", employeeID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

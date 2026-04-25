@@ -23,6 +23,7 @@ import (
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
+	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
 type ReimbursementsHandler struct {
@@ -34,7 +35,6 @@ type ReimbursementsHandler struct {
 
 const (
 	maxReimbursementAttachmentFiles   = 5
-	maxReimbursementAttachmentSize    = 10 << 20
 	maxReimbursementMultipartMaxBytes = 50 << 20
 )
 
@@ -408,30 +408,13 @@ func saveAttachments(baseUploadsDir string, files []*multipart.FileHeader) ([]st
 
 	paths := make([]string, 0, len(files))
 	for _, file := range files {
-		if file.Size > maxReimbursementAttachmentSize {
-			return nil, fmt.Errorf("%w: each file must be smaller than 10MB", errAttachmentValidation)
+		if _, err := uploads.ValidateMultipartFile(uploads.KindReimbursement, file); err != nil {
+			return nil, fmt.Errorf("%w: %w", errAttachmentValidation, err)
 		}
 
 		src, err := file.Open()
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
-		}
-
-		sniff := make([]byte, 512)
-		n, readErr := src.Read(sniff)
-		if readErr != nil && !errors.Is(readErr, io.EOF) {
-			_ = src.Close()
-			return nil, fmt.Errorf("%w: %w", errAttachmentStorage, readErr)
-		}
-		if _, err := src.Seek(0, 0); err != nil {
-			_ = src.Close()
-			return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
-		}
-
-		contentType := http.DetectContentType(sniff[:n])
-		if !allowedAttachmentType(contentType) {
-			_ = src.Close()
-			return nil, fmt.Errorf("%w: only image and PDF files are allowed", errAttachmentValidation)
 		}
 
 		filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitizeFilename(file.Filename)
@@ -453,10 +436,6 @@ func saveAttachments(baseUploadsDir string, files []*multipart.FileHeader) ([]st
 	}
 
 	return paths, nil
-}
-
-func allowedAttachmentType(contentType string) bool {
-	return strings.HasPrefix(contentType, "image/") || contentType == "application/pdf"
 }
 
 func sanitizeFilename(value string) string {
