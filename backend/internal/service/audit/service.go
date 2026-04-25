@@ -23,7 +23,7 @@ func NewService(repo *auditrepo.Repository) *Service {
 // failures are logged so that audit issues do not break business operations.
 func (s *Service) Log(ctx context.Context, entry Entry) {
 	if err := s.repo.Insert(ctx, entry); err != nil {
-		slog.Error("failed to write audit log",
+		slog.ErrorContext(ctx, "failed to write audit log",
 			"error", err,
 			"action", entry.Action,
 			"module", entry.Module,

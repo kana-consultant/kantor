@@ -153,7 +153,7 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 
 	// Notify assignee (skip self-assign)
 	if task.AssigneeID != nil && *task.AssigneeID != createdBy {
-		slog.Info(
+		slog.InfoContext(ctx,
 			"dispatching task assigned notification",
 			"task_id", task.ID,
 			"assignee_id", *task.AssigneeID,
@@ -207,7 +207,7 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 	if task.AssigneeID != nil {
 		newAssigneeID := *task.AssigneeID
 		if newAssigneeID != oldAssigneeID && newAssigneeID != actorID {
-			slog.Info(
+			slog.InfoContext(ctx,
 				"dispatching task assigned notification",
 				"task_id", task.ID,
 				"assignee_id", newAssigneeID,
@@ -320,7 +320,7 @@ func normalizeStringPointer(value *string) *string {
 
 func (s *KanbanService) dispatchTaskAssignedNotification(ctx context.Context, taskID string, assigneeID string) {
 	if len(s.notifiers) == 0 {
-		slog.Warn("task assigned notification skipped because no notifier is registered", "task_id", taskID, "assignee_id", assigneeID)
+		slog.WarnContext(ctx, "task assigned notification skipped because no notifier is registered", "task_id", taskID, "assignee_id", assigneeID)
 		return
 	}
 
@@ -333,7 +333,7 @@ func (s *KanbanService) dispatchTaskAssignedNotification(ctx context.Context, ta
 		go func() {
 			defer func() {
 				if recovered := recover(); recovered != nil {
-					slog.Error(
+					slog.ErrorContext(notificationCtx,
 						"task assigned notifier panicked",
 						"task_id", taskID,
 						"assignee_id", assigneeID,

@@ -174,7 +174,7 @@ func (s *Service) GetDailyStats(ctx context.Context) *DailyStats {
 	stats := client.GetDailyStats()
 	sentToday, countErr := s.repo.CountSentLogsToday(ctx)
 	if countErr != nil {
-		slog.Error("failed to count daily wa logs", "error", countErr)
+		slog.ErrorContext(ctx, "failed to count daily wa logs", "error", countErr)
 		return stats
 	}
 	stats.SentToday = sentToday
@@ -356,7 +356,7 @@ func (s *Service) QuickSend(ctx context.Context, phone string, message string) e
 		ErrorMessage:   errMsg,
 	})
 	if logErr != nil {
-		slog.Error("failed to log quick send", "error", logErr)
+		slog.ErrorContext(ctx, "failed to log quick send", "error", logErr)
 	}
 
 	return err
@@ -401,7 +401,7 @@ func (s *Service) SendTaskAssignedNotification(ctx context.Context, taskID strin
 	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
 		task, err := s.repo.GetTaskWithProject(scopedCtx, taskID)
 		if err != nil || task == nil {
-			slog.Error("failed to get task for WA notification", "task_id", taskID, "error", err)
+			slog.ErrorContext(scopedCtx, "failed to get task for WA notification", "task_id", taskID, "error", err)
 			return struct{}{}, nil
 		}
 
@@ -412,7 +412,7 @@ func (s *Service) SendTaskAssignedNotification(ctx context.Context, taskID strin
 
 		tmpl, err := s.repo.GetTemplateBySlug(scopedCtx, "task_assigned")
 		if err != nil {
-			slog.Error("failed to get task_assigned template", "error", err)
+			slog.ErrorContext(scopedCtx, "failed to get task_assigned template", "error", err)
 			return struct{}{}, nil
 		}
 		if !tmpl.IsActive {
@@ -438,7 +438,7 @@ func (s *Service) SendTaskAssignedNotification(ctx context.Context, taskID strin
 			&assigneeID, stringPtr("task"), &task.TaskID)
 		return struct{}{}, nil
 	}); err != nil {
-		slog.Error("failed to send task assigned WA notification", "task_id", taskID, "error", err)
+		slog.ErrorContext(ctx, "failed to send task assigned WA notification", "task_id", taskID, "error", err)
 	}
 }
 
@@ -447,7 +447,7 @@ func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimb
 	if _, err := platformmiddleware.WithScopedTenantConn(ctx, func(scopedCtx context.Context) (struct{}, error) {
 		info, err := s.repo.GetReimbursementWithSubmitter(scopedCtx, reimbursementID)
 		if err != nil || info == nil {
-			slog.Error("failed to get reimbursement for WA notification", "reimbursement_id", reimbursementID, "error", err)
+			slog.ErrorContext(scopedCtx, "failed to get reimbursement for WA notification", "reimbursement_id", reimbursementID, "error", err)
 			return struct{}{}, nil
 		}
 
@@ -458,7 +458,7 @@ func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimb
 
 		tmpl, err := s.repo.GetTemplateBySlug(scopedCtx, "reimbursement_status")
 		if err != nil {
-			slog.Error("failed to get reimbursement_status template", "error", err)
+			slog.ErrorContext(scopedCtx, "failed to get reimbursement_status template", "error", err)
 			return struct{}{}, nil
 		}
 		if !tmpl.IsActive {
@@ -484,7 +484,7 @@ func (s *Service) SendReimbursementStatusNotification(ctx context.Context, reimb
 			&info.SubmitterID, stringPtr("reimbursement"), &reimbursementID)
 		return struct{}{}, nil
 	}); err != nil {
-		slog.Error("failed to send reimbursement WA notification", "reimbursement_id", reimbursementID, "error", err)
+		slog.ErrorContext(ctx, "failed to send reimbursement WA notification", "reimbursement_id", reimbursementID, "error", err)
 	}
 }
 
@@ -503,7 +503,7 @@ func (s *Service) SendReimbursementReminder(ctx context.Context, recipient model
 
 		tmpl, err := s.repo.GetTemplateBySlug(scopedCtx, slug)
 		if err != nil {
-			slog.Error("failed to get reimbursement reminder template", "slug", slug, "error", err)
+			slog.ErrorContext(scopedCtx, "failed to get reimbursement reminder template", "slug", slug, "error", err)
 			return struct{}{}, nil
 		}
 		if !tmpl.IsActive {
@@ -528,7 +528,7 @@ func (s *Service) SendReimbursementReminder(ctx context.Context, recipient model
 		s.sendAndLog(scopedCtx, *recipient.Phone, body, "auto_scheduled", &tmpl.ID, &tmpl.Slug, &recipient.UserID, &referenceType, nil)
 		return struct{}{}, nil
 	}); err != nil {
-		slog.Error("failed to send reimbursement reminder WA", "user_id", recipient.UserID, "kind", digest.Kind, "error", err)
+		slog.ErrorContext(ctx, "failed to send reimbursement reminder WA", "user_id", recipient.UserID, "kind", digest.Kind, "error", err)
 	}
 }
 
@@ -576,7 +576,7 @@ func (s *Service) sendAndLogWithSchedule(ctx context.Context, scheduleID *string
 		ReferenceID:     refID,
 	})
 	if logErr != nil {
-		slog.Error("failed to create broadcast log", "error", logErr)
+		slog.ErrorContext(ctx, "failed to create broadcast log", "error", logErr)
 	}
 	if status == "sent" {
 		s.createInAppNotification(ctx, templateSlug, userID, refType, refID)
@@ -599,7 +599,7 @@ func (s *Service) logSkippedWithSchedule(ctx context.Context, scheduleID *string
 		ReferenceID:     refID,
 	})
 	if err != nil {
-		slog.Error("failed to log skipped message", "error", err)
+		slog.ErrorContext(ctx, "failed to log skipped message", "error", err)
 	}
 }
 
@@ -628,7 +628,7 @@ func (s *Service) RunCronJobs(ctx context.Context, now time.Time) error {
 			continue
 		}
 		if err := s.runSchedule(ctx, schedule, "auto_scheduled"); err != nil {
-			slog.Error("failed to execute scheduled WA broadcast", "schedule_id", schedule.ID, "error", err)
+			slog.ErrorContext(ctx, "failed to execute scheduled WA broadcast", "schedule_id", schedule.ID, "error", err)
 		}
 	}
 
@@ -684,7 +684,7 @@ func (s *Service) createInAppNotification(ctx context.Context, templateSlug *str
 			ReferenceID:   refID,
 		},
 	}); err != nil {
-		slog.Error("failed to create in-app notification for wa delivery", "template_slug", *templateSlug, "user_id", recipientUserID, "error", err)
+		slog.ErrorContext(ctx, "failed to create in-app notification for wa delivery", "template_slug", *templateSlug, "user_id", recipientUserID, "error", err)
 	}
 }
 

@@ -275,7 +275,7 @@ func (h *KanbanHandler) writeError(ctx context.Context, w http.ResponseWriter, e
 	case errors.Is(err, operationalservice.ErrKanbanTaskAssigneeNotMember):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"assignee_id": "must belong to the project"})
 	default:
-		slog.Error("unexpected kanban handler error", "error", err)
+		slog.ErrorContext(ctx, "unexpected kanban handler error", "error", err)
 		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }

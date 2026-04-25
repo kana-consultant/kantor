@@ -390,7 +390,7 @@ func (h *ReimbursementsHandler) writeError(ctx context.Context, w http.ResponseW
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"employee_id": "not found"})
 	default:
-		slog.Error("unexpected reimbursement error", "error", err)
+		slog.ErrorContext(ctx, "unexpected reimbursement error", "error", err)
 		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}
 }

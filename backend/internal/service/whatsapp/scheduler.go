@@ -13,38 +13,38 @@ import (
 
 // RunDailyReminders executes UC-1 (task due today), UC-2 (task overdue), UC-4 (project deadline H-3).
 func (s *Service) RunDailyReminders(ctx context.Context) {
-	slog.Info("starting daily WA reminders")
+	slog.InfoContext(ctx, "starting daily WA reminders")
 
 	s.sendTaskDueTodayReminders(ctx)
 	s.sendTaskOverdueReminders(ctx)
 	s.sendProjectDeadlineReminders(ctx)
 
-	slog.Info("daily WA reminders completed")
+	slog.InfoContext(ctx, "daily WA reminders completed")
 }
 
 // RunWeeklyDigest executes UC-5 (weekly digest).
 func (s *Service) RunWeeklyDigest(ctx context.Context) {
-	slog.Info("starting weekly WA digest")
+	slog.InfoContext(ctx, "starting weekly WA digest")
 
 	tmpl, err := s.repo.GetTemplateBySlug(ctx, "weekly_digest")
 	if err != nil {
-		slog.Error("failed to get weekly_digest template", "error", err)
+		slog.ErrorContext(ctx, "failed to get weekly_digest template", "error", err)
 		return
 	}
 	if !tmpl.IsActive {
-		slog.Info("weekly_digest template is inactive, skipping")
+		slog.InfoContext(ctx, "weekly_digest template is inactive, skipping")
 		return
 	}
 
 	items, err := s.repo.GetWeeklyDigestData(ctx)
 	if err != nil {
-		slog.Error("failed to get weekly digest data", "error", err)
+		slog.ErrorContext(ctx, "failed to get weekly digest data", "error", err)
 		return
 	}
 
 	baseURL, err := s.resolveTenantBaseURL(ctx)
 	if err != nil {
-		slog.Error("failed to resolve tenant app url for weekly digest", "error", err)
+		slog.ErrorContext(ctx, "failed to resolve tenant app url for weekly digest", "error", err)
 		return
 	}
 
@@ -75,13 +75,13 @@ func (s *Service) RunWeeklyDigest(ctx context.Context) {
 			&item.UserID, nil, nil)
 	}
 
-	slog.Info("weekly WA digest completed", "recipients", len(items))
+	slog.InfoContext(ctx, "weekly WA digest completed", "recipients", len(items))
 }
 
 func (s *Service) sendTaskDueTodayReminders(ctx context.Context) {
 	tmpl, err := s.repo.GetTemplateBySlug(ctx, "task_due_today")
 	if err != nil {
-		slog.Error("failed to get task_due_today template", "error", err)
+		slog.ErrorContext(ctx, "failed to get task_due_today template", "error", err)
 		return
 	}
 	if !tmpl.IsActive {
@@ -90,20 +90,20 @@ func (s *Service) sendTaskDueTodayReminders(ctx context.Context) {
 
 	tasks, err := s.repo.GetTasksDueToday(ctx)
 	if err != nil {
-		slog.Error("failed to get tasks due today", "error", err)
+		slog.ErrorContext(ctx, "failed to get tasks due today", "error", err)
 		return
 	}
 
 	for _, task := range tasks {
 		s.sendTaskReminder(ctx, task, tmpl)
 	}
-	slog.Info("task due today reminders sent", "count", len(tasks))
+	slog.InfoContext(ctx, "task due today reminders sent", "count", len(tasks))
 }
 
 func (s *Service) sendTaskOverdueReminders(ctx context.Context) {
 	tmpl, err := s.repo.GetTemplateBySlug(ctx, "task_overdue")
 	if err != nil {
-		slog.Error("failed to get task_overdue template", "error", err)
+		slog.ErrorContext(ctx, "failed to get task_overdue template", "error", err)
 		return
 	}
 	if !tmpl.IsActive {
@@ -112,14 +112,14 @@ func (s *Service) sendTaskOverdueReminders(ctx context.Context) {
 
 	tasks, err := s.repo.GetTasksOverdue(ctx)
 	if err != nil {
-		slog.Error("failed to get overdue tasks", "error", err)
+		slog.ErrorContext(ctx, "failed to get overdue tasks", "error", err)
 		return
 	}
 
 	for _, task := range tasks {
 		s.sendTaskReminder(ctx, task, tmpl)
 	}
-	slog.Info("task overdue reminders sent", "count", len(tasks))
+	slog.InfoContext(ctx, "task overdue reminders sent", "count", len(tasks))
 }
 
 func (s *Service) sendTaskReminder(ctx context.Context, task warepo.TaskDueInfo, tmpl model.WAMessageTemplate) {
@@ -131,7 +131,7 @@ func (s *Service) sendTaskReminder(ctx context.Context, task warepo.TaskDueInfo,
 	// Anti-spam: check if already sent today
 	dup, err := s.repo.CheckDuplicateToday(ctx, task.AssigneeID, tmpl.Slug, task.TaskID)
 	if err != nil {
-		slog.Error("failed to check duplicate", "error", err)
+		slog.ErrorContext(ctx, "failed to check duplicate", "error", err)
 		return
 	}
 	if dup {
@@ -140,7 +140,7 @@ func (s *Service) sendTaskReminder(ctx context.Context, task warepo.TaskDueInfo,
 
 	baseURL, err := s.resolveTenantBaseURL(ctx)
 	if err != nil {
-		slog.Error("failed to resolve tenant app url for task reminder", "task_id", task.TaskID, "error", err)
+		slog.ErrorContext(ctx, "failed to resolve tenant app url for task reminder", "task_id", task.TaskID, "error", err)
 		return
 	}
 
@@ -159,7 +159,7 @@ func (s *Service) sendTaskReminder(ctx context.Context, task warepo.TaskDueInfo,
 func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
 	tmpl, err := s.repo.GetTemplateBySlug(ctx, "project_deadline_h3")
 	if err != nil {
-		slog.Error("failed to get project_deadline_h3 template", "error", err)
+		slog.ErrorContext(ctx, "failed to get project_deadline_h3 template", "error", err)
 		return
 	}
 	if !tmpl.IsActive {
@@ -168,13 +168,13 @@ func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
 
 	projects, err := s.repo.GetProjectsDeadlineIn3Days(ctx)
 	if err != nil {
-		slog.Error("failed to get projects deadline in 3 days", "error", err)
+		slog.ErrorContext(ctx, "failed to get projects deadline in 3 days", "error", err)
 		return
 	}
 
 	baseURL, err := s.resolveTenantBaseURL(ctx)
 	if err != nil {
-		slog.Error("failed to resolve tenant app url for project deadline reminder", "error", err)
+		slog.ErrorContext(ctx, "failed to resolve tenant app url for project deadline reminder", "error", err)
 		return
 	}
 
@@ -188,7 +188,7 @@ func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
 
 			dup, err := s.repo.CheckDuplicateToday(ctx, member.UserID, tmpl.Slug, project.ProjectID)
 			if err != nil {
-				slog.Error("failed to check duplicate", "error", err)
+				slog.ErrorContext(ctx, "failed to check duplicate", "error", err)
 				continue
 			}
 			if dup {
@@ -210,5 +210,5 @@ func (s *Service) sendProjectDeadlineReminders(ctx context.Context) {
 			sent++
 		}
 	}
-	slog.Info("project deadline reminders sent", "count", sent)
+	slog.InfoContext(ctx, "project deadline reminders sent", "count", sent)
 }

@@ -106,7 +106,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		if result, err := waRepositoryForSeed.EnsureDefaultTemplates(tCtx); err != nil {
 			return fmt.Errorf("seed wa templates for tenant %s: %w", t.Slug, err)
 		} else if result.InsertedCount > 0 {
-			slog.Info("seeded wa templates", "tenant", t.Slug, "inserted", result.InsertedCount, "slugs", result.InsertedSlugs)
+			slog.InfoContext(tCtx, "seeded wa templates", "tenant", t.Slug, "inserted", result.InsertedCount, "slugs", result.InsertedSlugs)
 		}
 		return nil
 	}); err != nil {
@@ -472,7 +472,7 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 
 	runPerTenant := func(name string, fn func(ctx context.Context, t tenant.Info) error) {
 		if err := platformmiddleware.ForEachTenant(ctx, a.db, fn); err != nil {
-			slog.Error("per-tenant background job failed", "job", name, "error", err)
+			slog.ErrorContext(ctx, "per-tenant background job failed", "job", name, "error", err)
 		}
 	}
 
@@ -480,7 +480,7 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					slog.Error("background job panicked", "job", name, "panic", r, "stack", string(debug.Stack()))
+					slog.ErrorContext(ctx, "background job panicked", "job", name, "panic", r, "stack", string(debug.Stack()))
 				}
 			}()
 			fn()
@@ -490,7 +490,7 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 	runBackground("background_scheduler", func() {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("background job panicked", "job", "background_scheduler", "panic", r, "stack", string(debug.Stack()))
+				slog.ErrorContext(ctx, "background job panicked", "job", "background_scheduler", "panic", r, "stack", string(debug.Stack()))
 			}
 		}()
 
@@ -781,7 +781,7 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 			return fmt.Errorf("seed tracker reminder config for tenant %q: %w", tc.Slug, err)
 		}
 
-		slog.Info("tenant seeded", "name", tc.Name, "slug", tc.Slug, "domains", tc.Domains)
+		slog.InfoContext(ctx, "tenant seeded", "name", tc.Name, "slug", tc.Slug, "domains", tc.Domains)
 	}
 	return nil
 }

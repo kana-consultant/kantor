@@ -35,7 +35,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		SuperAdmin: superAdmin,
 	})
 	if err != nil {
-		slog.Error("failed to list users", "error", err)
+		slog.ErrorContext(r.Context(), "failed to list users", "error", err)
 		response.WriteInternalError(r.Context(), w, err, "Failed to list users")
 		return
 	}
