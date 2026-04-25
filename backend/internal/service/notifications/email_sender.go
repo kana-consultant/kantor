@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type resendSender struct {
@@ -34,7 +36,13 @@ type renderEmailLayoutParams struct {
 
 func newResendSender() *resendSender {
 	return &resendSender{
-		client: &http.Client{Timeout: 15 * time.Second},
+		client: &http.Client{
+			Timeout: 15 * time.Second,
+			// Wrap the default transport so the outbound Resend call is
+			// captured as a child span tied to whichever request
+			// originated the email.
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
+		},
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/app"
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	"github.com/kana-consultant/kantor/backend/internal/tracing"
 )
 
 func main() {
@@ -26,6 +27,19 @@ func main() {
 	}
 
 	configureLogger(cfg.AppEnv)
+
+	tracingShutdown, err := tracing.Setup(ctx, "dev")
+	if err != nil {
+		slog.Error("failed to initialize tracing", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tracingShutdown(shutdownCtx); err != nil {
+			slog.Error("failed to flush tracing", "error", err)
+		}
+	}()
 
 	application, err := app.New(ctx, cfg)
 	if err != nil {

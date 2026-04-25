@@ -15,6 +15,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -262,6 +263,11 @@ func (a *App) buildRouter(
 
 	router.Use(chimiddleware.RequestID)
 	router.Use(chimiddleware.RealIP)
+	// otelhttp opens a server span for every request and stitches it into
+	// the W3C traceparent context propagated by upstream callers.
+	router.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(next, "http.request")
+	})
 	router.Use(platformmiddleware.AccessLogger)
 	router.Use(chimiddleware.Recoverer)
 	router.Use(platformmiddleware.AuditMiddleware(auditService))
