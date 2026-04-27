@@ -60,6 +60,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup SSH aliases for private flake inputs
+        env:
+          GH_FLAKE_A: ${{ secrets.GH_FLAKE_A }}
+          GH_FLAKE_B: ${{ secrets.GH_FLAKE_B }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "$GH_FLAKE_A" > ~/.ssh/flake-a
+          echo "$GH_FLAKE_B" > ~/.ssh/flake-b
+          chmod 600 ~/.ssh/flake-a ~/.ssh/flake-b
+          GH_SCAN=$(ssh-keyscan github.com 2>/dev/null)
+          echo "$GH_SCAN" | sed 's/^github.com/github.com-flake-a/' >> ~/.ssh/known_hosts
+          echo "$GH_SCAN" | sed 's/^github.com/github.com-flake-b/' >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host github.com-flake-a
+            HostName github.com
+            User git
+            IdentityFile ~/.ssh/flake-a
+            IdentitiesOnly yes
+          Host github.com-flake-b
+            HostName github.com
+            User git
+            IdentityFile ~/.ssh/flake-b
+            IdentitiesOnly yes
+          EOF
+          chmod 600 ~/.ssh/config
+
       - uses: DeterminateSystems/nix-installer-action@main
         with:
           extra-conf: |
