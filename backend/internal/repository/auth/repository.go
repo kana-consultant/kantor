@@ -826,14 +826,40 @@ func (r *Repository) listUserRoleKeys(ctx context.Context, userIDs []string) (ma
 }
 
 func (r *Repository) SetUserActive(ctx context.Context, userID string, active bool) error {
-	tag, err := repository.DB(ctx, r.db).Exec(ctx, `UPDATE users SET is_active = $2, updated_at = NOW() WHERE id = $1::uuid`, userID, active)
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	tag, err := tx.Exec(ctx, `UPDATE users SET is_active = $2, updated_at = NOW() WHERE id = $1::uuid`, userID, active)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
 	}
-	return nil
+
+	// When an account is deactivated, revoke all outstanding refresh tokens so
+	// the user cannot continue rotating sessions from previously issued cookies.
+	if !active {
+		if _, err = tx.Exec(
+			ctx,
+			`UPDATE refresh_tokens SET revoked_at = NOW(), last_used_at = NOW() WHERE user_id = $1::uuid AND revoked_at IS NULL`,
+			userID,
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error {
