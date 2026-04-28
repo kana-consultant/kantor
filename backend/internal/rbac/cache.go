@@ -18,11 +18,12 @@ type ModuleRole struct {
 }
 
 type CachedPermissions struct {
-	IsSuperAdmin bool                `json:"is_super_admin"`
+	IsActive     bool                  `json:"is_active"`
+	IsSuperAdmin bool                  `json:"is_super_admin"`
 	ModuleRoles  map[string]ModuleRole `json:"module_roles"`
-	Permissions  map[string]bool     `json:"permissions"`
-	CachedAt     time.Time           `json:"cached_at"`
-	TTL          time.Duration       `json:"ttl"`
+	Permissions  map[string]bool       `json:"permissions"`
+	CachedAt     time.Time             `json:"cached_at"`
+	TTL          time.Duration         `json:"ttl"`
 }
 
 func (c *CachedPermissions) PermissionList() []string {
@@ -85,12 +86,16 @@ func (c *PermissionCache) Load(ctx context.Context, userID string) (*CachedPermi
 
 	db := repository.DB(ctx, c.db)
 
-	var isSuperAdmin bool
-	if err := db.QueryRow(ctx, `SELECT is_super_admin FROM users WHERE id = $1::uuid`, userID).Scan(&isSuperAdmin); err != nil {
+	var (
+		isActive     bool
+		isSuperAdmin bool
+	)
+	if err := db.QueryRow(ctx, `SELECT is_active, is_super_admin FROM users WHERE id = $1::uuid`, userID).Scan(&isActive, &isSuperAdmin); err != nil {
 		return nil, fmt.Errorf("load super admin flag: %w", err)
 	}
 
 	cached := &CachedPermissions{
+		IsActive:     isActive,
 		IsSuperAdmin: isSuperAdmin,
 		ModuleRoles:  make(map[string]ModuleRole),
 		Permissions:  make(map[string]bool),

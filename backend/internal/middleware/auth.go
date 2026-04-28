@@ -61,6 +61,10 @@ func AuthMiddleware(
 				response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Failed to resolve user permissions", nil)
 				return
 			}
+			if !cachedPermissions.IsActive {
+				response.WriteError(w, http.StatusForbidden, "INACTIVE_USER", "akun pengguna sedang tidak aktif", nil)
+				return
+			}
 
 			roles := make([]string, 0, len(cachedPermissions.ModuleRoles)+1)
 			if cachedPermissions.IsSuperAdmin {
