@@ -86,10 +86,11 @@ export function getAuthPublicOptions() {
   return getJSON<AuthPublicOptions>("/auth/public-options");
 }
 
-export function revokeRefreshToken() {
+export function revokeRefreshToken(accessToken?: string) {
   return postJSON<{ revoked: boolean }, Record<string, never>>(
     "/auth/logout",
     {},
+    accessToken,
   );
 }
 
@@ -118,8 +119,9 @@ export async function logout() {
   const store = useAuthStore.getState();
 
   try {
+    const accessToken = store.session?.tokens.access_token;
     if (store.session) {
-      await revokeRefreshToken();
+      await revokeRefreshToken(accessToken);
     }
   } finally {
     store.clearSession();
