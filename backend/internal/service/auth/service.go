@@ -927,7 +927,7 @@ func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldToken
 		}
 	} else {
 		if err := s.repo.RotateRefreshToken(ctx, oldTokenHash, refreshParams); err != nil {
-			return AuthResult{}, err
+			return AuthResult{}, normalizeRefreshRotationError(err)
 		}
 	}
 
@@ -943,6 +943,13 @@ func (s *Service) issueAuthResult(ctx context.Context, user model.User, oldToken
 			ExpiresIn:    int64(time.Until(expiresAt).Seconds()),
 		},
 	}, nil
+}
+
+func normalizeRefreshRotationError(err error) error {
+	if errors.Is(err, authrepo.ErrNotFound) {
+		return ErrInvalidRefreshToken
+	}
+	return err
 }
 
 func toModuleRoleDTOs(items map[string]rbac.ModuleRole) map[string]dto.ModuleRoleDTO {

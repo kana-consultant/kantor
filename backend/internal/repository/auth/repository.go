@@ -334,8 +334,12 @@ func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string
 		WHERE token_hash = $1 AND revoked_at IS NULL
 	`
 
-	if _, err = tx.Exec(ctx, updateQuery, oldTokenHash); err != nil {
+	updateTag, err := tx.Exec(ctx, updateQuery, oldTokenHash)
+	if err != nil {
 		return err
+	}
+	if updateTag.RowsAffected() == 0 {
+		return ErrNotFound
 	}
 
 	insertQuery := `
