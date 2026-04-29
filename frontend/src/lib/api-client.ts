@@ -166,6 +166,13 @@ export async function refreshAuthSession() {
   return refreshAuthenticatedSession();
 }
 
+function clearSessionAndRedirectToLogin() {
+  useAuthStore.getState().clearSession();
+  // Hard navigation: app state is potentially corrupted at this
+  // point, so a full reload ensures no stale data remains.
+  window.location.href = "/login";
+}
+
 async function handleAuthRetry<T>(
   fn: (token?: string) => Promise<T>,
 ): Promise<T> {
@@ -174,6 +181,15 @@ async function handleAuthRetry<T>(
   try {
     return await fn(attemptedToken);
   } catch (err) {
+    if (
+      err instanceof ApiError &&
+      err.status === 403 &&
+      err.code === "INACTIVE_USER"
+    ) {
+      clearSessionAndRedirectToLogin();
+      throw err;
+    }
+
     if (err instanceof ApiError && err.status === 401) {
       const currentToken = getAccessToken();
       if (attemptedToken && currentToken && currentToken !== attemptedToken) {
@@ -191,10 +207,7 @@ async function handleAuthRetry<T>(
           return await fn(latestToken);
         }
 
-        useAuthStore.getState().clearSession();
-        // Hard navigation: app state is potentially corrupted at this
-        // point, so a full reload ensures no stale data remains.
-        window.location.href = "/login";
+        clearSessionAndRedirectToLogin();
         throw refreshErr;
       }
     }
