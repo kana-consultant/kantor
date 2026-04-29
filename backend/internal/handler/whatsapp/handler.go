@@ -358,6 +358,10 @@ func (h *Handler) createSchedule(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:      &principal.UserID,
 	})
 	if err != nil {
+		if errors.Is(err, waservice.ErrInvalidScheduleTargetConfig) {
+			response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"target_config": "invalid"})
+			return
+		}
 		h.writeInternalError(r.Context(), w, err)
 		return
 	}
@@ -391,6 +395,10 @@ func (h *Handler) updateSchedule(w http.ResponseWriter, r *http.Request) {
 		TargetConfig:   input.TargetConfig,
 		IsActive:       input.IsActive,
 	})
+	if errors.Is(err, waservice.ErrInvalidScheduleTargetConfig) {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"target_config": "invalid"})
+		return
+	}
 	if errors.Is(err, waservice.ErrScheduleNotFound) {
 		response.WriteError(w, http.StatusNotFound, "SCHEDULE_NOT_FOUND", "Schedule not found", nil)
 		return

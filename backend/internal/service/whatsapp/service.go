@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kana-consultant/kantor/backend/internal/config"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/model"
@@ -20,10 +21,11 @@ import (
 )
 
 var (
-	ErrTemplateNotFound = errors.New("wa template not found")
-	ErrScheduleNotFound = errors.New("wa schedule not found")
-	ErrSystemTemplate   = errors.New("cannot delete system template")
-	ErrInvalidPhone     = errors.New("invalid whatsapp phone number")
+	ErrTemplateNotFound            = errors.New("wa template not found")
+	ErrScheduleNotFound            = errors.New("wa schedule not found")
+	ErrSystemTemplate              = errors.New("cannot delete system template")
+	ErrInvalidPhone                = errors.New("invalid whatsapp phone number")
+	ErrInvalidScheduleTargetConfig = errors.New("invalid schedule target config")
 )
 
 type waNotificationsService interface {
@@ -260,10 +262,16 @@ func (s *Service) GetSchedule(ctx context.Context, id string) (model.WABroadcast
 }
 
 func (s *Service) CreateSchedule(ctx context.Context, params warepo.CreateScheduleParams) (model.WABroadcastSchedule, error) {
+	if err := validateScheduleTargetConfig(params.TargetType, params.TargetConfig); err != nil {
+		return model.WABroadcastSchedule{}, err
+	}
 	return s.repo.CreateSchedule(ctx, params)
 }
 
 func (s *Service) UpdateSchedule(ctx context.Context, id string, params warepo.UpdateScheduleParams) (model.WABroadcastSchedule, error) {
+	if err := validateScheduleTargetConfig(params.TargetType, params.TargetConfig); err != nil {
+		return model.WABroadcastSchedule{}, err
+	}
 	sch, err := s.repo.UpdateSchedule(ctx, id, params)
 	if errors.Is(err, warepo.ErrScheduleNotFound) {
 		return sch, ErrScheduleNotFound
@@ -814,6 +822,26 @@ func shouldRunScheduleNow(schedule model.WABroadcastSchedule, now time.Time) boo
 	return !schedule.LastRunAt.In(time.Local).Truncate(time.Minute).Equal(now.In(time.Local).Truncate(time.Minute))
 }
 
+func validateScheduleTargetConfig(targetType string, targetConfig *string) error {
+	var err error
+	switch targetType {
+	case "all_employees":
+		return nil
+	case "department":
+		_, err = parseDepartmentTargetConfig(targetConfig)
+	case "specific_users":
+		_, err = parseSpecificUsersTargetConfig(targetConfig)
+	case "project_members":
+		_, err = parseProjectMembersTargetConfig(targetConfig)
+	default:
+		return fmt.Errorf("%w: unsupported schedule target type %q", ErrInvalidScheduleTargetConfig, targetType)
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrInvalidScheduleTargetConfig, err.Error())
+	}
+	return nil
+}
+
 func parseDepartmentTargetConfig(raw *string) (string, error) {
 	trimmed := strings.TrimSpace(valueOrEmpty(raw))
 	if trimmed == "" {
@@ -843,7 +871,7 @@ func parseSpecificUsersTargetConfig(raw *string) ([]string, error) {
 
 	var direct []string
 	if err := json.Unmarshal([]byte(trimmed), &direct); err == nil {
-		return direct, nil
+		return normalizeUUIDList(direct, "specific_users target config")
 	}
 
 	var payload struct {
@@ -852,10 +880,7 @@ func parseSpecificUsersTargetConfig(raw *string) ([]string, error) {
 	if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
 		return nil, fmt.Errorf("invalid specific_users target config")
 	}
-	if len(payload.UserIDs) == 0 {
-		return nil, fmt.Errorf("specific_users target config is required")
-	}
-	return payload.UserIDs, nil
+	return normalizeUUIDList(payload.UserIDs, "specific_users target config")
 }
 
 func parseProjectMembersTargetConfig(raw *string) (string, error) {
@@ -864,7 +889,11 @@ func parseProjectMembersTargetConfig(raw *string) (string, error) {
 		return "", fmt.Errorf("project_members target config is required")
 	}
 	if !strings.HasPrefix(trimmed, "{") {
-		return trimmed, nil
+		parsed, err := uuid.Parse(trimmed)
+		if err != nil {
+			return "", fmt.Errorf("project_members target config must contain a valid project UUID")
+		}
+		return parsed.String(), nil
 	}
 
 	var payload struct {
@@ -876,7 +905,41 @@ func parseProjectMembersTargetConfig(raw *string) (string, error) {
 	if strings.TrimSpace(payload.ProjectID) == "" {
 		return "", fmt.Errorf("project_members target config is required")
 	}
-	return strings.TrimSpace(payload.ProjectID), nil
+	parsed, err := uuid.Parse(strings.TrimSpace(payload.ProjectID))
+	if err != nil {
+		return "", fmt.Errorf("project_members target config must contain a valid project UUID")
+	}
+	return parsed.String(), nil
+}
+
+func normalizeUUIDList(rawIDs []string, fieldLabel string) ([]string, error) {
+	normalized := make([]string, 0, len(rawIDs))
+	seen := make(map[string]struct{}, len(rawIDs))
+
+	for _, rawID := range rawIDs {
+		trimmed := strings.TrimSpace(rawID)
+		if trimmed == "" {
+			continue
+		}
+
+		parsed, err := uuid.Parse(trimmed)
+		if err != nil {
+			return nil, fmt.Errorf("%s must contain valid UUID values", fieldLabel)
+		}
+		canonical := parsed.String()
+		if _, exists := seen[canonical]; exists {
+			continue
+		}
+
+		seen[canonical] = struct{}{}
+		normalized = append(normalized, canonical)
+	}
+
+	if len(normalized) == 0 {
+		return nil, fmt.Errorf("%s is required", fieldLabel)
+	}
+
+	return normalized, nil
 }
 
 func valueOrEmpty(value *string) string {
