@@ -150,6 +150,10 @@ func DefaultPermissions() []PermissionDefinition {
 		{ID: "operational:vps:create", ModuleID: ModuleOperational, Resource: "vps", Action: "create", Description: "Mendaftarkan VPS baru ke inventaris", IsSensitive: true},
 		{ID: "operational:vps:edit", ModuleID: ModuleOperational, Resource: "vps", Action: "edit", Description: "Mengedit VPS, app, dan health check", IsSensitive: true},
 		{ID: "operational:vps:delete", ModuleID: ModuleOperational, Resource: "vps", Action: "delete", Description: "Menghapus VPS dari inventaris", IsSensitive: true},
+		{ID: "operational:domain:view", ModuleID: ModuleOperational, Resource: "domain", Action: "view", Description: "Melihat inventaris domain dan status DNS", IsSensitive: true},
+		{ID: "operational:domain:create", ModuleID: ModuleOperational, Resource: "domain", Action: "create", Description: "Mendaftarkan domain baru ke inventaris", IsSensitive: true},
+		{ID: "operational:domain:edit", ModuleID: ModuleOperational, Resource: "domain", Action: "edit", Description: "Mengedit domain dan setting check", IsSensitive: true},
+		{ID: "operational:domain:delete", ModuleID: ModuleOperational, Resource: "domain", Action: "delete", Description: "Menghapus domain dari inventaris", IsSensitive: true},
 
 		// HRIS
 		{ID: "hris:employee:view", ModuleID: ModuleHRIS, Resource: "employee", Action: "view", Description: "Melihat data karyawan"},
@@ -264,8 +268,8 @@ func managerCanAccess(permission PermissionDefinition) bool {
 		return false
 	}
 
-	// VPS monitoring is restricted to super_admin + admin by default.
-	if permission.ModuleID == ModuleOperational && permission.Resource == "vps" {
+	// VPS + Domain monitoring restricted to super_admin + admin by default.
+	if permission.ModuleID == ModuleOperational && (permission.Resource == "vps" || permission.Resource == "domain") {
 		return false
 	}
 
