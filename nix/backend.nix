@@ -6,7 +6,7 @@ buildGoModule {
 
   src = ../backend;
 
-  vendorHash = "sha256-l7nHZg1E48sPRCE4javft1FyREMmHLm2fO6jnk/2nts=";
+  vendorHash = "sha256-Wt8vHpTP8BpN7vdkI6R+isD6co9D8GJhC1gQ39nuGFA=";
 
   subPackages = [ "cmd/server" ];
 
