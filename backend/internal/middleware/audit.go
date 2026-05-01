@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"net"
 	"net/http"
 
 	auditservice "github.com/kana-consultant/kantor/backend/internal/service/audit"
@@ -16,7 +15,7 @@ const (
 func AuditMiddleware(svc *auditservice.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := extractIP(r)
+			ip := ClientIPFromRequest(r)
 			ctx := context.WithValue(r.Context(), auditServiceKey, svc)
 			ctx = context.WithValue(ctx, clientIPKey, ip)
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -72,14 +71,4 @@ func AuditLogWithUser(ctx context.Context, userID, action, module, resource, res
 		NewValue:   newValue,
 		IPAddress:  ClientIPFromContext(ctx),
 	})
-}
-
-func extractIP(r *http.Request) string {
-	// chi's RealIP middleware sets RemoteAddr from X-Forwarded-For / X-Real-IP,
-	// so r.RemoteAddr already reflects the real client IP in most setups.
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }

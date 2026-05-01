@@ -23,6 +23,7 @@ type Config struct {
 	JWTAccessExpiry           time.Duration
 	JWTRefreshExpiry          time.Duration
 	CORSOrigins               []string
+	TrustedProxyCIDRs         []string
 	TrackerRetentionDays      int
 	AppURL                    string
 	Tenants                   []TenantConfig
@@ -85,10 +86,12 @@ func Load() (Config, error) {
 		JWTAccessExpiry:           accessExpiry,
 		JWTRefreshExpiry:          refreshExpiry,
 		CORSOrigins:               splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),
-		TrackerRetentionDays:      parseIntEnv("TRACKER_RETENTION_DAYS", 90),
-		AppURL:                    getEnv("APP_URL", "http://localhost:3000"),
-		Tenants:                   parseTenants(getEnv("TENANTS", "Default|default|localhost")),
-		WAHADefaults:              wahaDefaults,
+		TrustedProxyCIDRs: splitCSV(getEnv("TRUSTED_PROXY_CIDRS",
+			"127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fc00::/7,fe80::/10")),
+		TrackerRetentionDays: parseIntEnv("TRACKER_RETENTION_DAYS", 90),
+		AppURL:               getEnv("APP_URL", "http://localhost:3000"),
+		Tenants:              parseTenants(getEnv("TENANTS", "Default|default|localhost")),
+		WAHADefaults:         wahaDefaults,
 	}
 
 	if cfg.DatabaseURL == "" {

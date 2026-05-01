@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"math"
-	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -110,14 +109,8 @@ func (l *ipRateLimiter) retryAfter(key string, now time.Time) time.Duration {
 	return 0
 }
 
-// clientIPFromRequest returns the client IP from r.RemoteAddr.
-// Assumes chi's RealIP middleware has already rewritten RemoteAddr
-// from X-Real-IP / X-Forwarded-For when behind a reverse proxy.
+// clientIPFromRequest resolves client IP from the trusted-proxy aware
+// middleware context and falls back to the direct RemoteAddr when needed.
 func clientIPFromRequest(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil {
-		return host
-	}
-
-	return r.RemoteAddr
+	return ClientIPFromRequest(r)
 }
