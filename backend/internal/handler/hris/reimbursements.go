@@ -179,7 +179,12 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxReimbursementMultipartMaxBytes)
 	if err := r.ParseMultipartForm(maxReimbursementMultipartMaxBytes); err != nil {
+		if platformmiddleware.IsBodyTooLargeError(err) {
+			platformmiddleware.WriteBodyTooLargeError(w)
+			return
+		}
 		response.WriteError(w, http.StatusBadRequest, "INVALID_MULTIPART", "Attachment upload must use multipart form data", nil)
 		return
 	}

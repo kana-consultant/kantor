@@ -23,6 +23,8 @@ type LeadsHandler struct {
 	validator *validator.Validate
 }
 
+const maxLeadImportMultipartMaxBytes = 10 << 20
+
 func NewLeadsHandler(service *marketingservice.LeadsService, users exportutil.UserLookup) *LeadsHandler {
 	return &LeadsHandler{
 		service:   service,
@@ -198,7 +200,12 @@ func (h *LeadsHandler) importCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, maxLeadImportMultipartMaxBytes)
+	if err := r.ParseMultipartForm(maxLeadImportMultipartMaxBytes); err != nil {
+		if platformmiddleware.IsBodyTooLargeError(err) {
+			platformmiddleware.WriteBodyTooLargeError(w)
+			return
+		}
 		response.WriteError(w, http.StatusBadRequest, "INVALID_MULTIPART", "Lead import must use multipart form data", nil)
 		return
 	}

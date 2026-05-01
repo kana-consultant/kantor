@@ -33,6 +33,11 @@ type CampaignsHandler struct {
 	uploadsDir string
 }
 
+const (
+	maxCampaignAttachmentMultipartMaxBytes = 50 << 20
+	maxCampaignAttachmentFiles             = 10
+)
+
 func NewCampaignsHandler(service *marketingservice.CampaignsService, uploadsDir string, users exportutil.UserLookup) *CampaignsHandler {
 	return &CampaignsHandler{
 		service:    service,
@@ -211,7 +216,12 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := r.ParseMultipartForm(50 << 20); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, maxCampaignAttachmentMultipartMaxBytes)
+	if err := r.ParseMultipartForm(maxCampaignAttachmentMultipartMaxBytes); err != nil {
+		if platformmiddleware.IsBodyTooLargeError(err) {
+			platformmiddleware.WriteBodyTooLargeError(w)
+			return
+		}
 		response.WriteError(w, http.StatusBadRequest, "INVALID_MULTIPART", "Attachment upload must use multipart form data", nil)
 		return
 	}
@@ -222,6 +232,10 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 	}
 	if len(files) == 0 {
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "At least one file is required", map[string]string{"files": "required"})
+		return
+	}
+	if len(files) > maxCampaignAttachmentFiles {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", fmt.Sprintf("Maximum %d files can be uploaded at once", maxCampaignAttachmentFiles), map[string]string{"files": "too_many_files"})
 		return
 	}
 

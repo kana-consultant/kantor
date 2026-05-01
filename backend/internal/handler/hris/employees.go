@@ -32,6 +32,8 @@ type EmployeesHandler struct {
 	uploadsDir   string
 }
 
+const maxEmployeeAvatarMultipartMaxBytes = 6 << 20
+
 func NewEmployeesHandler(
 	service *hrisservice.EmployeesService,
 	compensation *hrisservice.CompensationService,
@@ -138,7 +140,12 @@ func (h *EmployeesHandler) updateEmployee(w http.ResponseWriter, r *http.Request
 }
 
 func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxEmployeeAvatarMultipartMaxBytes)
 	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		if platformmiddleware.IsBodyTooLargeError(err) {
+			platformmiddleware.WriteBodyTooLargeError(w)
+			return
+		}
 		response.WriteError(w, http.StatusBadRequest, "INVALID_MULTIPART", "Avatar upload must use multipart form data", nil)
 		return
 	}
