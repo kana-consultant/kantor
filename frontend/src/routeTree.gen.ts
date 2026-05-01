@@ -37,9 +37,11 @@ import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminRolesRouteImport } from './routes/_authenticated/admin/roles'
 import { Route as AuthenticatedAdminRegistrationRouteImport } from './routes/_authenticated/admin/registration'
 import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin/audit-logs'
+import { Route as AuthenticatedOperationalVpsIndexRouteImport } from './routes/_authenticated/operational/vps/index'
 import { Route as AuthenticatedOperationalProjectsIndexRouteImport } from './routes/_authenticated/operational/projects/index'
 import { Route as AuthenticatedHrisReimbursementsIndexRouteImport } from './routes/_authenticated/hris/reimbursements/index'
 import { Route as AuthenticatedHrisEmployeesIndexRouteImport } from './routes/_authenticated/hris/employees/index'
+import { Route as AuthenticatedOperationalVpsVpsIDRouteImport } from './routes/_authenticated/operational/vps/$vpsID'
 import { Route as AuthenticatedOperationalProjectsProjectIdRouteImport } from './routes/_authenticated/operational/projects/$projectId'
 import { Route as AuthenticatedHrisReimbursementsReimbursementIdRouteImport } from './routes/_authenticated/hris/reimbursements/$reimbursementId'
 import { Route as AuthenticatedHrisEmployeesEmployeeIdRouteImport } from './routes/_authenticated/hris/employees/$employeeId'
@@ -200,6 +202,12 @@ const AuthenticatedAdminAuditLogsRoute =
     path: '/admin/audit-logs',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedOperationalVpsIndexRoute =
+  AuthenticatedOperationalVpsIndexRouteImport.update({
+    id: '/operational/vps/',
+    path: '/operational/vps/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedOperationalProjectsIndexRoute =
   AuthenticatedOperationalProjectsIndexRouteImport.update({
     id: '/operational/projects/',
@@ -216,6 +224,12 @@ const AuthenticatedHrisEmployeesIndexRoute =
   AuthenticatedHrisEmployeesIndexRouteImport.update({
     id: '/hris/employees/',
     path: '/hris/employees/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOperationalVpsVpsIDRoute =
+  AuthenticatedOperationalVpsVpsIDRouteImport.update({
+    id: '/operational/vps/$vpsID',
+    path: '/operational/vps/$vpsID',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedOperationalProjectsProjectIdRoute =
@@ -268,9 +282,11 @@ export interface FileRoutesByFullPath {
   '/hris/employees/$employeeId': typeof AuthenticatedHrisEmployeesEmployeeIdRoute
   '/hris/reimbursements/$reimbursementId': typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   '/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/operational/vps/$vpsID': typeof AuthenticatedOperationalVpsVpsIDRoute
   '/hris/employees/': typeof AuthenticatedHrisEmployeesIndexRoute
   '/hris/reimbursements/': typeof AuthenticatedHrisReimbursementsIndexRoute
   '/operational/projects/': typeof AuthenticatedOperationalProjectsIndexRoute
+  '/operational/vps/': typeof AuthenticatedOperationalVpsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -303,9 +319,11 @@ export interface FileRoutesByTo {
   '/hris/employees/$employeeId': typeof AuthenticatedHrisEmployeesEmployeeIdRoute
   '/hris/reimbursements/$reimbursementId': typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   '/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/operational/vps/$vpsID': typeof AuthenticatedOperationalVpsVpsIDRoute
   '/hris/employees': typeof AuthenticatedHrisEmployeesIndexRoute
   '/hris/reimbursements': typeof AuthenticatedHrisReimbursementsIndexRoute
   '/operational/projects': typeof AuthenticatedOperationalProjectsIndexRoute
+  '/operational/vps': typeof AuthenticatedOperationalVpsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -340,9 +358,11 @@ export interface FileRoutesById {
   '/_authenticated/hris/employees/$employeeId': typeof AuthenticatedHrisEmployeesEmployeeIdRoute
   '/_authenticated/hris/reimbursements/$reimbursementId': typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   '/_authenticated/operational/projects/$projectId': typeof AuthenticatedOperationalProjectsProjectIdRoute
+  '/_authenticated/operational/vps/$vpsID': typeof AuthenticatedOperationalVpsVpsIDRoute
   '/_authenticated/hris/employees/': typeof AuthenticatedHrisEmployeesIndexRoute
   '/_authenticated/hris/reimbursements/': typeof AuthenticatedHrisReimbursementsIndexRoute
   '/_authenticated/operational/projects/': typeof AuthenticatedOperationalProjectsIndexRoute
+  '/_authenticated/operational/vps/': typeof AuthenticatedOperationalVpsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -377,9 +397,11 @@ export interface FileRouteTypes {
     | '/hris/employees/$employeeId'
     | '/hris/reimbursements/$reimbursementId'
     | '/operational/projects/$projectId'
+    | '/operational/vps/$vpsID'
     | '/hris/employees/'
     | '/hris/reimbursements/'
     | '/operational/projects/'
+    | '/operational/vps/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -412,9 +434,11 @@ export interface FileRouteTypes {
     | '/hris/employees/$employeeId'
     | '/hris/reimbursements/$reimbursementId'
     | '/operational/projects/$projectId'
+    | '/operational/vps/$vpsID'
     | '/hris/employees'
     | '/hris/reimbursements'
     | '/operational/projects'
+    | '/operational/vps'
   id:
     | '__root__'
     | '/'
@@ -448,9 +472,11 @@ export interface FileRouteTypes {
     | '/_authenticated/hris/employees/$employeeId'
     | '/_authenticated/hris/reimbursements/$reimbursementId'
     | '/_authenticated/operational/projects/$projectId'
+    | '/_authenticated/operational/vps/$vpsID'
     | '/_authenticated/hris/employees/'
     | '/_authenticated/hris/reimbursements/'
     | '/_authenticated/operational/projects/'
+    | '/_authenticated/operational/vps/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -660,6 +686,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAuditLogsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/operational/vps/': {
+      id: '/_authenticated/operational/vps/'
+      path: '/operational/vps'
+      fullPath: '/operational/vps/'
+      preLoaderRoute: typeof AuthenticatedOperationalVpsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/operational/projects/': {
       id: '/_authenticated/operational/projects/'
       path: '/operational/projects'
@@ -679,6 +712,13 @@ declare module '@tanstack/react-router' {
       path: '/hris/employees'
       fullPath: '/hris/employees/'
       preLoaderRoute: typeof AuthenticatedHrisEmployeesIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/operational/vps/$vpsID': {
+      id: '/_authenticated/operational/vps/$vpsID'
+      path: '/operational/vps/$vpsID'
+      fullPath: '/operational/vps/$vpsID'
+      preLoaderRoute: typeof AuthenticatedOperationalVpsVpsIDRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/operational/projects/$projectId': {
@@ -731,9 +771,11 @@ interface AuthenticatedRouteChildren {
   AuthenticatedHrisEmployeesEmployeeIdRoute: typeof AuthenticatedHrisEmployeesEmployeeIdRoute
   AuthenticatedHrisReimbursementsReimbursementIdRoute: typeof AuthenticatedHrisReimbursementsReimbursementIdRoute
   AuthenticatedOperationalProjectsProjectIdRoute: typeof AuthenticatedOperationalProjectsProjectIdRoute
+  AuthenticatedOperationalVpsVpsIDRoute: typeof AuthenticatedOperationalVpsVpsIDRoute
   AuthenticatedHrisEmployeesIndexRoute: typeof AuthenticatedHrisEmployeesIndexRoute
   AuthenticatedHrisReimbursementsIndexRoute: typeof AuthenticatedHrisReimbursementsIndexRoute
   AuthenticatedOperationalProjectsIndexRoute: typeof AuthenticatedOperationalProjectsIndexRoute
+  AuthenticatedOperationalVpsIndexRoute: typeof AuthenticatedOperationalVpsIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -766,11 +808,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedHrisReimbursementsReimbursementIdRoute,
   AuthenticatedOperationalProjectsProjectIdRoute:
     AuthenticatedOperationalProjectsProjectIdRoute,
+  AuthenticatedOperationalVpsVpsIDRoute: AuthenticatedOperationalVpsVpsIDRoute,
   AuthenticatedHrisEmployeesIndexRoute: AuthenticatedHrisEmployeesIndexRoute,
   AuthenticatedHrisReimbursementsIndexRoute:
     AuthenticatedHrisReimbursementsIndexRoute,
   AuthenticatedOperationalProjectsIndexRoute:
     AuthenticatedOperationalProjectsIndexRoute,
+  AuthenticatedOperationalVpsIndexRoute: AuthenticatedOperationalVpsIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

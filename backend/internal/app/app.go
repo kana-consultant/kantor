@@ -145,6 +145,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
 	trackerRepository := operationalrepo.NewTrackerRepository(pool)
 	trackerReminderRepository := operationalrepo.NewTrackerReminderRepository(pool)
+	vpsRepository := operationalrepo.NewVPSRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
 	compensationRepository := hrisrepo.NewCompensationRepository(pool)
 	financeRepository := hrisrepo.NewFinanceRepository(pool)
@@ -183,6 +184,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	emailDeliveryService := notificationsservice.NewEmailDeliveryService(authRepository, waRepository, encrypter, cfg)
 
 	trackerReminderService := operationalservice.NewTrackerReminderService(trackerReminderRepository, notificationsRepository, whatsappService)
+	vpsService := operationalservice.NewVPSService(vpsRepository)
+	vpsMonitorService := operationalservice.NewVPSMonitorService(vpsRepository, notificationsRepository, authRepository)
 
 	// Wire event triggers
 	kanbanService.SetTaskAssignNotifier(whatsappService)
@@ -209,6 +212,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		operationalhandler.NewKanbanHandler(kanbanService),
 		operationalhandler.NewTrackerHandler(trackerService),
 		operationalhandler.NewTrackerReminderHandler(trackerReminderService),
+		operationalhandler.NewVPSHandler(vpsService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
 		hrishandler.NewEmployeesHandler(employeesService, compensationService, cfg.UploadsDir, authRepository),
 		hrishandler.NewDepartmentsHandler(departmentsService),
@@ -224,7 +228,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		fileshandler.New(filesService),
 		wahandler.New(whatsappService),
 	)
-	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService)
+	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService)
 
 	return application, nil
 }
@@ -258,6 +262,7 @@ func (a *App) buildRouter(
 	kanbanHandler *operationalhandler.KanbanHandler,
 	trackerHandler *operationalhandler.TrackerHandler,
 	trackerReminderHandler *operationalhandler.TrackerReminderHandler,
+	vpsHandler *operationalhandler.VPSHandler,
 	hrisOverviewHandler *hrishandler.OverviewHandler,
 	employeesHandler *hrishandler.EmployeesHandler,
 	departmentsHandler *hrishandler.DepartmentsHandler,
@@ -401,6 +406,7 @@ func (a *App) buildRouter(
 					module.Route("/projects", projectsHandler.RegisterRoutes)
 					module.Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
 					module.Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
+					module.Route("/vps", vpsHandler.RegisterRoutes)
 				})
 
 				protected.Route("/tracker", func(tracker chi.Router) {
@@ -447,7 +453,7 @@ func (a *App) buildRouter(
 	return router
 }
 
-func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService) {
+func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -489,6 +495,16 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 			_, _, err := authService.AutoRollRegistrationCodeIfExpired(tCtx, time.Now())
 			return err
 		})
+		runPerTenant("vps_rollup_yesterday", func(tCtx context.Context, t tenant.Info) error {
+			return vpsMonitorService.RollupYesterday(tCtx, time.Now())
+		})
+		runPerTenant("vps_purge_events", func(tCtx context.Context, t tenant.Info) error {
+			_, err := vpsMonitorService.PurgeOldEvents(tCtx, time.Now(), 7)
+			return err
+		})
+		runPerTenant("vps_renewal_alerts", func(tCtx context.Context, t tenant.Info) error {
+			return vpsMonitorService.SendRenewalAlerts(tCtx, time.Now(), 7)
+		})
 
 		for {
 			select {
@@ -505,6 +521,36 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 				runPerTenant("registration_auto_roll", func(tCtx context.Context, t tenant.Info) error {
 					_, _, err := authService.AutoRollRegistrationCodeIfExpired(tCtx, tickAt)
 					return err
+				})
+				runPerTenant("vps_rollup_yesterday", func(tCtx context.Context, t tenant.Info) error {
+					return vpsMonitorService.RollupYesterday(tCtx, tickAt)
+				})
+				runPerTenant("vps_purge_events", func(tCtx context.Context, t tenant.Info) error {
+					_, err := vpsMonitorService.PurgeOldEvents(tCtx, tickAt, 7)
+					return err
+				})
+				runPerTenant("vps_renewal_alerts", func(tCtx context.Context, t tenant.Info) error {
+					return vpsMonitorService.SendRenewalAlerts(tCtx, tickAt, 7)
+				})
+			}
+		}
+	})
+
+	runBackground("vps_monitor_scheduler", func() {
+		// Tick every 30s — finer than that wastes CPU since the smallest
+		// configurable check interval is 30s. ListDueChecks filters by
+		// last_check_at + interval so this loop is cheap when no checks
+		// are due.
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case tickAt := <-ticker.C:
+				runPerTenant("vps_monitor_run_due", func(tCtx context.Context, t tenant.Info) error {
+					return vpsMonitorService.RunDueChecks(tCtx, tickAt)
 				})
 			}
 		}

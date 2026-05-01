@@ -146,6 +146,10 @@ func DefaultPermissions() []PermissionDefinition {
 		{ID: "operational:tracker-reminder:manage", ModuleID: ModuleOperational, Resource: "tracker_reminder", Action: "manage", Description: "Mengelola pengaturan reminder activity tracker"},
 		{ID: "operational:wa:view", ModuleID: ModuleOperational, Resource: "wa_broadcast", Action: "view", Description: "Melihat dashboard dan log WA broadcast"},
 		{ID: "operational:wa:manage", ModuleID: ModuleOperational, Resource: "wa_broadcast", Action: "manage", Description: "Mengelola template schedule dan pengiriman WA"},
+		{ID: "operational:vps:view", ModuleID: ModuleOperational, Resource: "vps", Action: "view", Description: "Melihat inventaris VPS dan status uptime", IsSensitive: true},
+		{ID: "operational:vps:create", ModuleID: ModuleOperational, Resource: "vps", Action: "create", Description: "Mendaftarkan VPS baru ke inventaris", IsSensitive: true},
+		{ID: "operational:vps:edit", ModuleID: ModuleOperational, Resource: "vps", Action: "edit", Description: "Mengedit VPS, app, dan health check", IsSensitive: true},
+		{ID: "operational:vps:delete", ModuleID: ModuleOperational, Resource: "vps", Action: "delete", Description: "Menghapus VPS dari inventaris", IsSensitive: true},
 
 		// HRIS
 		{ID: "hris:employee:view", ModuleID: ModuleHRIS, Resource: "employee", Action: "view", Description: "Melihat data karyawan"},
@@ -257,6 +261,11 @@ func managerCanAccess(permission PermissionDefinition) bool {
 	}
 
 	if permission.ID == "operational:tracker-reminder:manage" {
+		return false
+	}
+
+	// VPS monitoring is restricted to super_admin + admin by default.
+	if permission.ModuleID == ModuleOperational && permission.Resource == "vps" {
 		return false
 	}
 
