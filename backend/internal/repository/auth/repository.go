@@ -315,7 +315,7 @@ func (r *Repository) GetRefreshTokenByHash(ctx context.Context, tokenHash string
 	return refreshToken, nil
 }
 
-func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string, params CreateRefreshTokenParams) error {
+func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string, params CreateRefreshTokenParams) (err error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	tx, err := repository.DB(ctx, r.db).Begin(ctx)
@@ -339,7 +339,8 @@ func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string
 		return err
 	}
 	if updateTag.RowsAffected() == 0 {
-		return ErrNotFound
+		err = ErrNotFound
+		return
 	}
 
 	insertQuery := `
@@ -351,7 +352,8 @@ func (r *Repository) RotateRefreshToken(ctx context.Context, oldTokenHash string
 		return err
 	}
 
-	return tx.Commit(ctx)
+	err = tx.Commit(ctx)
+	return err
 }
 
 func (r *Repository) RevokeAllUserTokens(ctx context.Context, userID string) error {

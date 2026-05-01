@@ -126,6 +126,9 @@ func TestRotateRefreshToken_ReturnsNotFoundWhenAlreadyRevoked(t *testing.T) {
 	if tx.committed {
 		t.Fatal("transaction must not commit when old token is already revoked")
 	}
+	if !tx.rolledBack {
+		t.Fatal("expected rollback when old token is already revoked")
+	}
 }
 
 func TestRotateRefreshToken_SucceedsWhenOldTokenIsActive(t *testing.T) {
