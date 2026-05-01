@@ -40,9 +40,9 @@ type vpsMonitorAuthLookup interface {
 // alerts on transition. It is invoked from the per-tenant background
 // scheduler in app.go.
 type VPSMonitorService struct {
-	repo     vpsRepository
-	notifs   vpsMonitorNotifications
-	authRepo vpsMonitorAuthLookup
+	repo       vpsRepository
+	notifs     vpsMonitorNotifications
+	authRepo   vpsMonitorAuthLookup
 	httpClient *http.Client
 }
 
@@ -223,6 +223,14 @@ func (s *VPSMonitorService) probe(ctx context.Context, c model.VPSHealthCheck) o
 }
 
 func probeTCP(ctx context.Context, target string, timeout time.Duration) operationalrepo.CheckResult {
+	host, _, err := net.SplitHostPort(target)
+	if err != nil {
+		return operationalrepo.CheckResult{Status: "down", ErrorMessage: "invalid tcp target: " + err.Error()}
+	}
+	if err := ensureProbeHostIsPublic(ctx, host, timeout); err != nil {
+		return operationalrepo.CheckResult{Status: "down", ErrorMessage: err.Error()}
+	}
+
 	dialer := &net.Dialer{Timeout: timeout}
 	dialCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -242,9 +250,14 @@ func probeHTTP(ctx context.Context, client *http.Client, target string, timeout 
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if _, err := url.Parse(target); err != nil {
+	parsed, err := url.Parse(target)
+	if err != nil {
 		return operationalrepo.CheckResult{Status: "down", ErrorMessage: "invalid url: " + err.Error()}
 	}
+	if err := ensureProbeHostIsPublic(reqCtx, parsed.Hostname(), timeout); err != nil {
+		return operationalrepo.CheckResult{Status: "down", ErrorMessage: err.Error()}
+	}
+
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, target, nil)
 	if err != nil {
 		return operationalrepo.CheckResult{Status: "down", ErrorMessage: "request build: " + err.Error()}
@@ -281,6 +294,30 @@ func probeHTTP(ctx context.Context, client *http.Client, target string, timeout 
 		}
 	}
 	return res
+}
+
+func ensureProbeHostIsPublic(ctx context.Context, host string, timeout time.Duration) error {
+	if err := validateProbeHost(host); err != nil {
+		return err
+	}
+	if _, isLiteral := parseLiteralIP(host); isLiteral {
+		return nil
+	}
+
+	resolveCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ips, err := net.DefaultResolver.LookupNetIP(resolveCtx, "ip", host)
+	if err != nil {
+		// Let the probe attempt continue and report the dial/request failure.
+		return nil
+	}
+	for _, ip := range ips {
+		if isBlockedProbeIP(ip.Unmap()) {
+			return fmt.Errorf("target host resolves to non-public IP %s", ip.String())
+		}
+	}
+	return nil
 }
 
 func trimCertIssuer(s string) string {
@@ -444,4 +481,3 @@ func (s *VPSMonitorService) RollupYesterday(ctx context.Context, now time.Time) 
 	yesterday := now.AddDate(0, 0, -1)
 	return s.repo.RollupDailySummary(ctx, yesterday)
 }
-
