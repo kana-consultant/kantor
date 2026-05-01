@@ -825,7 +825,7 @@ func (r *Repository) listUserRoleKeys(ctx context.Context, userIDs []string) (ma
 	return roleMap, nil
 }
 
-func (r *Repository) SetUserActive(ctx context.Context, userID string, active bool) error {
+func (r *Repository) SetUserActive(ctx context.Context, userID string, active bool) (err error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
@@ -844,7 +844,8 @@ func (r *Repository) SetUserActive(ctx context.Context, userID string, active bo
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return ErrNotFound
+		err = ErrNotFound
+		return
 	}
 
 	// When an account is deactivated, revoke all outstanding refresh tokens so
@@ -859,7 +860,8 @@ func (r *Repository) SetUserActive(ctx context.Context, userID string, active bo
 		}
 	}
 
-	return tx.Commit(ctx)
+	err = tx.Commit(ctx)
+	return err
 }
 
 func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roles []rbac.RoleKey) error {

@@ -159,4 +159,7 @@ func TestSetUserActive_ReturnsNotFoundWhenUserMissing(t *testing.T) {
 	if tx.committed {
 		t.Fatal("transaction must not commit when user is missing")
 	}
+	if !tx.rolledBack {
+		t.Fatal("expected rollback when user is missing")
+	}
 }
