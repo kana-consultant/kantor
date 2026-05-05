@@ -59,7 +59,7 @@ func AccessLogger(next http.Handler) http.Handler {
 				slog.Int("status", status),
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.Int64("latency_ms", latency.Milliseconds()),
-				slog.String("remote_ip", r.RemoteAddr),
+				slog.String("remote_ip", ClientIPFromRequest(r)),
 			}
 			if reqID := chimiddleware.GetReqID(r.Context()); reqID != "" {
 				attrs = append(attrs, slog.String("request_id", reqID))

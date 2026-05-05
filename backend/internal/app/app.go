@@ -15,18 +15,17 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/go-chi/chi/v5"
 
 	backendauth "github.com/kana-consultant/kantor/backend/internal/auth"
 	"github.com/kana-consultant/kantor/backend/internal/config"
-	"github.com/kana-consultant/kantor/backend/internal/metrics"
 	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
@@ -35,6 +34,7 @@ import (
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
 	wahandler "github.com/kana-consultant/kantor/backend/internal/handler/whatsapp"
+	"github.com/kana-consultant/kantor/backend/internal/metrics"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	auditrepo "github.com/kana-consultant/kantor/backend/internal/repository/audit"
@@ -206,7 +206,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		metrics:              metrics.NewRegistry(),
 		accessTokenBlacklist: accessTokenBlacklist,
 	}
-	application.router = application.buildRouter(
+	router, err := application.buildRouter(
 		auditService,
 		authService,
 		adminhandler.NewAuditLogsHandler(auditService),
@@ -232,6 +232,11 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		fileshandler.New(filesService),
 		wahandler.New(whatsappService),
 	)
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("build router: %w", err)
+	}
+	application.router = router
 	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService, domainMonitorService)
 
 	return application, nil
@@ -282,12 +287,17 @@ func (a *App) buildRouter(
 	notificationsHandler *notificationshandler.Handler,
 	filesHandler *fileshandler.Handler,
 	waHandler *wahandler.Handler,
-) http.Handler {
+) (http.Handler, error) {
 	router := chi.NewRouter()
 	authHandler := authhandler.New(authService, a.cfg)
 
+	clientIPMiddleware, err := platformmiddleware.NewClientIPMiddleware(a.cfg.TrustedProxyCIDRs)
+	if err != nil {
+		return nil, err
+	}
+
 	router.Use(chimiddleware.RequestID)
-	router.Use(chimiddleware.RealIP)
+	router.Use(clientIPMiddleware)
 	// otelhttp opens a server span for every request and stitches it into
 	// the W3C traceparent context propagated by upstream callers.
 	router.Use(func(next http.Handler) http.Handler {
@@ -456,7 +466,7 @@ func (a *App) buildRouter(
 		})
 	})
 
-	return router
+	return router, nil
 }
 
 func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService, domainMonitorService *operationalservice.DomainMonitorService) {
