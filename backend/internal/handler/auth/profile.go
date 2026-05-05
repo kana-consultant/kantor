@@ -19,6 +19,8 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
+const maxProfileAvatarMultipartMaxBytes = 6 << 20
+
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
@@ -96,7 +98,12 @@ func (h *Handler) UploadProfileAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxProfileAvatarMultipartMaxBytes)
 	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		if platformmiddleware.IsBodyTooLargeError(err) {
+			platformmiddleware.WriteBodyTooLargeError(w)
+			return
+		}
 		response.WriteError(w, http.StatusBadRequest, "INVALID_MULTIPART", "Upload harus menggunakan multipart form data", nil)
 		return
 	}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -27,4 +28,18 @@ func MaxBodySize(maxBytes int64) func(http.Handler) http.Handler {
 // Handlers that decode JSON should check for http.MaxBytesError and call this.
 func WriteBodyTooLargeError(w http.ResponseWriter) {
 	response.WriteError(w, http.StatusRequestEntityTooLarge, "BODY_TOO_LARGE", "Request body exceeds the maximum allowed size", nil)
+}
+
+// IsBodyTooLargeError detects body-size violations produced by http.MaxBytesReader.
+func IsBodyTooLargeError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "request body too large")
 }
