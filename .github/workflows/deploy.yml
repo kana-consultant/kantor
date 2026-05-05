@@ -61,12 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Skip secret-dependent deploy build for fork PRs
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true
-        run: echo "Fork pull request detected. Skipping Nix/Cachix/deploy steps because repository secrets are unavailable."
-
       - name: Setup SSH aliases for private flake inputs
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         env:
           GH_FLAKE_A: ${{ secrets.GH_FLAKE_A }}
           GH_FLAKE_B: ${{ secrets.GH_FLAKE_B }}
@@ -93,30 +88,25 @@ jobs:
           chmod 600 ~/.ssh/config
 
       - uses: DeterminateSystems/nix-installer-action@main
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         with:
           extra-conf: |
             access-tokens = github.com=${{ secrets.GH_TOKEN }}
 
       - uses: cachix/cachix-action@v15
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         with:
           name: kantor-kana
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           installCommand: nix profile install nixpkgs#cachix
 
       - name: Setup sops age key
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         run: |
           mkdir -p ~/.config/sops/age
           echo "${{ secrets.SOPS_AGE_KEY }}" > ~/.config/sops/age/keys.txt
 
       - name: Clone nix-config
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         run: git clone https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/KeyCode17/nix-config.git /tmp/nix-config
 
       - name: Build NixOS system
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         id: build
         run: |
           SYSTEM=$(nix build \
@@ -126,7 +116,6 @@ jobs:
           echo "path=$SYSTEM" >> "$GITHUB_OUTPUT"
 
       - name: Push to Cachix
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         run: cachix push kantor-kana ${{ steps.build.outputs.path }}
 
       - name: Deploy to server
