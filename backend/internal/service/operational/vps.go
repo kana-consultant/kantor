@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/netip"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +24,11 @@ var (
 	ErrVPSCheckOnOther  = errors.New("vps app cannot link to a check on a different vps")
 	ErrInvalidVPSCheck  = errors.New("invalid vps health check")
 )
+
+var blockedProbeCIDRs = []netip.Prefix{
+	netip.MustParsePrefix("100.64.0.0/10"), // CGNAT
+	netip.MustParsePrefix("198.18.0.0/15"), // benchmark/testing range
+}
 
 type vpsRepository interface {
 	CreateVPS(ctx context.Context, p operationalrepo.CreateVPSParams) (model.VPSServer, error)
@@ -142,11 +151,11 @@ func (s *VPSService) ListVPS(ctx context.Context, p operationalrepo.ListVPSParam
 // VPSDetail bundles a server with its checks, apps, and recent events for the
 // detail page. The handler renders this directly as JSON.
 type VPSDetail struct {
-	Server  model.VPSServer               `json:"server"`
-	Checks  []model.VPSHealthCheck        `json:"checks"`
-	Apps    []model.VPSApp                `json:"apps"`
-	Events  []model.VPSHealthEvent        `json:"events"`
-	Daily   []model.VPSHealthDailySummary `json:"daily"`
+	Server model.VPSServer               `json:"server"`
+	Checks []model.VPSHealthCheck        `json:"checks"`
+	Apps   []model.VPSApp                `json:"apps"`
+	Events []model.VPSHealthEvent        `json:"events"`
+	Daily  []model.VPSHealthDailySummary `json:"daily"`
 }
 
 func (s *VPSService) GetVPSDetail(ctx context.Context, vpsID string) (VPSDetail, error) {
@@ -325,20 +334,94 @@ func validateCheckTarget(checkType string, target string) error {
 		if target == "" {
 			return fmt.Errorf("%w: icmp target (host or IP) is required", ErrInvalidVPSCheck)
 		}
+		if err := validateProbeHost(target); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidVPSCheck, err)
+		}
 	case "tcp":
-		// expect host:port
-		idx := strings.LastIndex(target, ":")
-		if idx <= 0 || idx == len(target)-1 {
+		host, port, err := net.SplitHostPort(target)
+		if err != nil {
 			return fmt.Errorf("%w: tcp target must be host:port", ErrInvalidVPSCheck)
 		}
+		p, err := strconv.Atoi(port)
+		if err != nil || p < 1 || p > 65535 {
+			return fmt.Errorf("%w: tcp target must use numeric port", ErrInvalidVPSCheck)
+		}
+		if err := validateProbeHost(host); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidVPSCheck, err)
+		}
 	case "http", "https":
-		if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+		parsed, err := url.ParseRequestURI(target)
+		if err != nil || !parsed.IsAbs() || parsed.Hostname() == "" {
 			return fmt.Errorf("%w: http/https target must be a full URL", ErrInvalidVPSCheck)
+		}
+		if parsed.User != nil {
+			return fmt.Errorf("%w: URL credentials are not allowed", ErrInvalidVPSCheck)
+		}
+		if parsed.Scheme != checkType {
+			return fmt.Errorf("%w: %s checks must use %s:// target", ErrInvalidVPSCheck, checkType, checkType)
+		}
+		if parsed.Port() != "" {
+			p, err := strconv.Atoi(parsed.Port())
+			if err != nil || p < 1 || p > 65535 {
+				return fmt.Errorf("%w: URL port must be numeric", ErrInvalidVPSCheck)
+			}
+		}
+		if err := validateProbeHost(parsed.Hostname()); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidVPSCheck, err)
 		}
 	default:
 		return fmt.Errorf("%w: unknown check type %q", ErrInvalidVPSCheck, checkType)
 	}
 	return nil
+}
+
+func validateProbeHost(rawHost string) error {
+	host := strings.TrimSpace(rawHost)
+	if host == "" {
+		return errors.New("target host is required")
+	}
+	if strings.EqualFold(host, "localhost") || strings.HasSuffix(strings.ToLower(host), ".localhost") {
+		return errors.New("localhost targets are not allowed")
+	}
+
+	ip, ok := parseLiteralIP(host)
+	if !ok {
+		return nil
+	}
+	if isBlockedProbeIP(ip) {
+		return fmt.Errorf("target IP %s is not allowed", ip.String())
+	}
+	return nil
+}
+
+func parseLiteralIP(raw string) (netip.Addr, bool) {
+	trimmed := strings.TrimSpace(strings.Trim(raw, "[]"))
+	if zone := strings.Index(trimmed, "%"); zone > 0 {
+		trimmed = trimmed[:zone]
+	}
+	addr, err := netip.ParseAddr(trimmed)
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}
+
+func isBlockedProbeIP(addr netip.Addr) bool {
+	if !addr.IsValid() {
+		return true
+	}
+	if addr.IsLoopback() || addr.IsPrivate() || addr.IsMulticast() || addr.IsUnspecified() {
+		return true
+	}
+	if addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsInterfaceLocalMulticast() {
+		return true
+	}
+	for _, cidr := range blockedProbeCIDRs {
+		if cidr.Contains(addr) {
+			return true
+		}
+	}
+	return false
 }
 
 func mapVPSError(err error) error {
