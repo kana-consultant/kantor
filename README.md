@@ -196,6 +196,11 @@ npm run build
 
 See [Testing Guide](docs/testing.md) for the current automated coverage and CI workflow.
 
+### MCP Server
+
+KANTOR includes a stdio MCP gateway for AI clients that need to call the platform API.
+See [MCP Server](docs/mcp.md) for setup and client configuration.
+
 ---
 
 ## Project Structure
