@@ -24,14 +24,20 @@ type oauthClientRepository interface {
 	GetOAuthClient(ctx context.Context, clientID string) (authrepo.OAuthClient, error)
 }
 
+type oauthCodeRepository interface {
+	CreateOAuthCode(ctx context.Context, params authrepo.CreateOAuthCodeParams) error
+	ConsumeOAuthCode(ctx context.Context, codeHash string, now time.Time) (authrepo.OAuthCodeRow, error)
+	PurgeExpiredOAuthCodes(ctx context.Context, now time.Time) (int64, error)
+}
+
 type OAuthService struct {
 	repo  oauthClientRepository
-	codes *oauth.CodeStore
+	codes oauthCodeRepository
 	auth  *Service
 }
 
-func NewOAuthService(repo oauthClientRepository, auth *Service) *OAuthService {
-	return &OAuthService{repo: repo, codes: oauth.NewCodeStore(), auth: auth}
+func NewOAuthService(repo oauthClientRepository, codes oauthCodeRepository, auth *Service) *OAuthService {
+	return &OAuthService{repo: repo, codes: codes, auth: auth}
 }
 
 type RegisterClientResult struct {
@@ -92,19 +98,31 @@ func (s *OAuthService) Grant(ctx context.Context, params GrantParams, now time.T
 	if params.CodeChallengeMethod != "S256" || strings.TrimSpace(params.CodeChallenge) == "" {
 		return "", ErrOAuthInvalidRequest
 	}
-	return s.codes.Issue(oauth.AuthCode{
+
+	plaintext, hash, err := oauth.NewCode()
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.codes.CreateOAuthCode(ctx, authrepo.CreateOAuthCodeParams{
+		CodeHash:            hash,
 		UserID:              params.UserID,
 		ClientID:            params.ClientID,
 		RedirectURI:         params.RedirectURI,
 		CodeChallenge:       params.CodeChallenge,
 		CodeChallengeMethod: params.CodeChallengeMethod,
 		Scope:               params.Scope,
-	}, now)
+		ExpiresAt:           now.Add(oauth.CodeTTL),
+	}); err != nil {
+		return "", err
+	}
+	return plaintext, nil
 }
 
 func (s *OAuthService) ExchangeCode(ctx context.Context, code string, clientID string, redirectURI string, codeVerifier string, userAgent string, ipAddress string, now time.Time) (dto.TokenPair, error) {
-	stored, ok := s.codes.Consume(code, now)
-	if !ok {
+	hash := oauth.HashCode(code)
+	stored, err := s.codes.ConsumeOAuthCode(ctx, hash, now)
+	if err != nil {
 		return dto.TokenPair{}, ErrOAuthInvalidGrant
 	}
 	if stored.ClientID != clientID || stored.RedirectURI != redirectURI {
@@ -127,4 +145,10 @@ func (s *OAuthService) RefreshGrant(ctx context.Context, refreshToken string, us
 		return dto.TokenPair{}, err
 	}
 	return result.Tokens, nil
+}
+
+// PurgeExpiredCodes removes stale authorization codes from the database.
+// Called by the background scheduler to prevent table bloat.
+func (s *OAuthService) PurgeExpiredCodes(ctx context.Context, now time.Time) (int64, error) {
+	return s.codes.PurgeExpiredOAuthCodes(ctx, now)
 }

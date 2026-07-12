@@ -5,12 +5,13 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"sync"
+	"encoding/hex"
 	"time"
 )
 
-const codeTTL = 2 * time.Minute
+const CodeTTL = 2 * time.Minute
 
+// AuthCode holds the metadata for an in-flight authorization code grant.
 type AuthCode struct {
 	UserID              string
 	ClientID            string
@@ -21,15 +22,6 @@ type AuthCode struct {
 	ExpiresAt           time.Time
 }
 
-type CodeStore struct {
-	mu    sync.Mutex
-	codes map[string]AuthCode
-}
-
-func NewCodeStore() *CodeStore {
-	return &CodeStore{codes: make(map[string]AuthCode)}
-}
-
 func newRandomToken(byteLen int) (string, error) {
 	buffer := make([]byte, byteLen)
 	if _, err := rand.Read(buffer); err != nil {
@@ -38,38 +30,23 @@ func newRandomToken(byteLen int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buffer), nil
 }
 
-// Issue stores a single-use authorization code and returns its value.
-func (s *CodeStore) Issue(code AuthCode, now time.Time) (string, error) {
-	value, err := newRandomToken(32)
+// NewCode generates a random authorization code value and its SHA-256 hash.
+// Only the hash is stored; the plaintext is returned once to the caller.
+func NewCode() (plaintext string, hash string, err error) {
+	plaintext, err = newRandomToken(32)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	code.ExpiresAt = now.Add(codeTTL)
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for key, existing := range s.codes {
-		if now.After(existing.ExpiresAt) {
-			delete(s.codes, key)
-		}
-	}
-	s.codes[value] = code
-	return value, nil
+	sum := sha256.Sum256([]byte(plaintext))
+	hash = hex.EncodeToString(sum[:])
+	return plaintext, hash, nil
 }
 
-// Consume returns and deletes the code. ok is false when missing or expired.
-func (s *CodeStore) Consume(value string, now time.Time) (AuthCode, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	code, ok := s.codes[value]
-	if !ok {
-		return AuthCode{}, false
-	}
-	delete(s.codes, value)
-	if now.After(code.ExpiresAt) {
-		return AuthCode{}, false
-	}
-	return code, true
+// HashCode returns the SHA-256 hex digest of a code value, used to look up
+// a previously issued code in the database.
+func HashCode(code string) string {
+	sum := sha256.Sum256([]byte(code))
+	return hex.EncodeToString(sum[:])
 }
 
 // VerifyPKCE checks an S256 code_verifier against the stored code_challenge.

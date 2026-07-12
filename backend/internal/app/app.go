@@ -171,7 +171,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	accessTokenBlacklist := backendauth.NewAccessTokenBlacklist(time.Minute)
 	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter, accessTokenBlacklist)
 	patService := authservice.NewPATService(authRepository)
-	oauthService := authservice.NewOAuthService(authRepository, authService)
+	oauthService := authservice.NewOAuthService(authRepository, authRepository, authService)
 
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
@@ -275,7 +275,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("build router: %w", err)
 	}
 	application.router = router
-	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService, domainMonitorService)
+	application.startBackgroundJobs(authService, oauthService, subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService, domainMonitorService)
 
 	return application, nil
 }
@@ -546,7 +546,7 @@ func (a *App) buildRouter(
 	return router, nil
 }
 
-func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService, domainMonitorService *operationalservice.DomainMonitorService) {
+func (a *App) startBackgroundJobs(authService *authservice.Service, oauthService *authservice.OAuthService, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService, domainMonitorService *operationalservice.DomainMonitorService) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -634,6 +634,10 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 			_, err := domainMonitorService.PurgeOldEvents(tCtx, time.Now(), 7)
 			return err
 		})
+		runPerTenant("oauth_code_purge", func(tCtx context.Context, t tenant.Info) error {
+			_, err := oauthService.PurgeExpiredCodes(tCtx, time.Now())
+			return err
+		})
 		runPerTenant("domain_whois_sync", func(tCtx context.Context, t tenant.Info) error {
 			return domainMonitorService.SyncWhoisAll(tCtx, time.Now())
 		})
@@ -669,6 +673,10 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 				})
 				runPerTenant("domain_purge_events", func(tCtx context.Context, t tenant.Info) error {
 					_, err := domainMonitorService.PurgeOldEvents(tCtx, tickAt, 7)
+					return err
+				})
+				runPerTenant("oauth_code_purge", func(tCtx context.Context, t tenant.Info) error {
+					_, err := oauthService.PurgeExpiredCodes(tCtx, tickAt)
 					return err
 				})
 				runPerTenant("domain_whois_sync", func(tCtx context.Context, t tenant.Info) error {
