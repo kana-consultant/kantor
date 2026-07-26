@@ -130,6 +130,10 @@ var endpointAnnotations = map[string]EndpointMeta{
 			qs("search", "Free-text search."),
 		},
 	},
+	"GET /api/v1/operational/tasks/mine": {
+		Description: "Your assigned tasks across all projects (status: open/done/overdue). Self-scoped to the caller.",
+		Query:       []QueryParam{qe("status", "Computed status filter.", "open", "done", "overdue", "all")},
+	},
 
 	// ---- Tracker ----
 	"GET /api/v1/tracker/my-activity": {
