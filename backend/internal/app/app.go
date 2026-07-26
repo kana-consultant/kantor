@@ -480,6 +480,7 @@ func (a *App) buildRouter(
 					module.Route("/projects", projectsHandler.RegisterRoutes)
 					module.With(projectsHandler.RequireProjectAccess).Route("/projects/{projectID}/columns", kanbanHandler.RegisterColumnRoutes)
 					module.With(projectsHandler.RequireProjectAccess).Route("/projects/{projectID}/tasks", kanbanHandler.RegisterTaskRoutes)
+					module.With(platformmiddleware.RequirePermission("operational:task:view")).Get("/tasks/mine", kanbanHandler.ListMyTasks)
 					module.Route("/vps", vpsHandler.RegisterRoutes)
 					module.Route("/domains", domainHandler.RegisterRoutes)
 				})

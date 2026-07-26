@@ -40,3 +40,15 @@ type MoveKanbanTaskRequest struct {
 	ColumnID string `json:"column_id" validate:"required,uuid4"`
 	Position int    `json:"position" validate:"required,min=1"`
 }
+
+// MyTaskItem is a cross-project task assigned to the calling user.
+type MyTaskItem struct {
+	TaskID      string `json:"task_id"`
+	Title       string `json:"title"`
+	ProjectID   string `json:"project_id"`
+	ProjectName string `json:"project_name"`
+	ColumnName  string `json:"column_name"`
+	Status      string `json:"status"`
+	DueDate     string `json:"due_date"`
+	Priority    string `json:"priority"`
+}

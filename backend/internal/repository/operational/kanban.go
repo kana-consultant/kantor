@@ -397,6 +397,57 @@ func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]m
 	return tasks, rows.Err()
 }
 
+// AssignedTaskRow is a raw scan of a task assigned to a user, across projects.
+type AssignedTaskRow struct {
+	TaskID      string
+	Title       string
+	ProjectID   string
+	ProjectName string
+	ColumnName  string
+	ColumnType  string
+	DueDate     string
+	Priority    string
+}
+
+func (r *KanbanRepository) ListTasksAssignedTo(ctx context.Context, userID string) ([]AssignedTaskRow, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		SELECT kt.id::text, kt.title, p.id::text, p.name,
+			kc.name, kc.column_type,
+			COALESCE(to_char(kt.due_date, 'YYYY-MM-DD'), ''), kt.priority
+		FROM kanban_tasks kt
+		JOIN kanban_columns kc ON kc.id = kt.column_id
+		JOIN projects p ON p.id = kt.project_id
+		WHERE kt.assignee_id = $1::uuid
+		ORDER BY kt.due_date ASC NULLS LAST, kt.priority DESC, kt.created_at ASC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tasks := make([]AssignedTaskRow, 0)
+	for rows.Next() {
+		var task AssignedTaskRow
+		if err := rows.Scan(
+			&task.TaskID,
+			&task.Title,
+			&task.ProjectID,
+			&task.ProjectName,
+			&task.ColumnName,
+			&task.ColumnType,
+			&task.DueDate,
+			&task.Priority,
+		); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	return tasks, rows.Err()
+}
+
 func (r *KanbanRepository) GetTask(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error) {
 	var task model.KanbanTask
 	err := repository.DB(ctx, r.db).QueryRow(ctx, `

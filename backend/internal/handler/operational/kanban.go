@@ -188,6 +188,24 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, result, nil)
 }
 
+// ListMyTasks handles GET /operational/tasks/mine, self-scoped to the caller.
+func (h *KanbanHandler) ListMyTasks(w http.ResponseWriter, r *http.Request) {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	result, err := h.service.ListMyTasks(r.Context(), principal.UserID, status)
+	if err != nil {
+		h.writeError(r.Context(), w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, result, nil)
+}
+
 func (h *KanbanHandler) updateTask(w http.ResponseWriter, r *http.Request) {
 	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
 	if !ok {

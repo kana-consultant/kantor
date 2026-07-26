@@ -39,6 +39,7 @@ type kanbanRepository interface {
 	MoveTask(ctx context.Context, projectID string, taskID string, destinationColumnID string, destinationPosition int) error
 	Snapshot(ctx context.Context, projectID string) (operationalrepo.KanbanSnapshot, error)
 	GetTask(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error)
+	ListTasksAssignedTo(ctx context.Context, userID string) ([]operationalrepo.AssignedTaskRow, error)
 }
 
 type kanbanProjectsRepository interface {
@@ -117,6 +118,47 @@ func (s *KanbanService) ReorderColumns(ctx context.Context, projectID string, re
 
 func (s *KanbanService) ListTasks(ctx context.Context, projectID string) ([]model.KanbanTask, error) {
 	return s.repo.ListTasks(ctx, projectID)
+}
+
+// ListMyTasks returns the caller's assigned tasks across all projects,
+// optionally filtered by computed status (open/done/overdue/all).
+func (s *KanbanService) ListMyTasks(ctx context.Context, userID string, status string) ([]operationaldto.MyTaskItem, error) {
+	rows, err := s.repo.ListTasksAssignedTo(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	today := time.Now().UTC().Format("2006-01-02")
+	items := make([]operationaldto.MyTaskItem, 0, len(rows))
+	for _, row := range rows {
+		computedStatus := computeTaskStatus(row.ColumnType, row.ColumnName, row.DueDate, today)
+		if status != "" && status != "all" && status != computedStatus {
+			continue
+		}
+
+		items = append(items, operationaldto.MyTaskItem{
+			TaskID:      row.TaskID,
+			Title:       row.Title,
+			ProjectID:   row.ProjectID,
+			ProjectName: row.ProjectName,
+			ColumnName:  row.ColumnName,
+			Status:      computedStatus,
+			DueDate:     row.DueDate,
+			Priority:    row.Priority,
+		})
+	}
+
+	return items, nil
+}
+
+func computeTaskStatus(columnType string, columnName string, dueDate string, today string) string {
+	if columnType == "done" || strings.EqualFold(columnName, "done") || strings.EqualFold(columnName, "archived") {
+		return "done"
+	}
+	if dueDate != "" && dueDate < today {
+		return "overdue"
+	}
+	return "open"
 }
 
 func (s *KanbanService) CreateTask(ctx context.Context, projectID string, request operationaldto.CreateKanbanTaskRequest, createdBy string) (model.KanbanTask, error) {

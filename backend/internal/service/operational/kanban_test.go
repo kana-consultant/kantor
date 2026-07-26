@@ -206,6 +206,10 @@ func (f *fakeKanbanRepository) GetTask(ctx context.Context, projectID string, ta
 	return f.getTaskFunc(ctx, projectID, taskID)
 }
 
+func (f *fakeKanbanRepository) ListTasksAssignedTo(ctx context.Context, userID string) ([]operationalrepo.AssignedTaskRow, error) {
+	return nil, nil
+}
+
 type fakeKanbanProjectsRepository struct {
 	project   model.Project
 	memberIDs []string
