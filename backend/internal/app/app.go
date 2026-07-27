@@ -178,6 +178,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
 	trackerRepository := operationalrepo.NewTrackerRepository(pool)
 	trackerReminderRepository := operationalrepo.NewTrackerReminderRepository(pool)
+	discordReminderRepository := operationalrepo.NewDiscordReminderRepository(pool)
 	vpsRepository := operationalrepo.NewVPSRepository(pool)
 	domainRepository := operationalrepo.NewDomainRepository(pool)
 	departmentsRepository := hrisrepo.NewDepartmentsRepository(pool)
@@ -220,6 +221,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	emailDeliveryService := notificationsservice.NewEmailDeliveryService(authRepository, waRepository, encrypter, cfg)
 
 	trackerReminderService := operationalservice.NewTrackerReminderService(trackerReminderRepository, notificationsRepository, whatsappService)
+	discordReminderService := operationalservice.NewDiscordReminderService(discordReminderRepository)
 	vpsService := operationalservice.NewVPSService(vpsRepository)
 	vpsMonitorService := operationalservice.NewVPSMonitorService(vpsRepository, notificationsRepository, authRepository, pool)
 	domainService := operationalservice.NewDomainService(domainRepository)
@@ -252,6 +254,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		operationalhandler.NewKanbanHandler(kanbanService),
 		operationalhandler.NewTrackerHandler(trackerService),
 		operationalhandler.NewTrackerReminderHandler(trackerReminderService),
+		operationalhandler.NewDiscordReminderHandler(discordReminderService),
 		operationalhandler.NewVPSHandler(vpsService),
 		operationalhandler.NewDomainHandler(domainService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
@@ -275,7 +278,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("build router: %w", err)
 	}
 	application.router = router
-	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService, domainMonitorService)
+	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, discordReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService, domainMonitorService)
 
 	return application, nil
 }
@@ -311,6 +314,7 @@ func (a *App) buildRouter(
 	kanbanHandler *operationalhandler.KanbanHandler,
 	trackerHandler *operationalhandler.TrackerHandler,
 	trackerReminderHandler *operationalhandler.TrackerReminderHandler,
+	discordReminderHandler *operationalhandler.DiscordReminderHandler,
 	vpsHandler *operationalhandler.VPSHandler,
 	domainHandler *operationalhandler.DomainHandler,
 	hrisOverviewHandler *hrishandler.OverviewHandler,
@@ -485,6 +489,11 @@ func (a *App) buildRouter(
 					module.Route("/domains", domainHandler.RegisterRoutes)
 				})
 
+				protected.Route("/discord-reminder", func(r chi.Router) {
+					r.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
+					discordReminderHandler.RegisterRoutes(r)
+				})
+
 				protected.Route("/tracker", func(tracker chi.Router) {
 					tracker.Use(platformmiddleware.RequireModuleAccess(rbac.ModuleOperational))
 					trackerHandler.RegisterRoutes(tracker)
@@ -547,7 +556,7 @@ func (a *App) buildRouter(
 	return router, nil
 }
 
-func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService, domainMonitorService *operationalservice.DomainMonitorService) {
+func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, discordReminderService *operationalservice.DiscordReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService, domainMonitorService *operationalservice.DomainMonitorService) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -705,6 +714,10 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 
 	runPerTenantTicker("tracker_reminder_scheduler", time.Minute, false, func(tCtx context.Context, t tenant.Info, now time.Time) error {
 		return trackerReminderService.RunReminderJobs(tCtx, now)
+	})
+
+	runPerTenantTicker("discord_reminder_scheduler", time.Minute, false, func(tCtx context.Context, t tenant.Info, now time.Time) error {
+		return discordReminderService.RunReminderJobs(tCtx, now)
 	})
 
 	// Close sessions orphaned by crashed/disconnected extensions so a later
@@ -882,6 +895,28 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 		trConn.Release()
 		if err != nil {
 			return fmt.Errorf("seed tracker reminder config for tenant %q: %w", tc.Slug, err)
+		}
+
+		// Ensure discord_reminder_configs row exists (disabled by default;
+		// webhook URL + shared secret set via super-admin API, not env).
+		drConn, err := pool.Acquire(ctx)
+		if err != nil {
+			return fmt.Errorf("acquire conn for discord reminder config seed: %w", err)
+		}
+		_, err = drConn.Exec(ctx, fmt.Sprintf("SET app.current_tenant = '%s'", tenantID))
+		if err != nil {
+			drConn.Release()
+			return fmt.Errorf("set tenant guc for discord reminder config seed: %w", err)
+		}
+		_, err = drConn.Exec(ctx,
+			`INSERT INTO discord_reminder_configs (tenant_id)
+			 VALUES ($1::uuid)
+			 ON CONFLICT (tenant_id) DO NOTHING`,
+			tenantID)
+		_, _ = drConn.Exec(ctx, "RESET ALL")
+		drConn.Release()
+		if err != nil {
+			return fmt.Errorf("seed discord reminder config for tenant %q: %w", tc.Slug, err)
 		}
 
 		// Ensure compensation_policies row exists (defaults seeded, admin tunes via UI).
