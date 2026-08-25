@@ -83,21 +83,12 @@ export function TaskModal({
 						</div>
 
 						<TaskMetaFields
-							className="md:hidden"
 							form={form}
-							idPrefix="task-m"
 							members={members}
 						/>
-
 					</div>
 
 					<div className="shrink-0 border-t border-border bg-surface px-6 pb-5 pt-5">
-						<TaskMetaFields
-							className="mb-5 hidden md:grid"
-							form={form}
-							members={members}
-						/>
-
 						<div className="flex flex-wrap gap-3">
 							<Button
 								variant="ops"
