@@ -390,7 +390,7 @@ func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID stri
 		LEFT JOIN users ON users.id = kanban_tasks.assignee_id
 		WHERE kanban_tasks.project_id = $1::uuid
 		  AND ($2 = '' OR kanban_tasks.column_id = $2::uuid)
-		ORDER BY kanban_tasks.column_id, kanban_tasks.position ASC, kanban_tasks.created_at ASC
+		ORDER BY kanban_tasks.column_id, kanban_tasks.position ASC, kanban_tasks.created_at ASC, kanban_tasks.id ASC
 		LIMIT NULLIF($3, 0) OFFSET $4
 	`, projectID, columnID, limit, offset)
 	if err != nil {
