@@ -175,6 +175,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	projectsRepository := operationalrepo.NewProjectsRepository(pool)
 	kanbanRepository := operationalrepo.NewKanbanRepository(pool)
+	kanbanTaskFieldRepository := operationalrepo.NewKanbanTaskFieldRepository(pool)
 	operationalOverviewRepository := operationalrepo.NewOverviewRepository(pool)
 	trackerRepository := operationalrepo.NewTrackerRepository(pool)
 	trackerReminderRepository := operationalrepo.NewTrackerReminderRepository(pool)
@@ -196,6 +197,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	projectsService := operationalservice.NewProjectsService(projectsRepository, kanbanRepository)
 	kanbanService := operationalservice.NewKanbanService(kanbanRepository, projectsRepository)
+	kanbanService.SetTaskFieldRepository(kanbanTaskFieldRepository)
 	operationalOverviewService := operationalservice.NewOverviewService(operationalOverviewRepository)
 	trackerService := operationalservice.NewTrackerService(trackerRepository, cfg.TrackerRetentionDays)
 	employeesService := hrisservice.NewEmployeesService(employeesRepository)

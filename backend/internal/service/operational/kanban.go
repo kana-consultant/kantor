@@ -54,7 +54,12 @@ type kanbanProjectsRepository interface {
 type KanbanService struct {
 	repo         kanbanRepository
 	projectsRepo kanbanProjectsRepository
+	fieldsRepo   kanbanTaskFieldRepository
 	notifiers    []TaskAssignNotifier
+}
+
+func (s *KanbanService) SetTaskFieldRepository(repo kanbanTaskFieldRepository) {
+	s.fieldsRepo = repo
 }
 
 func NewKanbanService(repo kanbanRepository, projectsRepo kanbanProjectsRepository) *KanbanService {
@@ -226,6 +231,11 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 		return task, err
 	}
 
+	if err := s.replaceTaskFields(ctx, task.ID, request.Fields); err != nil {
+		return model.KanbanTask{}, err
+	}
+	s.attachTaskFields(ctx, &task)
+
 	// Notify assignee (skip self-assign)
 	if task.AssigneeID != nil && *task.AssigneeID != createdBy {
 		slog.InfoContext(ctx,
@@ -278,6 +288,11 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 		return task, err
 	}
 
+	if err := s.replaceTaskFields(ctx, task.ID, request.Fields); err != nil {
+		return model.KanbanTask{}, err
+	}
+	s.attachTaskFields(ctx, &task)
+
 	// Notify new assignee if changed and not self-assign
 	if task.AssigneeID != nil {
 		newAssigneeID := *task.AssigneeID
@@ -305,6 +320,20 @@ func (s *KanbanService) DeleteTask(ctx context.Context, projectID string, taskID
 	}
 
 	return err
+}
+
+func (s *KanbanService) GetTaskDetail(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error) {
+	task, err := s.repo.GetTask(ctx, projectID, taskID)
+	if errors.Is(err, operationalrepo.ErrKanbanTaskNotFound) {
+		return model.KanbanTask{}, ErrKanbanTaskNotFound
+	}
+	if err != nil {
+		return model.KanbanTask{}, err
+	}
+
+	s.attachTaskFields(ctx, &task)
+
+	return task, nil
 }
 
 func (s *KanbanService) MoveTask(ctx context.Context, projectID string, taskID string, request operationaldto.MoveKanbanTaskRequest) error {
