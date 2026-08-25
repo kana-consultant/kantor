@@ -149,6 +149,10 @@ func (f *fakeKanbanRepository) CreateDefaultColumns(ctx context.Context, project
 	return nil
 }
 
+func (f *fakeKanbanRepository) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
 func (f *fakeKanbanRepository) ListColumns(ctx context.Context, projectID string) ([]model.KanbanColumn, error) {
 	return nil, nil
 }

@@ -43,6 +43,7 @@ func (h *KanbanHandler) RegisterColumnRoutes(router chi.Router) {
 func (h *KanbanHandler) RegisterTaskRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("operational:task:create")).Post("/", h.createTask)
 	router.With(platformmiddleware.RequirePermission("operational:task:view")).Get("/", h.listTasks)
+	router.With(platformmiddleware.RequirePermission("operational:task:view")).Get("/{taskID}", h.getTask)
 	router.With(platformmiddleware.RequirePermission("operational:task:edit")).Put("/{taskID}", h.updateTask)
 	router.With(platformmiddleware.RequirePermission("operational:task:delete")).Delete("/{taskID}", h.deleteTask)
 	router.With(platformmiddleware.RequirePermission("operational:task:edit")).Patch("/{taskID}/move", h.moveTask)
@@ -238,6 +239,25 @@ func (h *KanbanHandler) ListMyTasks(w http.ResponseWriter, r *http.Request) {
 
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	result, err := h.service.ListMyTasks(r.Context(), principal.UserID, status)
+	if err != nil {
+		h.writeError(r.Context(), w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, result, nil)
+}
+
+func (h *KanbanHandler) getTask(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := validateKanbanUUIDParam(w, "projectID", chi.URLParam(r, "projectID"))
+	if !ok {
+		return
+	}
+	taskID, ok := validateKanbanUUIDParam(w, "taskID", chi.URLParam(r, "taskID"))
+	if !ok {
+		return
+	}
+
+	result, err := h.service.GetTaskDetail(r.Context(), projectID, taskID)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return

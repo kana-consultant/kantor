@@ -42,6 +42,7 @@ type kanbanRepository interface {
 	Snapshot(ctx context.Context, projectID string) (operationalrepo.KanbanSnapshot, error)
 	GetTask(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error)
 	ListTasksAssignedTo(ctx context.Context, userID string) ([]operationalrepo.AssignedTaskRow, error)
+	WithTx(ctx context.Context, fn func(context.Context) error) error
 }
 
 type kanbanProjectsRepository interface {
@@ -54,7 +55,12 @@ type kanbanProjectsRepository interface {
 type KanbanService struct {
 	repo         kanbanRepository
 	projectsRepo kanbanProjectsRepository
+	fieldsRepo   kanbanTaskFieldRepository
 	notifiers    []TaskAssignNotifier
+}
+
+func (s *KanbanService) SetTaskFieldRepository(repo kanbanTaskFieldRepository) {
+	s.fieldsRepo = repo
 }
 
 func NewKanbanService(repo kanbanRepository, projectsRepo kanbanProjectsRepository) *KanbanService {
@@ -207,24 +213,36 @@ func (s *KanbanService) CreateTask(ctx context.Context, projectID string, reques
 		return model.KanbanTask{}, err
 	}
 
-	task, err := s.repo.CreateTask(ctx, projectID, operationalrepo.CreateKanbanTaskParams{
-		ColumnID:    request.ColumnID,
-		Title:       strings.TrimSpace(request.Title),
-		Description: normalizeStringPointer(request.Description),
-		AssigneeID:  assigneeID,
-		DueDate:     normalizeTimePointer(request.DueDate),
-		Priority:    request.Priority,
-		Label:       normalizeStringPointer(request.Label),
-		AssignedVia: createAssignedVia(request.AssigneeID, assigneeID),
-		CreatedBy:   createdBy,
+	var task model.KanbanTask
+	err := s.repo.WithTx(ctx, func(txCtx context.Context) error {
+		created, err := s.repo.CreateTask(txCtx, projectID, operationalrepo.CreateKanbanTaskParams{
+			ColumnID:    request.ColumnID,
+			Title:       strings.TrimSpace(request.Title),
+			Description: normalizeStringPointer(request.Description),
+			AssigneeID:  assigneeID,
+			DueDate:     normalizeTimePointer(request.DueDate),
+			Priority:    request.Priority,
+			Label:       normalizeStringPointer(request.Label),
+			AssignedVia: createAssignedVia(request.AssigneeID, assigneeID),
+			CreatedBy:   createdBy,
+		})
+		if err != nil {
+			return err
+		}
+		if err := s.replaceTaskFields(txCtx, created.ID, request.Fields); err != nil {
+			return err
+		}
+		task = created
+		return nil
 	})
 	switch {
 	case errors.Is(err, operationalrepo.ErrKanbanColumnNotFound):
 		return model.KanbanTask{}, ErrKanbanColumnNotFound
 	}
 	if err != nil {
-		return task, err
+		return model.KanbanTask{}, err
 	}
+	s.attachTaskFields(ctx, &task)
 
 	// Notify assignee (skip self-assign)
 	if task.AssigneeID != nil && *task.AssigneeID != createdBy {
@@ -261,22 +279,34 @@ func (s *KanbanService) UpdateTask(ctx context.Context, projectID string, taskID
 		return model.KanbanTask{}, err
 	}
 
-	task, err := s.repo.UpdateTask(ctx, projectID, taskID, operationalrepo.UpdateKanbanTaskParams{
-		Title:       strings.TrimSpace(request.Title),
-		Description: normalizeStringPointer(request.Description),
-		AssigneeID:  assigneeID,
-		DueDate:     normalizeTimePointer(request.DueDate),
-		Priority:    request.Priority,
-		Label:       normalizeStringPointer(request.Label),
-		AssignedVia: updateAssignedVia(request.AssigneeID, assigneeID, oldAssigneeID),
+	var task model.KanbanTask
+	err := s.repo.WithTx(ctx, func(txCtx context.Context) error {
+		updated, err := s.repo.UpdateTask(txCtx, projectID, taskID, operationalrepo.UpdateKanbanTaskParams{
+			Title:       strings.TrimSpace(request.Title),
+			Description: normalizeStringPointer(request.Description),
+			AssigneeID:  assigneeID,
+			DueDate:     normalizeTimePointer(request.DueDate),
+			Priority:    request.Priority,
+			Label:       normalizeStringPointer(request.Label),
+			AssignedVia: updateAssignedVia(request.AssigneeID, assigneeID, oldAssigneeID),
+		})
+		if err != nil {
+			return err
+		}
+		if err := s.replaceTaskFields(txCtx, updated.ID, request.Fields); err != nil {
+			return err
+		}
+		task = updated
+		return nil
 	})
 	switch {
 	case errors.Is(err, operationalrepo.ErrKanbanTaskNotFound):
 		return model.KanbanTask{}, ErrKanbanTaskNotFound
 	}
 	if err != nil {
-		return task, err
+		return model.KanbanTask{}, err
 	}
+	s.attachTaskFields(ctx, &task)
 
 	// Notify new assignee if changed and not self-assign
 	if task.AssigneeID != nil {
@@ -305,6 +335,20 @@ func (s *KanbanService) DeleteTask(ctx context.Context, projectID string, taskID
 	}
 
 	return err
+}
+
+func (s *KanbanService) GetTaskDetail(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error) {
+	task, err := s.repo.GetTask(ctx, projectID, taskID)
+	if errors.Is(err, operationalrepo.ErrKanbanTaskNotFound) {
+		return model.KanbanTask{}, ErrKanbanTaskNotFound
+	}
+	if err != nil {
+		return model.KanbanTask{}, err
+	}
+
+	s.attachTaskFields(ctx, &task)
+
+	return task, nil
 }
 
 func (s *KanbanService) MoveTask(ctx context.Context, projectID string, taskID string, request operationaldto.MoveKanbanTaskRequest) error {
