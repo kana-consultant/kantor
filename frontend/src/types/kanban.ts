@@ -10,6 +10,36 @@ export interface KanbanColumn {
   created_at: string;
 }
 
+export interface KanbanTaskField {
+  id: string;
+  task_id: string;
+  name: string;
+  value: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskFieldDraft {
+  name: string;
+  value: string;
+}
+
+export interface KanbanTaskListItem {
+  id: string;
+  column_id: string;
+  title: string;
+  description?: string | null;
+  assignee_id?: string | null;
+  assignee_name?: string | null;
+  avatar_url?: string | null;
+  due_date?: string | null;
+  priority: ProjectPriority;
+  label?: string | null;
+  assigned_via: "manual" | "auto";
+  position: number;
+}
+
 export interface KanbanTask {
   id: string;
   column_id: string;
@@ -27,6 +57,7 @@ export interface KanbanTask {
   created_by: string;
   created_at: string;
   updated_at: string;
+  fields?: KanbanTaskField[] | null;
 }
 
 export interface KanbanFilters {
@@ -45,4 +76,5 @@ export interface TaskFormValues {
   due_date: string;
   priority: ProjectPriority;
   label: string;
+  fields: TaskFieldDraft[];
 }

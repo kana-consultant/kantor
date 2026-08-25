@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
 	DndContext,
@@ -16,7 +16,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-
+import {
+	KanbanDialogs,
+	type ColumnModalState,
+} from "@/components/shared/kanban-dialogs";
+import { KanbanToolbar } from "@/components/shared/kanban-toolbar";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useKanbanDrag } from "@/hooks/use-kanban-drag";
+import { useKanbanMutations } from "@/hooks/use-kanban-mutations";
 import {
 	ColumnOverlay,
 	TaskOverlay,
@@ -40,7 +47,7 @@ import {
 import type {
 	KanbanColumn,
 	KanbanFilters,
-	KanbanTask,
+	KanbanTaskListItem,
 	TaskFormValues,
 } from "@/types/kanban";
 import type { ProjectMember } from "@/types/project";
@@ -52,6 +59,7 @@ const taskSchema = z.object({
 	due_date: z.string(),
 	priority: z.enum(["low", "medium", "high", "critical"]),
 	label: z.string(),
+	fields: z.array(z.object({ name: z.string(), value: z.string() })),
 });
 
 const emptyTaskForm: TaskFormValues = {
@@ -61,6 +69,7 @@ const emptyTaskForm: TaskFormValues = {
 	due_date: "",
 	priority: "medium",
 	label: "",
+	fields: [],
 };
 
 const columnColorOptions = [
@@ -103,19 +112,19 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	const [columnToDelete, setColumnToDelete] = useState<KanbanColumn | null>(
 		null,
 	);
-	const [taskToDelete, setTaskToDelete] = useState<KanbanTask | null>(null);
+	const [taskToDelete, setTaskToDelete] = useState<KanbanTaskListItem | null>(null);
 
 	const columnsQuery = useQuery({
 		queryKey: kanbanKeys.columns(projectId),
 		queryFn: () => listKanbanColumns(projectId),
 	});
 
-	const [loadedTasks, setLoadedTasks] = useState<Record<string, KanbanTask[]>>(
+	const [loadedTasks, setLoadedTasks] = useState<Record<string, KanbanTaskListItem[]>>(
 		{},
 	);
 
 	const handleTasksLoaded = useCallback(
-		(columnId: string, columnTasks: KanbanTask[]) => {
+		(columnId: string, columnTasks: KanbanTaskListItem[]) => {
 			setLoadedTasks((current) =>
 				current[columnId] === columnTasks
 					? current
@@ -129,6 +138,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		resolver: zodResolver(taskSchema),
 		defaultValues: emptyTaskForm,
 	});
+
 	const {
 		createColumn: createColumnMutation,
 		updateColumn: updateColumnMutation,
@@ -169,6 +179,9 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		() => visibleColumnIds.flatMap((columnId) => loadedTasks[columnId] ?? []),
 		[loadedTasks, visibleColumnIds],
 	);
+	const { activeTask, activeColumn, handleDragStart, handleDragEnd } =
+		useKanbanDrag(projectId, columns, tasks);
+
 	const taskFilters = useMemo(
 		() => ({
 			search: searchTerm,
@@ -177,41 +190,35 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 			label: filters.label,
 			dueDate: filters.dueDate,
 		}),
-		[
-			filters.assignee,
-			filters.dueDate,
-			filters.label,
-			filters.priority,
-			searchTerm,
-		],
+		[filters.assignee, filters.dueDate, filters.label, filters.priority, searchTerm],
 	);
 
+	const tasksRef = useRef(tasks);
+	tasksRef.current = tasks;
+	const editingTaskId = taskModal?.mode === "edit" ? taskModal.taskId : null;
+
+
 	useEffect(() => {
-		if (!taskModal) {
+		if (!editingTaskId) {
 			form.reset(emptyTaskForm);
 			return;
 		}
 
-		if (taskModal.mode === "create") {
-			form.reset(emptyTaskForm);
-			return;
-		}
-
-		const task = tasks.find((item) => item.id === taskModal.taskId);
-		if (!task) {
-			form.reset(emptyTaskForm);
+		const summary = tasksRef.current.find((item) => item.id === editingTaskId);
+		if (!summary) {
 			return;
 		}
 
 		form.reset({
-			title: task.title,
-			description: task.description ?? "",
-			assignee_id: task.assignee_id ?? "",
-			due_date: task.due_date ? extractDateInputValue(task.due_date) : "",
-			priority: task.priority,
-			label: task.label ?? "",
-		});
-	}, [form, taskModal, tasks]);
+			title: summary.title,
+			description: summary.description ?? "",
+			assignee_id: summary.assignee_id ?? "",
+			due_date: summary.due_date ? extractDateInputValue(summary.due_date) : "",
+			priority: summary.priority,
+			label: summary.label ?? "",
+				});
+	}, [editingTaskId, form]);
+
 
 	async function handleQuickAdd(columnId: string) {
 		const title = quickDrafts[columnId]?.trim() ?? "";
@@ -279,8 +286,6 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		setColumnForm({ name: "", color: "#38BDF8" });
 	}
 
-	const { activeTask, activeColumn, handleDragStart, handleDragEnd } =
-		useKanbanDrag(projectId, columns, tasks);
 
 	if (columnsQuery.isLoading) {
 		return <Card className="p-8">Memuat board proyek...</Card>;
@@ -329,34 +334,34 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 										!filters.columnId || column.id === filters.columnId,
 								)
 								.map((column) => (
-								<KanbanColumnContainer
-									column={column}
-									filters={taskFilters}
-									key={column.id}
-									onDeleteColumn={() => setColumnToDelete(column)}
-									onEditColumn={() => startColumnEdit(column)}
-									onQuickAdd={() => void handleQuickAdd(column.id)}
-									onQuickDraftChange={(value) =>
-										setQuickDrafts((current) => ({
-											...current,
-											[column.id]: value,
-										}))
-									}
-									onTaskClick={(task) =>
-										setTaskModal({
-											mode: "edit",
-											columnId: task.column_id,
-											taskId: task.id,
-										})
-									}
-									onTaskCreate={() =>
-										setTaskModal({ mode: "create", columnId: column.id })
-									}
-									onTasksLoaded={handleTasksLoaded}
-									projectId={projectId}
-									quickDraft={quickDrafts[column.id] ?? ""}
-								/>
-							))}
+									<KanbanColumnContainer
+										column={column}
+										key={column.id}
+										onDeleteColumn={() => setColumnToDelete(column)}
+										onEditColumn={() => startColumnEdit(column)}
+										onQuickAdd={() => void handleQuickAdd(column.id)}
+										onQuickDraftChange={(value) =>
+											setQuickDrafts((current) => ({
+												...current,
+												[column.id]: value,
+											}))
+										}
+										onTaskClick={(task) =>
+											setTaskModal({
+												mode: "edit",
+												columnId: task.column_id,
+												taskId: task.id,
+											})
+										}
+										onTaskCreate={() =>
+											setTaskModal({ mode: "create", columnId: column.id })
+										}
+										filters={taskFilters}
+										onTasksLoaded={handleTasksLoaded}
+										projectId={projectId}
+										quickDraft={quickDrafts[column.id] ?? ""}
+									/>
+								))}
 						</div>
 					</div>
 				</SortableContext>
@@ -430,3 +435,4 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		</div>
 	);
 }
+

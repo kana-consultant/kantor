@@ -7,18 +7,21 @@ import {
 	moveKanbanTask,
 	reorderKanbanColumns,
 } from "@/services/operational-kanban";
-import type { KanbanColumn, KanbanTask } from "@/types/kanban";
+import type {
+	KanbanColumn,
+	KanbanTaskListItem,
+} from "@/types/kanban";
 
 export interface DragSnapshot {
 	columns: KanbanColumn[];
-	tasks: KanbanTask[];
+	tasks: KanbanTaskListItem[];
 }
 
-export type DragTaskData = { type: "task"; task: KanbanTask };
+export type DragTaskData = { type: "task"; task: KanbanTaskListItem };
 export type DragColumnData = { type: "column"; column: KanbanColumn };
 
 export function moveTaskInMemory(
-	tasks: KanbanTask[],
+	tasks: KanbanTaskListItem[],
 	activeTaskId: string,
 	overData: unknown,
 	overId: string,
@@ -77,8 +80,8 @@ export function moveTaskInMemory(
 	return flattenTaskBuckets(buckets);
 }
 
-function buildTaskBuckets(tasks: KanbanTask[]) {
-	const buckets: Record<string, KanbanTask[]> = {};
+function buildTaskBuckets(tasks: KanbanTaskListItem[]) {
+	const buckets: Record<string, KanbanTaskListItem[]> = {};
 	for (const task of [...tasks].sort(sortTaskList)) {
 		if (!buckets[task.column_id]) {
 			buckets[task.column_id] = [];
@@ -88,8 +91,8 @@ function buildTaskBuckets(tasks: KanbanTask[]) {
 	return buckets;
 }
 
-function flattenTaskBuckets(buckets: Record<string, KanbanTask[]>) {
-	const nextTasks: KanbanTask[] = [];
+function flattenTaskBuckets(buckets: Record<string, KanbanTaskListItem[]>) {
+	const nextTasks: KanbanTaskListItem[] = [];
 	for (const columnId of Object.keys(buckets)) {
 		buckets[columnId]!.forEach((task, index) => {
 			nextTasks.push({ ...task, column_id: columnId, position: index + 1 });
@@ -109,7 +112,7 @@ export function sortTaskList(
 }
 
 interface TaskPageShape {
-	items: KanbanTask[];
+	items: KanbanTaskListItem[];
 	total: number;
 	limit: number;
 	offset: number;
@@ -124,7 +127,7 @@ interface TaskInfiniteShape {
 export function setTasksCache(
 	queryClient: ReturnType<typeof useQueryClient>,
 	projectId: string,
-	tasks: KanbanTask[],
+	tasks: KanbanTaskListItem[],
 ) {
 	const byId = new Map(tasks.map((task) => [task.id, task]));
 	const entries = queryClient.getQueriesData<TaskInfiniteShape>({
@@ -179,7 +182,7 @@ export function getTasksCache(
 		queryKey: kanbanKeys.tasks(projectId),
 	});
 
-	const tasks: KanbanTask[] = [];
+	const tasks: KanbanTaskListItem[] = [];
 	for (const [, data] of entries) {
 		for (const page of data?.pages ?? []) {
 			tasks.push(...page.items);
@@ -198,7 +201,7 @@ export async function invalidateBoard(
 
 export function finishTaskDrag(
 	taskId: string,
-	nextTasks: KanbanTask[] | null,
+	nextTasks: KanbanTaskListItem[] | null,
 	snapshot: DragSnapshot | null,
 	queryClient: ReturnType<typeof useQueryClient>,
 	projectId: string,
@@ -241,7 +244,7 @@ export function finishTaskDrag(
 export function finishColumnDrag(
 	event: DragEndEvent,
 	columns: KanbanColumn[],
-	tasks: KanbanTask[],
+	tasks: KanbanTaskListItem[],
 	snapshot: DragSnapshot | null,
 	queryClient: ReturnType<typeof useQueryClient>,
 	projectId: string,
@@ -291,7 +294,7 @@ export function finishColumnDrag(
 function resolveOverColumnId(
 	event: DragEndEvent,
 	columns: KanbanColumn[],
-	tasks: KanbanTask[],
+	tasks: KanbanTaskListItem[],
 ) {
 	const overData = event.over?.data.current;
 	if (isColumnDragData(overData)) {

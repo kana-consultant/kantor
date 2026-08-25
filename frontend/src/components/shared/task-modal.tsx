@@ -9,13 +9,14 @@ import {
 	DrawerTitle,
 } from "@/components/shared/drawer";
 import { PermissionGate } from "@/components/shared/permission-gate";
+import { TaskFieldEditor } from "@/components/shared/task-field-editor";
 import {
 	TaskMetaFields,
 	TaskTitleField,
 } from "@/components/shared/task-modal-fields";
 import { Button } from "@/components/ui/button";
 import { permissions } from "@/lib/permissions";
-import type { TaskFormValues } from "@/types/kanban";
+import type { TaskFieldDraft, TaskFormValues } from "@/types/kanban";
 import type { ProjectMember } from "@/types/project";
 
 export function TaskModal({
@@ -37,7 +38,12 @@ export function TaskModal({
 	onDelete: () => void;
 	onClose: () => void;
 }) {
-	const { register, handleSubmit } = form;
+	const { register, handleSubmit, watch, setValue } = form;
+	const fields = watch("fields") ?? [];
+
+	function handleFieldsChange(next: TaskFieldDraft[]) {
+		setValue("fields", next, { shouldDirty: true });
+	}
 
 	return (
 		<Drawer
@@ -81,6 +87,11 @@ export function TaskModal({
 								{...register("description")}
 							/>
 						</div>
+
+						<TaskFieldEditor
+							fields={fields}
+							onChange={handleFieldsChange}
+						/>
 
 						<TaskMetaFields
 							form={form}

@@ -1,6 +1,11 @@
 ﻿import { authRequestJSON } from "@/lib/api-client";
 import { toUTCDateOnlyISOString } from "@/lib/date";
-import type { KanbanColumn, KanbanTask, TaskFormValues } from "@/types/kanban";
+import type {
+  KanbanColumn,
+  KanbanTask,
+  KanbanTaskListItem,
+  TaskFormValues,
+} from "@/types/kanban";
 
 export interface KanbanTaskQuery {
   search?: string;
@@ -14,7 +19,7 @@ export interface KanbanTaskQuery {
 }
 
 export interface KanbanTaskPage {
-  items: KanbanTask[];
+  items: KanbanTaskListItem[];
   total: number;
   limit: number;
   offset: number;
@@ -27,6 +32,8 @@ export const kanbanKeys = {
   all: (projectId: string) => ["operational", "projects", projectId, "kanban"] as const,
   columns: (projectId: string) => [...kanbanKeys.all(projectId), "columns"] as const,
   tasks: (projectId: string) => [...kanbanKeys.all(projectId), "tasks"] as const,
+  task: (projectId: string, taskId: string) =>
+    [...kanbanKeys.tasks(projectId), "detail", taskId] as const,
   columnTasks: (projectId: string, columnId: string, query: KanbanTaskQuery) =>
     [
       ...kanbanKeys.tasks(projectId),
@@ -125,6 +132,14 @@ export async function listKanbanTasks(projectId: string, query: KanbanTaskQuery 
   );
 }
 
+
+export async function getKanbanTask(projectId: string, taskId: string) {
+  return authRequestJSON<KanbanTask>(
+    `/operational/projects/${projectId}/tasks/${taskId}`,
+    { method: "GET" },
+  );
+}
+
 export async function createKanbanTask(projectId: string, input: { column_id: string } & TaskFormValues) {
   return authRequestJSON<KanbanTask>(
     `/operational/projects/${projectId}/tasks`,
@@ -185,5 +200,16 @@ function serializeTaskForm(input: Partial<{ column_id: string }> & TaskFormValue
     due_date: input.due_date ? toUTCDateOnlyISOString(input.due_date) : null,
     priority: input.priority,
     label: input.label.trim() || null,
+    fields: serializeTaskFields(input.fields),
   };
+}
+
+function serializeTaskFields(fields: TaskFormValues["fields"] | undefined) {
+  if (!fields?.length) {
+    return [];
+  }
+
+  return fields
+    .map((field) => ({ name: field.name.trim(), value: field.value.trim() }))
+    .filter((field) => field.name.length > 0 && field.value.length > 0);
 }

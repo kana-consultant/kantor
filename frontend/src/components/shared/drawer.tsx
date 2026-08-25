@@ -30,8 +30,8 @@ interface DrawerContextValue {
 const DrawerContext = createContext<DrawerContextValue | null>(null);
 
 const sizeClassNames: Record<DrawerSize, string> = {
-  md: "max-w-[480px]",
-  lg: "max-w-[640px]",
+  md: "w-full max-w-[480px] md:w-[480px]",
+  lg: "w-full max-w-[640px] md:w-[640px]",
 };
 
 export function Drawer({
@@ -86,8 +86,12 @@ export const DrawerContent = forwardRef<
   const context = useDrawerContext();
   const contentRef = useRef<HTMLDivElement | null>(null);
 
+  const { open, rendered, dismissible, onOpenChange } = context;
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+
   useEffect(() => {
-    if (!context.rendered) {
+    if (!rendered || !open) {
       return undefined;
     }
 
@@ -98,22 +102,26 @@ export const DrawerContent = forwardRef<
 
     const focusable = getFocusableElements(node);
     const target = focusable[0] ?? node;
-    window.setTimeout(() => {
-      if (context.open) {
-        target.focus();
-      }
-    }, 0);
+    const timeout = window.setTimeout(() => target.focus(), 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [open, rendered]);
+
+  useEffect(() => {
+    if (!open || !dismissible) {
+      return undefined;
+    }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && context.dismissible) {
+      if (event.key === "Escape") {
         event.preventDefault();
-        context.onOpenChange(false);
+        onOpenChangeRef.current(false);
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [context]);
+  }, [dismissible, open]);
 
   if (!context.rendered || typeof document === "undefined") {
     return null;
@@ -138,13 +146,13 @@ export const DrawerContent = forwardRef<
         }}
         type="button"
       />
-      <div className="absolute inset-y-0 right-0 flex justify-end">
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex justify-end">
         <div
           aria-describedby={context.descriptionId}
           aria-labelledby={context.titleId}
           aria-modal="true"
           className={cn(
-            "flex h-full w-full flex-col overflow-hidden border-l border-border bg-surface shadow-xl outline-none",
+            "pointer-events-auto flex h-full flex-col overflow-hidden border-l border-border bg-surface shadow-xl outline-none",
             "motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:slide-in-from-right motion-safe:data-[state=open]:duration-200",
             "motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=closed]:slide-out-to-right motion-safe:data-[state=closed]:duration-150",
             sizeClassNames[size],

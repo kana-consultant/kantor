@@ -14,13 +14,13 @@ import { cn } from "@/lib/utils";
 import type { DragColumnData, DragTaskData } from "@/components/shared/kanban-dnd";
 import type {
 	KanbanColumn,
-	KanbanTask,
+	KanbanTaskListItem,
 } from "@/types/kanban";
 import type { ProjectPriority } from "@/types/project";
 
 export interface KanbanColumnCardProps {
 	column: KanbanColumn;
-	tasks: KanbanTask[];
+	tasks: KanbanTaskListItem[];
 	totalTasks: number;
 	hasMore: boolean;
 	isLoadingTasks: boolean;
@@ -29,7 +29,7 @@ export interface KanbanColumnCardProps {
 	quickDraft: string;
 	onQuickDraftChange: (value: string) => void;
 	onQuickAdd: () => void;
-	onTaskClick: (task: KanbanTask) => void;
+	onTaskClick: (task: KanbanTaskListItem) => void;
 	onTaskCreate: () => void;
 	onEditColumn: () => void;
 	onDeleteColumn: () => void;
@@ -178,7 +178,7 @@ export function KanbanTaskCard({
 	task,
 	onClick,
 }: {
-	task: KanbanTask;
+	task: KanbanTaskListItem;
 	onClick: () => void;
 }) {
 	const sortable = useSortable({
@@ -251,7 +251,7 @@ export function KanbanTaskCard({
 	);
 }
 
-export function TaskOverlay({ task }: { task: KanbanTask }) {
+export function TaskOverlay({ task }: { task: KanbanTaskListItem }) {
 	return (
 		<div className="w-[min(82vw,320px)] md:w-[320px]">
 			<Card className="border-ops shadow-2xl p-4 rotate-2">

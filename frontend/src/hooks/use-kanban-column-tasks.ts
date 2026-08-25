@@ -6,10 +6,10 @@ import {
 	listKanbanTasks,
 	type KanbanTaskQuery,
 } from "@/services/operational-kanban";
-import type { KanbanTask } from "@/types/kanban";
+import type { KanbanTaskListItem } from "@/types/kanban";
 
 export interface ColumnTasksResult {
-	tasks: KanbanTask[];
+	tasks: KanbanTaskListItem[];
 	total: number;
 	hasMore: boolean;
 	isLoading: boolean;

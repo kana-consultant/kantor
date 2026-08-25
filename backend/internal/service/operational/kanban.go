@@ -124,8 +124,31 @@ func (s *KanbanService) ReorderColumns(ctx context.Context, projectID string, re
 	return err
 }
 
-func (s *KanbanService) ListTasks(ctx context.Context, projectID string) ([]model.KanbanTask, error) {
-	return s.repo.ListTasks(ctx, projectID)
+func (s *KanbanService) ListTasks(ctx context.Context, projectID string, query operationaldto.ListKanbanTasksQuery) ([]model.KanbanTask, error) {
+	return s.repo.ListTasksFiltered(ctx, projectID, operationalrepo.ListKanbanTasksFilter{
+		Search:     strings.TrimSpace(query.Search),
+		ColumnID:   strings.TrimSpace(query.ColumnID),
+		AssigneeID: strings.TrimSpace(query.AssigneeID),
+		Priority:   strings.TrimSpace(query.Priority),
+		Label:      strings.TrimSpace(query.Label),
+		DueDate:    strings.TrimSpace(query.DueDate),
+		Limit:      query.Limit,
+		Offset:     query.Offset,
+	})
+}
+
+func (s *KanbanService) GetTask(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error) {
+	task, err := s.repo.GetTask(ctx, projectID, taskID)
+	if errors.Is(err, operationalrepo.ErrKanbanTaskNotFound) {
+		return model.KanbanTask{}, ErrKanbanTaskNotFound
+	}
+	if err != nil {
+		return model.KanbanTask{}, err
+	}
+
+	s.attachTaskFields(ctx, &task)
+
+	return task, nil
 }
 
 func (s *KanbanService) ListTasksPage(ctx context.Context, projectID string, query operationaldto.ListKanbanTasksQuery) (operationaldto.KanbanTaskPage, error) {
@@ -150,12 +173,17 @@ func (s *KanbanService) ListTasksPage(ctx context.Context, projectID string, que
 		return operationaldto.KanbanTaskPage{}, err
 	}
 
+	items := make([]model.KanbanTaskListItem, 0, len(tasks))
+	for _, task := range tasks {
+		items = append(items, task.ToListItem())
+	}
+
 	return operationaldto.KanbanTaskPage{
-		Items:   tasks,
+		Items:   items,
 		Total:   total,
 		Limit:   query.Limit,
 		Offset:  query.Offset,
-		HasMore: query.Offset+len(tasks) < total,
+		HasMore: query.Offset+len(items) < total,
 	}, nil
 }
 
@@ -335,20 +363,6 @@ func (s *KanbanService) DeleteTask(ctx context.Context, projectID string, taskID
 	}
 
 	return err
-}
-
-func (s *KanbanService) GetTaskDetail(ctx context.Context, projectID string, taskID string) (model.KanbanTask, error) {
-	task, err := s.repo.GetTask(ctx, projectID, taskID)
-	if errors.Is(err, operationalrepo.ErrKanbanTaskNotFound) {
-		return model.KanbanTask{}, ErrKanbanTaskNotFound
-	}
-	if err != nil {
-		return model.KanbanTask{}, err
-	}
-
-	s.attachTaskFields(ctx, &task)
-
-	return task, nil
 }
 
 func (s *KanbanService) MoveTask(ctx context.Context, projectID string, taskID string, request operationaldto.MoveKanbanTaskRequest) error {
