@@ -3,6 +3,7 @@ import { toUTCDateOnlyISOString } from "@/lib/date";
 import type { KanbanColumn, KanbanTask, TaskFormValues } from "@/types/kanban";
 
 export interface KanbanTaskQuery {
+  search?: string;
   columnId?: string;
   assigneeId?: string;
   priority?: string;
@@ -31,6 +32,7 @@ export const kanbanKeys = {
       ...kanbanKeys.tasks(projectId),
       "column",
       columnId,
+      query.search ?? "",
       query.assigneeId ?? "",
       query.priority ?? "",
       query.label ?? "",
@@ -95,6 +97,10 @@ export async function reorderKanbanColumns(projectId: string, columnIds: string[
 
 export async function listKanbanTasks(projectId: string, query: KanbanTaskQuery = {}) {
   const params = new URLSearchParams();
+  const search = query.search?.trim();
+  if (search) {
+    params.set("q", search);
+  }
   if (query.columnId) {
     params.set("column_id", query.columnId);
   }
