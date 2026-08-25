@@ -5,56 +5,41 @@ import {
 	DragOverlay,
 	PointerSensor,
 	closestCorners,
-	useDroppable,
 	useSensor,
 	useSensors,
-	type DragEndEvent,
-	type DragStartEvent,
 } from "@dnd-kit/core";
 import {
 	SortableContext,
-	arrayMove,
 	horizontalListSortingStrategy,
-	useSortable,
-	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm, type UseFormReturn } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { GripVertical, Plus } from "lucide-react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+
 import {
-	Drawer,
-	DrawerBody,
-	DrawerClose,
-	DrawerContent,
-	DrawerDescription,
-	DrawerHeader,
-	DrawerTitle,
-} from "@/components/shared/drawer";
-import { FormModal } from "@/components/shared/form-modal";
-import { PermissionGate } from "@/components/shared/permission-gate";
-import { ProtectedAvatar } from "@/components/shared/protected-avatar";
-import { Button } from "@/components/ui/button";
+	ColumnOverlay,
+	KanbanColumnCard,
+	TaskOverlay,
+} from "@/components/shared/kanban-cards";
+import {
+	KanbanDialogs,
+	type ColumnModalState,
+} from "@/components/shared/kanban-dialogs";
+import {
+	matchesFilters,
+	sortTaskList,
+} from "@/components/shared/kanban-dnd";
+import { useKanbanDrag } from "@/hooks/use-kanban-drag";
+import { useKanbanMutations } from "@/hooks/use-kanban-mutations";
+import { KanbanToolbar } from "@/components/shared/kanban-toolbar";
+import { TaskModal } from "@/components/shared/task-modal";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { permissions } from "@/lib/permissions";
-import { extractDateInputValue, formatCalendarDate } from "@/lib/date";
-import { cn } from "@/lib/utils";
+import { extractDateInputValue } from "@/lib/date";
 import {
-	createKanbanColumn,
-	createKanbanTask,
-	deleteKanbanColumn,
-	deleteKanbanTask,
 	kanbanKeys,
 	listKanbanColumns,
 	listKanbanTasks,
-	moveKanbanTask,
-	reorderKanbanColumns,
-	updateKanbanColumn,
-	updateKanbanTask,
 } from "@/services/operational-kanban";
 import type {
 	KanbanColumn,
@@ -62,7 +47,7 @@ import type {
 	KanbanTask,
 	TaskFormValues,
 } from "@/types/kanban";
-import type { ProjectMember, ProjectPriority } from "@/types/project";
+import type { ProjectMember } from "@/types/project";
 
 const taskSchema = z.object({
 	title: z.string().trim().min(2, "Judul minimal 2 karakter").max(160),
@@ -96,22 +81,11 @@ interface KanbanBoardProps {
 	members: ProjectMember[];
 }
 
-interface DragSnapshot {
-	columns: KanbanColumn[];
-	tasks: KanbanTask[];
-}
-
-type ColumnModalState = { mode: "create" } | { mode: "edit"; columnId: string };
-
 type TaskModalState =
 	| { mode: "create"; columnId: string }
 	| { mode: "edit"; columnId: string; taskId: string };
 
-type DragTaskData = { type: "task"; task: KanbanTask };
-type DragColumnData = { type: "column"; column: KanbanColumn };
-
 export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
-	const queryClient = useQueryClient();
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
 	);
@@ -126,9 +100,6 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	const [columnForm, setColumnForm] = useState({ name: "", color: "#38BDF8" });
 	const [taskModal, setTaskModal] = useState<TaskModalState | null>(null);
 	const [boardError, setBoardError] = useState<string | null>(null);
-	const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
-	const [activeColumn, setActiveColumn] = useState<KanbanColumn | null>(null);
-	const [dragSnapshot, setDragSnapshot] = useState<DragSnapshot | null>(null);
 	const [columnToDelete, setColumnToDelete] = useState<KanbanColumn | null>(
 		null,
 	);
@@ -148,82 +119,34 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		resolver: zodResolver(taskSchema),
 		defaultValues: emptyTaskForm,
 	});
-
-	const createColumnMutation = useMutation({
-		mutationFn: (payload: { name: string; color?: string }) =>
-			createKanbanColumn(projectId, payload),
-		onSuccess: async () => {
+	const {
+		createColumn: createColumnMutation,
+		updateColumn: updateColumnMutation,
+		deleteColumn: deleteColumnMutation,
+		createTask: createTaskMutation,
+		updateTask: updateTaskMutation,
+		deleteTask: deleteTaskMutation,
+	} = useKanbanMutations(projectId, {
+		onError: setBoardError,
+		onColumnSaved: () => {
 			setColumnForm({ name: "", color: "#38BDF8" });
 			setColumnModal(null);
-			await invalidateBoard(queryClient, projectId);
 		},
-		onError: (error) => setBoardError(extractErrorMessage(error)),
-	});
-
-	const updateColumnMutation = useMutation({
-		mutationFn: (payload: { columnId: string; name: string; color?: string }) =>
-			updateKanbanColumn(projectId, payload.columnId, {
-				name: payload.name,
-				color: payload.color,
-			}),
-		onSuccess: async () => {
-			setColumnModal(null);
-			await invalidateBoard(queryClient, projectId);
-		},
-		onError: (error) => setBoardError(extractErrorMessage(error)),
-	});
-
-	const deleteColumnMutation = useMutation({
-		mutationFn: (columnId: string) => deleteKanbanColumn(projectId, columnId),
-		onSuccess: async () => {
-			setColumnToDelete(null);
-			await invalidateBoard(queryClient, projectId);
-		},
-		onError: (error) => setBoardError(extractErrorMessage(error)),
-	});
-
-	const createTaskMutation = useMutation({
-		mutationFn: (payload: { column_id: string } & TaskFormValues) =>
-			createKanbanTask(projectId, payload),
-		onSuccess: async () => {
+		onColumnDeleted: () => setColumnToDelete(null),
+		onTaskSaved: () => {
 			form.reset(emptyTaskForm);
 			setTaskModal(null);
-			await invalidateBoard(queryClient, projectId);
 		},
-		onError: (error) => setBoardError(extractErrorMessage(error)),
-	});
-
-	const updateTaskMutation = useMutation({
-		mutationFn: (payload: { taskId: string; values: TaskFormValues }) =>
-			updateKanbanTask(projectId, payload.taskId, payload.values),
-		onSuccess: async () => {
-			form.reset(emptyTaskForm);
-			setTaskModal(null);
-			await invalidateBoard(queryClient, projectId);
-		},
-		onError: (error) => setBoardError(extractErrorMessage(error)),
-	});
-
-	const deleteTaskMutation = useMutation({
-		mutationFn: (taskId: string) => deleteKanbanTask(projectId, taskId),
-		onSuccess: async () => {
+		onTaskDeleted: () => {
 			form.reset(emptyTaskForm);
 			setTaskModal(null);
 			setTaskToDelete(null);
-			await invalidateBoard(queryClient, projectId);
 		},
-		onError: (error) => setBoardError(extractErrorMessage(error)),
 	});
 
 	const columns = columnsQuery.data ?? [];
 	const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
 	const filteredTasks = tasks.filter((task) => matchesFilters(task, filters));
-	const activeFilterCount = [
-		filters.assignee,
-		filters.priority,
-		filters.label,
-		filters.dueDate,
-	].filter(Boolean).length;
 
 	useEffect(() => {
 		if (!taskModal) {
@@ -318,80 +241,8 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		setColumnForm({ name: "", color: "#38BDF8" });
 	}
 
-	function handleDragStart(event: DragStartEvent) {
-		const data = event.active.data.current;
-
-		if (isTaskDragData(data)) {
-			setActiveTask(data.task);
-			setDragSnapshot({ columns, tasks });
-			return;
-		}
-
-		if (isColumnDragData(data)) {
-			setActiveColumn(data.column);
-			setDragSnapshot({ columns, tasks });
-		}
-	}
-
-	function rollbackDrag() {
-		if (!dragSnapshot) {
-			return;
-		}
-
-		queryClient.setQueryData(
-			kanbanKeys.columns(projectId),
-			dragSnapshot.columns,
-		);
-		queryClient.setQueryData(kanbanKeys.tasks(projectId), dragSnapshot.tasks);
-	}
-
-	function resetDrag() {
-		setActiveTask(null);
-		setActiveColumn(null);
-		setDragSnapshot(null);
-	}
-
-	function handleDragEnd(event: DragEndEvent) {
-		if (!event.over) {
-			rollbackDrag();
-			resetDrag();
-			return;
-		}
-
-		const activeData = event.active.data.current;
-
-		if (isColumnDragData(activeData)) {
-			finishColumnDrag(
-				event,
-				columns,
-				tasks,
-				dragSnapshot,
-				queryClient,
-				projectId,
-			);
-			resetDrag();
-			return;
-		}
-
-		if (isTaskDragData(activeData)) {
-			const nextTasks = moveTaskInMemory(
-				dragSnapshot?.tasks ?? tasks,
-				activeData.task.id,
-				event.over.data.current,
-				event.over.id.toString(),
-			);
-
-			finishTaskDrag(
-				activeData.task.id,
-				nextTasks,
-				dragSnapshot,
-				queryClient,
-				projectId,
-			);
-		}
-
-		resetDrag();
-	}
+	const { activeTask, activeColumn, handleDragStart, handleDragEnd } =
+		useKanbanDrag(projectId, columns, tasks);
 
 	if (columnsQuery.isLoading || tasksQuery.isLoading) {
 		return <Card className="p-8">Memuat board proyek...</Card>;
@@ -412,111 +263,15 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 
 	return (
 		<div className="space-y-6">
-			<Card className="p-6">
-				<div className="flex flex-col gap-5">
-					<div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-						<div>
-							<p className="mb-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-ops">
-								Board proyek
-							</p>
-							<h4 className="text-[20px] font-[700] text-text-primary leading-tight">
-								Ruang kerja task proyek
-							</h4>
-							<p className="mt-1 max-w-3xl text-[13px] text-text-secondary">
-								Kelola task proyek dalam satu board, pindahkan kartu antar tahap
-								kerja, dan gunakan filter tanpa keluar dari halaman ini.
-							</p>
-						</div>
-
-						<PermissionGate permission={permissions.operationalColumnManage}>
-							<div className="flex w-full flex-col items-stretch gap-3 xl:w-auto xl:items-end">
-								<Button
-									variant="ops"
-									className="xl:self-end"
-									onClick={() => {
-										setBoardError(null);
-										startColumnCreate();
-									}}
-									type="button">
-									<Plus className="h-4 w-4" />
-									Kolom baru
-								</Button>
-							</div>
-						</PermissionGate>
-					</div>
-
-					<div className="grid gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
-						<select
-							className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
-							onChange={(event) =>
-								setFilters((current) => ({
-									...current,
-									assignee: event.target.value,
-								}))
-							}
-							value={filters.assignee}>
-							<option value="">Semua PIC</option>
-							{members.map((member) => (
-								<option
-									key={member.user_id}
-									value={member.user_id}>
-									{member.full_name || member.user_email || member.user_id}
-								</option>
-							))}
-						</select>
-						<select
-							className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
-							onChange={(event) =>
-								setFilters((current) => ({
-									...current,
-									priority: event.target.value,
-								}))
-							}
-							value={filters.priority}>
-							<option value="">Semua prioritas</option>
-							<option value="low">Rendah</option>
-							<option value="medium">Medium</option>
-							<option value="high">Tinggi</option>
-							<option value="critical">Kritis</option>
-						</select>
-						<Input
-							className="h-[44px] focus-visible:border-ops focus-visible:ring-ops/10"
-							onChange={(event) =>
-								setFilters((current) => ({
-									...current,
-									label: event.target.value,
-								}))
-							}
-							placeholder="Filter label"
-							value={filters.label}
-						/>
-						<Input
-							className="h-[44px] focus-visible:border-ops focus-visible:ring-ops/10"
-							onChange={(event) =>
-								setFilters((current) => ({
-									...current,
-									dueDate: event.target.value,
-								}))
-							}
-							type="date"
-							value={filters.dueDate}
-						/>
-						<Button
-							onClick={() =>
-								setFilters({
-									assignee: "",
-									priority: "",
-									label: "",
-									dueDate: "",
-								})
-							}
-							variant="secondary"
-							className="h-[44px]">
-							Reset {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
-						</Button>
-					</div>
-				</div>
-			</Card>
+			<KanbanToolbar
+				filters={filters}
+				members={members}
+				onColumnCreate={() => {
+					setBoardError(null);
+					startColumnCreate();
+				}}
+				onFiltersChange={setFilters}
+			/>
 
 			{boardError ? (
 				<Card className="p-4 text-[13px] font-[500] text-priority-high border-priority-high/20 bg-priority-high/5">
@@ -602,871 +357,36 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 				/>
 			) : null}
 
-			<FormModal
-				isLoading={
+			<KanbanDialogs
+				columnColorOptions={columnColorOptions}
+				columnForm={columnForm}
+				columnModal={columnModal}
+				columnToDelete={columnToDelete}
+				isColumnDeleting={deleteColumnMutation.isPending}
+				isColumnSaving={
 					createColumnMutation.isPending || updateColumnMutation.isPending
 				}
-				isOpen={Boolean(columnModal)}
-				onClose={() => {
-					setColumnModal(null);
-					setColumnForm({ name: "", color: "#38BDF8" });
-				}}
-				onSubmit={(event) => {
-					event.preventDefault();
-					handleColumnSubmit();
-				}}
-				size="sm"
-				submitLabel={
-					columnModal?.mode === "edit" ? "Simpan kolom" : "Buat kolom"
-				}
-				title={columnModal?.mode === "edit" ? "Edit kolom" : "Buat kolom"}
-				subtitle="Gunakan nama singkat dan warna aksen yang jelas agar kolom mudah dipindai di board.">
-				<div className="space-y-2">
-					<label className="text-[13px] font-[600] text-text-primary">
-						Nama kolom
-					</label>
-					<Input
-						className="focus-visible:border-ops focus-visible:ring-ops/10"
-						onChange={(event) =>
-							setColumnForm((current) => ({
-								...current,
-								name: event.target.value,
-							}))
-						}
-						placeholder="Review"
-						value={columnForm.name}
-					/>
-				</div>
-				<div className="space-y-2">
-					<p className="text-[13px] font-[600] text-text-primary">
-						Warna aksen
-					</p>
-					<div className="flex flex-wrap gap-2">
-						{columnColorOptions.map((color) => (
-							<button
-								aria-label={`Choose list color ${color}`}
-								className={cn(
-									"h-9 w-9 rounded-full border-2 transition hover:scale-105",
-									columnForm.color === color
-										? "border-foreground shadow-sm"
-										: "border-transparent",
-								)}
-								key={color}
-								onClick={() =>
-									setColumnForm((current) => ({ ...current, color }))
-								}
-								style={{ backgroundColor: color }}
-								type="button"
-							/>
-						))}
-					</div>
-				</div>
-			</FormModal>
-
-			<ConfirmDialog
-				confirmLabel="Hapus kolom"
-				description={
-					columnToDelete
-						? `Semua task di dalam "${columnToDelete.name}" akan ikut terhapus bersama kolom ini.`
-						: ""
-				}
-				isLoading={deleteColumnMutation.isPending}
-				isOpen={Boolean(columnToDelete)}
-				onClose={() => setColumnToDelete(null)}
-				onConfirm={() => {
+				isTaskDeleting={deleteTaskMutation.isPending}
+				onColumnDeleteClose={() => setColumnToDelete(null)}
+				onColumnDeleteConfirm={() => {
 					if (columnToDelete) {
 						deleteColumnMutation.mutate(columnToDelete.id);
 					}
 				}}
-				title={
-					columnToDelete ? `Hapus ${columnToDelete.name}?` : "Hapus kolom?"
-				}
-			/>
-
-			<ConfirmDialog
-				confirmLabel="Hapus task"
-				description={
-					taskToDelete
-						? `Task "${taskToDelete.title}" akan dihapus dari board ini.`
-						: ""
-				}
-				isLoading={deleteTaskMutation.isPending}
-				isOpen={Boolean(taskToDelete)}
-				onClose={() => setTaskToDelete(null)}
-				onConfirm={() => {
+				onColumnFormChange={setColumnForm}
+				onColumnModalClose={() => {
+					setColumnModal(null);
+					setColumnForm({ name: "", color: "#38BDF8" });
+				}}
+				onColumnSubmit={handleColumnSubmit}
+				onTaskDeleteClose={() => setTaskToDelete(null)}
+				onTaskDeleteConfirm={() => {
 					if (taskToDelete) {
 						deleteTaskMutation.mutate(taskToDelete.id);
 					}
 				}}
-				title={taskToDelete ? `Hapus ${taskToDelete.title}?` : "Hapus task?"}
+				taskToDelete={taskToDelete}
 			/>
 		</div>
 	);
-}
-
-function matchesFilters(task: KanbanTask, filters: KanbanFilters) {
-	if (filters.assignee && task.assignee_id !== filters.assignee) {
-		return false;
-	}
-	if (filters.priority && task.priority !== filters.priority) {
-		return false;
-	}
-	if (filters.label) {
-		const label = task.label?.toLowerCase() ?? "";
-		if (!label.includes(filters.label.toLowerCase())) {
-			return false;
-		}
-	}
-	if (
-		filters.dueDate &&
-		(!task.due_date || extractDateInputValue(task.due_date) !== filters.dueDate)
-	) {
-		return false;
-	}
-	return true;
-}
-
-function moveTaskInMemory(
-	tasks: KanbanTask[],
-	activeTaskId: string,
-	overData: unknown,
-	overId: string,
-) {
-	const activeTask = tasks.find((task) => task.id === activeTaskId);
-	if (!activeTask) {
-		return null;
-	}
-
-	const buckets = buildTaskBuckets(tasks);
-	const sourceList = [...(buckets[activeTask.column_id] ?? [])];
-	const sourceIndex = sourceList.findIndex((task) => task.id === activeTaskId);
-	if (sourceIndex < 0) {
-		return null;
-	}
-
-	const [movingTask] = sourceList.splice(sourceIndex, 1);
-	buckets[activeTask.column_id] = sourceList;
-
-	let destinationColumnId = activeTask.column_id;
-	let destinationIndex = sourceList.length;
-
-	if (isTaskDragData(overData)) {
-		destinationColumnId = overData.task.column_id;
-		const targetList =
-			destinationColumnId === activeTask.column_id
-				? sourceList
-				: [...(buckets[destinationColumnId] ?? [])];
-		const overIndex = targetList.findIndex(
-			(task) => task.id === overData.task.id,
-		);
-		destinationIndex = overIndex >= 0 ? overIndex : targetList.length;
-	} else if (isColumnDragData(overData)) {
-		destinationColumnId = overData.column.id;
-		const targetList =
-			destinationColumnId === activeTask.column_id
-				? sourceList
-				: [...(buckets[destinationColumnId] ?? [])];
-		destinationIndex = targetList.length;
-	} else {
-		const targetList = buckets[activeTask.column_id] ?? [];
-		const overIndex = targetList.findIndex((task) => task.id === overId);
-		destinationIndex = overIndex >= 0 ? overIndex : targetList.length;
-	}
-
-	const destinationList =
-		destinationColumnId === activeTask.column_id
-			? sourceList
-			: [...(buckets[destinationColumnId] ?? [])];
-	destinationList.splice(destinationIndex, 0, {
-		...movingTask!,
-		column_id: destinationColumnId,
-	});
-	buckets[destinationColumnId] = destinationList;
-
-	return flattenTaskBuckets(buckets);
-}
-
-function buildTaskBuckets(tasks: KanbanTask[]) {
-	const buckets: Record<string, KanbanTask[]> = {};
-	for (const task of [...tasks].sort(sortTaskList)) {
-		if (!buckets[task.column_id]) {
-			buckets[task.column_id] = [];
-		}
-		buckets[task.column_id]!.push(task);
-	}
-	return buckets;
-}
-
-function flattenTaskBuckets(buckets: Record<string, KanbanTask[]>) {
-	const nextTasks: KanbanTask[] = [];
-	for (const columnId of Object.keys(buckets)) {
-		buckets[columnId]!.forEach((task, index) => {
-			nextTasks.push({ ...task, column_id: columnId, position: index + 1 });
-		});
-	}
-	return nextTasks.sort(sortTaskList);
-}
-
-// function taskPlacementChanged(currentTasks: KanbanTask[], nextTasks: KanbanTask[], taskId: string) {
-//   const currentTask = currentTasks.find((task) => task.id === taskId);
-//   const nextTask = nextTasks.find((task) => task.id === taskId);
-
-//   if (!currentTask || !nextTask) {
-//     return false;
-//   }
-
-//   return currentTask.column_id !== nextTask.column_id || currentTask.position !== nextTask.position;
-// }
-
-function sortTaskList(left: KanbanTask, right: KanbanTask) {
-	if (left.column_id === right.column_id) {
-		return left.position - right.position;
-	}
-	return left.column_id.localeCompare(right.column_id);
-}
-
-async function invalidateBoard(
-	queryClient: ReturnType<typeof useQueryClient>,
-	projectId: string,
-) {
-	await queryClient.invalidateQueries({ queryKey: kanbanKeys.all(projectId) });
-}
-
-function finishTaskDrag(
-	taskId: string,
-	nextTasks: KanbanTask[] | null,
-	snapshot: DragSnapshot | null,
-	queryClient: ReturnType<typeof useQueryClient>,
-	projectId: string,
-) {
-	if (!snapshot || !nextTasks) {
-		return;
-	}
-
-	const previousTask = snapshot.tasks.find((task) => task.id === taskId);
-	const nextTask = nextTasks.find((task) => task.id === taskId);
-
-	if (!previousTask || !nextTask) {
-		queryClient.setQueryData(kanbanKeys.tasks(projectId), snapshot.tasks);
-		return;
-	}
-
-	if (
-		previousTask.column_id === nextTask.column_id &&
-		previousTask.position === nextTask.position
-	) {
-		return;
-	}
-
-	queryClient.setQueryData(kanbanKeys.tasks(projectId), nextTasks);
-	void moveKanbanTask(
-		projectId,
-		nextTask.id,
-		nextTask.column_id,
-		nextTask.position,
-	)
-		.then(async () => {
-			await invalidateBoard(queryClient, projectId);
-		})
-		.catch(async () => {
-			queryClient.setQueryData(kanbanKeys.tasks(projectId), snapshot.tasks);
-			await invalidateBoard(queryClient, projectId);
-		});
-}
-
-function finishColumnDrag(
-	event: DragEndEvent,
-	columns: KanbanColumn[],
-	tasks: KanbanTask[],
-	snapshot: DragSnapshot | null,
-	queryClient: ReturnType<typeof useQueryClient>,
-	projectId: string,
-) {
-	if (!snapshot) {
-		return;
-	}
-
-	const currentColumns =
-		queryClient.getQueryData<KanbanColumn[]>(kanbanKeys.columns(projectId)) ??
-		columns;
-	const activeIndex = currentColumns.findIndex(
-		(column) => column.id === event.active.id,
-	);
-	const currentTasks =
-		queryClient.getQueryData<KanbanTask[]>(kanbanKeys.tasks(projectId)) ??
-		tasks;
-	const overColumnId = resolveOverColumnId(event, currentColumns, currentTasks);
-	const overIndex = currentColumns.findIndex(
-		(column) => column.id === overColumnId,
-	);
-	if (activeIndex < 0 || overIndex < 0 || activeIndex === overIndex) {
-		return;
-	}
-
-	const nextColumns = arrayMove(currentColumns, activeIndex, overIndex).map(
-		(column, index) => ({
-			...column,
-			position: index + 1,
-		}),
-	);
-
-	queryClient.setQueryData(kanbanKeys.columns(projectId), nextColumns);
-	void reorderKanbanColumns(
-		projectId,
-		nextColumns.map((column) => column.id),
-	)
-		.then(async () => {
-			await invalidateBoard(queryClient, projectId);
-		})
-		.catch(async () => {
-			queryClient.setQueryData(kanbanKeys.columns(projectId), snapshot.columns);
-			await invalidateBoard(queryClient, projectId);
-		});
-}
-
-function resolveOverColumnId(
-	event: DragEndEvent,
-	columns: KanbanColumn[],
-	tasks: KanbanTask[],
-) {
-	const overData = event.over?.data.current;
-	if (isColumnDragData(overData)) {
-		return overData.column.id;
-	}
-
-	const overId = event.over?.id?.toString();
-	if (!overId) {
-		return null;
-	}
-
-	if (columns.some((column) => column.id === overId)) {
-		return overId;
-	}
-
-	return tasks.find((task) => task.id === overId)?.column_id ?? null;
-}
-
-function isTaskDragData(value: unknown): value is DragTaskData {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"type" in value &&
-		value.type === "task"
-	);
-}
-
-function isColumnDragData(value: unknown): value is DragColumnData {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"type" in value &&
-		value.type === "column"
-	);
-}
-
-function extractErrorMessage(error: unknown) {
-	return error instanceof Error
-		? error.message
-		: "Terjadi kesalahan yang tidak terduga";
-}
-
-interface KanbanColumnCardProps {
-	column: KanbanColumn;
-	tasks: KanbanTask[];
-	quickDraft: string;
-	onQuickDraftChange: (value: string) => void;
-	onQuickAdd: () => void;
-	onTaskClick: (task: KanbanTask) => void;
-	onTaskCreate: () => void;
-	onEditColumn: () => void;
-	onDeleteColumn: () => void;
-}
-
-function KanbanColumnCard(props: KanbanColumnCardProps) {
-	const sortable = useSortable({
-		id: props.column.id,
-		data: { type: "column", column: props.column } satisfies DragColumnData,
-	});
-	const droppable = useDroppable({
-		id: `column-drop-${props.column.id}`,
-		data: { type: "column", column: props.column } satisfies DragColumnData,
-	});
-	const style = {
-		transform: CSS.Transform.toString(sortable.transform),
-		transition: sortable.transition,
-	};
-
-	return (
-		<div
-			className="w-[min(82vw,320px)] shrink-0 md:w-[320px]"
-			ref={sortable.setNodeRef}
-			style={style}>
-			<Card
-				className={cn(
-					"flex h-full min-h-[420px] flex-col border-border bg-surface-muted p-3 shadow-sm transition-all md:min-h-[500px] md:p-4",
-					sortable.isDragging && "opacity-70",
-					droppable.isOver && "border-ops/40 bg-ops/5 shadow-card",
-				)}
-				ref={droppable.setNodeRef}>
-				<div className="flex items-start justify-between gap-3">
-					<div className="flex items-center gap-3">
-						<button
-							{...sortable.attributes}
-							{...sortable.listeners}
-							className="rounded-[6px] border border-border bg-background px-2 py-1 text-[11px] font-[700] uppercase tracking-[0.08em] text-text-secondary hover:bg-surface-muted transition-colors cursor-grab"
-							type="button">
-							Geser
-						</button>
-						<div>
-							<div className="flex items-center gap-2">
-								<span
-									className="h-2.5 w-2.5 rounded-full"
-									style={{ backgroundColor: props.column.color ?? "#94A3B8" }}
-								/>
-								<h5 className="font-[600] text-[14px] text-text-primary truncate max-w-[120px]">
-									{props.column.name}
-								</h5>
-							</div>
-							<p className="text-[12px] font-[500] text-text-tertiary">
-								{props.tasks.length} task
-							</p>
-						</div>
-					</div>
-
-					<PermissionGate permission={permissions.operationalColumnManage}>
-						<div className="flex gap-2">
-							<Button
-								onClick={props.onEditColumn}
-								size="sm"
-								variant="secondary"
-								className="h-7 px-2 text-[11px]">
-								Edit
-							</Button>
-							<PermissionGate permission={permissions.operationalColumnManage}>
-								<Button
-									onClick={props.onDeleteColumn}
-									size="sm"
-									variant="ghost"
-									className="h-7 px-2 text-[11px]">
-									Hapus
-								</Button>
-							</PermissionGate>
-						</div>
-					</PermissionGate>
-				</div>
-
-				<div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1 max-h-[460px]">
-					<SortableContext
-						items={props.tasks.map((task) => task.id)}
-						strategy={verticalListSortingStrategy}>
-						{props.tasks.map((task) => (
-							<KanbanTaskCard
-								key={task.id}
-								onClick={() => props.onTaskClick(task)}
-								task={task}
-							/>
-						))}
-					</SortableContext>
-
-					{props.tasks.length === 0 ? (
-						<div className="rounded-[12px] border border-dashed border-border bg-background/50 px-4 py-8 text-center text-[13px] font-[500] text-text-tertiary">
-							Belum ada task di kolom ini.
-						</div>
-					) : null}
-				</div>
-
-				<PermissionGate permission={permissions.operationalTaskCreate}>
-					<div className="mt-4 rounded-[12px] border border-border bg-background p-3 space-y-3">
-						<Input
-							className="focus-visible:border-ops focus-visible:ring-ops/10"
-							onChange={(event) => props.onQuickDraftChange(event.target.value)}
-							placeholder="Tambahkan task cepat"
-							value={props.quickDraft}
-						/>
-						<div className="flex gap-3">
-							<Button
-								variant="ops"
-								onClick={props.onQuickAdd}
-								size="sm">
-								Tambah cepat
-							</Button>
-							<Button
-								onClick={props.onTaskCreate}
-								size="sm"
-								variant="ghost">
-								Form lengkap
-							</Button>
-						</div>
-					</div>
-				</PermissionGate>
-			</Card>
-		</div>
-	);
-}
-
-function KanbanTaskCard({
-	task,
-	onClick,
-}: {
-	task: KanbanTask;
-	onClick: () => void;
-}) {
-	const sortable = useSortable({
-		id: task.id,
-		data: { type: "task", task } satisfies DragTaskData,
-	});
-	const style = {
-		transform: CSS.Transform.toString(sortable.transform),
-		transition: sortable.transition,
-	};
-
-	return (
-		<div
-			ref={sortable.setNodeRef}
-			style={style}>
-			<Card
-				className={cn(
-					"cursor-pointer p-4 shadow-sm transition-all hover:border-ops/30 hover:shadow-card group",
-					sortable.isDragging && "opacity-60 ring-2 ring-ops",
-				)}
-				onClick={onClick}>
-				<div className="flex items-start justify-between gap-3">
-					<div>
-						<div className="flex flex-wrap items-center gap-2 mb-2">
-							<PriorityBadge priority={task.priority} />
-							<AssignmentBadge assignedVia={task.assigned_via} />
-							{task.label ? (
-								<span className="rounded-full bg-surface-muted border border-border px-2 py-0.5 text-[11px] font-[600] uppercase tracking-wider text-text-secondary">
-									{task.label}
-								</span>
-							) : null}
-						</div>
-						<h6 className="text-[14px] font-[600] text-text-primary leading-tight">
-							{task.title}
-						</h6>
-					</div>
-					<button
-						{...sortable.attributes}
-						{...sortable.listeners}
-						aria-label={`Pindahkan task ${task.title}`}
-						className="rounded-[8px] border border-border bg-surface-muted p-2 text-text-tertiary transition hover:border-ops/40 hover:bg-ops/10 hover:text-ops active:cursor-grabbing"
-						onClick={(event) => event.stopPropagation()}
-						type="button">
-						<GripVertical className="h-4 w-4" />
-					</button>
-				</div>
-
-				{task.description ? (
-					<p className="mt-2 line-clamp-2 text-[12px] text-text-secondary leading-relaxed">
-						{task.description}
-					</p>
-				) : null}
-
-				<div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
-					<div className="flex items-center gap-2">
-						<AvatarBadge
-							avatarUrl={task.avatar_url}
-							name={task.assignee_name}
-						/>
-						<span className="text-[12px] font-[500] text-text-secondary truncate max-w-[120px]">
-							{task.assignee_name ?? "Belum ada PIC"}
-						</span>
-					</div>
-					<span className="text-[11px] font-[600] text-text-tertiary uppercase tracking-wider">
-						{task.due_date ? formatDate(task.due_date) : "Tanpa deadline"}
-					</span>
-				</div>
-			</Card>
-		</div>
-	);
-}
-
-function TaskOverlay({ task }: { task: KanbanTask }) {
-	return (
-		<div className="w-[min(82vw,320px)] md:w-[320px]">
-			<Card className="border-ops shadow-2xl p-4 rotate-2">
-				<PriorityBadge priority={task.priority} />
-				<p className="mt-2 text-[14px] font-[600] text-text-primary leading-tight">
-					{task.title}
-				</p>
-			</Card>
-		</div>
-	);
-}
-
-function ColumnOverlay({
-	column,
-	taskCount,
-}: {
-	column: KanbanColumn;
-	taskCount: number;
-}) {
-	return (
-		<div className="w-[min(82vw,320px)] md:w-[320px]">
-			<Card className="border-ops shadow-2xl p-4 rotate-2">
-				<div className="flex items-center gap-2">
-					<span
-						className="h-2 w-2 rounded-full"
-						style={{ backgroundColor: column.color ?? "#94A3B8" }}
-					/>
-					<p className="text-[14px] font-[600] text-text-primary">
-						{column.name}
-					</p>
-				</div>
-				<p className="mt-1 text-[12px] font-[500] text-text-tertiary">
-					{taskCount} tasks
-				</p>
-			</Card>
-		</div>
-	);
-}
-
-function TaskModal({
-	mode,
-	form,
-	members,
-	isSubmitting,
-	isDeleting,
-	onSubmit,
-	onDelete,
-	onClose,
-}: {
-	mode: "create" | "edit";
-	form: UseFormReturn<TaskFormValues>;
-	members: ProjectMember[];
-	isSubmitting: boolean;
-	isDeleting: boolean;
-	onSubmit: (values: TaskFormValues) => void;
-	onDelete: () => void;
-	onClose: () => void;
-}) {
-	const {
-		register,
-		handleSubmit,
-		formState: { errors },
-	} = form;
-
-	return (
-		<Drawer
-			onOpenChange={(open) => (!open ? onClose() : undefined)}
-			open>
-			<DrawerContent size="lg">
-				<DrawerHeader className="flex items-start justify-between gap-4">
-					<div>
-						<p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-ops mb-1">
-							{mode === "create" ? "Buat task" : "Detail task"}
-						</p>
-						<DrawerTitle>
-							{mode === "create" ? "Task baru" : "Edit task"}
-						</DrawerTitle>
-						<DrawerDescription>
-							{mode === "create"
-								? "Isi ringkasan task, PIC, dan due date tanpa keluar dari board."
-								: "Tinjau detail task, edit informasi pengerjaan, atau hapus task dari board."}
-						</DrawerDescription>
-					</div>
-					<DrawerClose />
-				</DrawerHeader>
-
-				<DrawerBody>
-					<form
-						className="space-y-6"
-						onSubmit={handleSubmit(onSubmit)}>
-						<div className="grid gap-2">
-							<label
-								className="text-[13px] font-[600] text-text-primary"
-								htmlFor="task-title">
-								Judul<span className="ml-0.5 text-priority-high">*</span>
-							</label>
-							<Input
-								className="focus-visible:border-ops focus-visible:ring-ops/10"
-								id="task-title"
-								{...register("title")}
-							/>
-							{errors.title ? (
-								<p className="text-[13px] font-[500] text-priority-high">
-									{errors.title.message}
-								</p>
-							) : null}
-						</div>
-
-						<div className="grid gap-2">
-							<label
-								className="text-[13px] font-[600] text-text-primary"
-								htmlFor="task-description">
-								Deskripsi
-							</label>
-							<textarea
-								className="min-h-32 w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10 disabled:cursor-not-allowed disabled:opacity-50"
-								id="task-description"
-								{...register("description")}
-							/>
-						</div>
-
-						<div className="grid gap-5 md:grid-cols-2">
-							<div className="grid gap-2">
-								<label
-									className="text-[13px] font-[600] text-text-primary"
-									htmlFor="task-assignee">
-									PIC
-								</label>
-								<select
-									className="flex h-[44px] w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
-									id="task-assignee"
-									{...register("assignee_id")}>
-									<option value="">Belum ditentukan</option>
-									{members.map((member) => (
-										<option
-											key={member.user_id}
-											value={member.user_id}>
-											{member.full_name || member.user_email || member.user_id}
-										</option>
-									))}
-								</select>
-							</div>
-
-							<div className="grid gap-2">
-								<label
-									className="text-[13px] font-[600] text-text-primary"
-									htmlFor="task-due-date">
-									Deadline
-								</label>
-								<Input
-									className="focus-visible:border-ops focus-visible:ring-ops/10"
-									id="task-due-date"
-									type="date"
-									{...register("due_date")}
-								/>
-							</div>
-						</div>
-
-						<div className="grid gap-5 md:grid-cols-2">
-							<div className="grid gap-2">
-								<label
-									className="text-[13px] font-[600] text-text-primary"
-									htmlFor="task-priority">
-									Prioritas
-								</label>
-								<select
-									className="flex h-[44px] w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
-									id="task-priority"
-									{...register("priority")}>
-									<option value="low">Rendah</option>
-									<option value="medium">Medium</option>
-									<option value="high">Tinggi</option>
-									<option value="critical">Kritis</option>
-								</select>
-							</div>
-
-							<div className="grid gap-2">
-								<label
-									className="text-[13px] font-[600] text-text-primary"
-									htmlFor="task-label">
-									Label
-								</label>
-								<Input
-									className="focus-visible:border-ops focus-visible:ring-ops/10"
-									id="task-label"
-									placeholder="Bug, desain, backend"
-									{...register("label")}
-								/>
-							</div>
-						</div>
-
-						<div className="flex flex-wrap gap-3 pt-4 border-t border-border">
-							<Button
-								variant="ops"
-								disabled={isSubmitting}
-								type="submit">
-								{isSubmitting
-									? "Menyimpan..."
-									: mode === "create"
-										? "Buat task"
-										: "Simpan perubahan"}
-							</Button>
-							{mode === "edit" ? (
-								<PermissionGate permission={permissions.operationalTaskDelete}>
-									<Button
-										disabled={isDeleting}
-										onClick={onDelete}
-										type="button"
-										variant="ghost">
-										{isDeleting ? "Menghapus..." : "Hapus task"}
-									</Button>
-								</PermissionGate>
-							) : null}
-						</div>
-					</form>
-				</DrawerBody>
-			</DrawerContent>
-		</Drawer>
-	);
-}
-
-function PriorityBadge({ priority }: { priority: ProjectPriority }) {
-	const tone =
-		priority === "critical"
-			? "bg-priority-critical-bg text-priority-critical"
-			: priority === "high"
-				? "bg-priority-high-bg text-priority-high"
-				: priority === "medium"
-					? "bg-priority-medium-bg text-priority-medium"
-					: "bg-surface-muted text-text-secondary border border-border";
-	const label =
-		priority === "critical"
-			? "kritis"
-			: priority === "high"
-				? "tinggi"
-				: priority === "medium"
-					? "medium"
-					: "rendah";
-
-	return (
-		<span
-			className={cn(
-				"rounded-[6px] px-2 py-0.5 text-[11px] font-[700] uppercase tracking-[0.08em]",
-				tone,
-			)}>
-			{label}
-		</span>
-	);
-}
-
-function AssignmentBadge({ assignedVia }: { assignedVia: "manual" | "auto" }) {
-	const tone =
-		assignedVia === "auto"
-			? "bg-ops/10 text-ops"
-			: "bg-surface-muted text-text-secondary border border-border";
-
-	return (
-		<span
-			className={cn(
-				"rounded-[6px] px-2 py-0.5 text-[11px] font-[700] uppercase tracking-[0.08em]",
-				tone,
-			)}>
-			{assignedVia === "auto" ? "otomatis" : "manual"}
-		</span>
-	);
-}
-
-function AvatarBadge({
-	name,
-	avatarUrl,
-}: {
-	name?: string | null;
-	avatarUrl?: string | null;
-}) {
-	return (
-		<ProtectedAvatar
-			alt={name ?? "Unassigned"}
-			avatarUrl={avatarUrl}
-			className="h-8 w-8 shadow-sm ring-2 ring-background"
-			fallbackClassName="bg-ops text-white"
-			iconClassName="h-4 w-4"
-		/>
-	);
-}
-
-function formatDate(value: string) {
-	return formatCalendarDate(value);
 }
