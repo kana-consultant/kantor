@@ -54,7 +54,11 @@ type MyTaskItem struct {
 }
 
 type ListKanbanTasksQuery struct {
-	ColumnID string
-	Limit    int
-	Offset   int
+	ColumnID   string
+	AssigneeID string
+	Priority   string
+	Label      string
+	DueDate    string
+	Limit      int
+	Offset     int
 }

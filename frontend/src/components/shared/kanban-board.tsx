@@ -27,7 +27,6 @@ import {
 	type ColumnModalState,
 } from "@/components/shared/kanban-dialogs";
 import {
-	matchesFilters,
 } from "@/components/shared/kanban-dnd";
 import { useKanbanDrag } from "@/hooks/use-kanban-drag";
 import { useKanbanMutations } from "@/hooks/use-kanban-mutations";
@@ -157,10 +156,14 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		() => Object.values(loadedTasks).flat(),
 		[loadedTasks],
 	);
-	const filterTasks = useCallback(
-		(columnTasks: KanbanTask[]) =>
-			columnTasks.filter((task) => matchesFilters(task, filters)),
-		[filters],
+	const taskFilters = useMemo(
+		() => ({
+			assigneeId: filters.assignee,
+			priority: filters.priority,
+			label: filters.label,
+			dueDate: filters.dueDate,
+		}),
+		[filters.assignee, filters.dueDate, filters.label, filters.priority],
 	);
 
 	useEffect(() => {
@@ -302,7 +305,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 							{columns.map((column) => (
 								<KanbanColumnContainer
 									column={column}
-									filterTasks={filterTasks}
+									filters={taskFilters}
 									key={column.id}
 									onDeleteColumn={() => setColumnToDelete(column)}
 									onEditColumn={() => startColumnEdit(column)}

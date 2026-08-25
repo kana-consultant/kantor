@@ -181,8 +181,12 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := operationaldto.ListKanbanTasksQuery{
-		Limit:  parseKanbanPositiveInt(r.URL.Query().Get("limit")),
-		Offset: parseKanbanPositiveInt(r.URL.Query().Get("offset")),
+		AssigneeID: strings.TrimSpace(r.URL.Query().Get("assignee_id")),
+		Priority:   strings.TrimSpace(r.URL.Query().Get("priority")),
+		Label:      strings.TrimSpace(r.URL.Query().Get("label")),
+		DueDate:    strings.TrimSpace(r.URL.Query().Get("due_date")),
+		Limit:      parseKanbanPositiveInt(r.URL.Query().Get("limit")),
+		Offset:     parseKanbanPositiveInt(r.URL.Query().Get("offset")),
 	}
 	if columnID := strings.TrimSpace(r.URL.Query().Get("column_id")); columnID != "" {
 		validatedColumnID, ok := validateKanbanUUIDParam(w, "column_id", columnID)
