@@ -155,9 +155,19 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	});
 
 	const columns = columnsQuery.data ?? [];
+	const visibleColumnIds = useMemo(
+		() =>
+			columns
+				.filter((column) => !filters.columnId || column.id === filters.columnId)
+				.map((column) => column.id),
+		[columns, filters.columnId],
+	);
+	// Derive the working task list from only the currently-visible columns so a
+	// hidden (column filter) or deleted column's stale loadedTasks entries do not
+	// leak into drag state, the overlay count, or the task-modal lookup.
 	const tasks = useMemo(
-		() => Object.values(loadedTasks).flat(),
-		[loadedTasks],
+		() => visibleColumnIds.flatMap((columnId) => loadedTasks[columnId] ?? []),
+		[loadedTasks, visibleColumnIds],
 	);
 	const taskFilters = useMemo(
 		() => ({

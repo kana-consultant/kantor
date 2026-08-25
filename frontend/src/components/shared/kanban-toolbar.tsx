@@ -1,4 +1,4 @@
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { Button } from "@/components/ui/button";
@@ -85,11 +85,29 @@ export function KanbanToolbar({
 									search: event.target.value,
 								}))
 							}
+							onKeyDown={(event) => {
+								if (event.key === "Escape" && filters.search) {
+									event.preventDefault();
+									onFiltersChange((current) => ({ ...current, search: "" }));
+								}
+							}}
 							placeholder="Cari judul atau deskripsi task"
 							type="text"
 							value={filters.search}
 						/>
-						<Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+						{filters.search ? (
+							<button
+								aria-label="Bersihkan pencarian"
+								className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-[4px] text-text-tertiary transition-colors hover:bg-surface-muted hover:text-text-primary"
+								onClick={() =>
+									onFiltersChange((current) => ({ ...current, search: "" }))
+								}
+								type="button">
+								<X className="h-4 w-4" />
+							</button>
+						) : (
+							<Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+						)}
 					</div>
 					<select
 						aria-label="Filter kolom task"
