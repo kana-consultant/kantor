@@ -21,6 +21,11 @@ import type { ProjectPriority } from "@/types/project";
 export interface KanbanColumnCardProps {
 	column: KanbanColumn;
 	tasks: KanbanTask[];
+	totalTasks: number;
+	hasMore: boolean;
+	isLoadingTasks: boolean;
+	isFetchingMore: boolean;
+	onLoadMore: () => void;
 	quickDraft: string;
 	onQuickDraftChange: (value: string) => void;
 	onQuickAdd: () => void;
@@ -76,7 +81,7 @@ export function KanbanColumnCard(props: KanbanColumnCardProps) {
 								</h5>
 							</div>
 							<p className="text-[12px] font-[500] text-text-tertiary">
-								{props.tasks.length} task
+								{props.totalTasks} task
 							</p>
 						</div>
 					</div>
@@ -103,7 +108,18 @@ export function KanbanColumnCard(props: KanbanColumnCardProps) {
 					</PermissionGate>
 				</div>
 
-				<div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1 max-h-[460px]">
+				<div
+					className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1 max-h-[460px]"
+					onScroll={(event) => {
+						const el = event.currentTarget;
+						if (
+							props.hasMore &&
+							!props.isFetchingMore &&
+							el.scrollHeight - el.scrollTop - el.clientHeight < 120
+						) {
+							props.onLoadMore();
+						}
+					}}>
 					<SortableContext
 						items={props.tasks.map((task) => task.id)}
 						strategy={verticalListSortingStrategy}>
@@ -116,12 +132,17 @@ export function KanbanColumnCard(props: KanbanColumnCardProps) {
 						))}
 					</SortableContext>
 
-					{props.tasks.length === 0 ? (
+					{props.tasks.length === 0 && !props.isLoadingTasks ? (
 						<div className="rounded-[12px] border border-dashed border-border bg-background/50 px-4 py-8 text-center text-[13px] font-[500] text-text-tertiary">
 							Belum ada task di kolom ini.
 						</div>
 					) : null}
 
+					{props.isLoadingTasks || props.isFetchingMore ? (
+						<p className="py-3 text-center text-[12px] font-[500] text-text-tertiary">
+							Memuat task...
+						</p>
+					) : null}
 				</div>
 
 				<PermissionGate permission={permissions.operationalTaskCreate}>

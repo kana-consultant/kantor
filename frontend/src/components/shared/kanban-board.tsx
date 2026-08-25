@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
 	DndContext,
@@ -19,16 +19,15 @@ import { z } from "zod";
 
 import {
 	ColumnOverlay,
-	KanbanColumnCard,
 	TaskOverlay,
 } from "@/components/shared/kanban-cards";
+import { KanbanColumnContainer } from "@/components/shared/kanban-column-container";
 import {
 	KanbanDialogs,
 	type ColumnModalState,
 } from "@/components/shared/kanban-dialogs";
 import {
 	matchesFilters,
-	sortTaskList,
 } from "@/components/shared/kanban-dnd";
 import { useKanbanDrag } from "@/hooks/use-kanban-drag";
 import { useKanbanMutations } from "@/hooks/use-kanban-mutations";
@@ -39,7 +38,6 @@ import { extractDateInputValue } from "@/lib/date";
 import {
 	kanbanKeys,
 	listKanbanColumns,
-	listKanbanTasks,
 } from "@/services/operational-kanban";
 import type {
 	KanbanColumn,
@@ -110,10 +108,20 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		queryFn: () => listKanbanColumns(projectId),
 	});
 
-	const tasksQuery = useQuery({
-		queryKey: kanbanKeys.tasks(projectId),
-		queryFn: () => listKanbanTasks(projectId),
-	});
+	const [loadedTasks, setLoadedTasks] = useState<Record<string, KanbanTask[]>>(
+		{},
+	);
+
+	const handleTasksLoaded = useCallback(
+		(columnId: string, columnTasks: KanbanTask[]) => {
+			setLoadedTasks((current) =>
+				current[columnId] === columnTasks
+					? current
+					: { ...current, [columnId]: columnTasks },
+			);
+		},
+		[],
+	);
 
 	const form = useForm<TaskFormValues>({
 		resolver: zodResolver(taskSchema),
@@ -145,8 +153,15 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	});
 
 	const columns = columnsQuery.data ?? [];
-	const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
-	const filteredTasks = tasks.filter((task) => matchesFilters(task, filters));
+	const tasks = useMemo(
+		() => Object.values(loadedTasks).flat(),
+		[loadedTasks],
+	);
+	const filterTasks = useCallback(
+		(columnTasks: KanbanTask[]) =>
+			columnTasks.filter((task) => matchesFilters(task, filters)),
+		[filters],
+	);
 
 	useEffect(() => {
 		if (!taskModal) {
@@ -244,19 +259,14 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	const { activeTask, activeColumn, handleDragStart, handleDragEnd } =
 		useKanbanDrag(projectId, columns, tasks);
 
-	if (columnsQuery.isLoading || tasksQuery.isLoading) {
+	if (columnsQuery.isLoading) {
 		return <Card className="p-8">Memuat board proyek...</Card>;
 	}
 
-	if (
-		columnsQuery.error instanceof Error ||
-		tasksQuery.error instanceof Error
-	) {
+	if (columnsQuery.error instanceof Error) {
 		return (
 			<Card className="p-8 text-error">
-				{(columnsQuery.error as Error | undefined)?.message ??
-					(tasksQuery.error as Error | undefined)?.message ??
-					"Gagal memuat board proyek"}
+				{columnsQuery.error.message ?? "Gagal memuat board proyek"}
 			</Card>
 		);
 	}
@@ -290,8 +300,10 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 					<div className="-mx-1 overflow-x-auto px-1 pb-3">
 						<div className="flex min-w-max gap-3 md:gap-5">
 							{columns.map((column) => (
-								<KanbanColumnCard
+								<KanbanColumnContainer
 									column={column}
+									filterTasks={filterTasks}
+									key={column.id}
 									onDeleteColumn={() => setColumnToDelete(column)}
 									onEditColumn={() => startColumnEdit(column)}
 									onQuickAdd={() => void handleQuickAdd(column.id)}
@@ -311,10 +323,9 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 									onTaskCreate={() =>
 										setTaskModal({ mode: "create", columnId: column.id })
 									}
+									onTasksLoaded={handleTasksLoaded}
+									projectId={projectId}
 									quickDraft={quickDrafts[column.id] ?? ""}
-									tasks={filteredTasks
-										.filter((task) => task.column_id === column.id)
-										.sort(sortTaskList)}
 								/>
 							))}
 						</div>

@@ -52,3 +52,9 @@ type MyTaskItem struct {
 	DueDate     string `json:"due_date"`
 	Priority    string `json:"priority"`
 }
+
+type ListKanbanTasksQuery struct {
+	ColumnID string
+	Limit    int
+	Offset   int
+}

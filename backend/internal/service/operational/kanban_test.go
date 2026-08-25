@@ -173,6 +173,14 @@ func (f *fakeKanbanRepository) ListTasks(ctx context.Context, projectID string) 
 	return nil, nil
 }
 
+func (f *fakeKanbanRepository) ListTasksFiltered(ctx context.Context, projectID string, filter operationalrepo.ListKanbanTasksFilter) ([]model.KanbanTask, error) {
+	return nil, nil
+}
+
+func (f *fakeKanbanRepository) CountTasks(ctx context.Context, projectID string, filter operationalrepo.ListKanbanTasksFilter) (int, error) {
+	return 0, nil
+}
+
 func (f *fakeKanbanRepository) CreateTask(ctx context.Context, projectID string, params operationalrepo.CreateKanbanTaskParams) (model.KanbanTask, error) {
 	if f.createTaskFunc == nil {
 		return model.KanbanTask{}, nil

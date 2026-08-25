@@ -2,10 +2,28 @@
 import { toUTCDateOnlyISOString } from "@/lib/date";
 import type { KanbanColumn, KanbanTask, TaskFormValues } from "@/types/kanban";
 
+export interface KanbanTaskQuery {
+  columnId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface KanbanTaskPage {
+  items: KanbanTask[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
+export const kanbanPageSize = 20;
+
 export const kanbanKeys = {
   all: (projectId: string) => ["operational", "projects", projectId, "kanban"] as const,
   columns: (projectId: string) => [...kanbanKeys.all(projectId), "columns"] as const,
   tasks: (projectId: string) => [...kanbanKeys.all(projectId), "tasks"] as const,
+  columnTasks: (projectId: string, columnId: string, query: KanbanTaskQuery) =>
+    [...kanbanKeys.tasks(projectId), "column", columnId, query.limit ?? ""] as const,
 };
 
 export async function listKanbanColumns(projectId: string) {
@@ -63,9 +81,16 @@ export async function reorderKanbanColumns(projectId: string, columnIds: string[
   );
 }
 
-export async function listKanbanTasks(projectId: string) {
-  return authRequestJSON<KanbanTask[]>(
-    `/operational/projects/${projectId}/tasks`,
+export async function listKanbanTasks(projectId: string, query: KanbanTaskQuery = {}) {
+  const params = new URLSearchParams();
+  if (query.columnId) {
+    params.set("column_id", query.columnId);
+  }
+  params.set("limit", String(query.limit ?? kanbanPageSize));
+  params.set("offset", String(query.offset ?? 0));
+
+  return authRequestJSON<KanbanTaskPage>(
+    `/operational/projects/${projectId}/tasks?${params.toString()}`,
     { method: "GET" },
   );
 }

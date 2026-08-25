@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -179,13 +180,34 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.ListTasks(r.Context(), projectID)
+	query := operationaldto.ListKanbanTasksQuery{
+		Limit:  parseKanbanPositiveInt(r.URL.Query().Get("limit")),
+		Offset: parseKanbanPositiveInt(r.URL.Query().Get("offset")),
+	}
+	if columnID := strings.TrimSpace(r.URL.Query().Get("column_id")); columnID != "" {
+		validatedColumnID, ok := validateKanbanUUIDParam(w, "column_id", columnID)
+		if !ok {
+			return
+		}
+		query.ColumnID = validatedColumnID
+	}
+
+	result, err := h.service.ListTasksPage(r.Context(), projectID, query)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, result, nil)
+}
+
+func parseKanbanPositiveInt(raw string) int {
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || value < 0 {
+		return 0
+	}
+
+	return value
 }
 
 // ListMyTasks handles GET /operational/tasks/mine, self-scoped to the caller.
