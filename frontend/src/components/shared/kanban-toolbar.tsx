@@ -1,11 +1,11 @@
-import { Plus } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { permissions } from "@/lib/permissions";
-import type { KanbanFilters } from "@/types/kanban";
+import type { KanbanColumn, KanbanFilters } from "@/types/kanban";
 import type { ProjectMember } from "@/types/project";
 
 const emptyFilters: KanbanFilters = {
@@ -13,9 +13,12 @@ const emptyFilters: KanbanFilters = {
 	priority: "",
 	label: "",
 	dueDate: "",
+	search: "",
+	columnId: "",
 };
 
 interface KanbanToolbarProps {
+	columns: KanbanColumn[];
 	members: ProjectMember[];
 	filters: KanbanFilters;
 	onFiltersChange: (
@@ -25,6 +28,7 @@ interface KanbanToolbarProps {
 }
 
 export function KanbanToolbar({
+	columns,
 	members,
 	filters,
 	onFiltersChange,
@@ -35,6 +39,8 @@ export function KanbanToolbar({
 		filters.priority,
 		filters.label,
 		filters.dueDate,
+		filters.search,
+		filters.columnId,
 	].filter(Boolean).length;
 
 	return (
@@ -66,6 +72,62 @@ export function KanbanToolbar({
 							</Button>
 						</div>
 					</PermissionGate>
+				</div>
+
+				<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,240px)]">
+					<div className="relative">
+						<Input
+							aria-label="Cari task"
+							className="h-[44px] pr-10 focus-visible:border-ops focus-visible:ring-ops/10"
+							onChange={(event) =>
+								onFiltersChange((current) => ({
+									...current,
+									search: event.target.value,
+								}))
+							}
+							onKeyDown={(event) => {
+								if (event.key === "Escape" && filters.search) {
+									event.preventDefault();
+									onFiltersChange((current) => ({ ...current, search: "" }));
+								}
+							}}
+							placeholder="Cari judul atau deskripsi task"
+							type="text"
+							value={filters.search}
+						/>
+						{filters.search ? (
+							<button
+								aria-label="Bersihkan pencarian"
+								className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-[4px] text-text-tertiary transition-colors hover:bg-surface-muted hover:text-text-primary"
+								onClick={() =>
+									onFiltersChange((current) => ({ ...current, search: "" }))
+								}
+								type="button">
+								<X className="h-4 w-4" />
+							</button>
+						) : (
+							<Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+						)}
+					</div>
+					<select
+						aria-label="Filter kolom task"
+						className="flex h-[44px] w-full rounded-[6px] border border-transparent bg-surface-muted px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all focus-visible:border-ops focus-visible:bg-surface focus-visible:ring-4 focus-visible:ring-ops/10"
+						onChange={(event) =>
+							onFiltersChange((current) => ({
+								...current,
+								columnId: event.target.value,
+							}))
+						}
+						value={filters.columnId}>
+						<option value="">Semua kolom</option>
+						{columns.map((column) => (
+							<option
+								key={column.id}
+								value={column.id}>
+								{column.name}
+							</option>
+						))}
+					</select>
 				</div>
 
 				<div className="grid gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">

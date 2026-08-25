@@ -34,6 +34,8 @@ export interface KanbanFilters {
   priority: string;
   label: string;
   dueDate: string;
+  search: string;
+  columnId: string;
 }
 
 export interface TaskFormValues {

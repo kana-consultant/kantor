@@ -29,6 +29,7 @@ import {
 import { useKanbanDrag } from "@/hooks/use-kanban-drag";
 import { useKanbanMutations } from "@/hooks/use-kanban-mutations";
 import { KanbanToolbar } from "@/components/shared/kanban-toolbar";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { TaskModal } from "@/components/shared/task-modal";
 import { Card } from "@/components/ui/card";
 import { extractDateInputValue } from "@/lib/date";
@@ -89,7 +90,11 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		priority: "",
 		label: "",
 		dueDate: "",
+		search: "",
+		columnId: "",
 	});
+	const debouncedSearch = useDebouncedValue(filters.search, 500);
+	const searchTerm = debouncedSearch.trim();
 	const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
 	const [columnModal, setColumnModal] = useState<ColumnModalState | null>(null);
 	const [columnForm, setColumnForm] = useState({ name: "", color: "#38BDF8" });
@@ -150,18 +155,35 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	});
 
 	const columns = columnsQuery.data ?? [];
+	const visibleColumnIds = useMemo(
+		() =>
+			columns
+				.filter((column) => !filters.columnId || column.id === filters.columnId)
+				.map((column) => column.id),
+		[columns, filters.columnId],
+	);
+	// Derive the working task list from only the currently-visible columns so a
+	// hidden (column filter) or deleted column's stale loadedTasks entries do not
+	// leak into drag state, the overlay count, or the task-modal lookup.
 	const tasks = useMemo(
-		() => Object.values(loadedTasks).flat(),
-		[loadedTasks],
+		() => visibleColumnIds.flatMap((columnId) => loadedTasks[columnId] ?? []),
+		[loadedTasks, visibleColumnIds],
 	);
 	const taskFilters = useMemo(
 		() => ({
+			search: searchTerm,
 			assigneeId: filters.assignee,
 			priority: filters.priority,
 			label: filters.label,
 			dueDate: filters.dueDate,
 		}),
-		[filters.assignee, filters.dueDate, filters.label, filters.priority],
+		[
+			filters.assignee,
+			filters.dueDate,
+			filters.label,
+			filters.priority,
+			searchTerm,
+		],
 	);
 
 	useEffect(() => {
@@ -275,6 +297,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	return (
 		<div className="space-y-6">
 			<KanbanToolbar
+				columns={columns}
 				filters={filters}
 				members={members}
 				onColumnCreate={() => {
@@ -300,7 +323,12 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 					strategy={horizontalListSortingStrategy}>
 					<div className="-mx-1 overflow-x-auto px-1 pb-3">
 						<div className="flex min-w-max gap-3 md:gap-5">
-							{columns.map((column) => (
+							{columns
+								.filter(
+									(column) =>
+										!filters.columnId || column.id === filters.columnId,
+								)
+								.map((column) => (
 								<KanbanColumnContainer
 									column={column}
 									filters={taskFilters}
