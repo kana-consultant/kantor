@@ -124,6 +124,7 @@ func (s *KanbanService) ListTasks(ctx context.Context, projectID string) ([]mode
 
 func (s *KanbanService) ListTasksPage(ctx context.Context, projectID string, query operationaldto.ListKanbanTasksQuery) (operationaldto.KanbanTaskPage, error) {
 	filter := operationalrepo.ListKanbanTasksFilter{
+		Search:     strings.TrimSpace(query.Search),
 		ColumnID:   strings.TrimSpace(query.ColumnID),
 		AssigneeID: strings.TrimSpace(query.AssigneeID),
 		Priority:   strings.TrimSpace(query.Priority),

@@ -182,6 +182,7 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := operationaldto.ListKanbanTasksQuery{
+		Search:   strings.TrimSpace(r.URL.Query().Get("q")),
 		Priority: strings.TrimSpace(r.URL.Query().Get("priority")),
 		Label:    strings.TrimSpace(r.URL.Query().Get("label")),
 		Limit:    parseKanbanPositiveInt(r.URL.Query().Get("limit")),

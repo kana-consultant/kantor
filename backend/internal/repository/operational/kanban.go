@@ -25,6 +25,7 @@ const (
 )
 
 type ListKanbanTasksFilter struct {
+	Search     string
 	ColumnID   string
 	AssigneeID string
 	Priority   string
@@ -358,6 +359,7 @@ func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]m
 func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID string, filter ListKanbanTasksFilter) ([]model.KanbanTask, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
+	search := strings.TrimSpace(filter.Search)
 	columnID := strings.TrimSpace(filter.ColumnID)
 	limit := filter.Limit
 	switch {
@@ -398,6 +400,18 @@ func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID stri
 		  AND ($6 = '' OR kanban_tasks.priority = $6)
 		  AND ($7 = '' OR kanban_tasks.label ILIKE '%' || $7 || '%' ESCAPE '\')
 		  AND ($8 = '' OR kanban_tasks.due_date::date = $8::date)
+		  AND (
+			$9 = ''
+			OR kanban_tasks.id IN (
+				SELECT id
+				FROM kanban_tasks
+				WHERE project_id = $1::uuid AND title ILIKE '%' || $9 || '%'
+				UNION
+				SELECT id
+				FROM kanban_tasks
+				WHERE project_id = $1::uuid AND description ILIKE '%' || $9 || '%'
+			)
+		  )
 		ORDER BY kanban_tasks.column_id, kanban_tasks.position ASC, kanban_tasks.created_at ASC, kanban_tasks.id ASC
 		LIMIT NULLIF($3, 0) OFFSET $4
 	`, projectID, columnID, limit, offset,
@@ -405,6 +419,7 @@ func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID stri
 		strings.TrimSpace(filter.Priority),
 		escapeLikePattern(strings.TrimSpace(filter.Label)),
 		strings.TrimSpace(filter.DueDate),
+		search,
 	)
 	if err != nil {
 		return nil, err

@@ -54,6 +54,7 @@ type MyTaskItem struct {
 }
 
 type ListKanbanTasksQuery struct {
+	Search     string
 	ColumnID   string
 	AssigneeID string
 	Priority   string
