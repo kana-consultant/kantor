@@ -4,6 +4,7 @@ import {
 	kanbanKeys,
 	kanbanPageSize,
 	listKanbanTasks,
+	type KanbanTaskQuery,
 } from "@/services/operational-kanban";
 import type { KanbanTask } from "@/types/kanban";
 
@@ -20,12 +21,14 @@ export interface ColumnTasksResult {
 export function useKanbanColumnTasks(
 	projectId: string,
 	columnId: string,
+	filters: KanbanTaskQuery,
 ): ColumnTasksResult {
 	const query = useInfiniteQuery({
-		queryKey: kanbanKeys.columnTasks(projectId, columnId, {}),
+		queryKey: kanbanKeys.columnTasks(projectId, columnId, filters),
 		initialPageParam: 0,
 		queryFn: ({ pageParam }) =>
 			listKanbanTasks(projectId, {
+				...filters,
 				columnId,
 				limit: kanbanPageSize,
 				offset: pageParam,

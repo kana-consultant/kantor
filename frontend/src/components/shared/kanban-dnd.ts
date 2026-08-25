@@ -2,17 +2,12 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { useQueryClient } from "@tanstack/react-query";
 
-import { extractDateInputValue } from "@/lib/date";
 import {
 	kanbanKeys,
 	moveKanbanTask,
 	reorderKanbanColumns,
 } from "@/services/operational-kanban";
-import type {
-	KanbanColumn,
-	KanbanFilters,
-	KanbanTask,
-} from "@/types/kanban";
+import type { KanbanColumn, KanbanTask } from "@/types/kanban";
 
 export interface DragSnapshot {
 	columns: KanbanColumn[];
@@ -21,28 +16,6 @@ export interface DragSnapshot {
 
 export type DragTaskData = { type: "task"; task: KanbanTask };
 export type DragColumnData = { type: "column"; column: KanbanColumn };
-
-export function matchesFilters(task: KanbanTask, filters: KanbanFilters) {
-	if (filters.assignee && task.assignee_id !== filters.assignee) {
-		return false;
-	}
-	if (filters.priority && task.priority !== filters.priority) {
-		return false;
-	}
-	if (filters.label) {
-		const label = task.label?.toLowerCase() ?? "";
-		if (!label.includes(filters.label.toLowerCase())) {
-			return false;
-		}
-	}
-	if (
-		filters.dueDate &&
-		(!task.due_date || extractDateInputValue(task.due_date) !== filters.dueDate)
-	) {
-		return false;
-	}
-	return true;
-}
 
 export function moveTaskInMemory(
 	tasks: KanbanTask[],

@@ -4,6 +4,10 @@ import type { KanbanColumn, KanbanTask, TaskFormValues } from "@/types/kanban";
 
 export interface KanbanTaskQuery {
   columnId?: string;
+  assigneeId?: string;
+  priority?: string;
+  label?: string;
+  dueDate?: string;
   limit?: number;
   offset?: number;
 }
@@ -23,7 +27,15 @@ export const kanbanKeys = {
   columns: (projectId: string) => [...kanbanKeys.all(projectId), "columns"] as const,
   tasks: (projectId: string) => [...kanbanKeys.all(projectId), "tasks"] as const,
   columnTasks: (projectId: string, columnId: string, query: KanbanTaskQuery) =>
-    [...kanbanKeys.tasks(projectId), "column", columnId, query.limit ?? ""] as const,
+    [
+      ...kanbanKeys.tasks(projectId),
+      "column",
+      columnId,
+      query.assigneeId ?? "",
+      query.priority ?? "",
+      query.label ?? "",
+      query.dueDate ?? "",
+    ] as const,
 };
 
 export async function listKanbanColumns(projectId: string) {
@@ -85,6 +97,18 @@ export async function listKanbanTasks(projectId: string, query: KanbanTaskQuery 
   const params = new URLSearchParams();
   if (query.columnId) {
     params.set("column_id", query.columnId);
+  }
+  if (query.assigneeId) {
+    params.set("assignee_id", query.assigneeId);
+  }
+  if (query.priority) {
+    params.set("priority", query.priority);
+  }
+  if (query.label?.trim()) {
+    params.set("label", query.label.trim());
+  }
+  if (query.dueDate) {
+    params.set("due_date", query.dueDate);
   }
   params.set("limit", String(query.limit ?? kanbanPageSize));
   params.set("offset", String(query.offset ?? 0));
