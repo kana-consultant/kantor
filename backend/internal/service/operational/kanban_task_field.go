@@ -2,6 +2,7 @@ package operational
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
@@ -35,6 +36,8 @@ func (s *KanbanService) attachTaskFields(ctx context.Context, task *model.Kanban
 
 	fields, err := s.fieldsRepo.ListByTask(ctx, task.ID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to load kanban task custom fields",
+			"task_id", task.ID, "error", err)
 		return
 	}
 	task.Fields = fields

@@ -91,6 +91,24 @@ func NewKanbanRepository(db repository.DBTX) *KanbanRepository {
 	return &KanbanRepository{db: db}
 }
 
+// WithTx runs fn inside a transaction bound to the request's tenant-scoped
+// connection, so every repository call made with the passed context (task write
+// + custom-field replace) participates in the same transaction and commits or
+// rolls back together.
+func (r *KanbanRepository) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	tx, err := repository.DB(ctx, r.db).Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := fn(repository.WithConn(ctx, tx)); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (r *KanbanRepository) CreateDefaultColumns(ctx context.Context, projectID string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
