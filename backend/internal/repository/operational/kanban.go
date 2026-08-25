@@ -359,7 +359,7 @@ func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]m
 func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID string, filter ListKanbanTasksFilter) ([]model.KanbanTask, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-	search := strings.TrimSpace(filter.Search)
+	search := escapeLikePattern(strings.TrimSpace(filter.Search))
 	columnID := strings.TrimSpace(filter.ColumnID)
 	limit := filter.Limit
 	switch {
@@ -405,11 +405,11 @@ func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID stri
 			OR kanban_tasks.id IN (
 				SELECT id
 				FROM kanban_tasks
-				WHERE project_id = $1::uuid AND title ILIKE '%' || $9 || '%'
+				WHERE project_id = $1::uuid AND title ILIKE '%' || $9 || '%' ESCAPE '\'
 				UNION
 				SELECT id
 				FROM kanban_tasks
-				WHERE project_id = $1::uuid AND description ILIKE '%' || $9 || '%'
+				WHERE project_id = $1::uuid AND description ILIKE '%' || $9 || '%' ESCAPE '\'
 			)
 		  )
 		ORDER BY kanban_tasks.column_id, kanban_tasks.position ASC, kanban_tasks.created_at ASC, kanban_tasks.id ASC

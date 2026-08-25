@@ -26,11 +26,11 @@ func (r *KanbanRepository) CountTasks(ctx context.Context, projectID string, fil
 			OR kanban_tasks.id IN (
 				SELECT id
 				FROM kanban_tasks
-				WHERE project_id = $1::uuid AND title ILIKE '%' || $7 || '%'
+				WHERE project_id = $1::uuid AND title ILIKE '%' || $7 || '%' ESCAPE '\'
 				UNION
 				SELECT id
 				FROM kanban_tasks
-				WHERE project_id = $1::uuid AND description ILIKE '%' || $7 || '%'
+				WHERE project_id = $1::uuid AND description ILIKE '%' || $7 || '%' ESCAPE '\'
 			)
 		  )
 	`, projectID,
@@ -39,7 +39,7 @@ func (r *KanbanRepository) CountTasks(ctx context.Context, projectID string, fil
 		strings.TrimSpace(filter.Priority),
 		escapeLikePattern(strings.TrimSpace(filter.Label)),
 		strings.TrimSpace(filter.DueDate),
-		strings.TrimSpace(filter.Search),
+		escapeLikePattern(strings.TrimSpace(filter.Search)),
 	).Scan(&total)
 
 	return total, err
