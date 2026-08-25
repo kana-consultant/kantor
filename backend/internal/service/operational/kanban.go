@@ -33,6 +33,8 @@ type kanbanRepository interface {
 	DeleteColumn(ctx context.Context, projectID string, columnID string) error
 	ReorderColumns(ctx context.Context, projectID string, columnIDs []string) error
 	ListTasks(ctx context.Context, projectID string) ([]model.KanbanTask, error)
+	ListTasksFiltered(ctx context.Context, projectID string, filter operationalrepo.ListKanbanTasksFilter) ([]model.KanbanTask, error)
+	CountTasks(ctx context.Context, projectID string, filter operationalrepo.ListKanbanTasksFilter) (int, error)
 	CreateTask(ctx context.Context, projectID string, params operationalrepo.CreateKanbanTaskParams) (model.KanbanTask, error)
 	UpdateTask(ctx context.Context, projectID string, taskID string, params operationalrepo.UpdateKanbanTaskParams) (model.KanbanTask, error)
 	DeleteTask(ctx context.Context, projectID string, taskID string) error
@@ -118,6 +120,32 @@ func (s *KanbanService) ReorderColumns(ctx context.Context, projectID string, re
 
 func (s *KanbanService) ListTasks(ctx context.Context, projectID string) ([]model.KanbanTask, error) {
 	return s.repo.ListTasks(ctx, projectID)
+}
+
+func (s *KanbanService) ListTasksPage(ctx context.Context, projectID string, query operationaldto.ListKanbanTasksQuery) (operationaldto.KanbanTaskPage, error) {
+	filter := operationalrepo.ListKanbanTasksFilter{
+		ColumnID: strings.TrimSpace(query.ColumnID),
+		Limit:    query.Limit,
+		Offset:   query.Offset,
+	}
+
+	tasks, err := s.repo.ListTasksFiltered(ctx, projectID, filter)
+	if err != nil {
+		return operationaldto.KanbanTaskPage{}, err
+	}
+
+	total, err := s.repo.CountTasks(ctx, projectID, filter)
+	if err != nil {
+		return operationaldto.KanbanTaskPage{}, err
+	}
+
+	return operationaldto.KanbanTaskPage{
+		Items:   tasks,
+		Total:   total,
+		Limit:   query.Limit,
+		Offset:  query.Offset,
+		HasMore: query.Offset+len(tasks) < total,
+	}, nil
 }
 
 // ListMyTasks returns the caller's assigned tasks across all projects,

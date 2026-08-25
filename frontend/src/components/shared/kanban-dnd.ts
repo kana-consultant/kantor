@@ -135,19 +135,85 @@ export function sortTaskList(
 	return left.column_id.localeCompare(right.column_id);
 }
 
+interface TaskPageShape {
+	items: KanbanTask[];
+	total: number;
+	limit: number;
+	offset: number;
+	has_more: boolean;
+}
+
+interface TaskInfiniteShape {
+	pages: TaskPageShape[];
+	pageParams: unknown[];
+}
+
 export function setTasksCache(
 	queryClient: ReturnType<typeof useQueryClient>,
 	projectId: string,
 	tasks: KanbanTask[],
 ) {
-	queryClient.setQueryData<KanbanTask[]>(kanbanKeys.tasks(projectId), tasks);
+	const byId = new Map(tasks.map((task) => [task.id, task]));
+	const entries = queryClient.getQueriesData<TaskInfiniteShape>({
+		queryKey: kanbanKeys.tasks(projectId),
+	});
+
+	for (const [queryKey, current] of entries) {
+		if (!current?.pages) {
+			continue;
+		}
+
+		const columnIndex = queryKey.indexOf("column");
+		const columnId =
+			columnIndex >= 0 ? (queryKey[columnIndex + 1] as string) : undefined;
+
+		const loaded = current.pages.flatMap((page) => page.items);
+		const known = new Set(loaded.map((item) => item.id));
+		const next = loaded
+			.map((item) => byId.get(item.id) ?? item)
+			.filter((item) => !columnId || item.column_id === columnId);
+
+		if (columnId) {
+			for (const task of tasks) {
+				if (task.column_id === columnId && !known.has(task.id)) {
+					next.push(task);
+				}
+			}
+		}
+		next.sort(sortTaskList);
+
+		let cursor = 0;
+		queryClient.setQueryData<TaskInfiniteShape>(queryKey, {
+			...current,
+			pages: current.pages.map((page, index) => {
+				const size =
+					index === current.pages.length - 1
+						? next.length - cursor
+						: page.items.length;
+				const items = next.slice(cursor, cursor + Math.max(size, 0));
+				cursor += items.length;
+				return { ...page, items };
+			}),
+		});
+	}
 }
 
 export function getTasksCache(
 	queryClient: ReturnType<typeof useQueryClient>,
 	projectId: string,
 ) {
-	return queryClient.getQueryData<KanbanTask[]>(kanbanKeys.tasks(projectId));
+	const entries = queryClient.getQueriesData<TaskInfiniteShape>({
+		queryKey: kanbanKeys.tasks(projectId),
+	});
+
+	const tasks: KanbanTask[] = [];
+	for (const [, data] of entries) {
+		for (const page of data?.pages ?? []) {
+			tasks.push(...page.items);
+		}
+	}
+
+	return tasks.length > 0 ? tasks : undefined;
 }
 
 export async function invalidateBoard(

@@ -17,6 +17,19 @@ var (
 	ErrKanbanTaskNotFound   = errors.New("kanban task not found")
 )
 
+const (
+	defaultKanbanTaskLimit = 20
+	maxKanbanTaskLimit     = 100
+
+	KanbanTaskLimitAll = -1
+)
+
+type ListKanbanTasksFilter struct {
+	ColumnID string
+	Limit    int
+	Offset   int
+}
+
 type KanbanRepository struct {
 	db repository.DBTX
 }
@@ -335,8 +348,26 @@ func (r *KanbanRepository) ReorderColumns(ctx context.Context, projectID string,
 }
 
 func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]model.KanbanTask, error) {
+	return r.ListTasksFiltered(ctx, projectID, ListKanbanTasksFilter{Limit: KanbanTaskLimitAll})
+}
+
+func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID string, filter ListKanbanTasksFilter) ([]model.KanbanTask, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
+	columnID := strings.TrimSpace(filter.ColumnID)
+	limit := filter.Limit
+	switch {
+	case limit == KanbanTaskLimitAll:
+		limit = 0
+	case limit <= 0:
+		limit = defaultKanbanTaskLimit
+	case limit > maxKanbanTaskLimit:
+		limit = maxKanbanTaskLimit
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
 	rows, err := repository.DB(ctx, r.db).Query(ctx, `
 		SELECT
 			kanban_tasks.id::text,
@@ -358,8 +389,10 @@ func (r *KanbanRepository) ListTasks(ctx context.Context, projectID string) ([]m
 		FROM kanban_tasks
 		LEFT JOIN users ON users.id = kanban_tasks.assignee_id
 		WHERE kanban_tasks.project_id = $1::uuid
+		  AND ($2 = '' OR kanban_tasks.column_id = $2::uuid)
 		ORDER BY kanban_tasks.column_id, kanban_tasks.position ASC, kanban_tasks.created_at ASC
-	`, projectID)
+		LIMIT NULLIF($3, 0) OFFSET $4
+	`, projectID, columnID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
