@@ -19,7 +19,11 @@ import { Plus } from "lucide-react";
 import { TaskFieldRow } from "@/components/shared/task-field-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { TaskFieldDraft } from "@/types/kanban";
+import {
+	MAX_TASK_FIELD_NAME,
+	MAX_TASK_FIELDS,
+	type TaskFieldDraft,
+} from "@/types/kanban";
 
 const suggestedFieldNames = ["Problem", "Solution", "Outcome", "Reference"];
 
@@ -41,19 +45,25 @@ export function TaskFieldEditor({ fields, onChange }: TaskFieldEditorProps) {
 	);
 
 	const usedNames = new Set(fields.map(fieldKey));
+	const atFieldLimit = fields.length >= MAX_TASK_FIELDS;
 	const availableSuggestions = suggestedFieldNames.filter(
 		(name) => !usedNames.has(name.toLowerCase()),
 	);
 	const canAddDraft =
-		Boolean(draftName.trim()) && !usedNames.has(draftName.trim().toLowerCase());
+		Boolean(draftName.trim()) &&
+		!usedNames.has(draftName.trim().toLowerCase()) &&
+		!atFieldLimit;
 
 	function addField(name: string) {
 		const trimmed = name.trim();
-		if (!trimmed || usedNames.has(trimmed.toLowerCase())) {
+		if (!trimmed || usedNames.has(trimmed.toLowerCase()) || atFieldLimit) {
 			return;
 		}
 
-		onChange([...fields, { name: trimmed, value: "" }]);
+		onChange([
+			...fields,
+			{ name: trimmed.slice(0, MAX_TASK_FIELD_NAME), value: "" },
+		]);
 		setExpanded((current) => ({ ...current, [trimmed.toLowerCase()]: true }));
 	}
 
@@ -79,6 +89,7 @@ export function TaskFieldEditor({ fields, onChange }: TaskFieldEditorProps) {
 					{availableSuggestions.map((name) => (
 						<Button
 							className="h-8 shrink-0 px-3 text-[13px]"
+							disabled={atFieldLimit}
 							key={name}
 							onClick={() => addField(name)}
 							size="sm"
@@ -94,6 +105,8 @@ export function TaskFieldEditor({ fields, onChange }: TaskFieldEditorProps) {
 			<div className="flex gap-2">
 				<Input
 					className="h-9 focus-visible:border-ops focus-visible:ring-ops/10"
+					disabled={atFieldLimit}
+					maxLength={MAX_TASK_FIELD_NAME}
 					onChange={(event) => setDraftName(event.target.value)}
 					onKeyDown={(event) => {
 						if (event.key === "Enter") {
@@ -119,6 +132,12 @@ export function TaskFieldEditor({ fields, onChange }: TaskFieldEditorProps) {
 					<Plus className="h-4 w-4" />
 				</Button>
 			</div>
+
+			{atFieldLimit ? (
+				<p className="text-[12px] text-text-tertiary">
+					Maksimal {MAX_TASK_FIELDS} kolom per task.
+				</p>
+			) : null}
 
 			<DndContext
 				collisionDetection={closestCenter}

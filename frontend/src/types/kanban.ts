@@ -25,6 +25,12 @@ export interface TaskFieldDraft {
   value: string;
 }
 
+// Custom task-field limits. Keep in sync with the backend validation in
+// backend/internal/dto/operational/kanban_task_field.go.
+export const MAX_TASK_FIELDS = 50;
+export const MAX_TASK_FIELD_NAME = 120;
+export const MAX_TASK_FIELD_VALUE = 20000;
+
 export interface KanbanTaskListItem {
   id: string;
   column_id: string;

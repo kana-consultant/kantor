@@ -41,6 +41,7 @@ import { TaskModal } from "@/components/shared/task-modal";
 import { Card } from "@/components/ui/card";
 import { extractDateInputValue } from "@/lib/date";
 import {
+	getKanbanTask,
 	kanbanKeys,
 	listKanbanColumns,
 } from "@/services/operational-kanban";
@@ -197,6 +198,12 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	tasksRef.current = tasks;
 	const editingTaskId = taskModal?.mode === "edit" ? taskModal.taskId : null;
 
+	const editingTaskQuery = useQuery({
+		queryKey: kanbanKeys.task(projectId, editingTaskId ?? ""),
+		queryFn: () => getKanbanTask(projectId, editingTaskId as string),
+		enabled: Boolean(editingTaskId),
+	});
+	const editingTaskDetail = editingTaskQuery.data;
 
 	useEffect(() => {
 		if (!editingTaskId) {
@@ -216,8 +223,26 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 			due_date: summary.due_date ? extractDateInputValue(summary.due_date) : "",
 			priority: summary.priority,
 			label: summary.label ?? "",
-				});
+			fields: [],
+		});
 	}, [editingTaskId, form]);
+
+	// Custom fields are only returned by the task detail endpoint, so load them
+	// separately and populate the editor once they arrive — without clobbering
+	// any edits already made to the other fields.
+	useEffect(() => {
+		if (!editingTaskId || editingTaskDetail?.id !== editingTaskId) {
+			return;
+		}
+
+		form.setValue(
+			"fields",
+			(editingTaskDetail.fields ?? []).map((field) => ({
+				name: field.name,
+				value: field.value,
+			})),
+		);
+	}, [editingTaskId, editingTaskDetail, form]);
 
 
 	async function handleQuickAdd(columnId: string) {
@@ -382,6 +407,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 
 			{taskModal ? (
 				<TaskModal
+					error={boardError}
 					form={form}
 					isDeleting={deleteTaskMutation.isPending}
 					isSubmitting={

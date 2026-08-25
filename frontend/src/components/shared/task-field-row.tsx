@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, GripVertical, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { TaskFieldDraft } from "@/types/kanban";
+import { MAX_TASK_FIELD_VALUE, type TaskFieldDraft } from "@/types/kanban";
 
 interface TaskFieldRowProps {
 	id: string;
@@ -77,6 +77,7 @@ export function TaskFieldRow({
 				<div className="border-t border-border px-3 py-3">
 					<textarea
 						className="min-h-24 w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-[14px] text-text-primary shadow-sm outline-none transition-all placeholder:text-text-tertiary focus-visible:border-ops focus-visible:ring-4 focus-visible:ring-ops/10"
+						maxLength={MAX_TASK_FIELD_VALUE}
 						onChange={(event) => onValueChange(event.target.value)}
 						placeholder={`Isi ${field.name}`}
 						value={field.value}

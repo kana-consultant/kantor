@@ -25,6 +25,7 @@ export function TaskModal({
 	members,
 	isSubmitting,
 	isDeleting,
+	error,
 	onSubmit,
 	onDelete,
 	onClose,
@@ -34,6 +35,7 @@ export function TaskModal({
 	members: ProjectMember[];
 	isSubmitting: boolean;
 	isDeleting: boolean;
+	error?: string | null;
 	onSubmit: (values: TaskFormValues) => void;
 	onDelete: () => void;
 	onClose: () => void;
@@ -100,6 +102,11 @@ export function TaskModal({
 					</div>
 
 					<div className="shrink-0 border-t border-border bg-surface px-6 pb-5 pt-5">
+						{error ? (
+							<p className="mb-3 rounded-[6px] border border-priority-high/20 bg-priority-high/5 px-3 py-2 text-[13px] font-[500] text-priority-high">
+								{error}
+							</p>
+						) : null}
 						<div className="flex flex-wrap gap-3">
 							<Button
 								variant="ops"
