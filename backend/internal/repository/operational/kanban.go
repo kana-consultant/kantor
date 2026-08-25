@@ -396,14 +396,14 @@ func (r *KanbanRepository) ListTasksFiltered(ctx context.Context, projectID stri
 		  AND ($2 = '' OR kanban_tasks.column_id = $2::uuid)
 		  AND ($5 = '' OR kanban_tasks.assignee_id = $5::uuid)
 		  AND ($6 = '' OR kanban_tasks.priority = $6)
-		  AND ($7 = '' OR kanban_tasks.label ILIKE '%' || $7 || '%')
+		  AND ($7 = '' OR kanban_tasks.label ILIKE '%' || $7 || '%' ESCAPE '\')
 		  AND ($8 = '' OR kanban_tasks.due_date::date = $8::date)
 		ORDER BY kanban_tasks.column_id, kanban_tasks.position ASC, kanban_tasks.created_at ASC, kanban_tasks.id ASC
 		LIMIT NULLIF($3, 0) OFFSET $4
 	`, projectID, columnID, limit, offset,
 		strings.TrimSpace(filter.AssigneeID),
 		strings.TrimSpace(filter.Priority),
-		strings.TrimSpace(filter.Label),
+		escapeLikePattern(strings.TrimSpace(filter.Label)),
 		strings.TrimSpace(filter.DueDate),
 	)
 	if err != nil {

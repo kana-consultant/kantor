@@ -26,8 +26,6 @@ import {
 	KanbanDialogs,
 	type ColumnModalState,
 } from "@/components/shared/kanban-dialogs";
-import {
-} from "@/components/shared/kanban-dnd";
 import { useKanbanDrag } from "@/hooks/use-kanban-drag";
 import { useKanbanMutations } from "@/hooks/use-kanban-mutations";
 import { KanbanToolbar } from "@/components/shared/kanban-toolbar";

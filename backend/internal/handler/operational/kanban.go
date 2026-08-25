@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
@@ -181,12 +182,10 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := operationaldto.ListKanbanTasksQuery{
-		AssigneeID: strings.TrimSpace(r.URL.Query().Get("assignee_id")),
-		Priority:   strings.TrimSpace(r.URL.Query().Get("priority")),
-		Label:      strings.TrimSpace(r.URL.Query().Get("label")),
-		DueDate:    strings.TrimSpace(r.URL.Query().Get("due_date")),
-		Limit:      parseKanbanPositiveInt(r.URL.Query().Get("limit")),
-		Offset:     parseKanbanPositiveInt(r.URL.Query().Get("offset")),
+		Priority: strings.TrimSpace(r.URL.Query().Get("priority")),
+		Label:    strings.TrimSpace(r.URL.Query().Get("label")),
+		Limit:    parseKanbanPositiveInt(r.URL.Query().Get("limit")),
+		Offset:   parseKanbanPositiveInt(r.URL.Query().Get("offset")),
 	}
 	if columnID := strings.TrimSpace(r.URL.Query().Get("column_id")); columnID != "" {
 		validatedColumnID, ok := validateKanbanUUIDParam(w, "column_id", columnID)
@@ -194,6 +193,20 @@ func (h *KanbanHandler) listTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		query.ColumnID = validatedColumnID
+	}
+	if assigneeID := strings.TrimSpace(r.URL.Query().Get("assignee_id")); assigneeID != "" {
+		validatedAssigneeID, ok := validateKanbanUUIDParam(w, "assignee_id", assigneeID)
+		if !ok {
+			return
+		}
+		query.AssigneeID = validatedAssigneeID
+	}
+	if dueDate := strings.TrimSpace(r.URL.Query().Get("due_date")); dueDate != "" {
+		if _, err := time.Parse("2006-01-02", dueDate); err != nil {
+			response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "due_date must be formatted as YYYY-MM-DD", map[string]string{"due_date": "invalid date"})
+			return
+		}
+		query.DueDate = dueDate
 	}
 
 	result, err := h.service.ListTasksPage(r.Context(), projectID, query)
