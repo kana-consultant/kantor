@@ -2,7 +2,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormModal } from "@/components/shared/form-modal";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { KanbanColumn, KanbanTask } from "@/types/kanban";
+import type { KanbanColumn, KanbanTaskListItem } from "@/types/kanban";
 
 export type ColumnModalState =
 	| { mode: "create" }
@@ -21,7 +21,7 @@ interface KanbanDialogsProps {
 	isColumnDeleting: boolean;
 	isTaskDeleting: boolean;
 	columnToDelete: KanbanColumn | null;
-	taskToDelete: KanbanTask | null;
+	taskToDelete: KanbanTaskListItem | null;
 	onColumnFormChange: (
 		updater: (current: ColumnFormValues) => ColumnFormValues,
 	) => void;

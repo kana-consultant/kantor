@@ -14,16 +14,16 @@ import {
 import { kanbanKeys } from "@/services/operational-kanban";
 import type {
 	KanbanColumn,
-	KanbanTask,
+	KanbanTaskListItem,
 } from "@/types/kanban";
 
 export function useKanbanDrag(
 	projectId: string,
 	columns: KanbanColumn[],
-	tasks: KanbanTask[],
+	tasks: KanbanTaskListItem[],
 ) {
 	const queryClient = useQueryClient();
-	const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
+	const [activeTask, setActiveTask] = useState<KanbanTaskListItem | null>(null);
 	const [activeColumn, setActiveColumn] = useState<KanbanColumn | null>(null);
 	const [dragSnapshot, setDragSnapshot] = useState<DragSnapshot | null>(null);
 

@@ -8,9 +8,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	operationaldto "github.com/kana-consultant/kantor/backend/internal/dto/operational"
 	exportreport "github.com/kana-consultant/kantor/backend/internal/export"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 )
@@ -86,7 +88,7 @@ func (h *ProjectsHandler) exportDetail(w http.ResponseWriter, r *http.Request) {
 		h.writeError(r.Context(), w, err)
 		return
 	}
-	tasks, err := h.kanban.ListTasks(r.Context(), projectID)
+	tasks, err := h.kanban.ListTasks(r.Context(), projectID, operationaldto.ListKanbanTasksQuery{Limit: operationalrepo.KanbanTaskLimitAll})
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return

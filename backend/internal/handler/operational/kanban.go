@@ -257,7 +257,7 @@ func (h *KanbanHandler) getTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.GetTaskDetail(r.Context(), projectID, taskID)
+	result, err := h.service.GetTask(r.Context(), projectID, taskID)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return

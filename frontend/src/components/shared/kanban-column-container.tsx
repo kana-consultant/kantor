@@ -1,17 +1,17 @@
 import { useEffect } from "react";
 
 import { KanbanColumnCard } from "@/components/shared/kanban-cards";
-import type { KanbanTaskQuery } from "@/services/operational-kanban";
 import { sortTaskList } from "@/components/shared/kanban-dnd";
 import { useKanbanColumnTasks } from "@/hooks/use-kanban-column-tasks";
-import type { KanbanColumn, KanbanTask } from "@/types/kanban";
+import type { KanbanTaskQuery } from "@/services/operational-kanban";
+import type { KanbanColumn, KanbanTaskListItem } from "@/types/kanban";
 
 interface KanbanColumnContainerProps {
 	projectId: string;
 	column: KanbanColumn;
 	filters: KanbanTaskQuery;
-	onTasksLoaded: (columnId: string, tasks: KanbanTask[]) => void;
-	onTaskClick: (task: KanbanTask) => void;
+	onTasksLoaded: (columnId: string, tasks: KanbanTaskListItem[]) => void;
+	onTaskClick: (task: KanbanTaskListItem) => void;
 	onTaskCreate: () => void;
 	onEditColumn: () => void;
 	onDeleteColumn: () => void;
