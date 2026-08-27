@@ -381,12 +381,12 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string, meta P
 		return nil
 	}
 
-	baseURL := strings.TrimRight(strings.TrimSpace(meta.PublicBaseURL), "/")
+	baseURL, err := tenant.ResolveBaseURL(ctx, s.repo, s.fallbackAppURL)
+	if err != nil {
+		return err
+	}
 	if baseURL == "" {
-		baseURL, err = tenant.ResolveBaseURL(ctx, s.repo, s.fallbackAppURL)
-		if err != nil {
-			return err
-		}
+		baseURL = strings.TrimRight(strings.TrimSpace(meta.PublicBaseURL), "/")
 	}
 	if baseURL == "" {
 		return ErrPasswordResetDisabled
