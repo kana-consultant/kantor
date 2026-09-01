@@ -67,7 +67,7 @@ type App struct {
 	permissionCache      *rbac.PermissionCache
 	tenantResolver       *tenant.Resolver
 	metrics              *metrics.Registry
-	accessTokenBlacklist *backendauth.AccessTokenBlacklist
+	accessTokenBlacklist *backendauth.PostgresRevocationStore
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -168,7 +168,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("configure data encryption: %w", err)
 	}
-	accessTokenBlacklist := backendauth.NewAccessTokenBlacklist(time.Minute)
+	accessTokenBlacklist := backendauth.NewPostgresRevocationStore(pool)
 	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter, accessTokenBlacklist)
 	patService := authservice.NewPATService(authRepository)
 	oauthService := authservice.NewOAuthService(authRepository, authService)
@@ -296,9 +296,6 @@ func (a *App) DB() *pgxpool.Pool {
 func (a *App) Close() {
 	if a.backgroundCancel != nil {
 		a.backgroundCancel()
-	}
-	if a.accessTokenBlacklist != nil {
-		a.accessTokenBlacklist.Stop()
 	}
 	if a.db != nil {
 		a.db.Close()

@@ -276,10 +276,12 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Best-effort revoke the access token attached to the request so it cannot
-	// be replayed for the rest of its 15-minute window after sign-out.
+	// be replayed for the rest of its 15-minute window after sign-out. The
+	// call is fire-and-forget: a revocation-store outage must not break
+	// logout, and the access token will expire on its own within minutes.
 	if header := strings.TrimSpace(r.Header.Get("Authorization")); strings.HasPrefix(strings.ToLower(header), "bearer ") {
 		if raw := strings.TrimSpace(header[len("bearer "):]); raw != "" {
-			h.service.RevokeAccessToken(raw)
+			h.service.RevokeAccessToken(r.Context(), raw)
 		}
 	}
 

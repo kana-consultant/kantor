@@ -48,7 +48,7 @@ var patScopeDefs = map[string]patScopeDef{
 func AuthMiddleware(
 	parseToken func(string) (*backendauth.AccessClaims, error),
 	loadPermissions func(context.Context, string) (*rbac.CachedPermissions, error),
-	blacklist *backendauth.AccessTokenBlacklist,
+	revocationStore backendauth.RevocationStore,
 	authenticatePAT func(context.Context, string) (string, string, *string, error),
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -89,7 +89,7 @@ func AuthMiddleware(
 					response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Access token is invalid or expired", nil)
 					return
 				}
-				if blacklist != nil && blacklist.IsRevoked(claims.ID) {
+				if revocationStore != nil && revocationStore.IsRevoked(r.Context(), claims.ID) {
 					response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Access token has been revoked", nil)
 					return
 				}

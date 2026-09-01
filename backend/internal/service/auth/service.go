@@ -124,7 +124,7 @@ type Service struct {
 	permissionCache *rbac.PermissionCache
 	passwordMailer  passwordResetMailer
 	encrypter       *security.Encrypter
-	tokenBlacklist  *backendauth.AccessTokenBlacklist
+	revocationStore backendauth.RevocationStore
 	fallbackAppURL  string
 }
 
@@ -150,7 +150,7 @@ type mailDeliveryRuntimeConfig struct {
 	PasswordResetTTL time.Duration
 }
 
-func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config, permissionCache *rbac.PermissionCache, encrypter *security.Encrypter, tokenBlacklist *backendauth.AccessTokenBlacklist) *Service {
+func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.Config, permissionCache *rbac.PermissionCache, encrypter *security.Encrypter, revocationStore backendauth.RevocationStore) *Service {
 	return &Service{
 		repo:            repo,
 		employeeRepo:    employeeRepo,
@@ -158,18 +158,34 @@ func New(repo authRepository, employeeRepo authEmployeesRepository, cfg config.C
 		permissionCache: permissionCache,
 		passwordMailer:  newResendMailer(),
 		encrypter:       encrypter,
-		tokenBlacklist:  tokenBlacklist,
+		revocationStore: revocationStore,
 		fallbackAppURL:  strings.TrimRight(strings.TrimSpace(cfg.AppURL), "/"),
 	}
 }
 
-// RevokeAccessToken adds the JTI of the supplied access token to the in-memory
-// blacklist so subsequent requests carrying the same token are rejected before
-// they ever reach a handler. Best-effort: invalid or already-expired tokens
-// are silently ignored — the only goal here is to shorten the natural expiry
-// window for a token the user just signed off.
-func (s *Service) RevokeAccessToken(rawToken string) {
-	if s.tokenBlacklist == nil {
+// NewServiceForTest builds a Service with the minimum wiring the
+// RevokeAccessToken tests need: no repository, no encrypter, no mailer.
+// The repo/employeeRepo are nil — callers must not exercise code paths
+// that touch them. Exported via a test-only file so the production
+// constructor stays the single source of truth.
+func NewServiceForTest(cfg config.Config, tm *backendauth.TokenManager, store backendauth.RevocationStore) *Service {
+	return &Service{
+		tokenManager:    tm,
+		revocationStore: store,
+		passwordMailer:  newResendMailer(),
+		fallbackAppURL:  strings.TrimRight(strings.TrimSpace(cfg.AppURL), "/"),
+	}
+}
+
+// RevokeAccessToken records the JTI of the supplied access token in the
+// shared RevocationStore so subsequent requests carrying the same token
+// are rejected before they ever reach a handler. Best-effort: invalid or
+// already-expired tokens are silently ignored — the only goal here is to
+// shorten the natural expiry window for a token the user just signed
+// off. A store outage is logged but does not propagate: logout must not
+// fail just because the revocation backend is unavailable.
+func (s *Service) RevokeAccessToken(ctx context.Context, rawToken string) {
+	if s.revocationStore == nil {
 		return
 	}
 	claims, err := s.tokenManager.ParseAccessToken(rawToken)
@@ -180,7 +196,9 @@ func (s *Service) RevokeAccessToken(rawToken string) {
 	if claims.ExpiresAt != nil {
 		exp = claims.ExpiresAt.Time
 	}
-	s.tokenBlacklist.Revoke(claims.ID, exp)
+	if err := s.revocationStore.Revoke(ctx, claims.ID, exp, claims.Subject, claims.TenantID); err != nil {
+		slog.ErrorContext(ctx, "failed to revoke access token", "error", err, "jti", claims.ID)
+	}
 }
 
 func (s *Service) EnsureSeedSuperAdmin(ctx context.Context, email string, password string, fullName string) error {
