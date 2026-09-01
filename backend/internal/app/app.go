@@ -68,6 +68,7 @@ type App struct {
 	tenantResolver       *tenant.Resolver
 	metrics              *metrics.Registry
 	accessTokenBlacklist *backendauth.AccessTokenBlacklist
+	patRateLimiter       *platformmiddleware.PATAuthRateLimiter
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -244,6 +245,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		tenantResolver:       tenantResolver,
 		metrics:              metrics.NewRegistry(),
 		accessTokenBlacklist: accessTokenBlacklist,
+		patRateLimiter:       platformmiddleware.NewPATAuthRateLimiter(10, 5, time.Minute),
 	}
 	router, err := application.buildRouter(
 		auditService,
@@ -416,7 +418,7 @@ func (a *App) buildRouter(
 			})
 
 			r.Group(func(protected chi.Router) {
-				protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load, a.accessTokenBlacklist, patService.Authenticate))
+				protected.Use(platformmiddleware.AuthMiddleware(authService.ParseAccessToken, a.permissionCache.Load, a.accessTokenBlacklist, patService.Authenticate, a.patRateLimiter))
 				// Per-user throttle so a single compromised token cannot hammer
 				// expensive endpoints (e.g. HRIS overview, exports). 240 req/min
 				// is high enough to leave normal UI navigation untouched.

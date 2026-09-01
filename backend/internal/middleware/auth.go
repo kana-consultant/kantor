@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	backendauth "github.com/kana-consultant/kantor/backend/internal/auth"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
@@ -50,6 +52,7 @@ func AuthMiddleware(
 	loadPermissions func(context.Context, string) (*rbac.CachedPermissions, error),
 	blacklist *backendauth.AccessTokenBlacklist,
 	authenticatePAT func(context.Context, string) (string, string, *string, error),
+	patRateLimiter *PATAuthRateLimiter,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +76,20 @@ func AuthMiddleware(
 				if authenticatePAT == nil {
 					response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Access token is invalid or expired", nil)
 					return
+				}
+				// Rate limit PAT authentication attempts BEFORE hitting database
+				if patRateLimiter != nil {
+					retryAfter := patRateLimiter.checkLimit(clientIPFromRequest(r), rawToken)
+					if retryAfter > 0 {
+						retryAfterSeconds := int(retryAfter.Seconds())
+						if retryAfterSeconds < 1 {
+							retryAfterSeconds = 1
+						}
+						response.WriteError(w, http.StatusTooManyRequests, "PAT_RATE_LIMIT_EXCEEDED", 
+							"Too many PAT authentication attempts. Please try again later.", 
+							map[string]int{"retry_after_seconds": retryAfterSeconds})
+						return
+					}
 				}
 				identity, err := WithScopedTenantConn(r.Context(), func(ctx context.Context) (patIdentity, error) {
 					uid, tid, scope, authErr := authenticatePAT(ctx, rawToken)
@@ -192,4 +209,95 @@ func hasAnyPrefix(value string, prefixes []string) bool {
 		}
 	}
 	return false
+}
+
+// PATAuthRateLimiter implements rate limiting for PAT authentication attempts.
+// It tracks attempts by both IP address and token hash to prevent:
+// 1. Brute force attacks (limiting attempts per IP)
+// 2. Leaked token abuse (limiting attempts per token)
+type PATAuthRateLimiter struct {
+	maxAttemptsPerIP    int
+	maxAttemptsPerToken int
+	window              time.Duration
+
+	mu      sync.Mutex
+	entries map[string]rateLimitEntry
+}
+
+// NewPATAuthRateLimiter creates a rate limiter for PAT authentication.
+// maxAttemptsPerIP: maximum auth attempts from a single IP in the window
+// maxAttemptsPerToken: maximum auth attempts for a single token in the window
+// window: time window for rate limiting (e.g., 1 minute)
+func NewPATAuthRateLimiter(maxAttemptsPerIP, maxAttemptsPerToken int, window time.Duration) *PATAuthRateLimiter {
+	return &PATAuthRateLimiter{
+		maxAttemptsPerIP:    maxAttemptsPerIP,
+		maxAttemptsPerToken: maxAttemptsPerToken,
+		window:              window,
+		entries:             make(map[string]rateLimitEntry),
+	}
+}
+
+// checkLimit checks if the request should be rate limited.
+// Returns retry-after duration if limited, 0 if allowed.
+func (l *PATAuthRateLimiter) checkLimit(clientIP, token string) time.Duration {
+	now := time.Now().UTC()
+	
+	// Check IP-based limit
+	ipKey := "ip:" + clientIP
+	if retryAfter := l.checkKey(ipKey, l.maxAttemptsPerIP, now); retryAfter > 0 {
+		return retryAfter
+	}
+	
+	// Check token-based limit (hash token to avoid storing actual token)
+	// Use first 16 chars of token as identifier (enough to distinguish tokens)
+	tokenKey := "token:" + tokenPrefix(token)
+	if retryAfter := l.checkKey(tokenKey, l.maxAttemptsPerToken, now); retryAfter > 0 {
+		return retryAfter
+	}
+	
+	return 0
+}
+
+func (l *PATAuthRateLimiter) checkKey(key string, maxAttempts int, now time.Time) time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	
+	// Cleanup old entries periodically
+	if len(l.entries) > 1024 {
+		for candidate, entry := range l.entries {
+			if now.After(entry.resetAt) {
+				delete(l.entries, candidate)
+			}
+		}
+		// Hard cap to prevent OOM under attack
+		if len(l.entries) > 10000 {
+			clear(l.entries)
+		}
+	}
+	
+	entry, exists := l.entries[key]
+	if !exists || now.After(entry.resetAt) {
+		l.entries[key] = rateLimitEntry{
+			count:   1,
+			resetAt: now.Add(l.window),
+		}
+		return 0
+	}
+	
+	if entry.count >= maxAttempts {
+		return entry.resetAt.Sub(now)
+	}
+	
+	entry.count++
+	l.entries[key] = entry
+	return 0
+}
+
+// tokenPrefix returns first 16 characters of token for rate limit keying.
+// This is enough to distinguish tokens without storing full token values.
+func tokenPrefix(token string) string {
+	if len(token) <= 16 {
+		return token
+	}
+	return token[:16]
 }
