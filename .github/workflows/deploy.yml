@@ -7,14 +7,20 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Production deploys (main) share one group and are never cancelled: a run
+# killed mid switch-to-configuration can leave the server half-switched. A
+# newer main push waits and supersedes only a still-pending one. PR runs and
+# workflow_dispatch on other branches only test, so each ref has its own
+# group and a newer push cancels the older run.
 concurrency:
-  group: deploy
-  cancel-in-progress: true
+  group: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'deploy-production' || format('ci-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
 
 jobs:
   backend-tests:
     name: Backend Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -32,6 +38,7 @@ jobs:
   frontend-build:
     name: Frontend Build Smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: frontend
@@ -56,6 +63,10 @@ jobs:
       - backend-tests
       - frontend-build
     runs-on: ubuntu-latest
+    # A stalled run must not hold the never-cancelled deploy-production
+    # group for GitHub's 6-hour default (main runs took 2-16 minutes so far;
+    # the first LibreOffice deploy downloads ~0.8 GiB more).
+    timeout-minutes: 120
     outputs:
       system-path: ${{ steps.build.outputs.path }}
     steps:
@@ -141,9 +152,50 @@ jobs:
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy-key
           chmod 600 ~/.ssh/deploy-key
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          echo -e "Host *\n  IdentityFile ~/.ssh/deploy-key\n  StrictHostKeyChecking accept-new" > ~/.ssh/config
+          # Keepalives end a dead connection after ~5 minutes instead of
+          # hanging until the job timeout; lenient, so a short network blip
+          # does not cut switch-to-configuration off.
+          echo -e "Host *\n  IdentityFile ~/.ssh/deploy-key\n  StrictHostKeyChecking accept-new\n  ConnectTimeout 20\n  ServerAliveInterval 30\n  ServerAliveCountMax 10" > ~/.ssh/config
           chmod 600 ~/.ssh/config
-          nix copy --to ssh://root@${{ secrets.DEPLOY_HOST }} ${{ steps.build.outputs.path }}
+          # --substitute-on-destination: the server fetches paths that are
+          # on a binary cache itself instead of the runner uploading them
+          # over ssh (LibreOffice: ~0.7-0.85 GiB download, ~2.2 GiB on disk).
+          nix copy --substitute-on-destination --to ssh://root@${{ secrets.DEPLOY_HOST }} ${{ steps.build.outputs.path }}
           ssh root@${{ secrets.DEPLOY_HOST }} "\
             nix-env -p /nix/var/nix/profiles/system --set ${{ steps.build.outputs.path }} && \
             ${{ steps.build.outputs.path }}/bin/switch-to-configuration switch"
+
+      - name: Check backend health
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        timeout-minutes: 10
+        # Actions logs of this public repo are public: the remote script
+        # prints only generic status, never journal lines, the unit's
+        # environment or response bodies. Read the journal on the server.
+        run: |
+          ssh -o LogLevel=ERROR -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 root@${{ secrets.DEPLOY_HOST }} bash -s <<'REMOTE'
+          set -u
+          unit=kantor-backend
+          port=$(systemctl show -p Environment --value "$unit" | tr ' ' '\n' | sed -n 's/^PORT=\([0-9][0-9]*\)$/\1/p' | head -n 1)
+          if [ -z "$port" ]; then
+            echo "$unit: no PORT in the unit environment (is services.kantor enabled?)"
+            exit 1
+          fi
+          ready=0
+          attempt=0
+          # Up to ~3 minutes: migrations and startup tasks run before listen.
+          deadline=$((SECONDS + 180))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            attempt=$((attempt + 1))
+            status=$(timeout 5 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/$1" && printf "GET /readyz HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && head -n 1 <&3' _ "$port" 2>/dev/null | tr -d '\r')
+            case "$status" in
+              "HTTP/1."[01]" 200"*) ready=1; break ;;
+            esac
+            sleep 5
+          done
+          echo "$unit: active=$(systemctl is-active "$unit") restarts=$(systemctl show -p NRestarts --value "$unit")"
+          if [ "$ready" -ne 1 ]; then
+            echo "$unit: /readyz did not return 200 within ~3 minutes; check 'journalctl -u $unit' on the server"
+            exit 1
+          fi
+          echo "$unit: /readyz OK after $attempt attempt(s)"
+          REMOTE
