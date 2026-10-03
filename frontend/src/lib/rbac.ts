@@ -122,7 +122,13 @@ export function canAccess(session: AuthSession | null, options: AccessOptions) {
   return false;
 }
 
-const landingRouteCandidates = [
+// requires: extra permissions the route needs besides `permission` (the
+// payslip endpoints also need hris:salary:view).
+const landingRouteCandidates: ReadonlyArray<{
+  path: string;
+  permission: string;
+  requires?: readonly string[];
+}> = [
   { path: "/operational/overview", permission: permissions.operationalOverview },
   { path: "/operational/projects", permission: permissions.operationalProjectView },
   { path: "/operational/tracker", permission: permissions.operationalTrackerView },
@@ -133,6 +139,12 @@ const landingRouteCandidates = [
   { path: "/hris/finance", permission: permissions.hrisFinanceView },
   { path: "/hris/reimbursements", permission: permissions.hrisReimbursementView },
   { path: "/hris/subscriptions", permission: permissions.hrisSubscriptionView },
+  {
+    path: "/hris/payslips",
+    permission: permissions.hrisPayslipView,
+    requires: [permissions.hrisSalaryView],
+  },
+  { path: "/hris/contracts", permission: permissions.hrisContractView },
   { path: "/marketing/overview", permission: permissions.marketingOverview },
   { path: "/marketing/campaigns", permission: permissions.marketingCampaignView },
   { path: "/marketing/ads-metrics", permission: permissions.marketingAdsMetricsView },
@@ -141,15 +153,17 @@ const landingRouteCandidates = [
   { path: "/admin/roles", permission: permissions.adminRolesView },
   { path: "/admin/users", permission: permissions.adminUsersView },
   { path: "/admin/settings", permission: permissions.adminSettingsView },
-] as const;
+];
 
 export function getDefaultAuthorizedPath(session: AuthSession | null) {
   if (!session) {
     return "/login";
   }
 
-  const matchedRoute = landingRouteCandidates.find((candidate) =>
-    hasPermission(session, candidate.permission),
+  const matchedRoute = landingRouteCandidates.find(
+    (candidate) =>
+      hasPermission(session, candidate.permission) &&
+      (candidate.requires ?? []).every((permission) => hasPermission(session, permission)),
   );
 
   return matchedRoute?.path ?? "/profile";

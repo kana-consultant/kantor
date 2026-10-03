@@ -13,6 +13,7 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
+	"github.com/kana-consultant/kantor/backend/internal/security"
 )
 
 var (
@@ -20,10 +21,18 @@ var (
 	ErrEmployeeEmailExists     = errors.New("employee email already exists")
 	ErrEmployeeUserAlreadyUsed = errors.New("user account is already linked to another employee")
 	ErrEmployeeAvatarNotFound  = errors.New("employee avatar not found")
+	// ErrEmployeeHasDocuments: a payslip or an employment contract (both ON
+	// DELETE RESTRICT) still references the employee.
+	ErrEmployeeHasDocuments = errors.New("employee has payslips or contracts")
 )
 
 type EmployeesRepository struct {
 	db repository.DBTX
+	// encrypter seals employees.bank_account_encrypted (see bank_account.go).
+	encrypter *security.Encrypter
+	// clearBankAccountPlaintext is the BANK_ACCOUNT_CLEAR_PLAINTEXT opt-in:
+	// false (default) writes the plaintext column next to the ciphertext.
+	clearBankAccountPlaintext bool
 }
 
 type ListEmployeesParams struct {
@@ -49,13 +58,58 @@ type UpsertEmployeeParams struct {
 	BankName          *string
 	LinkedInProfile   *string
 	SSHKeys           *string
+	// KeepStoredBankAccount (updates only) leaves the stored bank account
+	// columns as they are instead of writing BankAccountNumber: used when
+	// the stored number cannot be decrypted and the caller did not submit a
+	// new one, so a routine save never discards it.
+	KeepStoredBankAccount bool
 }
 
-func NewEmployeesRepository(db repository.DBTX) *EmployeesRepository {
-	return &EmployeesRepository{db: db}
+func NewEmployeesRepository(db repository.DBTX, encrypter *security.Encrypter) *EmployeesRepository {
+	return &EmployeesRepository{db: db, encrypter: encrypter}
+}
+
+// employeeColumns is the column list scanEmployee reads. Both bank account
+// columns are selected: the ciphertext and the plaintext (see
+// openBankAccount for which one a read uses).
+const employeeColumns = `id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_account_encrypted, bank_name, linkedin_profile, ssh_keys, created_at, updated_at`
+
+func (r *EmployeesRepository) scanEmployee(row pgx.Row) (model.Employee, error) {
+	var employee model.Employee
+	var bankAccountPlain, bankAccountSealed *string
+	if err := row.Scan(
+		&employee.ID,
+		&employee.UserID,
+		&employee.FullName,
+		&employee.Email,
+		&employee.Phone,
+		&employee.Position,
+		&employee.Department,
+		&employee.DateJoined,
+		&employee.EmploymentStatus,
+		&employee.Address,
+		&employee.EmergencyContact,
+		&employee.AvatarURL,
+		&bankAccountPlain,
+		&bankAccountSealed,
+		&employee.BankName,
+		&employee.LinkedInProfile,
+		&employee.SSHKeys,
+		&employee.CreatedAt,
+		&employee.UpdatedAt,
+	); err != nil {
+		return model.Employee{}, err
+	}
+	employee.BankAccountNumber, employee.BankAccountUnreadable = readBankAccount(r.encrypter, employee.ID, bankAccountPlain, bankAccountSealed)
+	return employee, nil
 }
 
 func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertEmployeeParams) (model.Employee, error) {
+	bankAccount, err := sealBankAccount(r.encrypter, params.BankAccountNumber)
+	if err != nil {
+		return model.Employee{}, err
+	}
+
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
@@ -70,10 +124,11 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 			address,
 			emergency_contact,
 			avatar_url,
-			bank_account_number,
+			bank_account_encrypted,
 			bank_name,
 			linkedin_profile,
-			ssh_keys
+			ssh_keys,
+			bank_account_number
 		)
 		VALUES (
 			$1,
@@ -86,16 +141,15 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 			NULLIF($8, ''),
 			NULLIF($9, ''),
 			NULLIF($10, ''),
-			NULLIF($11, ''),
+			$11,
 			NULLIF($12, ''),
 			NULLIF($13, ''),
-			NULLIF($14, '')
+			NULLIF($14, ''),
+			$15
 		)
-		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
-	`
+		RETURNING ` + employeeColumns
 
-	var employee model.Employee
-	err := repository.DB(ctx, r.db).QueryRow(
+	employee, err := r.scanEmployee(repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		params.FullName,
@@ -108,30 +162,12 @@ func (r *EmployeesRepository) CreateEmployee(ctx context.Context, params UpsertE
 		nullableString(params.Address),
 		nullableString(params.EmergencyContact),
 		nullableString(params.AvatarURL),
-		nullableString(params.BankAccountNumber),
+		bankAccount,
 		nullableString(params.BankName),
 		nullableString(params.LinkedInProfile),
 		nullableString(params.SSHKeys),
-	).Scan(
-		&employee.ID,
-		&employee.UserID,
-		&employee.FullName,
-		&employee.Email,
-		&employee.Phone,
-		&employee.Position,
-		&employee.Department,
-		&employee.DateJoined,
-		&employee.EmploymentStatus,
-		&employee.Address,
-		&employee.EmergencyContact,
-		&employee.AvatarURL,
-		&employee.BankAccountNumber,
-		&employee.BankName,
-		&employee.LinkedInProfile,
-		&employee.SSHKeys,
-		&employee.CreatedAt,
-		&employee.UpdatedAt,
-	)
+		r.plaintextBankAccount(params.BankAccountNumber),
+	))
 	if err != nil {
 		return model.Employee{}, mapEmployeeDBError(err)
 	}
@@ -174,7 +210,7 @@ func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmpl
 
 	offset := (params.Page - 1) * params.PerPage
 	listQuery := fmt.Sprintf(`
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
+		SELECT `+employeeColumns+`
 		FROM employees
 		WHERE %s
 		ORDER BY full_name ASC, created_at DESC
@@ -190,27 +226,8 @@ func (r *EmployeesRepository) ListEmployees(ctx context.Context, params ListEmpl
 
 	employees := make([]model.Employee, 0)
 	for rows.Next() {
-		var employee model.Employee
-		if err := rows.Scan(
-			&employee.ID,
-			&employee.UserID,
-			&employee.FullName,
-			&employee.Email,
-			&employee.Phone,
-			&employee.Position,
-			&employee.Department,
-			&employee.DateJoined,
-			&employee.EmploymentStatus,
-			&employee.Address,
-			&employee.EmergencyContact,
-			&employee.AvatarURL,
-			&employee.BankAccountNumber,
-			&employee.BankName,
-			&employee.LinkedInProfile,
-			&employee.SSHKeys,
-			&employee.CreatedAt,
-			&employee.UpdatedAt,
-		); err != nil {
+		employee, err := r.scanEmployee(rows)
+		if err != nil {
 			return nil, 0, err
 		}
 		employees = append(employees, employee)
@@ -227,32 +244,12 @@ func (r *EmployeesRepository) GetEmployeeByID(ctx context.Context, employeeID st
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
+		SELECT ` + employeeColumns + `
 		FROM employees
 		WHERE id = $1::uuid
 	`
 
-	var employee model.Employee
-	err := repository.DB(ctx, r.db).QueryRow(ctx, query, employeeID).Scan(
-		&employee.ID,
-		&employee.UserID,
-		&employee.FullName,
-		&employee.Email,
-		&employee.Phone,
-		&employee.Position,
-		&employee.Department,
-		&employee.DateJoined,
-		&employee.EmploymentStatus,
-		&employee.Address,
-		&employee.EmergencyContact,
-		&employee.AvatarURL,
-		&employee.BankAccountNumber,
-		&employee.BankName,
-		&employee.LinkedInProfile,
-		&employee.SSHKeys,
-		&employee.CreatedAt,
-		&employee.UpdatedAt,
-	)
+	employee, err := r.scanEmployee(repository.DB(ctx, r.db).QueryRow(ctx, query, employeeID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.Employee{}, ErrEmployeeNotFound
@@ -268,32 +265,12 @@ func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID st
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
+		SELECT ` + employeeColumns + `
 		FROM employees
 		WHERE user_id = $1::uuid
 	`
 
-	var employee model.Employee
-	err := repository.DB(ctx, r.db).QueryRow(ctx, query, userID).Scan(
-		&employee.ID,
-		&employee.UserID,
-		&employee.FullName,
-		&employee.Email,
-		&employee.Phone,
-		&employee.Position,
-		&employee.Department,
-		&employee.DateJoined,
-		&employee.EmploymentStatus,
-		&employee.Address,
-		&employee.EmergencyContact,
-		&employee.AvatarURL,
-		&employee.BankAccountNumber,
-		&employee.BankName,
-		&employee.LinkedInProfile,
-		&employee.SSHKeys,
-		&employee.CreatedAt,
-		&employee.UpdatedAt,
-	)
+	employee, err := r.scanEmployee(repository.DB(ctx, r.db).QueryRow(ctx, query, userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.Employee{}, ErrEmployeeNotFound
@@ -305,6 +282,11 @@ func (r *EmployeesRepository) GetEmployeeByUserID(ctx context.Context, userID st
 }
 
 func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID string, params UpsertEmployeeParams) (model.Employee, error) {
+	bankAccount, err := sealBankAccount(r.encrypter, params.BankAccountNumber)
+	if err != nil {
+		return model.Employee{}, err
+	}
+
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 	query := `
@@ -320,17 +302,16 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 			address = NULLIF($9, ''),
 			emergency_contact = NULLIF($10, ''),
 			avatar_url = NULLIF($11, ''),
-			bank_account_number = NULLIF($12, ''),
+			bank_account_encrypted = CASE WHEN $16::boolean THEN bank_account_encrypted ELSE $12 END,
+			bank_account_number = CASE WHEN $16::boolean THEN bank_account_number ELSE $17 END,
 			bank_name = NULLIF($13, ''),
 			linkedin_profile = NULLIF($14, ''),
 			ssh_keys = NULLIF($15, ''),
 			updated_at = NOW()
 		WHERE id = $1::uuid
-		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
-	`
+		RETURNING ` + employeeColumns
 
-	var employee model.Employee
-	err := repository.DB(ctx, r.db).QueryRow(
+	employee, err := r.scanEmployee(repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		query,
 		employeeID,
@@ -344,30 +325,13 @@ func (r *EmployeesRepository) UpdateEmployee(ctx context.Context, employeeID str
 		nullableString(params.Address),
 		nullableString(params.EmergencyContact),
 		nullableString(params.AvatarURL),
-		nullableString(params.BankAccountNumber),
+		bankAccount,
 		nullableString(params.BankName),
 		nullableString(params.LinkedInProfile),
 		nullableString(params.SSHKeys),
-	).Scan(
-		&employee.ID,
-		&employee.UserID,
-		&employee.FullName,
-		&employee.Email,
-		&employee.Phone,
-		&employee.Position,
-		&employee.Department,
-		&employee.DateJoined,
-		&employee.EmploymentStatus,
-		&employee.Address,
-		&employee.EmergencyContact,
-		&employee.AvatarURL,
-		&employee.BankAccountNumber,
-		&employee.BankName,
-		&employee.LinkedInProfile,
-		&employee.SSHKeys,
-		&employee.CreatedAt,
-		&employee.UpdatedAt,
-	)
+		params.KeepStoredBankAccount,
+		r.plaintextBankAccount(params.BankAccountNumber),
+	))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.Employee{}, ErrEmployeeNotFound
@@ -389,30 +353,9 @@ func (r *EmployeesRepository) UpdateEmployeeAvatar(ctx context.Context, employee
 			avatar_url = NULLIF($2, ''),
 			updated_at = NOW()
 		WHERE id = $1::uuid
-		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
-	`
+		RETURNING ` + employeeColumns
 
-	var employee model.Employee
-	err := repository.DB(ctx, r.db).QueryRow(ctx, query, employeeID, nullableString(avatarURL)).Scan(
-		&employee.ID,
-		&employee.UserID,
-		&employee.FullName,
-		&employee.Email,
-		&employee.Phone,
-		&employee.Position,
-		&employee.Department,
-		&employee.DateJoined,
-		&employee.EmploymentStatus,
-		&employee.Address,
-		&employee.EmergencyContact,
-		&employee.AvatarURL,
-		&employee.BankAccountNumber,
-		&employee.BankName,
-		&employee.LinkedInProfile,
-		&employee.SSHKeys,
-		&employee.CreatedAt,
-		&employee.UpdatedAt,
-	)
+	employee, err := r.scanEmployee(repository.DB(ctx, r.db).QueryRow(ctx, query, employeeID, nullableString(avatarURL)))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.Employee{}, ErrEmployeeNotFound
@@ -429,6 +372,11 @@ func (r *EmployeesRepository) DeleteEmployee(ctx context.Context, employeeID str
 	defer cancel()
 	commandTag, err := repository.DB(ctx, r.db).Exec(ctx, `DELETE FROM employees WHERE id = $1::uuid`, employeeID)
 	if err != nil {
+		// payslips_employee_id_fkey / employment_contracts_employee_id_fkey
+		// (and any other RESTRICT reference): legal records, 409.
+		if isForeignKeyViolation(err) {
+			return ErrEmployeeHasDocuments
+		}
 		return err
 	}
 
@@ -465,7 +413,13 @@ func (r *EmployeesRepository) UpdateEmployeeProfile(
 	bankName *string,
 	linkedInProfile *string,
 	sshKeys *string,
+	keepStoredBankAccount bool,
 ) (model.Employee, error) {
+	sealedBankAccount, err := sealBankAccount(r.encrypter, bankAccountNumber)
+	if err != nil {
+		return model.Employee{}, err
+	}
+
 	query := `
 		UPDATE employees
 		SET
@@ -474,34 +428,29 @@ func (r *EmployeesRepository) UpdateEmployeeProfile(
 			address = NULLIF($4, ''),
 			emergency_contact = NULLIF($5, ''),
 			avatar_url = NULLIF($6, ''),
-			bank_account_number = NULLIF($7, ''),
+			bank_account_encrypted = CASE WHEN $11::boolean THEN bank_account_encrypted ELSE $7 END,
+			bank_account_number = CASE WHEN $11::boolean THEN bank_account_number ELSE $12 END,
 			bank_name = NULLIF($8, ''),
 			linkedin_profile = NULLIF($9, ''),
 			ssh_keys = NULLIF($10, ''),
 			updated_at = NOW()
 		WHERE user_id = $1::uuid
-		RETURNING id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
-	`
+		RETURNING ` + employeeColumns
 
-	var employee model.Employee
-	err := repository.DB(ctx, r.db).QueryRow(ctx, query,
+	employee, err := r.scanEmployee(repository.DB(ctx, r.db).QueryRow(ctx, query,
 		userID,
 		fullName,
 		normalizePhone(phone),
 		nullableString(address),
 		nullableString(emergencyContact),
 		nullableString(avatarURL),
-		nullableString(bankAccountNumber),
+		sealedBankAccount,
 		nullableString(bankName),
 		nullableString(linkedInProfile),
 		nullableString(sshKeys),
-	).Scan(
-		&employee.ID, &employee.UserID, &employee.FullName, &employee.Email,
-		&employee.Phone, &employee.Position, &employee.Department, &employee.DateJoined,
-		&employee.EmploymentStatus, &employee.Address, &employee.EmergencyContact,
-		&employee.AvatarURL, &employee.BankAccountNumber, &employee.BankName,
-		&employee.LinkedInProfile, &employee.SSHKeys, &employee.CreatedAt, &employee.UpdatedAt,
-	)
+		keepStoredBankAccount,
+		r.plaintextBankAccount(bankAccountNumber),
+	))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.Employee{}, ErrEmployeeNotFound

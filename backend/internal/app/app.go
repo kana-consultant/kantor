@@ -27,6 +27,7 @@ import (
 
 	backendauth "github.com/kana-consultant/kantor/backend/internal/auth"
 	"github.com/kana-consultant/kantor/backend/internal/config"
+	"github.com/kana-consultant/kantor/backend/internal/docgen"
 	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
@@ -35,6 +36,7 @@ import (
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
 	wahandler "github.com/kana-consultant/kantor/backend/internal/handler/whatsapp"
+	"github.com/kana-consultant/kantor/backend/internal/mail"
 	"github.com/kana-consultant/kantor/backend/internal/mcp"
 	"github.com/kana-consultant/kantor/backend/internal/metrics"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
@@ -68,6 +70,9 @@ type App struct {
 	tenantResolver       *tenant.Resolver
 	metrics              *metrics.Registry
 	accessTokenBlacklist *backendauth.AccessTokenBlacklist
+	// auditRepository backs the opt-in audit_logs redaction scrub of
+	// existing rows, a background job (see auditScrubJob).
+	auditRepository *auditrepo.Repository
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -158,7 +163,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	// not minutes. Mutating endpoints (role change, deactivate, password change,
 	// password reset) explicitly call Invalidate() but the TTL is the safety net.
 	permissionCache := rbac.NewPermissionCache(pool, 60*time.Second)
-	employeesRepository := hrisrepo.NewEmployeesRepository(pool) // used by both auth & hris
 	var previousKeys []string
 	if cfg.DataEncryptionKeyPrevious != "" {
 		previousKeys = append(previousKeys, cfg.DataEncryptionKeyPrevious)
@@ -168,6 +172,14 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("configure data encryption: %w", err)
 	}
+	// used by both auth & hris; bank account numbers are encrypted at rest.
+	employeesRepository := hrisrepo.NewEmployeesRepository(pool, encrypter)
+	employeesRepository.SetClearBankAccountPlaintext(cfg.DataMaintenance.BankAccountClearPlaintext)
+	// Encrypt bank account numbers into the new column (per tenant,
+	// idempotent, counts only in the log). Additive by default: existing
+	// values are not changed. The opt-in audit_logs scrub runs in the
+	// background once the server is up (startBackgroundJobs).
+	runDataHardening(ctx, pool, employeesRepository, cfg.DataMaintenance)
 	accessTokenBlacklist := backendauth.NewAccessTokenBlacklist(time.Minute)
 	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter, accessTokenBlacklist)
 	patService := authservice.NewPATService(authRepository)
@@ -189,6 +201,11 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	reimbursementsRepository := hrisrepo.NewReimbursementsRepository(pool)
 	subscriptionsRepository := hrisrepo.NewSubscriptionsRepository(pool)
 	hrisOverviewRepository := hrisrepo.NewOverviewRepository(pool)
+	documentSequencesRepository := hrisrepo.NewDocumentSequencesRepository(pool)
+	hrProfilesRepository := hrisrepo.NewHRProfilesRepository(pool, documentSequencesRepository)
+	payslipsRepository := hrisrepo.NewPayslipsRepository(pool, encrypter)
+	contractsRepository := hrisrepo.NewContractsRepository(pool, encrypter)
+	documentRecipientsRepository := hrisrepo.NewDocumentRecipientsRepository(pool)
 	campaignsRepository := marketingrepo.NewCampaignsRepository(pool)
 	adsMetricsRepository := marketingrepo.NewAdsMetricsRepository(pool)
 	leadsRepository := marketingrepo.NewLeadsRepository(pool)
@@ -211,6 +228,18 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	reimbursementsService := hrisservice.NewReimbursementsService(reimbursementsRepository, employeesRepository, authRepository, notificationsService, financeService)
 	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter, financeService)
 	hrisOverviewService := hrisservice.NewOverviewService(hrisOverviewRepository, employeesRepository, encrypter, payrollCache)
+	hrProfilesService := hrisservice.NewHRProfilesService(hrProfilesRepository, employeesRepository, encrypter)
+	companyProfileService := authservice.NewCompanyProfileService(authRepository, cfg.UploadsDir)
+
+	// Document engine: DOCX render + LibreOffice PDF, rendered in the
+	// background by the document worker. Document kinds (payslips,
+	// contracts) register their handlers on documentWorker.
+	pdfConverter := docgen.NewConverter(docgen.ConverterConfig{
+		Bin:        cfg.Documents.SofficeBin,
+		ProfileDir: cfg.Documents.LOProfileDir,
+		Timeout:    cfg.Documents.RenderTimeout,
+	})
+	documentStore := hrisservice.NewDocumentStore(cfg.UploadsDir, encrypter)
 	campaignsService := marketingservice.NewCampaignsService(campaignsRepository, authRepository, notificationsService)
 	adsMetricsService := marketingservice.NewAdsMetricsService(adsMetricsRepository)
 	leadsService := marketingservice.NewLeadsService(leadsRepository, authRepository, notificationsService)
@@ -222,12 +251,42 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	whatsappService := waservice.NewService(waRepository, cfg, notificationsService)
 	emailDeliveryService := notificationsservice.NewEmailDeliveryService(authRepository, waRepository, encrypter, cfg)
 
+	// Documents-only Gmail path (payslips, contracts, admin test email). The
+	// Resend path above keeps password reset + notifications.
+	emailDeliveriesRepository := notificationsrepo.NewEmailDeliveriesRepository(pool)
+	documentMailService := authservice.NewDocumentMailService(
+		authRepository,
+		emailDeliveriesRepository,
+		notificationsService,
+		mail.NewGmailSender(documentMailCaptureAddr(ctx, cfg)),
+		encrypter,
+	)
+	documentMailService.SetPDFStatus(cfg.Documents.PDFEnabled(), cfg.Documents.SofficeSource)
+
 	trackerReminderService := operationalservice.NewTrackerReminderService(trackerReminderRepository, notificationsRepository, whatsappService)
 	discordReminderService := operationalservice.NewDiscordReminderService(discordReminderRepository)
 	vpsService := operationalservice.NewVPSService(vpsRepository)
 	vpsMonitorService := operationalservice.NewVPSMonitorService(vpsRepository, notificationsRepository, authRepository, pool)
 	domainService := operationalservice.NewDomainService(domainRepository)
 	domainMonitorService := operationalservice.NewDomainMonitorService(domainRepository, notificationsRepository, authRepository, pool)
+	documentWorker := hrisservice.NewDocumentWorker(pool, auditService, pdfConverter, documentStore)
+	logDocumentEngine(ctx, cfg.Documents)
+	if err := documentWorker.Register(hrisservice.NewPayslipRenderHandler(payslipsRepository, encrypter, companyProfileService)); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("register payslip renderer: %w", err)
+	}
+	if err := documentWorker.Register(hrisservice.NewContractRenderHandler(contractsRepository, encrypter)); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("register contract renderer: %w", err)
+	}
+
+	// Payslips and contracts share the document mailer: recipient
+	// resolution, double-send guard, background batches.
+	documentMailer := hrisservice.NewDocumentMailer(documentMailService, emailDeliveriesRepository, documentRecipientsRepository, companyProfileService, auditService, cfg.Documents.AllowDocxSend)
+	payslipsService := hrisservice.NewPayslipsService(payslipsRepository, compensationService, hrProfilesService, companyProfileService, documentWorker, documentStore, documentMailer, encrypter)
+	contractsService := hrisservice.NewContractsService(contractsRepository, documentSequencesRepository, compensationService, hrProfilesService, companyProfileService, documentWorker, documentStore, documentMailer, encrypter)
+	// The active contract gives a payslip its status kerja and jabatan.
+	payslipsService.SetContractSource(contractsService)
 
 	// Wire event triggers
 	kanbanService.SetTaskAssignNotifier(whatsappService)
@@ -244,10 +303,13 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		tenantResolver:       tenantResolver,
 		metrics:              metrics.NewRegistry(),
 		accessTokenBlacklist: accessTokenBlacklist,
+		auditRepository:      auditRepository,
 	}
 	router, err := application.buildRouter(
 		auditService,
 		authService,
+		documentMailService,
+		companyProfileService,
 		patService,
 		oauthService,
 		adminhandler.NewAuditLogsHandler(auditService),
@@ -261,6 +323,10 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		operationalhandler.NewDomainHandler(domainService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
 		hrishandler.NewEmployeesHandler(employeesService, compensationService, cfg.UploadsDir, authRepository),
+		hrishandler.NewHRProfilesHandler(hrProfilesService),
+		hrishandler.NewPayslipsHandler(payslipsService),
+		hrishandler.NewContractsHandler(contractsService),
+		hrishandler.NewEmailDeliveriesHandler(documentMailer),
 		hrishandler.NewDepartmentsHandler(departmentsService),
 		hrishandler.NewCompensationHandler(compensationService),
 		hrishandler.NewCompensationPolicyHandler(compensationPolicyService),
@@ -280,7 +346,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("build router: %w", err)
 	}
 	application.router = router
-	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, discordReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService, domainMonitorService)
+	application.startBackgroundJobs(authService, subscriptionsService, trackerService, trackerReminderService, discordReminderService, reimbursementsService, whatsappService, emailDeliveryService, vpsMonitorService, domainMonitorService, documentWorker, documentMailer)
 
 	return application, nil
 }
@@ -308,6 +374,8 @@ func (a *App) Close() {
 func (a *App) buildRouter(
 	auditService *auditservice.Service,
 	authService *authservice.Service,
+	documentMailService *authservice.DocumentMailService,
+	companyProfileService *authservice.CompanyProfileService,
 	patService *authservice.PATService,
 	oauthService *authservice.OAuthService,
 	auditLogsHandler *adminhandler.AuditLogsHandler,
@@ -321,6 +389,10 @@ func (a *App) buildRouter(
 	domainHandler *operationalhandler.DomainHandler,
 	hrisOverviewHandler *hrishandler.OverviewHandler,
 	employeesHandler *hrishandler.EmployeesHandler,
+	hrProfilesHandler *hrishandler.HRProfilesHandler,
+	payslipsHandler *hrishandler.PayslipsHandler,
+	contractsHandler *hrishandler.ContractsHandler,
+	emailDeliveriesHandler *hrishandler.EmailDeliveriesHandler,
 	departmentsHandler *hrishandler.DepartmentsHandler,
 	compensationHandler *hrishandler.CompensationHandler,
 	compensationPolicyHandler *hrishandler.CompensationPolicyHandler,
@@ -337,6 +409,8 @@ func (a *App) buildRouter(
 ) (http.Handler, error) {
 	router := chi.NewRouter()
 	authHandler := authhandler.New(authService, a.cfg)
+	authHandler.SetDocumentMailService(documentMailService)
+	authHandler.SetCompanyProfileService(companyProfileService)
 	patHandler := authhandler.NewPATHandler(patService)
 	oauthHandler := authhandler.NewOAuthHandler(oauthService)
 
@@ -473,6 +547,20 @@ func (a *App) buildRouter(
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/auto-create-employee", authHandler.UpdateAutoCreateEmployee)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/mail-delivery", authHandler.UpdateMailDelivery)
 					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/reimbursement-reminder", authHandler.UpdateReimbursementReminder)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings/document-mail", authHandler.GetDocumentMail)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/document-mail", authHandler.UpdateDocumentMail)
+					admin.With(
+						platformmiddleware.RequirePermission("admin:settings:manage"),
+						platformmiddleware.NewUserRateLimit(5, time.Minute, "RATE_LIMITED", "Terlalu banyak email uji. Coba lagi sebentar."),
+					).Post("/settings/document-mail/test", authHandler.SendDocumentMailTest)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings/company-profile", authHandler.GetCompanyProfile)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Put("/settings/company-profile", authHandler.UpdateCompanyProfile)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:view")).Get("/settings/company-profile/logo", authHandler.GetCompanyLogo)
+					admin.With(
+						platformmiddleware.RequirePermission("admin:settings:manage"),
+						platformmiddleware.NewUserRateLimit(10, time.Minute, "RATE_LIMITED", "Terlalu banyak unggahan logo. Coba lagi sebentar."),
+					).Post("/settings/company-profile/logo", authHandler.UploadCompanyLogo)
+					admin.With(platformmiddleware.RequirePermission("admin:settings:manage")).Delete("/settings/company-profile/logo", authHandler.DeleteCompanyLogo)
 
 					admin.With(platformmiddleware.SuperAdminMiddleware()).Get("/settings/registration", authHandler.GetRegistrationSettings)
 					admin.With(platformmiddleware.SuperAdminMiddleware()).Put("/settings/registration", authHandler.UpdateRegistrationSettings)
@@ -510,6 +598,10 @@ func (a *App) buildRouter(
 					module.Route("/employees", employeesHandler.RegisterRoutes)
 					module.Route("/departments", departmentsHandler.RegisterRoutes)
 					module.Route("/employees/{employeeID}/salaries", compensationHandler.RegisterSalaryRoutes)
+					module.Route("/employees/{employeeID}/hr-profile", hrProfilesHandler.RegisterRoutes)
+					module.Route("/payslips", payslipsHandler.RegisterRoutes)
+					module.Route("/contracts", contractsHandler.RegisterRoutes)
+					module.Route("/email-deliveries", emailDeliveriesHandler.RegisterRoutes)
 					module.Route("/employees/{employeeID}/bonuses", compensationHandler.RegisterBonusRoutes)
 					module.With(platformmiddleware.RequirePermission("hris:bonus:edit")).Put("/bonuses/{bonusID}", compensationHandler.UpdateBonus)
 					module.With(platformmiddleware.RequirePermission("hris:bonus:delete")).Delete("/bonuses/{bonusID}", compensationHandler.DeleteBonus)
@@ -558,7 +650,7 @@ func (a *App) buildRouter(
 	return router, nil
 }
 
-func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, discordReminderService *operationalservice.DiscordReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService, domainMonitorService *operationalservice.DomainMonitorService) {
+func (a *App) startBackgroundJobs(authService *authservice.Service, subscriptionsService *hrisservice.SubscriptionsService, trackerService *operationalservice.TrackerService, trackerReminderService *operationalservice.TrackerReminderService, discordReminderService *operationalservice.DiscordReminderService, reimbursementsService *hrisservice.ReimbursementsService, whatsappService *waservice.Service, emailDeliveryService *notificationsservice.EmailDeliveryService, vpsMonitorService *operationalservice.VPSMonitorService, domainMonitorService *operationalservice.DomainMonitorService, documentWorker *hrisservice.DocumentWorker, documentMailer *hrisservice.DocumentMailer) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.backgroundCancel = cancel
 
@@ -606,6 +698,12 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 				}
 			}
 		})
+	}
+
+	// Existing audit_logs rows are only rewritten with the explicit
+	// AUDIT_SCRUB_EXISTING opt-in (off by default).
+	if job := auditScrubJob(ctx, a.cfg.DataMaintenance.AuditScrubExisting, a.db, a.auditRepository); job != nil {
+		runBackground("audit_redaction_scrub", job)
 	}
 
 	runBackground("background_scheduler", func() {
@@ -722,12 +820,66 @@ func (a *App) startBackgroundJobs(authService *authservice.Service, subscription
 		return discordReminderService.RunReminderJobs(tCtx, now)
 	})
 
+	// Document worker: renders queued payslips/contracts to PDF. The sweep
+	// (at startup, then every minute) re-queues rows left 'pending' or stuck
+	// in 'rendering'; generation enqueues directly.
+	runBackground("document_worker", func() {
+		documentWorker.Run(ctx)
+	})
+	runPerTenantTicker("document_render_sweep", time.Minute, true, func(tCtx context.Context, t tenant.Info, now time.Time) error {
+		return documentWorker.Sweep(tCtx, t, now)
+	})
+	// Document e-mail batches run in memory: queued/sending rows left by a
+	// process that stopped are failed after the stale window, so the slips
+	// can be sent again ('Kirim ulang') instead of staying 'Antre kirim'.
+	runPerTenantTicker("document_delivery_stale_sweep", time.Minute, true, func(tCtx context.Context, t tenant.Info, now time.Time) error {
+		return documentMailer.SweepStale(tCtx)
+	})
+
 	// Close sessions orphaned by crashed/disconnected extensions so a later
 	// heartbeat cannot resurrect a stale session and back-fill the offline gap.
 	runPerTenantTicker("tracker_stale_sessions", 5*time.Minute, false, func(tCtx context.Context, t tenant.Info, now time.Time) error {
 		_, err := trackerService.EndStaleSessions(tCtx, now)
 		return err
 	})
+}
+
+// documentMailCaptureAddr resolves where document email goes. Only an
+// explicit APP_ENV=development captures it (Mailpit at localhost:1025 unless
+// DOCUMENT_MAIL_DEV_SMTP_ADDR says otherwise); anywhere else it always goes
+// to the constant smtp.gmail.com.
+func documentMailCaptureAddr(ctx context.Context, cfg config.Config) string {
+	capture := cfg.DocumentMailCapture()
+	switch capture.Source {
+	case config.MailCaptureEnvInvalid:
+		slog.WarnContext(ctx, "DOCUMENT_MAIL_DEV_SMTP_ADDR is invalid; falling back to the default development capture server (set it to off to send through Gmail)", "reason", capture.Warning, "addr", capture.Addr)
+	case config.MailCaptureNotDevelopment:
+		if capture.Warning != "" {
+			slog.WarnContext(ctx, "DOCUMENT_MAIL_DEV_SMTP_ADDR ignored; document email uses smtp.gmail.com", "reason", capture.Warning, "app_env", cfg.RawAppEnv)
+		}
+	case config.MailCaptureOff:
+		slog.InfoContext(ctx, "document mail dev capture switched off (DOCUMENT_MAIL_DEV_SMTP_ADDR=off): document email goes to smtp.gmail.com even in development")
+	}
+	if capture.Addr != "" {
+		slog.WarnContext(ctx, "document mail dev capture active: document email is sent with plain SMTP (no TLS, no auth) to the local capture server instead of smtp.gmail.com", "addr", capture.Addr, "source", capture.Source)
+	}
+	return capture.Addr
+}
+
+// logDocumentEngine writes one startup line on how PDF conversion was
+// resolved (the soffice path is fine in server logs; it never reaches the
+// API).
+func logDocumentEngine(ctx context.Context, documents config.DocumentsConfig) {
+	switch documents.SofficeSource {
+	case config.SofficeSourceAuto, config.SofficeSourceEnv:
+		slog.InfoContext(ctx, "document PDF conversion enabled", "soffice_source", documents.SofficeSource, "soffice", documents.SofficeBin, "lo_profile_dir", documents.LOProfileDir, "lo_profile_default", documents.LOProfileDirDefaulted)
+	case config.SofficeSourceDisabled:
+		slog.InfoContext(ctx, "document PDF conversion disabled by SOFFICE_BIN; documents are DOCX only and sending is refused unless DOCUMENTS_ALLOW_DOCX_SEND=true", "soffice_source", documents.SofficeSource)
+	case config.SofficeSourceEnvInvalid:
+		slog.WarnContext(ctx, "SOFFICE_BIN is not an executable file; PDF conversion disabled (unset it to auto-detect LibreOffice, or set it to off)", "soffice_source", documents.SofficeSource, "soffice_bin", documents.SofficeRequested, "reason", documents.SofficeInvalidReason)
+	default:
+		slog.InfoContext(ctx, "LibreOffice not found: documents are DOCX only and sending is refused unless DOCUMENTS_ALLOW_DOCX_SEND=true. Install LibreOffice (macOS: brew install --cask libreoffice; Debian/Ubuntu: apt install libreoffice-writer) and restart, or set SOFFICE_BIN", "soffice_source", documents.SofficeSource)
+	}
 }
 
 func runMigrations(databaseURL string) error {
@@ -791,6 +943,16 @@ func ensureRuntimeDirectories(cfg config.Config) error {
 		return fmt.Errorf("create uploads dir: %w", err)
 	}
 
+	// The LibreOffice profile is reused across conversions. A failure here is
+	// not fatal: the converter reports it per job and documents stay DOCX.
+	if cfg.Documents.PDFEnabled() && cfg.Documents.LOProfileDir != "" {
+		if err := os.MkdirAll(cfg.Documents.LOProfileDir, 0o700); err != nil {
+			slog.Warn("cannot create DOCUMENT_LO_PROFILE_DIR; PDF conversion may fail", "dir", cfg.Documents.LOProfileDir, "error", err)
+		} else if err := docgen.SecureProfileDir(cfg.Documents.LOProfileDir); err != nil {
+			slog.Warn("LibreOffice profile dir rejected; PDF conversion uses a throwaway profile per job (slower)", "dir", cfg.Documents.LOProfileDir, "reason", err.Error())
+		}
+	}
+
 	return nil
 }
 
@@ -810,9 +972,12 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 		if i == 0 {
 			// First tenant: update the migration placeholder.
 			tenantID = defaultTenantID
+			// Only when TENANTS changed it: a plain restart leaves the row
+			// (and its updated_at) untouched.
 			_, err := pool.Exec(ctx,
 				`UPDATE tenants SET name = $1, slug = $2, updated_at = NOW()
-				 WHERE id = $3`,
+				 WHERE id = $3
+				   AND (name IS DISTINCT FROM $1 OR slug IS DISTINCT FROM $2)`,
 				tc.Name, tc.Slug, tenantID)
 			if err != nil {
 				return fmt.Errorf("update default tenant: %w", err)
@@ -822,7 +987,9 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 			err := pool.QueryRow(ctx,
 				`INSERT INTO tenants (name, slug)
 				 VALUES ($1, $2)
-				 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
+				 ON CONFLICT (slug) DO UPDATE SET
+				   name = EXCLUDED.name,
+				   updated_at = CASE WHEN tenants.name IS DISTINCT FROM EXCLUDED.name THEN NOW() ELSE tenants.updated_at END
 				 RETURNING id::text`,
 				tc.Name, tc.Slug).Scan(&tenantID)
 			if err != nil {
@@ -841,7 +1008,9 @@ func seedTenants(ctx context.Context, pool *pgxpool.Pool, tenants []config.Tenan
 				 VALUES ($1, $2, $3)
 				 ON CONFLICT (domain) DO UPDATE
 				   SET is_primary = EXCLUDED.is_primary,
-				       tenant_id  = EXCLUDED.tenant_id`,
+				       tenant_id  = EXCLUDED.tenant_id
+				 WHERE (tenant_domains.is_primary, tenant_domains.tenant_id)
+				   IS DISTINCT FROM (EXCLUDED.is_primary, EXCLUDED.tenant_id)`,
 				tenantID, domain, j == 0)
 			if err != nil {
 				return fmt.Errorf("upsert domain %q for tenant %q: %w", domain, tc.Slug, err)

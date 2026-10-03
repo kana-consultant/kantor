@@ -161,6 +161,37 @@ func (r *CompensationRepository) GetCurrentSalary(ctx context.Context, employeeI
 	return row, err
 }
 
+// GetSalaryAsOf returns the salary row in force on date: the latest
+// effective_date on or before it, the most recently created on a tie (a
+// correction entered later wins). Used by payslips with the last day of the
+// period, so a raise effective mid-month already applies.
+func (r *CompensationRepository) GetSalaryAsOf(ctx context.Context, employeeID string, date time.Time) (SalaryRow, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+	var row SalaryRow
+	err := repository.DB(ctx, r.db).QueryRow(ctx, `
+		SELECT id::text, employee_id::text, base_salary, allowances, deductions, net_salary, effective_date, created_by::text, created_at
+		FROM salaries
+		WHERE employee_id = $1::uuid AND effective_date <= $2::date
+		ORDER BY effective_date DESC, created_at DESC
+		LIMIT 1
+	`, employeeID, date.Format("2006-01-02")).Scan(
+		&row.ID,
+		&row.EmployeeID,
+		&row.BaseSalary,
+		&row.Allowances,
+		&row.Deductions,
+		&row.NetSalary,
+		&row.EffectiveDate,
+		&row.CreatedBy,
+		&row.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SalaryRow{}, ErrSalaryNotFound
+	}
+	return row, err
+}
+
 func (r *CompensationRepository) CreateBonus(ctx context.Context, params CreateBonusParams) (BonusRow, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()

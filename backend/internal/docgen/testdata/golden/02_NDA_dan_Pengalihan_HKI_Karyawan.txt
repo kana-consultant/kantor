@@ -1,0 +1,117 @@
+## word/header1.xml
+PT Contoh Teknologi Nusantara	RAHASIA | CONFIDENTIAL
+## word/document.xml
+PERJANJIAN KERAHASIAAN DAN PENGALIHAN HAK KEKAYAAN INTELEKTUAL
+CONFIDENTIALITY AND INTELLECTUAL PROPERTY ASSIGNMENT AGREEMENT
+No. 021/NDA-HKI/CTN/X/2026
+Perjanjian Kerahasiaan dan Pengalihan Hak Kekayaan Intelektual ini (selanjutnya disebut "Perjanjian") dibuat dan ditandatangani di Jakarta pada tanggal 1 Oktober 2026 oleh dan antara:
+This Confidentiality and Intellectual Property Assignment Agreement (hereinafter referred to as the "Agreement") is made and signed in Jakarta on 1 October 2026 by and between:
+1.	PT Contoh Teknologi Nusantara, suatu perseroan terbatas yang didirikan berdasarkan hukum Negara Republik Indonesia, berkedudukan di Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110, bergerak di bidang pengembangan perangkat lunak dan konsultasi kecerdasan artifisial, dalam hal ini diwakili oleh Rudi Hartono selaku Direktur, yang berwenang bertindak untuk dan atas nama perseroan tersebut, selanjutnya disebut "Perusahaan".
+1.	PT Contoh Teknologi Nusantara, a limited liability company established under the laws of the Republic of Indonesia, domiciled at Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110, engaged in pengembangan perangkat lunak dan konsultasi kecerdasan artifisial, in this matter represented by Rudi Hartono as Direktur, duly authorised to act for and on behalf of the company, hereinafter referred to as the "Company".
+2.	Rina Kartika Sari, lahir di Bandung pada tanggal 14-02-1998, jenis kelamin Perempuan / Female, pemegang Kartu Tanda Penduduk dengan NIK 3273015402980001, beralamat di Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung, nomor telepon 0812-0000-1111, email rina.kartika@example.com, bertindak untuk dan atas nama diri sendiri, selanjutnya disebut "Karyawan".
+2.	Rina Kartika Sari, born in Bandung on 14-02-1998, gender Perempuan / Female, holder of Indonesian identity card (NIK) number 3273015402980001, residing at Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung, phone 0812-0000-1111, email rina.kartika@example.com, acting for and on his/her own behalf, hereinafter referred to as the "Employee".
+Para Pihak terlebih dahulu menerangkan hal-hal sebagai berikut:
+a.	Bahwa Karyawan bekerja pada Perusahaan sebagai AI Engineer berdasarkan perjanjian kerja No. 021/PKWT/CTN/X/2026 ("Perjanjian Kerja");
+b.	Bahwa dalam melaksanakan pekerjaannya, Karyawan akan mengakses Informasi Rahasia serta menghasilkan karya yang memiliki nilai ekonomi bagi Perusahaan;
+c.	Bahwa berdasarkan peraturan perundang-undangan di bidang hak cipta, kepemilikan atas ciptaan yang dibuat dalam hubungan kerja dapat diatur melalui perjanjian, sehingga Para Pihak perlu mengaturnya secara tegas dalam Perjanjian ini.
+The Parties first declare the following:
+a.	Whereas the Employee works for the Company as AI Engineer under employment agreement No. 021/PKWT/CTN/X/2026 (the "Employment Agreement");
+b.	Whereas in performing the work, the Employee will access Confidential Information and create works of economic value to the Company;
+c.	Whereas under the copyright laws and regulations, ownership of works created within an employment relationship may be governed by agreement, so the Parties need to regulate it expressly in this Agreement.
+Pasal 1 — Definisi
+Article 1 — Definitions
+1.1	"Informasi Rahasia" berarti setiap informasi dalam bentuk apa pun, baik lisan, tertulis, elektronik, maupun bentuk lain, yang berkaitan dengan Perusahaan, afiliasinya, klien, atau mitranya, termasuk namun tidak terbatas pada: kode sumber, arsitektur sistem, model AI, prompt, dataset, dokumentasi teknis, kredensial dan kunci akses, strategi dan rencana bisnis, harga dan proposal, data keuangan, data karyawan, serta data klien dan data pribadi.
+1.2	"Karya" berarti setiap ciptaan, invensi, desain, perangkat lunak, kode sumber, model, prompt, dataset, dokumentasi, proses, metode, merek, konten, dan hasil kerja lainnya yang dibuat, dikembangkan, atau disempurnakan oleh Karyawan, baik sendiri maupun bersama pihak lain, selama masa kerja dan berkaitan dengan bidang usaha Perusahaan atau dibuat dengan menggunakan waktu kerja, fasilitas, data, atau sumber daya Perusahaan.
+1.3	"Data Pribadi" memiliki arti sebagaimana diatur dalam peraturan perundang-undangan mengenai pelindungan data pribadi.
+1.1	"Confidential Information" means any information in any form, whether oral, written, electronic or otherwise, relating to the Company, its affiliates, clients or partners, including but not limited to: source code, system architecture, AI models, prompts, datasets, technical documentation, credentials and access keys, business strategies and plans, pricing and proposals, financial data, employee data, as well as client data and personal data.
+1.2	"Work" means any creation, invention, design, software, source code, model, prompt, dataset, documentation, process, method, mark, content and other work product made, developed or improved by the Employee, alone or jointly with others, during employment and relating to the Company's line of business or made using the Company's working time, facilities, data or resources.
+1.3	"Personal Data" has the meaning given under the laws and regulations on personal data protection.
+Pasal 2 — Kewajiban Kerahasiaan
+Article 2 — Confidentiality Obligations
+Karyawan wajib:
+a.	Menggunakan Informasi Rahasia semata-mata untuk pelaksanaan pekerjaannya di Perusahaan;
+b.	Tidak mengungkapkan Informasi Rahasia kepada pihak mana pun tanpa persetujuan tertulis Perusahaan, kecuali kepada rekan kerja yang memerlukannya untuk pekerjaan;
+c.	Tidak menyalin, mengunduh, atau memindahkan Informasi Rahasia ke perangkat, akun, atau penyimpanan pribadi tanpa izin;
+d.	Tidak memasukkan Informasi Rahasia ke dalam layanan AI, aplikasi, atau platform pihak ketiga yang belum disetujui oleh Perusahaan;
+e.	Menjaga keamanan kredensial dan akses sistem, serta segera melaporkan kepada Perusahaan apabila terjadi atau diduga terjadi kebocoran Informasi Rahasia.
+The Employee shall:
+a.	Use Confidential Information solely for performing work for the Company;
+b.	Not disclose Confidential Information to any party without the Company's written consent, except to colleagues who need it for work;
+c.	Not copy, download or transfer Confidential Information to personal devices, accounts or storage without permission;
+d.	Not input Confidential Information into any AI service, application or third-party platform not approved by the Company;
+e.	Keep credentials and system access secure, and immediately report to the Company any actual or suspected leak of Confidential Information.
+Pasal 3 — Pengecualian
+Article 3 — Exclusions
+Kewajiban kerahasiaan tidak berlaku atas informasi yang: (a) telah menjadi milik umum bukan karena pelanggaran Karyawan; (b) telah diketahui secara sah oleh Karyawan sebelum bekerja di Perusahaan, dibuktikan dengan catatan tertulis; (c) diterima secara sah dari pihak ketiga tanpa kewajiban kerahasiaan; atau (d) wajib diungkapkan berdasarkan peraturan perundang-undangan atau perintah instansi berwenang, dengan ketentuan Karyawan terlebih dahulu memberitahu Perusahaan sepanjang diizinkan hukum.
+The confidentiality obligations do not apply to information that: (a) has become public other than through the Employee's breach; (b) was lawfully known to the Employee before joining the Company, as evidenced by written records; (c) is lawfully received from a third party without confidentiality obligations; or (d) must be disclosed under the laws and regulations or an order of a competent authority, provided the Employee first notifies the Company to the extent permitted by law.
+Pasal 4 — Data Pribadi dan Data Klien
+Article 4 — Personal Data and Client Data
+Karyawan wajib memproses Data Pribadi dan data klien hanya sesuai instruksi Perusahaan, kebijakan keamanan informasi Perusahaan, dan peraturan perundang-undangan mengenai pelindungan data pribadi. Setiap insiden atau dugaan insiden kebocoran data wajib dilaporkan kepada Perusahaan paling lambat 24 jam sejak diketahui.
+The Employee shall process Personal Data and client data only in accordance with the Company's instructions, the Company's information security policies and the laws and regulations on personal data protection. Any actual or suspected data breach shall be reported to the Company no later than 24 hours after becoming aware of it.
+Pasal 5 — Kepemilikan dan Pengalihan Hak Kekayaan Intelektual
+Article 5 — Ownership and Assignment of Intellectual Property
+5.1	Seluruh Karya beserta hak kekayaan intelektual yang melekat padanya, termasuk hak cipta, paten, desain, rahasia dagang, dan merek, menjadi milik Perusahaan sejak Karya tersebut dibuat.
+5.2	Sepanjang peraturan perundang-undangan menetapkan Karyawan sebagai pencipta atau pemegang hak atas suatu Karya, Karyawan dengan ini mengalihkan seluruh hak ekonomi atas Karya tersebut kepada Perusahaan secara penuh, tanpa batasan wilayah dan waktu, dan Perusahaan menerima pengalihan tersebut.
+5.3	Hak moral Karyawan tetap melekat sesuai peraturan perundang-undangan. Karyawan setuju untuk tidak menggunakan hak moralnya dengan cara yang menghalangi pemanfaatan Karya secara wajar oleh Perusahaan, termasuk modifikasi dan penggunaan tanpa pencantuman nama.
+5.4	Karyawan wajib membantu Perusahaan, termasuk menandatangani dokumen yang diperlukan, untuk mendaftarkan atau melindungi hak kekayaan intelektual atas Karya, baik selama maupun setelah masa kerja.
+5.5	Kompensasi atas pengalihan hak sebagaimana dimaksud dalam Pasal ini telah termasuk dalam upah yang diterima Karyawan berdasarkan Perjanjian Kerja.
+5.1	All Work and the intellectual property rights attached to it, including copyright, patents, designs, trade secrets and marks, shall belong to the Company from the moment the Work is created.
+5.2	To the extent the laws and regulations designate the Employee as the author or rights holder of any Work, the Employee hereby assigns all economic rights in such Work to the Company in full, without territorial or time limitation, and the Company accepts such assignment.
+5.3	The Employee's moral rights remain attached in accordance with the laws and regulations. The Employee agrees not to exercise moral rights in a manner that prevents the Company's reasonable use of the Work, including modification and use without attribution.
+5.4	The Employee shall assist the Company, including by signing necessary documents, to register or protect the intellectual property rights in the Work, both during and after employment.
+5.5	Compensation for the assignment of rights under this Article is included in the wages received by the Employee under the Employment Agreement.
+Pasal 6 — Karya Terdahulu
+Article 6 — Prior Works
+Karya yang dibuat Karyawan sebelum bekerja di Perusahaan dan dikecualikan dari Perjanjian ini tercantum dalam tabel di bawah. Apabila Karyawan memasukkan Karya Terdahulu ke dalam pekerjaan untuk Perusahaan, Karyawan memberikan kepada Perusahaan lisensi non-eksklusif, bebas royalti, tidak dapat dicabut, dan berlaku di seluruh dunia untuk menggunakan, memodifikasi, dan mendistribusikan Karya Terdahulu tersebut sebagai bagian dari produk atau layanan Perusahaan.
+Works created by the Employee before joining the Company and excluded from this Agreement are listed in the table below. If the Employee incorporates any Prior Work into work for the Company, the Employee grants the Company a non-exclusive, royalty-free, irrevocable, worldwide licence to use, modify and distribute such Prior Work as part of the Company's products or services.
+Karya Terdahulu / Prior Work
+Deskripsi / Description
+Tahun / Year
+indo-tokenizer (open-source)
+Library tokenisasi Bahasa Indonesia, lisensi MIT
+2024
+
+Pasal 7 — Perangkat Lunak Pihak Ketiga
+Article 7 — Third-Party Software
+Karyawan tidak akan memasukkan kode, pustaka, model, atau data milik pihak ketiga, termasuk yang berlisensi open-source, ke dalam Karya apabila lisensinya bertentangan dengan kebijakan Perusahaan atau berpotensi mewajibkan Perusahaan membuka kode sumbernya, tanpa persetujuan tertulis Perusahaan.
+The Employee shall not incorporate third-party code, libraries, models or data, including open-source licensed material, into any Work where the licence conflicts with Company policy or may require the Company to disclose its source code, without the Company's written approval.
+Pasal 8 — Pengembalian Materi
+Article 8 — Return of Materials
+Pada saat hubungan kerja berakhir atau atas permintaan Perusahaan, Karyawan wajib mengembalikan atau menghapus seluruh Informasi Rahasia dan materi milik Perusahaan yang ada padanya, serta memberikan pernyataan tertulis bahwa kewajiban tersebut telah dilaksanakan.
+Upon termination of employment or at the Company's request, the Employee shall return or delete all Confidential Information and Company materials in the Employee's possession, and provide a written statement confirming that this obligation has been fulfilled.
+Pasal 9 — Larangan Membujuk
+Article 9 — Non-Solicitation
+Selama masa kerja dan 12 bulan setelah hubungan kerja berakhir, Karyawan tidak akan, secara langsung maupun tidak langsung, membujuk karyawan Perusahaan untuk mengundurkan diri, atau membujuk klien Perusahaan yang ditangani Karyawan untuk mengalihkan pekerjaannya dari Perusahaan.
+During employment and for 12 months after employment ends, the Employee shall not, directly or indirectly, solicit Company employees to resign, or solicit Company clients handled by the Employee to move their business away from the Company.
+Pasal 10 — Jangka Waktu
+Article 10 — Term
+Perjanjian ini berlaku sejak ditandatangani. Kewajiban kerahasiaan tetap berlaku selama 3 tahun setelah hubungan kerja berakhir, dan untuk informasi yang merupakan rahasia dagang, berlaku selama informasi tersebut tetap bersifat rahasia. Ketentuan mengenai hak kekayaan intelektual berlaku tanpa batas waktu.
+This Agreement is effective upon signing. The confidentiality obligations survive for 3 years after employment ends, and for information constituting a trade secret, for as long as it remains secret. The intellectual property provisions apply without time limit.
+Pasal 11 — Sanksi
+Article 11 — Sanctions
+Pelanggaran atas Perjanjian ini dapat dikenakan sanksi sesuai peraturan perusahaan, termasuk pemutusan hubungan kerja sesuai peraturan perundang-undangan, serta tidak menghapus hak Perusahaan untuk menuntut ganti rugi dan menempuh upaya hukum lainnya, termasuk berdasarkan peraturan perundang-undangan mengenai rahasia dagang dan hak cipta.
+Breach of this Agreement may result in sanctions under company regulations, including termination of employment in accordance with the laws and regulations, without prejudice to the Company's right to claim damages and pursue other legal remedies, including under the laws and regulations on trade secrets and copyright.
+
+Pasal 12 — Hukum yang Berlaku dan Ketentuan Lain
+Article 12 — Governing Law and Miscellaneous
+12.1	Perjanjian ini tunduk pada hukum Negara Republik Indonesia. Perselisihan diselesaikan secara musyawarah; apabila tidak tercapai mufakat, diselesaikan melalui mekanisme penyelesaian yang berlaku menurut hukum Indonesia.
+12.2	Perjanjian ini merupakan bagian yang tidak terpisahkan dari Perjanjian Kerja dan tetap berlaku meskipun Perjanjian Kerja diperpanjang, diperbarui, atau diganti.
+12.3	Perjanjian ini dibuat dalam Bahasa Indonesia dan Bahasa Inggris. Apabila terdapat perbedaan penafsiran antara kedua versi bahasa, maka yang berlaku adalah versi Bahasa Indonesia.
+12.1	This Agreement is governed by the laws of the Republic of Indonesia. Disputes shall be settled amicably; failing agreement, through the dispute resolution mechanisms applicable under Indonesian law.
+12.2	This Agreement forms an integral part of the Employment Agreement and remains in force even if the Employment Agreement is extended, renewed or replaced.
+12.3	This Agreement is made in the Indonesian and English languages. In the event of any discrepancy in interpretation between the two versions, the version in the Indonesian language shall prevail.
+Jakarta, 1 Oktober 2026
+PERUSAHAAN
+COMPANY
+PT Contoh Teknologi Nusantara
+ 
+Rudi Hartono
+Direktur
+KARYAWAN
+EMPLOYEE
+ 
+e-Meterai Rp10.000
+Rina Kartika Sari
+AI Engineer
+## word/footer1.xml
+No. 021/NDA-HKI/CTN/X/2026	Hal. / Page  / 

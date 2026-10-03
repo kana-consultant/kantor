@@ -2,6 +2,8 @@ import {
   BarChart3,
   Building2,
   CreditCard,
+  FileSignature,
+  FileText,
   FolderKanban,
   LayoutDashboard,
   Megaphone,
@@ -87,6 +89,14 @@ const breadcrumbRules: Array<{
   {
     match: (pathname) => pathname.startsWith("/hris/reimbursements"),
     meta: { module: moduleThemes.hr, title: "Reimbursements", icon: Receipt },
+  },
+  {
+    match: (pathname) => pathname.startsWith("/hris/payslips"),
+    meta: { module: moduleThemes.hr, title: "Slip Gaji", icon: FileText },
+  },
+  {
+    match: (pathname) => pathname.startsWith("/hris/contracts"),
+    meta: { module: moduleThemes.hr, title: "Kontrak Kerja", icon: FileSignature },
   },
   {
     match: (pathname) => pathname.startsWith("/hris/subscriptions"),

@@ -100,4 +100,15 @@ derived from the HTTP method. Endpoints without a curated annotation keep the
 generic free-form `query` object.
 
 Excluded from the surface: superadmin endpoints (toggle super admin, registration
-settings) and public auth flows (login, register, password reset).
+settings), public auth flows (login, register, password reset), and mail
+credential / delivery routes (`/admin/settings/mail-delivery`,
+`/admin/settings/document-mail`, `/email-deliveries`), and HR document data
+(`/hris/employees/{id}/hr-profile` with the employee identity,
+`/admin/settings/company-profile` including its `/logo`, every
+`/hris/payslips` route: amounts, PDFs and sending, and every `/hris/contracts`
+route: PKWT/NDA terms, compensation, PDFs with the full NIK, and sending).
+Employee tools return the
+bank account number masked (`******7890`) unless the token's user holds
+`hris:employee_identity:view` or owns the record. The test
+`internal/mcp/catalog_router_test.go` builds the catalog from the real app router
+and fails if any of these reappear.

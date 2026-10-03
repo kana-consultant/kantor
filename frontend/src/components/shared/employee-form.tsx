@@ -83,6 +83,11 @@ interface EmployeeFormProps {
   onCancel?: () => void;
   onAvatarFileChange: (file: File | null) => void;
   onSubmit: (values: EmployeeFormValues) => void;
+  /**
+   * The employee is linked to a user account: the e-mail is the login (where
+   * slip gaji and contracts are sent) and only the user can change it.
+   */
+  emailLocked?: boolean;
 }
 
 export function EmployeeForm({
@@ -98,6 +103,7 @@ export function EmployeeForm({
   onCancel,
   onAvatarFileChange,
   onSubmit,
+  emailLocked = false,
 }: EmployeeFormProps) {
   const [selectedAvatarPreview, setSelectedAvatarPreview] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -225,7 +231,19 @@ export function EmployeeForm({
             <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("full_name")} placeholder="Safri Ahmad" />
           </Field>
           <Field error={errors.email?.message} label="Email" required>
-            <Input className="focus-visible:border-hr focus-visible:ring-hr/10" {...register("email")} placeholder="staff@kantor.local" type="email" />
+            <Input
+              className="focus-visible:border-hr focus-visible:ring-hr/10 read-only:cursor-not-allowed read-only:opacity-70"
+              {...register("email")}
+              placeholder="staff@kantor.local"
+              readOnly={emailLocked}
+              title={emailLocked ? "Email login akun karyawan" : undefined}
+              type="email"
+            />
+            {emailLocked ? (
+              <p className="text-[12px] text-text-tertiary">
+                Email login akun. Hanya pemilik akun yang dapat mengubahnya di Profil (dengan kata sandi).
+              </p>
+            ) : null}
           </Field>
         </div>
 

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	"github.com/kana-consultant/kantor/backend/internal/response"
+	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 )
 
 func (h *Handler) ListRoles(w http.ResponseWriter, r *http.Request) {
@@ -353,6 +355,123 @@ func (h *Handler) UpdateReimbursementReminder(w http.ResponseWriter, r *http.Req
 
 	platformmiddleware.AuditLog(r.Context(), "update", "admin", "system_setting", "reimbursement_reminder", previous.ReimbursementReminder, settings.ReimbursementReminder)
 	response.WriteJSON(w, http.StatusOK, settings, nil)
+}
+
+func (h *Handler) GetDocumentMail(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDocumentMail(w) {
+		return
+	}
+	setting, err := h.documentMail.GetSettings(r.Context())
+	if err != nil {
+		response.WriteInternalError(r.Context(), w, err, "Failed to load document mail setting")
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, setting, nil)
+}
+
+func (h *Handler) UpdateDocumentMail(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDocumentMail(w) {
+		return
+	}
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	var input dto.UpdateDocumentMailRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON", nil)
+		return
+	}
+	if err := h.validator.Struct(input); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request validation failed", validationDetails(err))
+		return
+	}
+
+	setting, changed, err := h.documentMail.UpdateSettings(r.Context(), principal.UserID, input)
+	if err != nil {
+		h.writeDocumentMailError(r.Context(), w, err, "Failed to update document mail setting")
+		return
+	}
+
+	// Field names only: the audit trail must never hold the address history
+	// or anything derived from the app password.
+	if len(changed) > 0 {
+		platformmiddleware.AuditLog(r.Context(), "update", "admin", "system_setting", "document_mail", nil, map[string]any{
+			"changed_fields": changed,
+		})
+	}
+	response.WriteJSON(w, http.StatusOK, setting, nil)
+}
+
+func (h *Handler) SendDocumentMailTest(w http.ResponseWriter, r *http.Request) {
+	if !h.requireDocumentMail(w) {
+		return
+	}
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authenticated principal is missing", nil)
+		return
+	}
+
+	result, err := h.documentMail.SendTest(r.Context(), principal.UserID)
+	if err != nil {
+		h.writeDocumentMailError(r.Context(), w, err, "Failed to send test email")
+		return
+	}
+
+	auditValue := map[string]any{
+		"delivery_id": result.DeliveryID,
+		"recipient":   maskEmailAddress(result.Recipient),
+		"sent":        result.Sent,
+	}
+	if result.ErrorCategory != nil {
+		auditValue["error_category"] = *result.ErrorCategory
+	}
+	platformmiddleware.AuditLog(r.Context(), "send_test", "admin", "system_setting", "document_mail", nil, auditValue)
+	response.WriteJSON(w, http.StatusOK, result, nil)
+}
+
+func (h *Handler) requireDocumentMail(w http.ResponseWriter) bool {
+	if h.documentMail == nil {
+		response.WriteError(w, http.StatusServiceUnavailable, "DOCUMENT_MAIL_UNAVAILABLE", "Email Dokumen tidak tersedia", nil)
+		return false
+	}
+	return true
+}
+
+func (h *Handler) writeDocumentMailError(ctx context.Context, w http.ResponseWriter, err error, fallback string) {
+	switch {
+	case errors.Is(err, authservice.ErrDocumentMailUsernameRequired):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"smtp_username": "required"})
+	case errors.Is(err, authservice.ErrDocumentMailUsernameInvalid):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"smtp_username": "email"})
+	case errors.Is(err, authservice.ErrDocumentMailPasswordRequired):
+		response.WriteError(w, http.StatusBadRequest, "SMTP_PASSWORD_REQUIRED", err.Error(), map[string]string{"smtp_password": "required"})
+	case errors.Is(err, authservice.ErrDocumentMailNotReady):
+		response.WriteError(w, http.StatusConflict, "DOCUMENT_MAIL_NOT_READY", err.Error(), nil)
+	case errors.Is(err, authservice.ErrDocumentMailInFlight):
+		response.WriteError(w, http.StatusConflict, "DOCUMENT_MAIL_IN_FLIGHT", err.Error(), nil)
+	case errors.Is(err, authservice.ErrDocumentMailInvalidRequest):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Alamat penerima tidak valid", nil)
+	default:
+		response.WriteInternalError(ctx, w, err, fallback)
+	}
+}
+
+// maskEmailAddress keeps the first two characters of the local part and the
+// domain ("su***@kantor.local") for audit metadata.
+func maskEmailAddress(address string) string {
+	local, domain, found := strings.Cut(strings.TrimSpace(address), "@")
+	if !found {
+		return "***"
+	}
+	visible := local
+	if len(visible) > 2 {
+		visible = visible[:2]
+	}
+	return visible + "***@" + domain
 }
 
 func (h *Handler) ListModules(w http.ResponseWriter, r *http.Request) {

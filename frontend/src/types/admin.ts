@@ -136,3 +136,91 @@ export interface AdminSettings {
   mail_delivery: MailDeliverySetting;
   reimbursement_reminder: ReimbursementReminderSetting;
 }
+
+/** Documents-only Gmail settings (payslips, contracts). Never carries the app password. */
+export interface DocumentMailSetting {
+  enabled: boolean;
+  smtp_host: string;
+  smtp_username: string;
+  smtp_port: 587 | 465;
+  sender_name: string;
+  has_smtp_password: boolean;
+  ready: boolean;
+  /** Present only while development mail capture (Mailpit) is active. */
+  dev_smtp_addr?: string | null;
+  /** Read-only: where document email actually goes (set by the server environment). */
+  delivery?: DocumentMailDeliveryStatus;
+  /** Read-only: whether generated documents are converted to PDF. */
+  pdf?: DocumentPdfStatus;
+}
+
+export interface DocumentMailDeliveryStatus {
+  mode: "gmail" | "dev_capture";
+  capture_addr?: string | null;
+}
+
+/** How the server resolved LibreOffice (never a filesystem path). */
+export type DocumentPdfSource = "auto" | "env" | "disabled" | "not_found" | "env_invalid";
+
+export interface DocumentPdfStatus {
+  enabled: boolean;
+  source: DocumentPdfSource;
+}
+
+export interface UpdateDocumentMailPayload {
+  enabled: boolean;
+  smtp_username: string;
+  smtp_password: string | null;
+  clear_smtp_password: boolean;
+  smtp_port: 587 | 465;
+  sender_name: string;
+}
+
+export type DocumentMailErrorCategory =
+  | "config"
+  | "message"
+  | "connect"
+  | "tls"
+  | "auth"
+  | "recipient"
+  | "rejected"
+  | "temporary"
+  | "timeout";
+
+export interface DocumentMailTestResult {
+  sent: boolean;
+  delivery_id: string;
+  recipient: string;
+  error_category?: DocumentMailErrorCategory | null;
+  error_message?: string | null;
+}
+
+/** Tenant company profile used by generated documents (contracts, payslips). */
+export interface CompanyProfile {
+  legal_name: string;
+  address: string;
+  business_type: string;
+  city: string;
+  signer_name: string;
+  signer_title: string;
+  hr_contact_email: string;
+  /** Prefix of document and employee numbers, e.g. "CTN" -> "CTN-0001". */
+  doc_code: string;
+  payday_day: number;
+  annual_leave_days: number;
+  has_logo: boolean;
+  logo_updated_at: string | null;
+}
+
+export interface UpdateCompanyProfilePayload {
+  legal_name: string;
+  address: string;
+  business_type: string;
+  city: string;
+  signer_name: string;
+  signer_title: string;
+  hr_contact_email: string;
+  doc_code: string;
+  payday_day: number;
+  annual_leave_days: number;
+}

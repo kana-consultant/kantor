@@ -287,3 +287,50 @@ export interface ReimbursementFormValues {
 }
 
 
+
+export type HRGender = "male" | "female";
+
+/**
+ * Identity section of the HR profile. Present only for callers with
+ * hris:employee_identity:view. The full NIK is never returned: nik_masked keeps
+ * the six region digits ("327301**********"). Empty strings mean "not filled".
+ */
+export interface HRIdentity {
+  has_nik: boolean;
+  nik_masked: string;
+  birth_place: string;
+  birth_date: string;
+  gender: HRGender | "";
+  bank_account_name: string;
+  ktp_address: string;
+  updated_at: string | null;
+}
+
+export interface HRProfile {
+  employee_id: string;
+  employee_number: number | null;
+  /** Assigned automatically at the employee's first payslip or contract. */
+  employee_code: string | null;
+  job_title: string | null;
+  updated_at: string | null;
+  identity_visible: boolean;
+  personal_email?: string;
+  identity?: HRIdentity;
+}
+
+export interface UpdateHRIdentityPayload {
+  /** Empty keeps the stored NIK (replace-only). */
+  nik: string;
+  birth_place: string;
+  birth_date: string;
+  gender: HRGender | "";
+  bank_account_name: string;
+  ktp_address: string;
+}
+
+/** Only the groups that are present are changed. */
+export interface UpdateHRProfilePayload {
+  job_title?: string;
+  personal_email?: string;
+  identity?: UpdateHRIdentityPayload;
+}

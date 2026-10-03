@@ -29,14 +29,6 @@ import {
 	TaskOverlay,
 } from "@/components/shared/kanban-cards";
 import { KanbanColumnContainer } from "@/components/shared/kanban-column-container";
-import {
-	KanbanDialogs,
-	type ColumnModalState,
-} from "@/components/shared/kanban-dialogs";
-import { useKanbanDrag } from "@/hooks/use-kanban-drag";
-import { useKanbanMutations } from "@/hooks/use-kanban-mutations";
-import { KanbanToolbar } from "@/components/shared/kanban-toolbar";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { TaskModal } from "@/components/shared/task-modal";
 import { Card } from "@/components/ui/card";
 import { extractDateInputValue } from "@/lib/date";
@@ -165,7 +157,7 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 		},
 	});
 
-	const columns = columnsQuery.data ?? [];
+	const columns = useMemo(() => columnsQuery.data ?? [], [columnsQuery.data]);
 	const visibleColumnIds = useMemo(
 		() =>
 			columns

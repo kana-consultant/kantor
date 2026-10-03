@@ -13,6 +13,10 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/repository"
 )
 
+// EnsureEmployeeProfileForUser returns the user's employee record, creating
+// it when needed. BankAccountNumber is never filled here: the number is
+// encrypted at rest (employees.bank_account_encrypted) and only the hris
+// employees repository opens it; callers only need the record itself.
 func (r *Repository) EnsureEmployeeProfileForUser(ctx context.Context, userID string) (model.Employee, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
@@ -39,7 +43,7 @@ func (r *Repository) EnsureEmployeeProfileForUser(ctx context.Context, userID st
 
 	var current model.Employee
 	if err := tx.QueryRow(ctx, `
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
+		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, NULL::text, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 		FROM employees
 		WHERE user_id = $1::uuid
 	`, userID).Scan(
@@ -81,7 +85,7 @@ func (r *Repository) EnsureEmployeeProfileForUser(ctx context.Context, userID st
 
 	var employee model.Employee
 	if err := tx.QueryRow(ctx, `
-		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, bank_account_number, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
+		SELECT id::text, user_id::text, full_name, email, phone, position, department, date_joined, employment_status, address, emergency_contact, avatar_url, NULL::text, bank_name, linkedin_profile, ssh_keys, created_at, updated_at
 		FROM employees
 		WHERE user_id = $1::uuid
 	`, userID).Scan(

@@ -1,5 +1,5 @@
 import { authRequestEnvelope, authRequestJSON } from "@/lib/api-client";
-import { toDateOnlyString } from "@/lib/date";
+import { extractDateInputValue, toDateOnlyString } from "@/lib/date";
 import type {
   Employee,
   EmployeeFilters,
@@ -76,6 +76,34 @@ export async function updateEmployee(employeeId: string, input: EmployeeFormValu
       body: JSON.stringify(serializeEmployeeForm(input)),
     },
   );
+}
+
+/**
+ * Saves a few fields of an employee through the full-replacement PUT, keeping
+ * every other field as last read. A masked bank account number echoed back
+ * ('******7890', for callers without identity view) keeps the stored one.
+ */
+export async function patchEmployeeFields(employee: Employee, changes: Partial<EmployeeFormValues>) {
+  return updateEmployee(employee.id, { ...employeeFormValues(employee), ...changes });
+}
+
+export function employeeFormValues(employee: Employee): EmployeeFormValues {
+  return {
+    full_name: employee.full_name,
+    email: employee.email,
+    phone: employee.phone ?? "",
+    position: employee.position,
+    department: employee.department ?? "",
+    date_joined: extractDateInputValue(employee.date_joined),
+    employment_status: employee.employment_status,
+    address: employee.address ?? "",
+    emergency_contact: employee.emergency_contact ?? "",
+    avatar_url: employee.avatar_url ?? "",
+    bank_account_number: employee.bank_account_number ?? "",
+    bank_name: employee.bank_name ?? "",
+    linkedin_profile: employee.linkedin_profile ?? "",
+    ssh_keys: employee.ssh_keys ?? "",
+  };
 }
 
 export async function uploadEmployeeAvatar(employeeId: string, file: File) {

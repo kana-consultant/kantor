@@ -28,6 +28,72 @@ type Config struct {
 	AppURL                    string
 	Tenants                   []TenantConfig
 	WAHADefaults              WAHADefaultsConfig
+	// RawAppEnv is APP_ENV exactly as set (trimmed), without the
+	// "development" default AppEnv falls back to. Security-relevant dev
+	// switches require it to be set explicitly.
+	RawAppEnv string
+	// DocumentMailDevSMTPAddr is the raw DOCUMENT_MAIL_DEV_SMTP_ADDR value.
+	// Read it through DocumentMailCapture, which only captures with an
+	// explicit APP_ENV=development.
+	DocumentMailDevSMTPAddr string
+	// Documents holds the document engine (DOCX render + LibreOffice PDF)
+	// settings.
+	Documents DocumentsConfig
+	// DataMaintenance holds the opt-in, irreversible clean-ups of existing
+	// rows. Both are off unless explicitly enabled.
+	DataMaintenance DataMaintenanceConfig
+}
+
+// DataMaintenanceConfig switches on clean-ups that rewrite existing rows and
+// cannot be undone. They are off by default so that starting a new release
+// never changes existing data; enable them only after a verified backup
+// (docs/deployment.md, "First deploy of the HR documents feature").
+type DataMaintenanceConfig struct {
+	// BankAccountClearPlaintext (BANK_ACCOUNT_CLEAR_PLAINTEXT) clears
+	// employees.bank_account_number once the encrypted copy is stored, and
+	// makes writes store the ciphertext only. Off: both columns are kept
+	// and written.
+	BankAccountClearPlaintext bool
+	// AuditScrubExisting (AUDIT_SCRUB_EXISTING) redacts the denylisted keys
+	// in audit_logs rows written before this release. New rows are always
+	// redacted on insert, whatever this says.
+	AuditScrubExisting bool
+	// Invalid lists the variables above whose value is not a boolean; they
+	// are treated as off (and logged at startup) instead of failing the
+	// start.
+	Invalid []string
+}
+
+// DocumentsConfig configures PDF conversion of generated documents (payslips,
+// contracts). An empty SofficeBin disables PDF: documents can still be
+// generated and downloaded as DOCX, but sending returns 409 unless
+// AllowDocxSend is set.
+type DocumentsConfig struct {
+	// SofficeBin is the resolved LibreOffice soffice executable: SOFFICE_BIN
+	// when it points at an executable file, otherwise auto-detected when
+	// SOFFICE_BIN is unset. Empty when PDF is disabled.
+	SofficeBin string
+	// SofficeSource is how SofficeBin was resolved (SofficeSource*).
+	SofficeSource string
+	// SofficeRequested is the raw SOFFICE_BIN value, for the startup log.
+	SofficeRequested string
+	// SofficeInvalidReason explains SofficeSourceEnvInvalid.
+	SofficeInvalidReason string
+	// RenderTimeout bounds one soffice call (DOCUMENT_RENDER_TIMEOUT).
+	RenderTimeout time.Duration
+	// LOProfileDir is the persistent LibreOffice profile reused across jobs:
+	// DOCUMENT_LO_PROFILE_DIR, or a per-user cache dir per port when unset.
+	LOProfileDir string
+	// LOProfileDirDefaulted is true when LOProfileDir is the default.
+	LOProfileDirDefaulted bool
+	// AllowDocxSend lets documents be emailed as DOCX when no PDF exists
+	// (DOCUMENTS_ALLOW_DOCX_SEND, default false).
+	AllowDocxSend bool
+}
+
+// PDFEnabled reports whether a usable soffice binary was resolved.
+func (d DocumentsConfig) PDFEnabled() bool {
+	return strings.TrimSpace(d.SofficeBin) != ""
 }
 
 // WAHADefaultsConfig holds the WAHA (WhatsApp HTTP API) values used to seed a
@@ -75,9 +141,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	port := getEnv("PORT", "8080")
+	documents, err := loadDocumentsConfig(port, systemFileLookup())
+	if err != nil {
+		return Config{}, err
+	}
+	dataMaintenance := loadDataMaintenanceConfig()
+
 	cfg := Config{
 		AppEnv:                    appEnv,
-		Port:                      getEnv("PORT", "8080"),
+		Port:                      port,
 		DatabaseURL:               os.Getenv("DATABASE_URL"),
 		JWTSecret:                 jwtSecret,
 		DataEncryptionKey:         dataEncryptionKey,
@@ -92,6 +165,11 @@ func Load() (Config, error) {
 		AppURL:               getEnv("APP_URL", "http://localhost:3000"),
 		Tenants:              parseTenants(getEnv("TENANTS", "Default|default|localhost")),
 		WAHADefaults:         wahaDefaults,
+
+		RawAppEnv:               strings.TrimSpace(os.Getenv("APP_ENV")),
+		DocumentMailDevSMTPAddr: strings.TrimSpace(os.Getenv("DOCUMENT_MAIL_DEV_SMTP_ADDR")),
+		Documents:               documents,
+		DataMaintenance:         dataMaintenance,
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -113,6 +191,16 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// DocumentMailCapture returns where document email goes. With APP_ENV
+// explicitly set to development (an unset or blank APP_ENV does not count,
+// even though AppEnv defaults to development) it is captured by a local SMTP
+// server — DefaultDevSMTPAddr (Mailpit) unless DOCUMENT_MAIL_DEV_SMTP_ADDR
+// names another host:port or switches capture off. In every other APP_ENV
+// Addr is empty and documents go to the constant smtp.gmail.com.
+func (c Config) DocumentMailCapture() MailCapture {
+	return resolveMailCapture(c.RawAppEnv, c.DocumentMailDevSMTPAddr)
 }
 
 func loadDotEnv() {
@@ -155,6 +243,24 @@ func parseBool(key string, fallback bool) (bool, error) {
 	default:
 		return false, fmt.Errorf("invalid boolean for %s", key)
 	}
+}
+
+// loadDataMaintenanceConfig reads the opt-in clean-up switches. A value that
+// is not a boolean counts as off: these switches only ever destroy data, so
+// a typo must neither enable them nor stop the server from starting.
+func loadDataMaintenanceConfig() DataMaintenanceConfig {
+	var cfg DataMaintenanceConfig
+	optIn := func(key string) bool {
+		enabled, err := parseBool(key, false)
+		if err != nil {
+			cfg.Invalid = append(cfg.Invalid, key)
+			return false
+		}
+		return enabled
+	}
+	cfg.BankAccountClearPlaintext = optIn("BANK_ACCOUNT_CLEAR_PLAINTEXT")
+	cfg.AuditScrubExisting = optIn("AUDIT_SCRUB_EXISTING")
+	return cfg
 }
 
 func splitCSV(value string) []string {
@@ -210,6 +316,41 @@ func loadWAHADefaults() (WAHADefaultsConfig, error) {
 		MaxDelayMS:       maxDelay,
 		ReminderCron:     getEnv("WAHA_REMINDER_CRON", "0 8 * * 1-5"),
 		WeeklyDigestCron: getEnv("WAHA_WEEKLY_DIGEST_CRON", "0 8 * * 1"),
+	}, nil
+}
+
+const defaultDocumentRenderTimeout = 90 * time.Second
+
+func loadDocumentsConfig(port string, lookup fileLookup) (DocumentsConfig, error) {
+	timeout, err := parseDuration("DOCUMENT_RENDER_TIMEOUT", defaultDocumentRenderTimeout.String())
+	if err != nil {
+		return DocumentsConfig{}, err
+	}
+	if timeout <= 0 {
+		return DocumentsConfig{}, errors.New("DOCUMENT_RENDER_TIMEOUT must be greater than zero")
+	}
+
+	allowDocxSend, err := parseBool("DOCUMENTS_ALLOW_DOCX_SEND", false)
+	if err != nil {
+		return DocumentsConfig{}, err
+	}
+
+	soffice := resolveSoffice(os.Getenv("SOFFICE_BIN"), lookup)
+	profileDir := strings.TrimSpace(os.Getenv("DOCUMENT_LO_PROFILE_DIR"))
+	profileDefaulted := profileDir == ""
+	if profileDefaulted {
+		profileDir = defaultLOProfileDir(port, os.UserCacheDir, os.TempDir)
+	}
+
+	return DocumentsConfig{
+		SofficeBin:            soffice.Bin,
+		SofficeSource:         soffice.Source,
+		SofficeRequested:      soffice.Requested,
+		SofficeInvalidReason:  soffice.Reason,
+		RenderTimeout:         timeout,
+		LOProfileDir:          profileDir,
+		LOProfileDirDefaulted: profileDefaulted,
+		AllowDocxSend:         allowDocxSend,
 	}, nil
 }
 

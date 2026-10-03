@@ -34,6 +34,11 @@ services:
       UPLOADS_DIR: /app/data/uploads
     volumes:
       - uploads_data:/app/data/uploads
+    # Document conversion writes plaintext payslips/contracts to
+    # /tmp/kantor-docgen while soffice runs; keep them in memory so nothing
+    # survives a container restart.
+    tmpfs:
+      - /tmp
     expose:
       - "8080"
     healthcheck:

@@ -37,11 +37,25 @@ var excludedSuffixes = []string{
 
 // excludedContains drops credential and OAuth self-management endpoints: an AI
 // client must not mint or revoke its own tokens or approve OAuth grants. It also
-// drops file-serving routes, which return binary blobs.
+// drops file-serving routes, which return binary blobs, and the mail
+// credential / email-delivery routes: an AI client must not rewire where
+// tenant or document email goes, send it, or read who was mailed what. HR
+// document data stays off the surface too: employee identity (NIK, birth
+// data) behind /hr-profile, the company profile + logo that every
+// generated document carries, payslips (amounts, PDFs, sending) and
+// employment contracts (PKWT/NDA with full NIK, account number and
+// compensation; sending).
 var excludedContains = []string{
 	"/auth/pat",
 	"/oauth",
 	"/files/",
+	"/settings/document-mail",
+	"/settings/mail-delivery",
+	"/email-deliveries",
+	"/hr-profile",
+	"/settings/company-profile",
+	"/hris/payslips",
+	"/hris/contracts",
 }
 
 // BuildCatalog derives the MCP tool surface from the live chi route table, so it

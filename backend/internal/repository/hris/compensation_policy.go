@@ -29,7 +29,10 @@ type EmployeeMonthlyHoursRow struct {
 	EmployeeID    string
 	UserID        *string
 	FullName      string
+	Position      string
+	DateJoined    time.Time
 	ActiveSeconds int64
+	SessionCount  int64
 }
 
 type EmployeeDailyHoursRow struct {
@@ -104,20 +107,25 @@ func (r *CompensationPolicyRepository) Update(ctx context.Context, params Update
 	return policy, err
 }
 
+// ListMonthlyActiveSeconds returns every active/probation employee who had
+// joined by the end of the period, with their total tracked active seconds and
+// session count between from and to (inclusive dates).
 func (r *CompensationPolicyRepository) ListMonthlyActiveSeconds(ctx context.Context, from time.Time, to time.Time, employeeID *string) ([]EmployeeMonthlyHoursRow, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
 	rows, err := repository.DB(ctx, r.db).Query(ctx, `
-		SELECT e.id::text, e.user_id::text, e.full_name,
-		       COALESCE(SUM(s.total_active_seconds), 0)::bigint AS active_seconds
+		SELECT e.id::text, e.user_id::text, e.full_name, e.position, e.date_joined,
+		       COALESCE(SUM(s.total_active_seconds), 0)::bigint AS active_seconds,
+		       COUNT(s.id)::bigint AS session_count
 		FROM employees e
 		LEFT JOIN activity_sessions s
 		  ON s.user_id = e.user_id
 		 AND s.date BETWEEN $1::date AND $2::date
 		WHERE e.employment_status IN ('active', 'probation')
+		  AND e.date_joined <= $2::date
 		  AND ($3::uuid IS NULL OR e.id = $3::uuid)
-		GROUP BY e.id, e.user_id, e.full_name
+		GROUP BY e.id, e.user_id, e.full_name, e.position, e.date_joined
 		ORDER BY e.full_name
 	`, from, to, employeeID)
 	if err != nil {
@@ -129,7 +137,7 @@ func (r *CompensationPolicyRepository) ListMonthlyActiveSeconds(ctx context.Cont
 	for rows.Next() {
 		var row EmployeeMonthlyHoursRow
 		var userID sql.NullString
-		if err := rows.Scan(&row.EmployeeID, &userID, &row.FullName, &row.ActiveSeconds); err != nil {
+		if err := rows.Scan(&row.EmployeeID, &userID, &row.FullName, &row.Position, &row.DateJoined, &row.ActiveSeconds, &row.SessionCount); err != nil {
 			return nil, err
 		}
 		if userID.Valid {
@@ -140,7 +148,10 @@ func (r *CompensationPolicyRepository) ListMonthlyActiveSeconds(ctx context.Cont
 	return out, rows.Err()
 }
 
-func (r *CompensationPolicyRepository) ListDailyHoursViolations(ctx context.Context, from time.Time, to time.Time, minSeconds int64, employeeID *string) ([]EmployeeDailyHoursRow, error) {
+// ListDailyActiveSeconds returns the tracked active seconds per employee per
+// day between from and to (inclusive). Days without any session are absent;
+// the service derives short and absent weekdays from this map.
+func (r *CompensationPolicyRepository) ListDailyActiveSeconds(ctx context.Context, from time.Time, to time.Time, employeeID *string) ([]EmployeeDailyHoursRow, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
@@ -150,11 +161,10 @@ func (r *CompensationPolicyRepository) ListDailyHoursViolations(ctx context.Cont
 		JOIN activity_sessions s ON s.user_id = e.user_id
 		WHERE s.date BETWEEN $1::date AND $2::date
 		  AND e.employment_status IN ('active', 'probation')
-		  AND ($4::uuid IS NULL OR e.id = $4::uuid)
+		  AND ($3::uuid IS NULL OR e.id = $3::uuid)
 		GROUP BY e.id, s.date
-		HAVING SUM(s.total_active_seconds) > 0 AND SUM(s.total_active_seconds) < $3::bigint
 		ORDER BY e.id, s.date
-	`, from, to, minSeconds, employeeID)
+	`, from, to, employeeID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +181,10 @@ func (r *CompensationPolicyRepository) ListDailyHoursViolations(ctx context.Cont
 	return out, rows.Err()
 }
 
-func (r *CompensationPolicyRepository) ListCurrentBaseSalaries(ctx context.Context, employeeID *string) ([]EmployeeBaseSalaryRow, error) {
+// ListCurrentBaseSalaries returns each employee's newest salary row that is
+// already effective on asOf (the period end), so a raise dated next month
+// does not show up on this month's evaluation.
+func (r *CompensationPolicyRepository) ListCurrentBaseSalaries(ctx context.Context, asOf time.Time, employeeID *string) ([]EmployeeBaseSalaryRow, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
@@ -179,8 +192,9 @@ func (r *CompensationPolicyRepository) ListCurrentBaseSalaries(ctx context.Conte
 		SELECT DISTINCT ON (employee_id) employee_id::text, base_salary
 		FROM salaries
 		WHERE ($1::uuid IS NULL OR employee_id = $1::uuid)
+		  AND effective_date <= $2::date
 		ORDER BY employee_id, effective_date DESC, created_at DESC
-	`, employeeID)
+	`, employeeID, asOf)
 	if err != nil {
 		return nil, err
 	}

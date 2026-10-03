@@ -59,10 +59,11 @@
 ### HRIS Module
 
 - **Employee Management** &mdash; Employee profiles, department structure, avatars, bank details, SSH keys, LinkedIn
-- **Compensation** &mdash; Salary and bonus records with AES-256-GCM encryption at rest. Historical tracking with audit logging
+- **Compensation** &mdash; Salary and bonus records with AES-256-GCM encryption at rest (bank account numbers and identity data too). Historical tracking with audit logging that redacts amounts and secrets
 - **Subscription Tracking** &mdash; Tool/service subscriptions with renewal alerts (H-30, H-7, H-1) and cost aggregation
 - **Finance & Outcome** &mdash; Income and outcome tracking with customizable categories, approval workflow, 12-month trend analysis, and CSV/Excel export
 - **Reimbursements** &mdash; Submission with receipt upload, approval workflow (submitted &rarr; approved/rejected &rarr; paid), attachment management
+- **HR Documents** &mdash; Monthly payslips (Slip Gaji) and employment contracts (PKWT + NDA/HKI) generated from DOCX templates, converted to PDF by LibreOffice inside the backend (no separate converter sidecar service), and emailed through a dedicated Gmail account. Encrypted snapshots, numbering, void &amp; reissue, and an HR-only permission set. See [HRIS documents](docs/hris-documents.md)
 
 ### Marketing Module
 
@@ -267,6 +268,14 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `APP_URL`                | No       | Public base URL used for deep links in WA messages and notifications |
 | `TRACKER_RETENTION_DAYS` | No       | Activity tracker data retention (default: 90)          |
 
+The HR document features (payslips, contracts) need no extra variables. LibreOffice is
+auto-detected for PDF conversion (install it, e.g. `brew install --cask libreoffice`, and
+restart the backend), its profile goes to the user cache dir, and with
+`APP_ENV=development` document email is captured by Mailpit at `localhost:1025` instead of
+Gmail. `SOFFICE_BIN`, `DOCUMENT_LO_PROFILE_DIR` and `DOCUMENT_MAIL_DEV_SMTP_ADDR` are
+optional overrides (`off` disables PDF or the capture); Admin > Settings > Email Dokumen
+shows the effective status. See [HRIS documents](docs/hris-documents.md).
+
 WhatsApp runtime settings are no longer configured from environment variables.
 WAHA endpoint, API key, session name, rate limits, and schedules are stored per tenant in `tenant_wa_configs` and managed from the WA Broadcast settings page.
 
@@ -296,7 +305,8 @@ TENANTS=Company A|company-a|kantor.company-a.com;Company B|company-b|kantor.comp
 | Document                               | Description                                                             |
 | -------------------------------------- | ----------------------------------------------------------------------- |
 | [Architecture Overview](docs/architecture.md) | Runtime architecture, multi-tenancy, notifications, extension, and WA integration |
-| [Deployment Guide](docs/deployment.md) | Production deployment with Docker, TLS, backups, and security checklist |
+| [Deployment Guide](docs/deployment.md) | Production deployment with Docker Compose or NixOS, TLS, backups, document engine, and security checklist |
+| [HRIS Documents](docs/hris-documents.md) | Payslips and employment contracts: setup, HR flows, numbering, legal and data-protection notes |
 | [Testing Guide](docs/testing.md) | Automated backend test coverage, frontend smoke checks, and CI workflow |
 | [Contributing](CONTRIBUTING.md)        | Development setup, project rules, PR guidelines, and commit style       |
 | [Security Policy](SECURITY.md)         | Vulnerability reporting instructions                                    |

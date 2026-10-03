@@ -14,10 +14,10 @@ var endpointAnnotations = map[string]EndpointMeta{
 		},
 	},
 	"GET /api/v1/hris/salary-safety": {
-		Description: "Salary-safety (min-hours compliance) per employee for a period",
+		Description: "Salary-safety per employee for a month: actual tracked hours (whole month, weekends and today included) vs. the monthly target pro-rated by weekdays elapsed through yesterday (or month end for past months) since max(1st, date_joined). safe = actual >= expected_hours_to_date, at_risk = below; short_days/absent_days are warnings only. no_data with reason no_user, future_month or target_not_applicable (Part Time, Internship, Project Based, Outsourcing). Hours are in 0.01 h (actual rounded down, target rounded up), so monthly_active_hours >= expected_hours_to_date exactly when safe. Employees who have not started yet (date_joined after today) are not listed. meta holds the evaluated period and the current period in the policy timezone.",
 		Query: []QueryParam{
-			qi("year", "Period year (default current year)."),
-			qi("month", "Period month 1-12 (default current month)."),
+			qi("year", "Period year (default current year in the policy timezone)."),
+			qi("month", "Period month 1-12 (default current month in the policy timezone)."),
 			qs("employee_id", "Restrict to a single employee (UUID)."),
 		},
 	},

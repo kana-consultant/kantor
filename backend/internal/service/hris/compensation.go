@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
@@ -27,6 +28,7 @@ type compensationRepository interface {
 	CreateSalary(ctx context.Context, params hrisrepo.CreateSalaryParams) (hrisrepo.SalaryRow, error)
 	ListSalaries(ctx context.Context, employeeID string) ([]hrisrepo.SalaryRow, error)
 	GetCurrentSalary(ctx context.Context, employeeID string) (hrisrepo.SalaryRow, error)
+	GetSalaryAsOf(ctx context.Context, employeeID string, date time.Time) (hrisrepo.SalaryRow, error)
 	LogSalaryAccess(ctx context.Context, userID string, employeeID string, action string) error
 	CreateBonus(ctx context.Context, params hrisrepo.CreateBonusParams) (hrisrepo.BonusRow, error)
 	ListBonuses(ctx context.Context, employeeID string) ([]hrisrepo.BonusRow, error)
@@ -146,6 +148,46 @@ func (s *CompensationService) GetCurrentSalary(ctx context.Context, employeeID s
 		return model.SalaryRecord{}, err
 	}
 	return s.mapSalaryRow(row)
+}
+
+// SalaryAsOf returns the decrypted salary row in force on date (payslip
+// assembly). It does no permission check or access logging: callers are
+// gated by hris:salary:view and log the access themselves.
+func (s *CompensationService) SalaryAsOf(ctx context.Context, employeeID string, date time.Time) (model.SalaryRecord, error) {
+	row, err := s.repo.GetSalaryAsOf(ctx, employeeID, date)
+	if err != nil {
+		if errors.Is(err, hrisrepo.ErrSalaryNotFound) {
+			return model.SalaryRecord{}, ErrSalaryNotFound
+		}
+		return model.SalaryRecord{}, err
+	}
+	return s.mapSalaryRow(row)
+}
+
+// BonusRecords returns every bonus of the employee, decrypted (payslip
+// assembly applies the carry-over rule). No permission check, see
+// SalaryAsOf.
+func (s *CompensationService) BonusRecords(ctx context.Context, employeeID string) ([]model.BonusRecord, error) {
+	rows, err := s.repo.ListBonuses(ctx, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]model.BonusRecord, 0, len(rows))
+	for _, row := range rows {
+		record, err := s.mapBonusRow(row)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, record)
+	}
+	return result, nil
+}
+
+// LogSalaryAccess writes a salary-access audit row. Callers treat an error
+// as fatal (fail-closed): no salary data is returned unless the access was
+// recorded.
+func (s *CompensationService) LogSalaryAccess(ctx context.Context, actorID string, resourceID string, action string) error {
+	return s.repo.LogSalaryAccess(ctx, actorID, resourceID, action)
 }
 
 func (s *CompensationService) CreateBonus(ctx context.Context, employeeID string, request hrisdto.CreateBonusRequest, actorID string) (model.BonusRecord, error) {

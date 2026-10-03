@@ -464,9 +464,20 @@ func scanLogRecord(scanner logScanner) (LogRecord, error) {
 	return item, nil
 }
 
+// marshalNullableJSON encodes an audit value with the denylisted keys
+// redacted (redact.go), so no caller can store account numbers, salaries or
+// secrets in audit_logs.
 func marshalNullableJSON(v interface{}) ([]byte, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return json.Marshal(v)
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	redacted, _, err := RedactJSON(raw)
+	if err != nil {
+		return nil, fmt.Errorf("redact audit value: %w", err)
+	}
+	return redacted, nil
 }

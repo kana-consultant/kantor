@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { authDownload, ApiError } from "@/lib/api-client";
+import { triggerDownload } from "@/lib/download";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { Button, type ButtonProps } from "@/components/ui/button";
@@ -253,13 +254,4 @@ function defaultFilename(endpoint: string) {
   const lastPart = parts[parts.length - 1];
   const meaningful = lastPart === "export" ? parts[parts.length - 2] : lastPart;
   return meaningful ?? "report";
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-  const objectUrl = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = filename;
-  anchor.click();
-  window.URL.revokeObjectURL(objectUrl);
 }
