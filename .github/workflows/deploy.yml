@@ -130,7 +130,8 @@ jobs:
         run: |
           # The lp-covertplay machine needs the kantor and lp-covertplay
           # inputs. Override the other tenants' private flake inputs (used by
-          # porto/doc-project machines) to the already-cloned nix-config so
+          # other machines, e.g. porto/doc-project; absensi-perlinsos was added
+          # to nix-config on 2026-10-03) to the already-cloned nix-config so
           # this job never fetches repos it has no CI credentials for.
           SYSTEM=$(nix build \
             /tmp/nix-config#nixosConfigurations.lp-covertplay.config.system.build.toplevel \
@@ -139,6 +140,7 @@ jobs:
             --override-input segmenter path:/tmp/nix-config \
             --override-input segmenter-s52ai path:/tmp/nix-config \
             --override-input wa-bot path:/tmp/nix-config \
+            --override-input absensi-perlinsos path:/tmp/nix-config \
             --print-out-paths --no-link)
           echo "path=$SYSTEM" >> "$GITHUB_OUTPUT"
 
