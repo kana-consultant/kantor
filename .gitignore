@@ -29,6 +29,13 @@ frontend/.vite/
 .env.*.local
 graphify-out/
 
+# ── Runtime data ─────────────────────────────────────────────────────────────
+# UPLOADS_DIR=./uploads (the default) relative to where the backend runs:
+# avatars, tenant logos and encrypted payslip/contract PDFs. Anchored so the
+# backend/internal/uploads source package is not ignored.
+/uploads/
+/backend/uploads/
+
 # ── Docker ────────────────────────────────────────────────────────────────────
 pgdata/
 

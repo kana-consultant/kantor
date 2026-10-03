@@ -23,12 +23,15 @@ import (
 const refreshTokenCookie = "refresh_token"
 
 type Handler struct {
-	service       *authservice.Service
-	validator     *validator.Validate
-	cookieSecure  bool
-	cookiePath    string
-	refreshExpiry time.Duration
-	uploadsDir    string
+	service      *authservice.Service
+	documentMail *authservice.DocumentMailService
+	// companyProfile serves /admin/settings/company-profile (+ /logo).
+	companyProfile *authservice.CompanyProfileService
+	validator      *validator.Validate
+	cookieSecure   bool
+	cookiePath     string
+	refreshExpiry  time.Duration
+	uploadsDir     string
 }
 
 func New(service *authservice.Service, cfg config.Config) *Handler {
@@ -40,6 +43,12 @@ func New(service *authservice.Service, cfg config.Config) *Handler {
 		refreshExpiry: cfg.JWTRefreshExpiry,
 		uploadsDir:    cfg.UploadsDir,
 	}
+}
+
+// SetDocumentMailService wires the documents-only Gmail settings and test
+// endpoints (/admin/settings/document-mail).
+func (h *Handler) SetDocumentMailService(service *authservice.DocumentMailService) {
+	h.documentMail = service
 }
 
 func (h *Handler) RegisterRoutes(router chi.Router) {

@@ -1,0 +1,143 @@
+## word/header1.xml
+PT Contoh Teknologi Nusantara	RAHASIA | CONFIDENTIAL
+## word/document.xml
+PERJANJIAN KERJA WAKTU TERTENTU
+FIXED-TERM EMPLOYMENT AGREEMENT
+No. 021/PKWT/CTN/X/2026
+Perjanjian Kerja Waktu Tertentu ini (selanjutnya disebut "Perjanjian") dibuat dan ditandatangani di Jakarta pada tanggal 1 Oktober 2026 oleh dan antara:
+This Fixed-Term Employment Agreement (hereinafter referred to as the "Agreement") is made and signed in Jakarta on 1 October 2026 by and between:
+1.	PT Contoh Teknologi Nusantara, suatu perseroan terbatas yang didirikan berdasarkan hukum Negara Republik Indonesia, berkedudukan di Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110, bergerak di bidang pengembangan perangkat lunak dan konsultasi kecerdasan artifisial, dalam hal ini diwakili oleh Rudi Hartono selaku Direktur, yang berwenang bertindak untuk dan atas nama perseroan tersebut, selanjutnya disebut "Perusahaan".
+1.	PT Contoh Teknologi Nusantara, a limited liability company established under the laws of the Republic of Indonesia, domiciled at Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110, engaged in pengembangan perangkat lunak dan konsultasi kecerdasan artifisial, in this matter represented by Rudi Hartono as Direktur, duly authorised to act for and on behalf of the company, hereinafter referred to as the "Company".
+2.	Rina Kartika Sari, lahir di Bandung pada tanggal 14-02-1998, jenis kelamin Perempuan / Female, pemegang Kartu Tanda Penduduk dengan NIK 3273015402980001, beralamat di Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung, nomor telepon 0812-0000-1111, email rina.kartika@example.com, bertindak untuk dan atas nama diri sendiri, selanjutnya disebut "Karyawan".
+2.	Rina Kartika Sari, born in Bandung on 14-02-1998, gender Perempuan / Female, holder of Indonesian identity card (NIK) number 3273015402980001, residing at Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung, phone 0812-0000-1111, email rina.kartika@example.com, acting for and on his/her own behalf, hereinafter referred to as the "Employee".
+Perusahaan dan Karyawan secara bersama-sama disebut "Para Pihak" dan masing-masing disebut "Pihak".
+The Company and the Employee are jointly referred to as the "Parties" and each as a "Party".
+Para Pihak terlebih dahulu menerangkan hal-hal sebagai berikut:
+a.	Bahwa Perusahaan membutuhkan tenaga kerja untuk pekerjaan yang menurut jenis dan sifat atau kegiatannya akan selesai dalam waktu tertentu, yaitu pekerjaan pengembangan sistem AI untuk proyek klien yang penyelesaiannya diperkirakan dalam waktu tidak terlalu lama;
+b.	Bahwa Karyawan bersedia untuk dipekerjakan oleh Perusahaan berdasarkan Perjanjian Kerja Waktu Tertentu sesuai ketentuan peraturan perundang-undangan di bidang ketenagakerjaan.
+Berdasarkan hal-hal tersebut, Para Pihak sepakat untuk mengikatkan diri dalam Perjanjian ini dengan ketentuan sebagai berikut:
+The Parties first declare the following:
+a.	Whereas the Company requires personnel for work which, by its type, nature or activity, will be completed within a certain period, namely pekerjaan pengembangan sistem AI untuk proyek klien yang penyelesaiannya diperkirakan dalam waktu tidak terlalu lama;
+b.	Whereas the Employee is willing to be employed by the Company under a Fixed-Term Employment Agreement in accordance with the prevailing manpower laws and regulations.
+Based on the foregoing, the Parties agree to bind themselves under this Agreement on the following terms:
+Pasal 1 — Jabatan dan Tugas
+Article 1 — Position and Duties
+1.1	Perusahaan mempekerjakan Karyawan pada jabatan AI Engineer di departemen Engineering, dengan atasan langsung Head of Engineering.
+1.2	Tempat kerja Karyawan adalah kantor Perusahaan di Jakarta Selatan dengan pengaturan kerja hybrid (3 hari WFO, 2 hari WFH) / hybrid (3 days in office, 2 days remote).
+1.3	Uraian tugas Karyawan adalah: merancang, membangun, dan memelihara pipeline RAG serta integrasi LLM untuk proyek klien. Karyawan juga wajib melaksanakan tugas lain yang wajar dan berkaitan dengan jabatannya sebagaimana diberikan oleh atasan.
+1.1	The Company employs the Employee in the position of AI Engineer in the Engineering department, reporting directly to Head of Engineering.
+1.2	The Employee's place of work is kantor Perusahaan di Jakarta Selatan under a hybrid (3 hari WFO, 2 hari WFH) / hybrid (3 days in office, 2 days remote) work arrangement.
+1.3	The Employee's duties are: merancang, membangun, dan memelihara pipeline RAG serta integrasi LLM untuk proyek klien. The Employee shall also perform other reasonable duties related to the position as assigned by the supervisor.
+Pasal 2 — Jangka Waktu
+Article 2 — Term
+2.1	Perjanjian ini berlaku selama 12 bulan, terhitung sejak tanggal 1 Oktober 2026 sampai dengan tanggal 30 September 2027.
+2.2	Perjanjian ini tidak mensyaratkan adanya masa percobaan kerja.
+2.3	Perjanjian ini dapat diperpanjang berdasarkan kesepakatan tertulis Para Pihak, dengan ketentuan jangka waktu keseluruhan beserta perpanjangannya tidak melebihi batas yang diatur dalam peraturan perundang-undangan.
+2.4	Perusahaan akan memberitahukan maksud untuk memperpanjang atau tidak memperpanjang Perjanjian ini paling lambat 30 hari sebelum Perjanjian berakhir.
+2.1	This Agreement is valid for 12 months, commencing on 1 October 2026 and ending on 30 September 2027.
+2.2	This Agreement does not require any probationary period.
+2.3	This Agreement may be extended by written agreement of the Parties, provided that the total term including any extension does not exceed the limit stipulated by the prevailing laws and regulations.
+2.4	The Company shall notify its intention to extend or not to extend this Agreement no later than 30 days before this Agreement expires.
+Pasal 3 — Waktu Kerja dan Lembur
+Article 3 — Working Hours and Overtime
+3.1	Waktu kerja Karyawan adalah 40 jam per minggu, pada hari Senin–Jumat / Monday–Friday, pukul 09.00–18.00 WIB, dengan waktu istirahat sesuai peraturan perusahaan.
+3.2	Pekerjaan di luar waktu kerja hanya dapat dilakukan atas perintah tertulis atasan dan diberikan upah lembur sesuai peraturan perundang-undangan.
+3.1	The Employee's working hours are 40 hours per week, on Senin–Jumat / Monday–Friday, from 09.00–18.00 WIB, with rest periods in accordance with company regulations.
+3.2	Work outside working hours may only be performed upon the supervisor's written instruction and shall be compensated with overtime pay in accordance with the prevailing laws and regulations.
+Pasal 4 — Upah
+Article 4 — Wages
+4.1	Karyawan menerima gaji pokok sebesar Rp8.000.000 (delapan juta rupiah) per bulan, dan tunjangan tetap sebesar Rp1.000.000 per bulan.
+4.2	Upah dibayarkan setiap tanggal 25 setiap bulan melalui transfer ke rekening Karyawan berikut: Bank BCA, nomor rekening 1234567890, atas nama Rina Kartika Sari. Apabila tanggal tersebut jatuh pada hari libur, pembayaran dilakukan pada hari kerja sebelumnya.
+4.3	Pajak Penghasilan (PPh Pasal 21) atas upah Karyawan dipotong oleh Perusahaan sesuai peraturan perpajakan yang berlaku.
+4.4	Perusahaan memberikan slip gaji kepada Karyawan setiap bulan, secara elektronik melalui sistem internal Perusahaan.
+4.1	The Employee shall receive a basic salary of IDR 8.000.000 per month, and a fixed allowance of IDR 1.000.000 per month.
+4.2	Wages are paid on the 25 day of each month by transfer to the following Employee account: Bank BCA, account number 1234567890, account holder Rina Kartika Sari. If that date falls on a holiday, payment shall be made on the preceding working day.
+4.3	Income tax (Article 21 Income Tax) on the Employee's wages shall be withheld by the Company in accordance with the prevailing tax regulations.
+4.4	The Company shall provide the Employee with a payslip every month, electronically through the Company's internal system.
+Pasal 5 — Benefit dan Jaminan Sosial
+Article 5 — Benefits and Social Security
+5.1	Perusahaan mendaftarkan Karyawan dalam program BPJS Kesehatan dan BPJS Ketenagakerjaan (JKK, JKM, JHT, JP, dan JKP) sesuai peraturan perundang-undangan, dengan pembagian iuran sesuai ketentuan yang berlaku.
+5.2	Karyawan berhak atas Tunjangan Hari Raya Keagamaan (THR) sesuai peraturan perundang-undangan.
+5.3	Karyawan berhak atas cuti tahunan sebanyak 12 hari kerja sesuai peraturan perusahaan dan peraturan perundang-undangan.
+5.4	Selain itu, Karyawan berhak atas benefit sebagaimana tercantum dalam tabel berikut:
+5.1	The Company shall register the Employee in the BPJS Health and BPJS Employment programmes (JKK, JKM, JHT, JP and JKP) in accordance with the prevailing laws and regulations, with contributions shared as required by law.
+5.2	The Employee is entitled to a Religious Holiday Allowance (THR) in accordance with the prevailing laws and regulations.
+5.3	The Employee is entitled to 12 working days of annual leave in accordance with company regulations and the prevailing laws and regulations.
+5.4	In addition, the Employee is entitled to the benefits listed in the following table:
+Benefit
+Nilai / Value
+Keterangan / Notes
+Tunjangan internet / Internet allowance
+Rp300.000/bulan
+Dibayar bersama gaji
+Laptop kerja / Work laptop
+Pinjam pakai
+Dikembalikan saat kontrak berakhir
+Anggaran pelatihan / Learning budget
+Rp3.000.000/tahun
+Dengan persetujuan atasan
+
+Pasal 6 — Kewajiban Karyawan
+Article 6 — Employee Obligations
+a.	Melaksanakan tugas dengan penuh tanggung jawab, jujur, dan profesional;
+b.	Mematuhi peraturan perusahaan, kebijakan keamanan informasi, dan tata tertib yang berlaku;
+c.	Menggunakan sistem internal Perusahaan untuk pencatatan kehadiran, pelaporan tugas, dan pengajuan reimbursement sesuai prosedur;
+d.	Menjaga dan menggunakan aset Perusahaan hanya untuk kepentingan pekerjaan;
+e.	Tidak melakukan pekerjaan lain yang menimbulkan benturan kepentingan dengan Perusahaan tanpa persetujuan tertulis Perusahaan.
+a.	Perform duties responsibly, honestly and professionally;
+b.	Comply with company regulations, information security policies and applicable codes of conduct;
+c.	Use the Company's internal systems to record attendance, report tasks and submit reimbursements according to procedure;
+d.	Safeguard Company assets and use them solely for work purposes;
+e.	Not engage in other work that creates a conflict of interest with the Company without the Company's written approval.
+Pasal 7 — Kerahasiaan dan Hak Kekayaan Intelektual
+Article 7 — Confidentiality and Intellectual Property
+Karyawan wajib menandatangani dan mematuhi Perjanjian Kerahasiaan dan Pengalihan Hak Kekayaan Intelektual No. 021/NDA-HKI/CTN/X/2026, yang merupakan bagian yang tidak terpisahkan dari Perjanjian ini. Seluruh hasil kerja yang dibuat Karyawan dalam hubungan kerja ini menjadi milik Perusahaan sebagaimana diatur dalam perjanjian tersebut.
+The Employee shall sign and comply with the Confidentiality and Intellectual Property Assignment Agreement No. 021/NDA-HKI/CTN/X/2026, which forms an integral part of this Agreement. All work product created by the Employee in the course of this employment shall belong to the Company as provided in that agreement.
+Pasal 8 — Berakhirnya Perjanjian
+Article 8 — Termination
+8.1	Perjanjian ini berakhir apabila: (a) jangka waktu Perjanjian berakhir; (b) pekerjaan sebagaimana dimaksud dalam Perjanjian ini telah selesai; (c) Karyawan meninggal dunia; atau (d) terdapat alasan lain yang sah menurut peraturan perundang-undangan, peraturan perusahaan, atau putusan pengadilan.
+8.2	Apabila salah satu Pihak mengakhiri Perjanjian ini sebelum berakhirnya jangka waktu di luar alasan sebagaimana dimaksud dalam Pasal 8.1, Pihak yang mengakhiri wajib membayar ganti rugi kepada Pihak lainnya sebesar upah Karyawan sampai batas waktu berakhirnya jangka waktu Perjanjian.
+8.3	Karyawan yang bermaksud mengundurkan diri wajib mengajukan permohonan tertulis paling lambat 30 (tiga puluh) hari sebelumnya.
+8.1	This Agreement terminates if: (a) the term of this Agreement expires; (b) the work referred to in this Agreement has been completed; (c) the Employee passes away; or (d) there is another lawful reason under the laws and regulations, company regulations or a court decision.
+8.2	If either Party terminates this Agreement before the end of its term for reasons other than those referred to in Article 8.1, the terminating Party shall pay the other Party compensation equal to the Employee's wages for the remainder of the term.
+8.3	An Employee intending to resign shall submit a written request at least 30 (thirty) days in advance.
+Pasal 9 — Uang Kompensasi
+Article 9 — Compensation Payment
+Pada saat Perjanjian ini berakhir, Perusahaan wajib memberikan uang kompensasi kepada Karyawan yang besarnya dihitung berdasarkan masa kerja sesuai peraturan perundang-undangan yang berlaku.
+Upon expiry of this Agreement, the Company shall pay the Employee a compensation payment calculated based on the length of service in accordance with the prevailing laws and regulations.
+Pasal 10 — Serah Terima
+Article 10 — Handover
+Pada saat Perjanjian ini berakhir, Karyawan wajib menyerahkan seluruh pekerjaan, dokumen, data, akses akun, dan aset milik Perusahaan dalam keadaan baik, serta menghapus salinan Informasi Rahasia dari perangkat pribadinya.
+Upon termination of this Agreement, the Employee shall hand over all work, documents, data, account access and Company assets in good condition, and delete any copies of Confidential Information from personal devices.
+Pasal 11 — Penyelesaian Perselisihan
+Article 11 — Dispute Resolution
+Perselisihan yang timbul dari Perjanjian ini diselesaikan terlebih dahulu secara musyawarah untuk mufakat melalui perundingan bipartit. Apabila tidak tercapai kesepakatan, perselisihan diselesaikan melalui mekanisme penyelesaian perselisihan hubungan industrial sesuai peraturan perundang-undangan yang berlaku.
+Any dispute arising from this Agreement shall first be settled amicably through bipartite negotiation. If no agreement is reached, the dispute shall be settled through the industrial relations dispute settlement mechanism in accordance with the prevailing laws and regulations.
+
+Pasal 12 — Ketentuan Lain
+Article 12 — Miscellaneous
+12.1	Hal-hal yang belum diatur dalam Perjanjian ini mengikuti peraturan perusahaan dan peraturan perundang-undangan yang berlaku.
+12.2	Setiap perubahan atas Perjanjian ini hanya sah apabila dibuat secara tertulis dan ditandatangani Para Pihak.
+12.3	Perusahaan akan mencatatkan Perjanjian ini kepada instansi ketenagakerjaan sesuai ketentuan yang berlaku.
+12.4	Perjanjian ini dibuat dalam Bahasa Indonesia dan Bahasa Inggris. Apabila terdapat perbedaan penafsiran antara kedua versi bahasa, maka yang berlaku adalah versi Bahasa Indonesia.
+12.5	Perjanjian ini dibuat dalam 2 (dua) rangkap asli atau secara elektronik, masing-masing mempunyai kekuatan hukum yang sama.
+12.1	Matters not regulated in this Agreement shall follow company regulations and the prevailing laws and regulations.
+12.2	Any amendment to this Agreement is valid only if made in writing and signed by the Parties.
+12.3	The Company shall register this Agreement with the manpower authority in accordance with applicable regulations.
+12.4	This Agreement is made in the Indonesian and English languages. In the event of any discrepancy in interpretation between the two versions, the version in the Indonesian language shall prevail.
+12.5	This Agreement is made in 2 (two) original counterparts or electronically, each having equal legal force.
+Jakarta, 1 Oktober 2026
+PERUSAHAAN
+COMPANY
+PT Contoh Teknologi Nusantara
+ 
+Rudi Hartono
+Direktur
+KARYAWAN
+EMPLOYEE
+ 
+e-Meterai Rp10.000
+Rina Kartika Sari
+AI Engineer
+## word/footer1.xml
+No. 021/PKWT/CTN/X/2026	Hal. / Page  / 

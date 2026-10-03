@@ -25,6 +25,8 @@ import {
 } from "@/services/admin-rbac";
 import { toast } from "@/stores/toast-store";
 import { PolicySettingsCard } from "@/components/compensation-policy/policy-settings-card";
+import { DocumentMailCard } from "@/components/document-mail/document-mail-card";
+import { CompanyProfileCard } from "@/components/company-profile/company-profile-card";
 
 export const Route = createFileRoute("/_authenticated/admin/settings")({
   beforeLoad: async () => {
@@ -848,6 +850,10 @@ function AdminSettingsPage() {
             </Button>
           </div>
         </Card>
+
+        <DocumentMailCard />
+
+        <CompanyProfileCard />
 
         <Card className="space-y-5 p-6 xl:col-span-2">
           <div className="flex items-start gap-3">

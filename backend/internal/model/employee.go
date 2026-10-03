@@ -16,11 +16,14 @@ type Employee struct {
 	EmergencyContact  *string   `json:"emergency_contact,omitempty"`
 	AvatarURL         *string   `json:"avatar_url,omitempty"`
 	BankAccountNumber *string   `json:"bank_account_number,omitempty"`
-	BankName          *string   `json:"bank_name,omitempty"`
-	LinkedInProfile   *string   `json:"linkedin_profile,omitempty"`
-	SSHKeys           *string   `json:"ssh_keys,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	// BankAccountUnreadable: a stored (encrypted) account number exists but
+	// could not be decrypted; BankAccountNumber is then nil. Never sent.
+	BankAccountUnreadable bool      `json:"-"`
+	BankName              *string   `json:"bank_name,omitempty"`
+	LinkedInProfile       *string   `json:"linkedin_profile,omitempty"`
+	SSHKeys               *string   `json:"ssh_keys,omitempty"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
 }
 
 type Department struct {

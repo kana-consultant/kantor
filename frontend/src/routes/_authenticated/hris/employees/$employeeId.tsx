@@ -13,6 +13,9 @@ import { EmployeeForm } from "@/components/shared/employee-form";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ExportButton } from "@/components/shared/export-button";
 import { FormModal } from "@/components/shared/form-modal";
+import { EmployeeContractsCard } from "@/components/contracts/employee-contracts-card";
+import { HRProfileSection } from "@/components/hr-profile/hr-profile-section";
+import { PayslipStatusCard } from "@/components/payslips/payslip-status-card";
 import { PermissionGate } from "@/components/shared/permission-gate";
 import { ProtectedAvatar } from "@/components/shared/protected-avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -78,7 +81,7 @@ function EmployeeDetailPage() {
   const queryClient = useQueryClient();
   const session = useAuthStore((s) => s.session);
   const { hasPermission } = useRBAC();
-  const [tab, setTab] = useState<"profile" | "salary" | "bonus" | "reimbursements">("profile");
+  const [tab, setTab] = useState<"profile" | "salary" | "bonus" | "reimbursements" | "contracts">("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
@@ -284,6 +287,7 @@ function EmployeeDetailPage() {
         defaultValues={toEmployeeFormValues(employee)}
         departments={departmentsQuery.data ?? []}
         description="Perbarui data profil karyawan tanpa meninggalkan halaman detail."
+        emailLocked={Boolean(employee.user_id)}
         existingAvatarPath={employee.avatar_url}
         isOpen={isEditing}
         isSubmitting={updateEmployeeMutation.isPending}
@@ -302,6 +306,11 @@ function EmployeeDetailPage() {
         <Button onClick={() => setTab("salary")} variant={tab === "salary" ? "default" : "outline"}>Salary</Button>
         <Button onClick={() => setTab("bonus")} variant={tab === "bonus" ? "default" : "outline"}>Bonus</Button>
         <Button onClick={() => setTab("reimbursements")} variant={tab === "reimbursements" ? "default" : "outline"}>Reimbursements</Button>
+        {hasPermission(permissions.hrisContractView) ? (
+          <Button data-testid="employee-tab-contracts" onClick={() => setTab("contracts")} variant={tab === "contracts" ? "default" : "outline"}>
+            Kontrak
+          </Button>
+        ) : null}
       </div>
 
       {tab === "profile" ? <ProfileTab employee={employee} /> : null}
@@ -317,6 +326,11 @@ function EmployeeDetailPage() {
             isLoading={salaryHistoryQuery.isLoading}
             isModalOpen={isSalaryModalOpen}
             onModalOpenChange={setIsSalaryModalOpen}
+            payslipEmployeeId={
+              hasPermission(permissions.hrisPayslipView) && hasPermission(permissions.hrisSalaryView)
+                ? employeeId
+                : null
+            }
           />
         ) : (
           <Card className="p-6 text-sm text-muted-foreground">Anda tidak punya akses melihat data salary.</Card>
@@ -347,6 +361,10 @@ function EmployeeDetailPage() {
         )
       ) : null}
 
+      {tab === "contracts" && hasPermission(permissions.hrisContractView) ? (
+        <EmployeeContractsCard employeeId={employeeId} />
+      ) : null}
+
       {tab === "reimbursements" ? (
         <ReimbursementsTab
           employeeName={employee.full_name}
@@ -373,38 +391,42 @@ function ProfileTab({ employee }: { employee: Employee }) {
   ];
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-      <Card className="p-6">
-        <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Identity</p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {items.map((item) => (
-            <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={item.label}>
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
-              <div className="mt-2">
-                {item.label === "Status" ? (
-                  <StatusBadge status={item.value} variant="employee-status" />
-                ) : (
-                  <p className="text-sm font-semibold">{item.value}</p>
-                )}
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="p-6">
+          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Data umum</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {items.map((item) => (
+              <div className="rounded-[22px] border border-border/70 bg-background/70 p-4" key={item.label}>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
+                <div className="mt-2">
+                  {item.label === "Status" ? (
+                    <StatusBadge status={item.value} variant="employee-status" />
+                  ) : (
+                    <p className="text-sm font-semibold">{item.value}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </Card>
+
+        <div className="space-y-6">
+          <Card className="p-6">
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Address</p>
+            <p className="mt-4 text-sm text-muted-foreground">{employee.address || "Belum ada alamat yang tercatat."}</p>
+          </Card>
+
+          <Card className="p-6">
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">SSH Keys</p>
+            <pre className="mt-4 whitespace-pre-wrap break-all rounded-[16px] border border-border/70 bg-background/70 p-4 text-xs text-muted-foreground">
+              {employee.ssh_keys || "Belum ada SSH key yang tercatat."}
+            </pre>
+          </Card>
         </div>
-      </Card>
-
-      <div className="space-y-6">
-        <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Address</p>
-          <p className="mt-4 text-sm text-muted-foreground">{employee.address || "Belum ada alamat yang tercatat."}</p>
-        </Card>
-
-        <Card className="p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">SSH Keys</p>
-          <pre className="mt-4 whitespace-pre-wrap break-all rounded-[16px] border border-border/70 bg-background/70 p-4 text-xs text-muted-foreground">
-            {employee.ssh_keys || "Belum ada SSH key yang tercatat."}
-          </pre>
-        </Card>
       </div>
+
+      <HRProfileSection employeeId={employee.id} />
     </div>
   );
 }
@@ -418,6 +440,7 @@ function SalaryTab({
   createMutation,
   isModalOpen,
   onModalOpenChange,
+  payslipEmployeeId,
 }: {
   currentSalary?: SalaryRecord;
   currentSalaryError: unknown;
@@ -427,6 +450,8 @@ function SalaryTab({
   createMutation: ReturnType<typeof useMutation<SalaryRecord, Error, SalaryFormValues>>;
   isModalOpen: boolean;
   onModalOpenChange: (value: boolean) => void;
+  /** Set when the viewer may see payslips (hris:payslip:view + hris:salary:view). */
+  payslipEmployeeId: string | null;
 }) {
   const {
     control,
@@ -452,6 +477,8 @@ function SalaryTab({
           </div>
         ) : null}
       </Card>
+
+      {payslipEmployeeId ? <PayslipStatusCard employeeId={payslipEmployeeId} /> : null}
 
       <PermissionGate permission={permissions.hrisSalaryCreate}>
         <Card className="p-6">

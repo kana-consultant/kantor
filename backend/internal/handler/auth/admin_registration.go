@@ -5,6 +5,7 @@ import (
 
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 )
 
@@ -41,8 +42,16 @@ func (h *Handler) UpdateRegistrationSettings(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	platformmiddleware.AuditLog(r.Context(), "update", "admin", "system_setting", "registration", previous, updated)
+	platformmiddleware.AuditLog(r.Context(), "update", "admin", "system_setting", "registration", registrationAuditView(previous), registrationAuditView(updated))
 	response.WriteJSON(w, http.StatusOK, updated, nil)
+}
+
+// registrationAuditView is the registration settings as audited: the live
+// code is a secret reserved for super admins (audit readers are not), so
+// only has_code and code_expires_at are kept.
+func registrationAuditView(view authrepo.RegistrationSettingsView) authrepo.RegistrationSettingsView {
+	view.Code = nil
+	return view
 }
 
 func (h *Handler) RollRegistrationCode(w http.ResponseWriter, r *http.Request) {

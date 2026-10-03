@@ -61,7 +61,10 @@ const (
 //  2. Set DATA_ENCRYPTION_KEY_PREVIOUS to the previous key
 //  3. Restart the application
 //  4. New writes use the new key; old data decrypts via the old key
-//  5. Once all data is re-encrypted, DATA_ENCRYPTION_KEY_PREVIOUS can be removed
+//  5. Keep DATA_ENCRYPTION_KEY_PREVIOUS set for good: versions are
+//     positional (previous keys 1..n, primary n+1), so removing it would
+//     orphan the old data and also renumber the primary key, making the
+//     data written since the rotation unreadable too.
 func NewEncrypter(secret string, previousSecrets ...string) (*Encrypter, error) {
 	if strings.TrimSpace(secret) == "" {
 		return nil, errors.New("DATA_ENCRYPTION_KEY is required")

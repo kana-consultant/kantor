@@ -19,6 +19,8 @@ import {
   ShieldCheck,
   ScrollText,
   Settings2,
+  FileText,
+  FileSignature,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 
@@ -33,6 +35,8 @@ interface NavItem {
   label: string;
   icon: typeof LayoutDashboard;
   permission: string;
+  /** Extra permissions the page needs besides `permission`. */
+  requires?: string[];
 }
 
 interface NavSection {
@@ -124,6 +128,19 @@ const sections: NavSection[] = [
         icon: CreditCard,
         permission: permissions.hrisSubscriptionView,
       },
+      {
+        to: "/hris/payslips",
+        label: "Slip Gaji",
+        icon: FileText,
+        permission: permissions.hrisPayslipView,
+        requires: [permissions.hrisSalaryView],
+      },
+      {
+        to: "/hris/contracts",
+        label: "Kontrak Kerja",
+        icon: FileSignature,
+        permission: permissions.hrisContractView,
+      },
     ],
   },
   {
@@ -180,7 +197,11 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
     })
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => hasPermission(item.permission)),
+      items: section.items.filter(
+        (item) =>
+          hasPermission(item.permission) &&
+          (item.requires ?? []).every((permission) => hasPermission(permission)),
+      ),
     }))
     .filter((section) => section.items.length > 0);
 

@@ -2,6 +2,7 @@ package hris
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,9 +17,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 
+	"github.com/kana-consultant/kantor/backend/internal/docgen"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
@@ -73,8 +76,10 @@ func (h *EmployeesHandler) createEmployee(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	platformmiddleware.AuditLog(r.Context(), "create", "hris", "employee", result.ID, nil, input)
-	response.WriteJSON(w, http.StatusCreated, result, nil)
+	auditInput := input
+	auditInput.BankAccountNumber = maskedAccountForAudit(input.BankAccountNumber)
+	platformmiddleware.AuditLog(r.Context(), "create", "hris", "employee", result.ID, nil, auditInput)
+	response.WriteJSON(w, http.StatusCreated, h.visibleEmployee(r, result), nil)
 }
 
 func (h *EmployeesHandler) listEmployees(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +92,9 @@ func (h *EmployeesHandler) listEmployees(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
+	}
+	for index := range result {
+		result[index] = h.visibleEmployee(r, result[index])
 	}
 
 	response.WriteJSON(w, http.StatusOK, result, map[string]int64{
@@ -119,7 +127,7 @@ func (h *EmployeesHandler) getEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, result, nil)
+	response.WriteJSON(w, http.StatusOK, h.visibleEmployee(r, result), nil)
 }
 
 func (h *EmployeesHandler) updateEmployee(w http.ResponseWriter, r *http.Request) {
@@ -129,14 +137,76 @@ func (h *EmployeesHandler) updateEmployee(w http.ResponseWriter, r *http.Request
 	}
 
 	employeeID := chi.URLParam(r, "employeeID")
+	// The stored record tells which fields this save changes: the audit
+	// denylist redacts the bank account number, so without it a new number
+	// and an unchanged one would look the same.
+	previous, previousErr := h.service.GetEmployee(r.Context(), employeeID)
 	result, err := h.service.UpdateEmployee(r.Context(), employeeID, input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
 	}
 
-	platformmiddleware.AuditLog(r.Context(), "update", "hris", "employee", employeeID, nil, input)
-	response.WriteJSON(w, http.StatusOK, result, nil)
+	auditInput := input
+	auditInput.BankAccountNumber = maskedAccountForAudit(input.BankAccountNumber)
+	var auditValue any = auditInput
+	if previousErr == nil {
+		auditValue = withChangedFields(auditInput, changedEmployeeFields(previous, result))
+	}
+	platformmiddleware.AuditLog(r.Context(), "update", "hris", "employee", employeeID, nil, auditValue)
+	response.WriteJSON(w, http.StatusOK, h.visibleEmployee(r, result), nil)
+}
+
+// changedEmployeeFields lists the fields (names only, never values) that
+// differ between two versions of an employee record.
+func changedEmployeeFields(previous model.Employee, next model.Employee) []string {
+	optional := func(value *string) string {
+		if value == nil {
+			return ""
+		}
+		return strings.TrimSpace(*value)
+	}
+	checks := []struct {
+		name    string
+		changed bool
+	}{
+		{"full_name", previous.FullName != next.FullName},
+		{"email", !strings.EqualFold(previous.Email, next.Email)},
+		{"phone", optional(previous.Phone) != optional(next.Phone)},
+		{"position", previous.Position != next.Position},
+		{"department", optional(previous.Department) != optional(next.Department)},
+		{"date_joined", !previous.DateJoined.Equal(next.DateJoined)},
+		{"employment_status", previous.EmploymentStatus != next.EmploymentStatus},
+		{"address", optional(previous.Address) != optional(next.Address)},
+		{"emergency_contact", optional(previous.EmergencyContact) != optional(next.EmergencyContact)},
+		{"avatar_url", optional(previous.AvatarURL) != optional(next.AvatarURL)},
+		{"bank_account_number", optional(previous.BankAccountNumber) != optional(next.BankAccountNumber)},
+		{"bank_name", optional(previous.BankName) != optional(next.BankName)},
+		{"linkedin_profile", optional(previous.LinkedInProfile) != optional(next.LinkedInProfile)},
+		{"ssh_keys", optional(previous.SSHKeys) != optional(next.SSHKeys)},
+	}
+	fields := make([]string, 0, len(checks))
+	for _, check := range checks {
+		if check.changed {
+			fields = append(fields, check.name)
+		}
+	}
+	return fields
+}
+
+// withChangedFields returns the audit value as a JSON object with a
+// changed_fields list added.
+func withChangedFields(value any, fields []string) any {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return value
+	}
+	object := map[string]any{}
+	if err := json.Unmarshal(raw, &object); err != nil {
+		return value
+	}
+	object["changed_fields"] = fields
+	return object
 }
 
 func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +269,7 @@ func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) 
 	}, map[string]any{
 		"avatar_url": result.AvatarURL,
 	})
-	response.WriteJSON(w, http.StatusOK, result, nil)
+	response.WriteJSON(w, http.StatusOK, h.visibleEmployee(r, result), nil)
 }
 
 func (h *EmployeesHandler) deleteEmployee(w http.ResponseWriter, r *http.Request) {
@@ -250,6 +320,10 @@ func (h *EmployeesHandler) writeError(ctx context.Context, w http.ResponseWriter
 	switch {
 	case errors.Is(err, hrisservice.ErrEmployeeNotFound):
 		response.WriteError(w, http.StatusNotFound, "EMPLOYEE_NOT_FOUND", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrEmployeeHasDocuments):
+		response.WriteError(w, http.StatusConflict, "EMPLOYEE_HAS_LEGAL_RECORDS", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrEmployeeLinkedEmailLocked):
+		response.WriteError(w, http.StatusConflict, "EMPLOYEE_EMAIL_LOCKED", err.Error(), map[string]string{"email": "locked"})
 	case errors.Is(err, hrisservice.ErrEmployeeEmailExists):
 		response.WriteError(w, http.StatusConflict, "EMPLOYEE_EMAIL_EXISTS", err.Error(), map[string]string{"email": "already exists"})
 	case errors.Is(err, hrisservice.ErrEmployeeUserLinkedTwice):
@@ -311,4 +385,42 @@ func sanitizeEmployeeAvatarFilename(value string) string {
 
 func isEmployeeAvatarPath(path string, employeeID string) bool {
 	return strings.HasPrefix(filepath.ToSlash(path), "employees/"+employeeID+"/")
+}
+
+// visibleEmployee masks the bank account number ('******7890') unless the
+// caller holds hris:employee_identity:view or the record is their own. MCP
+// tools go through these handlers and inherit the masking.
+func (h *EmployeesHandler) visibleEmployee(r *http.Request, employee model.Employee) model.Employee {
+	principal, ok := platformmiddleware.PrincipalFromContext(r.Context())
+	if ok && canSeeFullBankAccount(principal, employee) {
+		return employee
+	}
+	return hrisservice.MaskEmployeeBankAccount(employee)
+}
+
+func canSeeFullBankAccount(principal platformmiddleware.Principal, employee model.Employee) bool {
+	if principal.IsSuperAdmin {
+		return true
+	}
+	if employee.UserID != nil && principal.UserID != "" && *employee.UserID == principal.UserID {
+		return true
+	}
+	if principal.Cached != nil && principal.Cached.Permissions[permissionIdentityView] {
+		return true
+	}
+	for _, item := range principal.Permissions {
+		if item == permissionIdentityView {
+			return true
+		}
+	}
+	return false
+}
+
+// maskedAccountForAudit keeps the full account number out of audit rows.
+func maskedAccountForAudit(value *string) *string {
+	if value == nil || strings.TrimSpace(*value) == "" || hrisservice.IsMaskedBankAccount(value) {
+		return value
+	}
+	masked := docgen.MaskAccount(*value)
+	return &masked
 }

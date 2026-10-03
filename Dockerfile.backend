@@ -12,10 +12,26 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/server ./cmd/server
 
 FROM alpine:3.22
 
+# Build with --build-arg WITH_LIBREOFFICE=true to convert generated documents
+# (payslips, contracts) to PDF. The backend auto-detects /usr/bin/soffice, so
+# no .env change is needed (SOFFICE_BIN stays an optional override). Without
+# it documents are DOCX only and sending them is refused unless
+# DOCUMENTS_ALLOW_DOCX_SEND=true.
+ARG WITH_LIBREOFFICE=false
+
 WORKDIR /app/backend
 
 RUN adduser -D -H appuser && apk add --no-cache ca-certificates
-RUN mkdir -p /app/data/uploads && chown -R appuser:appuser /app/data
+RUN if [ "$WITH_LIBREOFFICE" = "true" ]; then \
+        apk add --no-cache libreoffice-writer ttf-liberation fontconfig && fc-cache -f; \
+    fi
+RUN mkdir -p /app/data/uploads /app/data/lo-profile && chown -R appuser:appuser /app/data \
+    && chmod 700 /app/data/lo-profile
+
+# The LibreOffice profile is reused across conversions (only used when
+# LibreOffice is installed). Set explicitly so the container never falls back
+# to the per-user cache default.
+ENV DOCUMENT_LO_PROFILE_DIR=/app/data/lo-profile
 
 COPY --from=build /out/server /usr/local/bin/server
 COPY backend/migrations ./migrations

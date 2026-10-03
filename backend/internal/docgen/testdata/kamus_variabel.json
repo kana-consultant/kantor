@@ -1,0 +1,873 @@
+{
+  "_info": {
+    "sintaks": "Mustache/docxtemplater dengan delimiter {{ }}. Skalar: {{nama}}. Loop baris tabel: {{#list}} ... {{/list}} (satu baris tabel diulang per item). Kondisi: {{#flag}}..{{/flag}} tampil jika true; {{^flag}}..{{/flag}} tampil jika false.",
+    "format_angka": "Semua angka dikirim sebagai string yang sudah diformat (8.000.000). Tanggal dikirim sebagai string yang sudah diformat (ID & EN).",
+    "sumber": "ada = field sudah ada di KANTOR; BARU = perlu field/tabel baru; input = diisi user di form generate; hitung = dihitung backend; default = nilai default yang disarankan."
+  },
+  "templates": {
+    "01_PKWT_Perjanjian_Kerja_Waktu_Tertentu.docx": {
+      "jumlah_variabel": 43,
+      "variabel": {
+        "perusahaan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama PT pemberi kerja",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "021/PKWT/CTN/X/2026"
+        },
+        "dokumen_kota": {
+          "tipe": "string",
+          "deskripsi": "Kota tempat penandatanganan",
+          "sumber_kantor": "input (default: kota perusahaan)",
+          "contoh": "Jakarta"
+        },
+        "dokumen_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Indonesia (1 Oktober 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 Oktober 2026"
+        },
+        "dokumen_tanggal_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Inggris (1 October 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 October 2026"
+        },
+        "perusahaan_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat domisili PT",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110"
+        },
+        "perusahaan_jenis_usaha": {
+          "tipe": "string",
+          "deskripsi": "Bidang usaha PT",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "pengembangan perangkat lunak dan konsultasi kecerdasan artifisial"
+        },
+        "perusahaan_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama direksi/penanda tangan berwenang",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Rudi Hartono"
+        },
+        "perusahaan_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan (sesuai Anggaran Dasar)",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Direktur"
+        },
+        "karyawan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama lengkap sesuai KTP",
+          "sumber_kantor": "ada: employees.full_name",
+          "contoh": "Rina Kartika Sari"
+        },
+        "karyawan_tempat_lahir": {
+          "tipe": "string",
+          "deskripsi": "Tempat lahir",
+          "sumber_kantor": "BARU: employees.birth_place",
+          "contoh": "Bandung"
+        },
+        "karyawan_tanggal_lahir": {
+          "tipe": "string",
+          "deskripsi": "Tanggal lahir (dd-mm-yyyy)",
+          "sumber_kantor": "BARU: employees.birth_date",
+          "contoh": "14-02-1998"
+        },
+        "karyawan_jenis_kelamin": {
+          "tipe": "string",
+          "deskripsi": "Jenis kelamin, bilingual (Perempuan / Female)",
+          "sumber_kantor": "BARU: employees.gender",
+          "contoh": "Perempuan / Female"
+        },
+        "karyawan_nik": {
+          "tipe": "string",
+          "deskripsi": "NIK KTP 16 digit",
+          "sumber_kantor": "BARU: employees.nik (data sensitif — enkripsi & batasi akses)",
+          "contoh": "3273015402980001"
+        },
+        "karyawan_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat sesuai KTP",
+          "sumber_kantor": "ada: employees.address",
+          "contoh": "Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung"
+        },
+        "karyawan_telepon": {
+          "tipe": "string",
+          "deskripsi": "Nomor telepon",
+          "sumber_kantor": "ada: employees.phone",
+          "contoh": "0812-0000-1111"
+        },
+        "karyawan_email": {
+          "tipe": "string",
+          "deskripsi": "Email karyawan",
+          "sumber_kantor": "ada: employees.email",
+          "contoh": "rina.kartika@example.com"
+        },
+        "dasar_pkwt": {
+          "tipe": "string",
+          "deskripsi": "Alasan pekerjaan bersifat waktu tertentu (sementara/proyek/musiman/produk baru)",
+          "sumber_kantor": "input",
+          "contoh": "pekerjaan pengembangan sistem AI untuk proyek klien yang penyelesaiannya diperkirakan dalam waktu tidak terlalu lama"
+        },
+        "karyawan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan",
+          "sumber_kantor": "ada: employees.position",
+          "contoh": "AI Engineer"
+        },
+        "karyawan_departemen": {
+          "tipe": "string",
+          "deskripsi": "Departemen",
+          "sumber_kantor": "ada: employees.department",
+          "contoh": "Engineering"
+        },
+        "karyawan_atasan": {
+          "tipe": "string",
+          "deskripsi": "Atasan langsung",
+          "sumber_kantor": "ada: departments.head_name",
+          "contoh": "Head of Engineering"
+        },
+        "lokasi_kerja": {
+          "tipe": "string",
+          "deskripsi": "Tempat kerja",
+          "sumber_kantor": "input",
+          "contoh": "kantor Perusahaan di Jakarta Selatan"
+        },
+        "mode_kerja": {
+          "tipe": "string",
+          "deskripsi": "WFO / hybrid / remote (bilingual)",
+          "sumber_kantor": "input",
+          "contoh": "hybrid (3 hari WFO, 2 hari WFH) / hybrid (3 days in office, 2 days remote)"
+        },
+        "uraian_tugas": {
+          "tipe": "string",
+          "deskripsi": "Ringkasan tugas utama",
+          "sumber_kantor": "input",
+          "contoh": "merancang, membangun, dan memelihara pipeline RAG serta integrasi LLM untuk proyek klien"
+        },
+        "durasi_bulan": {
+          "tipe": "string",
+          "deskripsi": "Lama kontrak (bulan)",
+          "sumber_kantor": "hitung dari tanggal_mulai & tanggal_berakhir",
+          "contoh": "12"
+        },
+        "tanggal_mulai": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_mulai",
+          "contoh": "1 Oktober 2026"
+        },
+        "tanggal_berakhir": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_berakhir",
+          "contoh": "30 September 2027"
+        },
+        "hari_pemberitahuan": {
+          "tipe": "string",
+          "deskripsi": "Hari pemberitahuan sebelum berakhir/pengakhiran",
+          "sumber_kantor": "input (default 30 untuk PKWT, 14 untuk freelance/subkon)",
+          "contoh": "30"
+        },
+        "tanggal_mulai_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Inggris)",
+          "sumber_kantor": "hitung",
+          "contoh": "1 October 2026"
+        },
+        "tanggal_berakhir_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Inggris)",
+          "sumber_kantor": "hitung",
+          "contoh": "30 September 2027"
+        },
+        "jam_kerja_mingguan": {
+          "tipe": "string",
+          "deskripsi": "Jam kerja per minggu",
+          "sumber_kantor": "ada: compensation_policy (min hours) / default 40",
+          "contoh": "40"
+        },
+        "hari_kerja": {
+          "tipe": "string",
+          "deskripsi": "Hari kerja (slip) / hari kerja mingguan (PKWT, teks)",
+          "sumber_kantor": "slip: hitung dari kalender; PKWT: input",
+          "contoh": "Senin–Jumat / Monday–Friday"
+        },
+        "jam_kerja": {
+          "tipe": "string",
+          "deskripsi": "Jam kerja harian",
+          "sumber_kantor": "input",
+          "contoh": "09.00–18.00 WIB"
+        },
+        "gaji_pokok": {
+          "tipe": "string",
+          "deskripsi": "Gaji pokok, format 8.000.000",
+          "sumber_kantor": "ada: salaries.base_salary",
+          "contoh": "8.000.000"
+        },
+        "gaji_pokok_terbilang": {
+          "tipe": "string",
+          "deskripsi": "Gaji pokok dalam huruf",
+          "sumber_kantor": "hitung (fungsi terbilang)",
+          "contoh": "delapan juta rupiah"
+        },
+        "tunjangan_tetap": {
+          "tipe": "string",
+          "deskripsi": "Total tunjangan tetap per bulan",
+          "sumber_kantor": "ada: salaries.allowances (jumlah komponen tetap)",
+          "contoh": "1.000.000"
+        },
+        "tanggal_gajian": {
+          "tipe": "string",
+          "deskripsi": "Tanggal gajian tiap bulan",
+          "sumber_kantor": "input / setting tenant",
+          "contoh": "25"
+        },
+        "karyawan_bank": {
+          "tipe": "string",
+          "deskripsi": "Nama bank",
+          "sumber_kantor": "ada: employees.bank_name",
+          "contoh": "BCA"
+        },
+        "karyawan_norek": {
+          "tipe": "string",
+          "deskripsi": "Nomor rekening (di slip gaji sebaiknya di-mask, mis. ******7890)",
+          "sumber_kantor": "ada: employees.bank_account_number",
+          "contoh": "1234567890"
+        },
+        "karyawan_nama_rekening": {
+          "tipe": "string",
+          "deskripsi": "Nama pemilik rekening",
+          "sumber_kantor": "BARU: employees.bank_account_name",
+          "contoh": "Rina Kartika Sari"
+        },
+        "cuti_tahunan_hari": {
+          "tipe": "string",
+          "deskripsi": "Jumlah hari cuti tahunan",
+          "sumber_kantor": "setting tenant (default 12)",
+          "contoh": "12"
+        },
+        "benefit": {
+          "tipe": "array",
+          "deskripsi": "LOOP benefit: nama, nilai, keterangan",
+          "sumber_kantor": "input / template benefit per jabatan",
+          "field_item": [
+            "nama",
+            "nilai",
+            "keterangan"
+          ],
+          "contoh": [
+            {
+              "nama": "Tunjangan internet / Internet allowance",
+              "nilai": "Rp300.000/bulan",
+              "keterangan": "Dibayar bersama gaji"
+            },
+            {
+              "nama": "Laptop kerja / Work laptop",
+              "nilai": "Pinjam pakai",
+              "keterangan": "Dikembalikan saat kontrak berakhir"
+            },
+            {
+              "nama": "Anggaran pelatihan / Learning budget",
+              "nilai": "Rp3.000.000/tahun",
+              "keterangan": "Dengan persetujuan atasan"
+            }
+          ]
+        },
+        "nomor_nda_hki": {
+          "tipe": "string",
+          "deskripsi": "Nomor NDA & Pengalihan HKI terkait",
+          "sumber_kantor": "hitung: nomor dokumen NDA yang digenerate bersamaan",
+          "contoh": "021/NDA-HKI/CTN/X/2026"
+        }
+      },
+      "contoh_payload": {
+        "perusahaan_nama": "PT Contoh Teknologi Nusantara",
+        "perusahaan_alamat": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110",
+        "perusahaan_jenis_usaha": "pengembangan perangkat lunak dan konsultasi kecerdasan artifisial",
+        "perusahaan_penandatangan_nama": "Rudi Hartono",
+        "perusahaan_penandatangan_jabatan": "Direktur",
+        "dokumen_nomor": "021/PKWT/CTN/X/2026",
+        "dokumen_kota": "Jakarta",
+        "dokumen_tanggal": "1 Oktober 2026",
+        "dokumen_tanggal_en": "1 October 2026",
+        "karyawan_nama": "Rina Kartika Sari",
+        "karyawan_tempat_lahir": "Bandung",
+        "karyawan_tanggal_lahir": "14-02-1998",
+        "karyawan_jenis_kelamin": "Perempuan / Female",
+        "karyawan_nik": "3273015402980001",
+        "karyawan_alamat": "Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung",
+        "karyawan_telepon": "0812-0000-1111",
+        "karyawan_email": "rina.kartika@example.com",
+        "karyawan_jabatan": "AI Engineer",
+        "karyawan_departemen": "Engineering",
+        "karyawan_bank": "BCA",
+        "karyawan_norek": "1234567890",
+        "karyawan_nama_rekening": "Rina Kartika Sari",
+        "dasar_pkwt": "pekerjaan pengembangan sistem AI untuk proyek klien yang penyelesaiannya diperkirakan dalam waktu tidak terlalu lama",
+        "karyawan_atasan": "Head of Engineering",
+        "lokasi_kerja": "kantor Perusahaan di Jakarta Selatan",
+        "mode_kerja": "hybrid (3 hari WFO, 2 hari WFH) / hybrid (3 days in office, 2 days remote)",
+        "uraian_tugas": "merancang, membangun, dan memelihara pipeline RAG serta integrasi LLM untuk proyek klien",
+        "durasi_bulan": "12",
+        "tanggal_mulai": "1 Oktober 2026",
+        "tanggal_berakhir": "30 September 2027",
+        "tanggal_mulai_en": "1 October 2026",
+        "tanggal_berakhir_en": "30 September 2027",
+        "hari_pemberitahuan": "30",
+        "jam_kerja_mingguan": "40",
+        "hari_kerja": "Senin–Jumat / Monday–Friday",
+        "jam_kerja": "09.00–18.00 WIB",
+        "gaji_pokok": "8.000.000",
+        "gaji_pokok_terbilang": "delapan juta rupiah",
+        "tunjangan_tetap": "1.000.000",
+        "tanggal_gajian": "25",
+        "cuti_tahunan_hari": "12",
+        "benefit": [
+          {
+            "nama": "Tunjangan internet / Internet allowance",
+            "nilai": "Rp300.000/bulan",
+            "keterangan": "Dibayar bersama gaji"
+          },
+          {
+            "nama": "Laptop kerja / Work laptop",
+            "nilai": "Pinjam pakai",
+            "keterangan": "Dikembalikan saat kontrak berakhir"
+          },
+          {
+            "nama": "Anggaran pelatihan / Learning budget",
+            "nilai": "Rp3.000.000/tahun",
+            "keterangan": "Dengan persetujuan atasan"
+          }
+        ],
+        "nomor_nda_hki": "021/NDA-HKI/CTN/X/2026"
+      }
+    },
+    "02_NDA_dan_Pengalihan_HKI_Karyawan.docx": {
+      "jumlah_variabel": 23,
+      "variabel": {
+        "perusahaan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama PT pemberi kerja",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "021/NDA-HKI/CTN/X/2026"
+        },
+        "dokumen_kota": {
+          "tipe": "string",
+          "deskripsi": "Kota tempat penandatanganan",
+          "sumber_kantor": "input (default: kota perusahaan)",
+          "contoh": "Jakarta"
+        },
+        "dokumen_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Indonesia (1 Oktober 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 Oktober 2026"
+        },
+        "dokumen_tanggal_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Inggris (1 October 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 October 2026"
+        },
+        "perusahaan_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat domisili PT",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110"
+        },
+        "perusahaan_jenis_usaha": {
+          "tipe": "string",
+          "deskripsi": "Bidang usaha PT",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "pengembangan perangkat lunak dan konsultasi kecerdasan artifisial"
+        },
+        "perusahaan_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama direksi/penanda tangan berwenang",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Rudi Hartono"
+        },
+        "perusahaan_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan (sesuai Anggaran Dasar)",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Direktur"
+        },
+        "karyawan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama lengkap sesuai KTP",
+          "sumber_kantor": "ada: employees.full_name",
+          "contoh": "Rina Kartika Sari"
+        },
+        "karyawan_tempat_lahir": {
+          "tipe": "string",
+          "deskripsi": "Tempat lahir",
+          "sumber_kantor": "BARU: employees.birth_place",
+          "contoh": "Bandung"
+        },
+        "karyawan_tanggal_lahir": {
+          "tipe": "string",
+          "deskripsi": "Tanggal lahir (dd-mm-yyyy)",
+          "sumber_kantor": "BARU: employees.birth_date",
+          "contoh": "14-02-1998"
+        },
+        "karyawan_jenis_kelamin": {
+          "tipe": "string",
+          "deskripsi": "Jenis kelamin, bilingual (Perempuan / Female)",
+          "sumber_kantor": "BARU: employees.gender",
+          "contoh": "Perempuan / Female"
+        },
+        "karyawan_nik": {
+          "tipe": "string",
+          "deskripsi": "NIK KTP 16 digit",
+          "sumber_kantor": "BARU: employees.nik (data sensitif — enkripsi & batasi akses)",
+          "contoh": "3273015402980001"
+        },
+        "karyawan_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat sesuai KTP",
+          "sumber_kantor": "ada: employees.address",
+          "contoh": "Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung"
+        },
+        "karyawan_telepon": {
+          "tipe": "string",
+          "deskripsi": "Nomor telepon",
+          "sumber_kantor": "ada: employees.phone",
+          "contoh": "0812-0000-1111"
+        },
+        "karyawan_email": {
+          "tipe": "string",
+          "deskripsi": "Email karyawan",
+          "sumber_kantor": "ada: employees.email",
+          "contoh": "rina.kartika@example.com"
+        },
+        "karyawan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan",
+          "sumber_kantor": "ada: employees.position",
+          "contoh": "AI Engineer"
+        },
+        "nomor_kontrak_kerja": {
+          "tipe": "string",
+          "deskripsi": "Nomor PKWT terkait",
+          "sumber_kantor": "hitung: nomor PKWT karyawan",
+          "contoh": "021/PKWT/CTN/X/2026"
+        },
+        "jam_lapor_insiden": {
+          "tipe": "string",
+          "deskripsi": "Batas waktu lapor insiden data (jam)",
+          "sumber_kantor": "default 24",
+          "contoh": "24"
+        },
+        "karya_terdahulu": {
+          "tipe": "array",
+          "deskripsi": "LOOP karya terdahulu: judul, deskripsi, tahun (boleh kosong)",
+          "sumber_kantor": "input karyawan",
+          "field_item": [
+            "judul",
+            "deskripsi",
+            "tahun"
+          ],
+          "contoh": [
+            {
+              "judul": "indo-tokenizer (open-source)",
+              "deskripsi": "Library tokenisasi Bahasa Indonesia, lisensi MIT",
+              "tahun": "2024"
+            }
+          ]
+        },
+        "masa_non_solicit_bulan": {
+          "tipe": "string",
+          "deskripsi": "Durasi larangan membujuk (bulan)",
+          "sumber_kantor": "default 12",
+          "contoh": "12"
+        },
+        "masa_kerahasiaan_tahun": {
+          "tipe": "string",
+          "deskripsi": "Durasi kewajiban kerahasiaan setelah berakhir (tahun)",
+          "sumber_kantor": "default 3",
+          "contoh": "3"
+        }
+      },
+      "contoh_payload": {
+        "perusahaan_nama": "PT Contoh Teknologi Nusantara",
+        "perusahaan_alamat": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110",
+        "perusahaan_jenis_usaha": "pengembangan perangkat lunak dan konsultasi kecerdasan artifisial",
+        "perusahaan_penandatangan_nama": "Rudi Hartono",
+        "perusahaan_penandatangan_jabatan": "Direktur",
+        "dokumen_nomor": "021/NDA-HKI/CTN/X/2026",
+        "dokumen_kota": "Jakarta",
+        "dokumen_tanggal": "1 Oktober 2026",
+        "dokumen_tanggal_en": "1 October 2026",
+        "karyawan_nama": "Rina Kartika Sari",
+        "karyawan_tempat_lahir": "Bandung",
+        "karyawan_tanggal_lahir": "14-02-1998",
+        "karyawan_jenis_kelamin": "Perempuan / Female",
+        "karyawan_nik": "3273015402980001",
+        "karyawan_alamat": "Jl. Melati No. 5, RT 002/RW 004, Kel. Sukajadi, Kec. Sukajadi, Kota Bandung",
+        "karyawan_telepon": "0812-0000-1111",
+        "karyawan_email": "rina.kartika@example.com",
+        "karyawan_jabatan": "AI Engineer",
+        "karyawan_departemen": "Engineering",
+        "karyawan_bank": "BCA",
+        "karyawan_norek": "1234567890",
+        "karyawan_nama_rekening": "Rina Kartika Sari",
+        "nomor_kontrak_kerja": "021/PKWT/CTN/X/2026",
+        "jam_lapor_insiden": "24",
+        "masa_non_solicit_bulan": "12",
+        "masa_kerahasiaan_tahun": "3",
+        "karya_terdahulu": [
+          {
+            "judul": "indo-tokenizer (open-source)",
+            "deskripsi": "Library tokenisasi Bahasa Indonesia, lisensi MIT",
+            "tahun": "2024"
+          }
+        ]
+      }
+    },
+    "08_Slip_Gaji.docx": {
+      "jumlah_variabel": 25,
+      "variabel": {
+        "perusahaan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama PT pemberi kerja",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "periode": {
+          "tipe": "string",
+          "deskripsi": "Periode gaji, mis. Oktober 2026",
+          "sumber_kantor": "hitung",
+          "contoh": "Oktober 2026"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "PAY/2026/10/0021"
+        },
+        "perusahaan_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat domisili PT",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110"
+        },
+        "karyawan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama lengkap sesuai KTP",
+          "sumber_kantor": "ada: employees.full_name",
+          "contoh": "Rina Kartika Sari"
+        },
+        "karyawan_id": {
+          "tipe": "string",
+          "deskripsi": "ID/kode karyawan",
+          "sumber_kantor": "ada: employees.id (atau kode karyawan)",
+          "contoh": "CTN-0021"
+        },
+        "karyawan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan",
+          "sumber_kantor": "ada: employees.position",
+          "contoh": "AI Engineer"
+        },
+        "karyawan_departemen": {
+          "tipe": "string",
+          "deskripsi": "Departemen",
+          "sumber_kantor": "ada: employees.department",
+          "contoh": "Engineering"
+        },
+        "karyawan_status_kerja": {
+          "tipe": "string",
+          "deskripsi": "PKWT / PKWTT / Magang",
+          "sumber_kantor": "ada: employees.employment_status",
+          "contoh": "PKWT"
+        },
+        "karyawan_tanggal_bergabung": {
+          "tipe": "string",
+          "deskripsi": "Tanggal bergabung",
+          "sumber_kantor": "ada: employees.date_joined",
+          "contoh": "1 Oktober 2026"
+        },
+        "karyawan_email": {
+          "tipe": "string",
+          "deskripsi": "Email karyawan",
+          "sumber_kantor": "ada: employees.email",
+          "contoh": "rina.kartika@example.com"
+        },
+        "karyawan_telepon": {
+          "tipe": "string",
+          "deskripsi": "Nomor telepon",
+          "sumber_kantor": "ada: employees.phone",
+          "contoh": "0812-0000-1111"
+        },
+        "karyawan_bank": {
+          "tipe": "string",
+          "deskripsi": "Nama bank",
+          "sumber_kantor": "ada: employees.bank_name",
+          "contoh": "BCA"
+        },
+        "karyawan_norek": {
+          "tipe": "string",
+          "deskripsi": "Nomor rekening (di slip gaji sebaiknya di-mask, mis. ******7890)",
+          "sumber_kantor": "ada: employees.bank_account_number",
+          "contoh": "******7890"
+        },
+        "gaji": {
+          "tipe": "array",
+          "deskripsi": "LOOP komponen gaji: nama, keterangan, jumlah",
+          "sumber_kantor": "ada: salaries.base_salary + salaries.allowances (+ bonuses approved periode ini, opsional)",
+          "field_item": [
+            "nama",
+            "keterangan",
+            "jumlah"
+          ],
+          "contoh": [
+            {
+              "nama": "Gaji Pokok / Basic Salary",
+              "keterangan": "",
+              "jumlah": "8.000.000"
+            },
+            {
+              "nama": "Tunjangan Tetap / Fixed Allowance",
+              "keterangan": "",
+              "jumlah": "1.000.000"
+            },
+            {
+              "nama": "Tunjangan Internet / Internet Allowance",
+              "keterangan": "",
+              "jumlah": "300.000"
+            },
+            {
+              "nama": "Tunjangan Transport / Transport Allowance",
+              "keterangan": "",
+              "jumlah": "500.000"
+            },
+            {
+              "nama": "Bonus Kinerja / Performance Bonus",
+              "keterangan": "Q3 2026",
+              "jumlah": "750.000"
+            }
+          ]
+        },
+        "total_gaji": {
+          "tipe": "string",
+          "deskripsi": "Total gaji",
+          "sumber_kantor": "hitung dari loop gaji",
+          "contoh": "10.550.000"
+        },
+        "potongan": {
+          "tipe": "array",
+          "deskripsi": "LOOP potongan periode ini: nama, keterangan, jumlah (array kosong jika tidak ada)",
+          "sumber_kantor": "ada: salaries.deductions (komponen potongan)",
+          "field_item": [
+            "nama",
+            "keterangan",
+            "jumlah"
+          ],
+          "contoh": [
+            {
+              "nama": "BPJS Kesehatan / Health Insurance",
+              "keterangan": "1%",
+              "jumlah": "80.000"
+            },
+            {
+              "nama": "BPJS Ketenagakerjaan / Employment Insurance",
+              "keterangan": "JHT 2% + JP 1%",
+              "jumlah": "240.000"
+            },
+            {
+              "nama": "PPh 21 / Income Tax",
+              "keterangan": "TER",
+              "jumlah": "150.000"
+            },
+            {
+              "nama": "Pinjaman Karyawan / Employee Loan",
+              "keterangan": "Cicilan 3/10",
+              "jumlah": "100.000"
+            }
+          ]
+        },
+        "total_potongan": {
+          "tipe": "string",
+          "deskripsi": "Total potongan",
+          "sumber_kantor": "hitung dari loop potongan",
+          "contoh": "570.000"
+        },
+        "reimbursement": {
+          "tipe": "array",
+          "deskripsi": "LOOP reimbursement dibayar periode ini: tanggal, judul, kategori, jumlah (array kosong jika tidak ada)",
+          "sumber_kantor": "ada: reimbursements (status paid, paid_at dalam periode) → transaction_date, title, category, amount",
+          "field_item": [
+            "tanggal",
+            "judul",
+            "kategori",
+            "jumlah"
+          ],
+          "contoh": [
+            {
+              "tanggal": "03-10-2026",
+              "judul": "Transport meeting klien",
+              "kategori": "Transportasi",
+              "jumlah": "185.000"
+            },
+            {
+              "tanggal": "14-10-2026",
+              "judul": "Langganan API LLM (testing)",
+              "kategori": "Software",
+              "jumlah": "420.000"
+            },
+            {
+              "tanggal": "20-10-2026",
+              "judul": "Makan malam lembur tim",
+              "kategori": "Konsumsi",
+              "jumlah": "250.000"
+            }
+          ]
+        },
+        "total_reimbursement": {
+          "tipe": "string",
+          "deskripsi": "Total reimbursement",
+          "sumber_kantor": "hitung",
+          "contoh": "855.000"
+        },
+        "total_diterima": {
+          "tipe": "string",
+          "deskripsi": "Total diterima = total_gaji - total_potongan + total_reimbursement",
+          "sumber_kantor": "hitung",
+          "contoh": "10.835.000"
+        },
+        "total_diterima_terbilang": {
+          "tipe": "string",
+          "deskripsi": "Total diterima dalam huruf",
+          "sumber_kantor": "hitung",
+          "contoh": "sepuluh juta delapan ratus tiga puluh lima ribu rupiah"
+        },
+        "tanggal_bayar": {
+          "tipe": "string",
+          "deskripsi": "Tanggal pembayaran gaji",
+          "sumber_kantor": "hitung",
+          "contoh": "25 Oktober 2026"
+        },
+        "catatan_slip": {
+          "tipe": "string",
+          "deskripsi": "Catatan tambahan di slip (boleh kosong)",
+          "sumber_kantor": "input",
+          "contoh": ""
+        },
+        "kontak_hr": {
+          "tipe": "string",
+          "deskripsi": "Kontak HR",
+          "sumber_kantor": "setting tenant",
+          "contoh": "hr@contoh.co.id"
+        }
+      },
+      "contoh_payload": {
+        "perusahaan_nama": "PT Contoh Teknologi Nusantara",
+        "perusahaan_alamat": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110",
+        "dokumen_nomor": "PAY/2026/10/0021",
+        "periode": "Oktober 2026",
+        "tanggal_bayar": "25 Oktober 2026",
+        "karyawan_nama": "Rina Kartika Sari",
+        "karyawan_id": "CTN-0021",
+        "karyawan_jabatan": "AI Engineer",
+        "karyawan_departemen": "Engineering",
+        "karyawan_status_kerja": "PKWT",
+        "karyawan_tanggal_bergabung": "1 Oktober 2026",
+        "karyawan_email": "rina.kartika@example.com",
+        "karyawan_telepon": "0812-0000-1111",
+        "karyawan_bank": "BCA",
+        "karyawan_norek": "******7890",
+        "gaji": [
+          {
+            "nama": "Gaji Pokok / Basic Salary",
+            "keterangan": "",
+            "jumlah": "8.000.000"
+          },
+          {
+            "nama": "Tunjangan Tetap / Fixed Allowance",
+            "keterangan": "",
+            "jumlah": "1.000.000"
+          },
+          {
+            "nama": "Tunjangan Internet / Internet Allowance",
+            "keterangan": "",
+            "jumlah": "300.000"
+          },
+          {
+            "nama": "Tunjangan Transport / Transport Allowance",
+            "keterangan": "",
+            "jumlah": "500.000"
+          },
+          {
+            "nama": "Bonus Kinerja / Performance Bonus",
+            "keterangan": "Q3 2026",
+            "jumlah": "750.000"
+          }
+        ],
+        "total_gaji": "10.550.000",
+        "potongan": [
+          {
+            "nama": "BPJS Kesehatan / Health Insurance",
+            "keterangan": "1%",
+            "jumlah": "80.000"
+          },
+          {
+            "nama": "BPJS Ketenagakerjaan / Employment Insurance",
+            "keterangan": "JHT 2% + JP 1%",
+            "jumlah": "240.000"
+          },
+          {
+            "nama": "PPh 21 / Income Tax",
+            "keterangan": "TER",
+            "jumlah": "150.000"
+          },
+          {
+            "nama": "Pinjaman Karyawan / Employee Loan",
+            "keterangan": "Cicilan 3/10",
+            "jumlah": "100.000"
+          }
+        ],
+        "total_potongan": "570.000",
+        "reimbursement": [
+          {
+            "tanggal": "03-10-2026",
+            "judul": "Transport meeting klien",
+            "kategori": "Transportasi",
+            "jumlah": "185.000"
+          },
+          {
+            "tanggal": "14-10-2026",
+            "judul": "Langganan API LLM (testing)",
+            "kategori": "Software",
+            "jumlah": "420.000"
+          },
+          {
+            "tanggal": "20-10-2026",
+            "judul": "Makan malam lembur tim",
+            "kategori": "Konsumsi",
+            "jumlah": "250.000"
+          }
+        ],
+        "total_reimbursement": "855.000",
+        "total_diterima": "10.835.000",
+        "total_diterima_terbilang": "sepuluh juta delapan ratus tiga puluh lima ribu rupiah",
+        "catatan_slip": "",
+        "kontak_hr": "hr@contoh.co.id"
+      }
+    }
+  }
+}

@@ -73,8 +73,12 @@ export function PolicySettingsCard() {
             Aturan Kompensasi & Jam Kerja
           </h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Gaji aman jika total jam aktif sebulan memenuhi minimum bulanan dan
-            setiap hari aktif memenuhi minimum harian.
+            Gaji aman jika jam aktif bulan ini sudah mencapai target berjalan:
+            target jam per bulan dibagi rata ke hari kerja Senin–Jumat, dihitung
+            sejak awal bulan (atau tanggal bergabung) sampai kemarin; bulan lalu
+            memakai target penuh. Jam di akhir pekan dan hari ini tetap dihitung.
+            Part Time, Internship, Project Based, dan Outsourcing tidak
+            dievaluasi.
           </p>
         </div>
       </div>
@@ -131,7 +135,7 @@ export function PolicySettingsCard() {
             className="text-[13px] font-[600] text-text-primary"
             htmlFor="min-hours-per-day"
           >
-            Minimal Jam per Hari
+            Batas Hari Kerja Pendek (jam)
           </label>
           <Input
             className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
@@ -146,6 +150,10 @@ export function PolicySettingsCard() {
             type="number"
             value={minHoursPerDay}
           />
+          <p className="text-xs text-text-secondary">
+            Hari kerja dengan jam aktif di bawah angka ini ditandai sebagai
+            peringatan. Tidak mengubah status aman/berisiko.
+          </p>
         </div>
 
         <div className="space-y-1.5">
@@ -153,7 +161,7 @@ export function PolicySettingsCard() {
             className="text-[13px] font-[600] text-text-primary"
             htmlFor="min-hours-per-month"
           >
-            Minimal Jam per Bulan
+            Target Jam per Bulan
           </label>
           <Input
             className="h-10 rounded-[6px] border-transparent bg-surface-muted px-3 text-[14px] focus:border-ops focus:bg-surface focus:ring-2 focus:ring-ops/20"
@@ -167,6 +175,10 @@ export function PolicySettingsCard() {
             type="number"
             value={minHoursPerMonth}
           />
+          <p className="text-xs text-text-secondary">
+            Target sebulan penuh untuk karyawan Full Time. Untuk bulan berjalan
+            dan karyawan baru, target dihitung proporsional per hari kerja.
+          </p>
         </div>
       </div>
 

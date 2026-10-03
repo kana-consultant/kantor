@@ -114,6 +114,7 @@ type authEmployeesRepository interface {
 		bankName *string,
 		linkedInProfile *string,
 		sshKeys *string,
+		keepStoredBankAccount bool,
 	) (model.Employee, error)
 }
 
@@ -575,6 +576,15 @@ func (s *Service) GetProfile(ctx context.Context, userID string) (model.Employee
 func (s *Service) UpdateProfile(ctx context.Context, userID string, input dto.UpdateProfileRequest) (model.Employee, error) {
 	fullName := strings.TrimSpace(input.FullName)
 
+	// A stored account number that cannot be decrypted is shown as empty;
+	// saving the form without typing a new one must not discard it.
+	keepStoredBankAccount := false
+	if input.BankAccountNumber == nil || strings.TrimSpace(*input.BankAccountNumber) == "" {
+		if current, err := s.employeeRepo.GetEmployeeByUserID(ctx, userID); err == nil && current.BankAccountUnreadable {
+			keepStoredBankAccount = true
+		}
+	}
+
 	employee, err := s.employeeRepo.UpdateEmployeeProfile(
 		ctx,
 		userID,
@@ -587,6 +597,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, input dto.Up
 		input.BankName,
 		input.LinkedInProfile,
 		input.SSHKeys,
+		keepStoredBankAccount,
 	)
 	if err != nil {
 		return model.Employee{}, err

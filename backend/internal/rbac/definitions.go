@@ -189,6 +189,17 @@ func DefaultPermissions() []PermissionDefinition {
 		{ID: "hris:compensation_policy:view", ModuleID: ModuleHRIS, Resource: "compensation_policy", Action: "view", Description: "Melihat aturan kompensasi dan jam minimal tenant"},
 		{ID: "hris:compensation_policy:manage", ModuleID: ModuleHRIS, Resource: "compensation_policy", Action: "manage", Description: "Mengatur base salary dan ambang jam kerja minimal", IsSensitive: true},
 		{ID: "hris:salary_safety:view", ModuleID: ModuleHRIS, Resource: "salary_safety", Action: "view", Description: "Melihat status keamanan gaji karyawan berdasarkan jam kerja", IsSensitive: true},
+		// HR documents (identity data, contracts, payslips). All sensitive and
+		// kept out of the Manager baseline: tenant admins grant them to a
+		// dedicated HR role on purpose.
+		{ID: "hris:employee_identity:view", ModuleID: ModuleHRIS, Resource: "employee_identity", Action: "view", Description: "Melihat data identitas karyawan: NIK (tersamar), tempat & tanggal lahir, jenis kelamin, nama pemilik rekening, alamat KTP, email pribadi, dan nomor rekening lengkap", IsSensitive: true},
+		{ID: "hris:employee_identity:edit", ModuleID: ModuleHRIS, Resource: "employee_identity", Action: "edit", Description: "Mengisi atau mengganti data identitas karyawan (NIK, data lahir, jenis kelamin, pemilik rekening, alamat KTP, email pribadi)", IsSensitive: true},
+		{ID: "hris:contract:view", ModuleID: ModuleHRIS, Resource: "contract", Action: "view", Description: "Melihat daftar dan detail kontrak kerja (PKWT/NDA) beserta riwayat pengirimannya", IsSensitive: true},
+		{ID: "hris:contract:manage", ModuleID: ModuleHRIS, Resource: "contract", Action: "manage", Description: "Membuat, mengubah, generate, memperpanjang, dan mengubah status kontrak kerja, termasuk unduh DOCX", IsSensitive: true},
+		{ID: "hris:contract:send", ModuleID: ModuleHRIS, Resource: "contract", Action: "send", Description: "Mengirim dokumen kontrak kerja (PDF berisi NIK dan nomor rekening lengkap) ke email karyawan", IsSensitive: true},
+		{ID: "hris:payslip:view", ModuleID: ModuleHRIS, Resource: "payslip", Action: "view", Description: "Melihat slip gaji karyawan beserta nominal gaji, potongan, reimbursement, dan PDF-nya", IsSensitive: true},
+		{ID: "hris:payslip:manage", ModuleID: ModuleHRIS, Resource: "payslip", Action: "manage", Description: "Generate, mengubah draf, membatalkan dan menerbitkan ulang slip gaji, termasuk unduh DOCX", IsSensitive: true},
+		{ID: "hris:payslip:send", ModuleID: ModuleHRIS, Resource: "payslip", Action: "send", Description: "Mengirim slip gaji (PDF berisi nominal gaji) ke email karyawan", IsSensitive: true},
 
 		// Marketing
 		{ID: "marketing:campaign:view", ModuleID: ModuleMarketing, Resource: "campaign", Action: "view", Description: "Melihat campaign"},
@@ -245,6 +256,19 @@ func SystemRolePermissionIDs(roleSlug string) []string {
 	return result
 }
 
+// managerExcludedPermissions are withheld from the Manager system role even
+// though their action (view/edit/manage/send) would otherwise qualify.
+var managerExcludedPermissions = map[string]struct{}{
+	"hris:employee_identity:view": {},
+	"hris:employee_identity:edit": {},
+	"hris:contract:view":          {},
+	"hris:contract:manage":        {},
+	"hris:contract:send":          {},
+	"hris:payslip:view":           {},
+	"hris:payslip:manage":         {},
+	"hris:payslip:send":           {},
+}
+
 func managerCanAccess(permission PermissionDefinition) bool {
 	if permission.ModuleID == ModuleAdmin {
 		switch permission.ID {
@@ -264,6 +288,11 @@ func managerCanAccess(permission PermissionDefinition) bool {
 	}
 
 	if permission.ID == "hris:reimbursement:mark_paid" {
+		return false
+	}
+
+	// Identity data, contracts and payslips are Admin-only by default.
+	if _, restricted := managerExcludedPermissions[permission.ID]; restricted {
 		return false
 	}
 

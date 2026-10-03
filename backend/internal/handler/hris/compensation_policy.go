@@ -84,9 +84,19 @@ func (h *CompensationPolicyHandler) updatePolicy(w http.ResponseWriter, r *http.
 }
 
 func (h *CompensationPolicyHandler) getSalarySafety(w http.ResponseWriter, r *http.Request) {
-	now := time.Now()
-	year := parseIntDefault(r.URL.Query().Get("year"), now.Year())
-	month := parseIntDefault(r.URL.Query().Get("month"), int(now.Month()))
+	// The current period in the policy timezone is the default for a missing
+	// (or unparsable) year/month, and is returned in meta so the UI picks its
+	// default period and the last selectable month from the server instead of
+	// the browser clock. An explicit value, including 0, is passed through and
+	// validated by the service.
+	currentYear, currentMonth, err := h.service.CurrentPeriod(r.Context())
+	if err != nil {
+		platformmiddleware.LoggerFromContext(r.Context()).Error("salary safety period lookup failed", "error", err)
+		response.WriteInternalError(r.Context(), w, err, "Failed to evaluate salary safety")
+		return
+	}
+	year := parseIntDefault(r.URL.Query().Get("year"), currentYear)
+	month := parseIntDefault(r.URL.Query().Get("month"), currentMonth)
 
 	var employeeID *string
 	if raw := strings.TrimSpace(r.URL.Query().Get("employee_id")); raw != "" {
@@ -108,7 +118,12 @@ func (h *CompensationPolicyHandler) getSalarySafety(w http.ResponseWriter, r *ht
 	for _, evaluation := range evaluations {
 		out = append(out, toSalarySafetyResponse(evaluation))
 	}
-	response.WriteJSON(w, http.StatusOK, out, nil)
+	response.WriteJSON(w, http.StatusOK, out, hrisdto.SalarySafetyMeta{
+		PeriodYear:   year,
+		PeriodMonth:  month,
+		CurrentYear:  currentYear,
+		CurrentMonth: currentMonth,
+	})
 }
 
 func toCompensationPolicyResponse(policy model.CompensationPolicy) hrisdto.CompensationPolicyResponse {
@@ -130,18 +145,39 @@ func toSalarySafetyResponse(evaluation model.SalarySafetyEvaluation) hrisdto.Sal
 		})
 	}
 
+	var evaluatedThrough *string
+	if evaluation.EvaluatedThrough != nil {
+		value := evaluation.EvaluatedThrough.Format(salaryDateLayout)
+		evaluatedThrough = &value
+	}
+	var reason *string
+	if evaluation.Reason != nil {
+		value := string(*evaluation.Reason)
+		reason = &value
+	}
+
 	return hrisdto.SalarySafetyResponse{
-		EmployeeID:         evaluation.EmployeeID,
-		UserID:             evaluation.UserID,
-		FullName:           evaluation.FullName,
-		PeriodYear:         evaluation.PeriodYear,
-		PeriodMonth:        evaluation.PeriodMonth,
-		MonthlyActiveHours: evaluation.MonthlyActiveHours,
-		MinHoursPerMonth:   evaluation.MinHoursPerMonth,
-		MinHoursPerDay:     evaluation.MinHoursPerDay,
-		BaseSalary:         evaluation.BaseSalary,
-		DailyViolations:    violations,
-		Status:             string(evaluation.Status),
+		EmployeeID:          evaluation.EmployeeID,
+		UserID:              evaluation.UserID,
+		FullName:            evaluation.FullName,
+		PeriodYear:          evaluation.PeriodYear,
+		PeriodMonth:         evaluation.PeriodMonth,
+		MonthlyActiveHours:  evaluation.MonthlyActiveHours,
+		MinHoursPerMonth:    evaluation.MinHoursPerMonth,
+		MinHoursPerDay:      evaluation.MinHoursPerDay,
+		BaseSalary:          evaluation.BaseSalary,
+		DailyViolations:     violations,
+		Status:              string(evaluation.Status),
+		ExpectedHoursToDate: evaluation.ExpectedHoursToDate,
+		TargetHoursMonth:    evaluation.TargetHoursMonth,
+		WorkingDaysElapsed:  evaluation.WorkingDaysElapsed,
+		WorkingDaysTotal:    evaluation.WorkingDaysTotal,
+		EvaluatedThrough:    evaluatedThrough,
+		HasTrackerData:      evaluation.HasTrackerData,
+		ShortDays:           evaluation.ShortDays,
+		AbsentDays:          evaluation.AbsentDays,
+		Reason:              reason,
+		PositionUnset:       evaluation.PositionUnset,
 	}
 }
 

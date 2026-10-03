@@ -21,8 +21,8 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
-	"github.com/kana-consultant/kantor/backend/internal/seed"
 	"github.com/kana-consultant/kantor/backend/internal/security"
+	"github.com/kana-consultant/kantor/backend/internal/seed"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 	"github.com/kana-consultant/kantor/backend/internal/tenant"
 )
@@ -65,7 +65,7 @@ func run(ctx context.Context) error {
 	}
 
 	authRepository := authrepo.New(pool)
-	employeesRepository := hrisrepo.NewEmployeesRepository(pool)
+	employeesRepository := hrisrepo.NewEmployeesRepository(pool, encrypter)
 	permissionCache := rbac.NewPermissionCache(pool, 0)
 	authService := authservice.New(authRepository, employeesRepository, cfg, permissionCache, encrypter, nil)
 

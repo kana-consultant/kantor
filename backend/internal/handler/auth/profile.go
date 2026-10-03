@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
+	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
@@ -49,13 +51,47 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The previous record tells which bank fields this save changes; a
+	// missing profile simply has nothing to compare.
+	previous, previousErr := h.service.GetProfile(r.Context(), principal.UserID)
+
 	employee, err := h.service.UpdateProfile(r.Context(), principal.UserID, input)
 	if err != nil {
 		response.WriteInternalError(r.Context(), w, err, "Failed to update profile")
 		return
 	}
 
+	// Bank changes made by the employee are audited by field name only.
+	if previousErr == nil {
+		if fields := changedBankFields(previous, employee); len(fields) > 0 {
+			platformmiddleware.AuditLog(r.Context(), "update", "hris", "employee", employee.ID, nil, map[string]any{
+				"source":         "profile",
+				"changed_fields": fields,
+			})
+		}
+	}
+
 	response.WriteJSON(w, http.StatusOK, employee, nil)
+}
+
+// changedBankFields lists the bank fields that differ between two versions
+// of an employee record (names only, never values).
+func changedBankFields(previous model.Employee, next model.Employee) []string {
+	fields := make([]string, 0, 2)
+	if optionalValue(previous.BankAccountNumber) != optionalValue(next.BankAccountNumber) {
+		fields = append(fields, "bank_account_number")
+	}
+	if optionalValue(previous.BankName) != optionalValue(next.BankName) {
+		fields = append(fields, "bank_name")
+	}
+	return fields
+}
+
+func optionalValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }
 
 func (h *Handler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
