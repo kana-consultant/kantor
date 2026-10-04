@@ -1613,7 +1613,7 @@ func (s *PayslipsService) markSent(ctx context.Context, slip model.Payslip, form
 // anything is sent. A successful send marks a draft sent; an SMTP failure is
 // returned in the response (sent=false with the fixed category) together
 // with the failed delivery.
-func (s *PayslipsService) Send(ctx context.Context, viewer DocumentViewer, id string, source string) (PayslipSendResult, error) {
+func (s *PayslipsService) Send(ctx context.Context, viewer DocumentViewer, id string, input hrisdto.SendPayslipRequest) (PayslipSendResult, error) {
 	slip, err := s.getSlip(ctx, id)
 	if err != nil {
 		return PayslipSendResult{}, err
@@ -1624,12 +1624,15 @@ func (s *PayslipsService) Send(ctx context.Context, viewer DocumentViewer, id st
 	if err := s.mailer.requireReady(ctx); err != nil {
 		return PayslipSendResult{}, err
 	}
-	// The response carries the slip's amounts.
-	if err := s.logAmountsAccess(ctx, viewer.ActorID, slip.EmployeeID, payslipAccessSend); err != nil {
+	recipient, err := s.mailer.ResolveRecipient(ctx, slip.EmployeeID, input.RecipientSource)
+	if err != nil {
 		return PayslipSendResult{}, err
 	}
-	recipient, err := s.mailer.ResolveRecipient(ctx, slip.EmployeeID, source)
-	if err != nil {
+	if err := viewer.guardSend(recipient, input.ExpectedRecipient); err != nil {
+		return PayslipSendResult{}, err
+	}
+	// The response carries the slip's amounts.
+	if err := s.logAmountsAccess(ctx, viewer.ActorID, slip.EmployeeID, payslipAccessSend); err != nil {
 		return PayslipSendResult{}, err
 	}
 	if err := s.sendConflict(ctx, slip); err != nil {
@@ -1654,7 +1657,7 @@ func (s *PayslipsService) Send(ctx context.Context, viewer DocumentViewer, id st
 	}
 
 	delivery, sendErr := s.mailer.DeliverQueued(ctx, queued)
-	audit := payslipSendAudit(slip, recipient, format)
+	audit := viewer.auditValues(payslipSendAudit(slip, recipient, format))
 	result := PayslipSendResult{Audit: audit}
 	if sendErr != nil {
 		classified, ok := mail.AsSendError(sendErr)
@@ -1697,7 +1700,7 @@ type payslipSendCandidate struct {
 // selectForSend loads the requested slips in request order and splits them
 // into sendable candidates and skipped ones. withAttachments loads the
 // files (batch send); the preview only checks they exist.
-func (s *PayslipsService) selectForSend(ctx context.Context, ids []string, includeSent bool, withAttachments bool) ([]payslipSendCandidate, []hrisdto.PayslipSkipped, int, error) {
+func (s *PayslipsService) selectForSend(ctx context.Context, viewer DocumentViewer, ids []string, includeSent bool, withAttachments bool) ([]payslipSendCandidate, []hrisdto.PayslipSkipped, int, error) {
 	unique := make([]string, 0, len(ids))
 	seen := map[string]bool{}
 	for _, raw := range ids {
@@ -1748,6 +1751,9 @@ func (s *PayslipsService) selectForSend(ctx context.Context, ids []string, inclu
 			alreadySent++
 			skipSlip("already_sent", "Sudah terkirim, dilewati", name)
 			continue
+		case viewer.ViaMCP && !mcpRecipientAllowed(recipient):
+			skipSlip("mcp_recipient_not_login", ErrDocumentRecipientRestricted.Error(), name)
+			continue
 		}
 		busy, err := s.mailer.InFlight(ctx, model.EmailDeliveryKindPayslip, slip.ID)
 		if err != nil {
@@ -1790,10 +1796,38 @@ func (s *PayslipsService) selectForSend(ctx context.Context, ids []string, inclu
 	return candidates, skipped, alreadySent, nil
 }
 
+// guardBatchRecipients checks a batch against the addresses the human was
+// shown (send-preview): once expected is given, every slip that would be
+// sent must be listed with exactly its resolved address. Through MCP the map
+// is required. Nothing is queued when it fails.
+func guardBatchRecipients(viewer DocumentViewer, candidates []payslipSendCandidate, expected map[string]string) error {
+	if len(expected) == 0 {
+		if viewer.ViaMCP && len(candidates) > 0 {
+			return ErrDocumentExpectedRecipientsRequired
+		}
+		return nil
+	}
+	byID := make(map[string]string, len(expected))
+	for id, address := range expected {
+		byID[strings.ToLower(strings.TrimSpace(id))] = address
+	}
+	for _, candidate := range candidates {
+		// The message names the slip, so the caller knows which entry to fix.
+		address, listed := byID[strings.ToLower(candidate.slip.ID)]
+		if !listed || strings.TrimSpace(address) == "" {
+			return fmt.Errorf("%w (slip %s tidak ada di expected_recipients)", ErrDocumentRecipientMismatch, candidate.slip.ID)
+		}
+		if err := viewer.guardSend(candidate.recipient, address); err != nil {
+			return fmt.Errorf("%w (slip %s)", err, candidate.slip.ID)
+		}
+	}
+	return nil
+}
+
 // SendPreview lists the recipients a batch send would use (the confirm
 // dialog): every address, 'alamat baru' flags, and the skipped slips.
 func (s *PayslipsService) SendPreview(ctx context.Context, viewer DocumentViewer, input hrisdto.PayslipSendPreviewRequest) (hrisdto.PayslipSendPreviewResponse, error) {
-	candidates, skipped, alreadySent, err := s.selectForSend(ctx, input.IDs, input.IncludeAlreadySent, false)
+	candidates, skipped, alreadySent, err := s.selectForSend(ctx, viewer, input.IDs, input.IncludeAlreadySent, false)
 	if err != nil {
 		return hrisdto.PayslipSendPreviewResponse{}, err
 	}
@@ -1831,8 +1865,11 @@ func (s *PayslipsService) PrepareBatch(ctx context.Context, viewer DocumentViewe
 	if err := s.mailer.requireReady(ctx); err != nil {
 		return PreparedPayslipBatch{}, err
 	}
-	candidates, skipped, alreadySent, err := s.selectForSend(ctx, input.IDs, input.IncludeAlreadySent, true)
+	candidates, skipped, alreadySent, err := s.selectForSend(ctx, viewer, input.IDs, input.IncludeAlreadySent, true)
 	if err != nil {
+		return PreparedPayslipBatch{}, err
+	}
+	if err := guardBatchRecipients(viewer, candidates, input.ExpectedRecipients); err != nil {
 		return PreparedPayslipBatch{}, err
 	}
 
@@ -1887,7 +1924,9 @@ func (s *PayslipsService) PrepareBatch(ctx context.Context, viewer DocumentViewe
 			return prepared, err
 		}
 
-		audit := payslipSendAudit(slip, candidate.recipient, candidate.format)
+		// Marked here, before the copy below, so the outcome row written by
+		// the background sender carries it too.
+		audit := viewer.auditValues(payslipSendAudit(slip, candidate.recipient, candidate.format))
 		audit["delivery_id"] = queued.Delivery.ID
 		audit["batch_id"] = batchID
 		prepared.Requested = append(prepared.Requested, PayslipAuditEntry{PayslipID: slip.ID, Values: audit})

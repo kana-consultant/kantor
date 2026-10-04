@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 
+	"github.com/kana-consultant/kantor/backend/internal/clientvia"
 	"github.com/kana-consultant/kantor/backend/internal/docgen"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	"github.com/kana-consultant/kantor/backend/internal/exportutil"
@@ -141,6 +142,17 @@ func (h *EmployeesHandler) updateEmployee(w http.ResponseWriter, r *http.Request
 	// denylist redacts the bank account number, so without it a new number
 	// and an unchanged one would look the same.
 	previous, previousErr := h.service.GetEmployee(r.Context(), employeeID)
+	if clientvia.IsMCP(r) {
+		// Fail closed: without the stored record the check below cannot run.
+		if previousErr != nil {
+			h.writeError(r.Context(), w, previousErr)
+			return
+		}
+		if employeeEmailChanges(previous, input) {
+			response.WriteError(w, http.StatusConflict, "EMPLOYEE_EMAIL_LOCKED", "Lewat MCP, email karyawan tidak dapat diubah; ubah di aplikasi web.", map[string]string{"email": "mcp"})
+			return
+		}
+	}
 	result, err := h.service.UpdateEmployee(r.Context(), employeeID, input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
@@ -155,6 +167,14 @@ func (h *EmployeesHandler) updateEmployee(w http.ResponseWriter, r *http.Request
 	}
 	platformmiddleware.AuditLog(r.Context(), "update", "hris", "employee", employeeID, nil, auditValue)
 	response.WriteJSON(w, http.StatusOK, h.visibleEmployee(r, result), nil)
+}
+
+// employeeEmailChanges reports whether an update would change the
+// employee's e-mail. Through the MCP tool surface that is refused: for an
+// employee without an account, employees.email decides which user account
+// the employee gets linked to, and document e-mail goes to that account.
+func employeeEmailChanges(previous model.Employee, input hrisdto.UpdateEmployeeRequest) bool {
+	return !strings.EqualFold(strings.TrimSpace(previous.Email), strings.TrimSpace(input.Email))
 }
 
 // changedEmployeeFields lists the fields (names only, never values) that

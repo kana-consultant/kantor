@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 
+	"github.com/kana-consultant/kantor/backend/internal/clientvia"
 	hrisdto "github.com/kana-consultant/kantor/backend/internal/dto/hris"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/rbac"
@@ -89,8 +90,12 @@ func principalHas(principal platformmiddleware.Principal, permission string) boo
 
 // documentViewer: personal e-mail addresses are identity data, shown in
 // full only with hris:employee_identity:view.
-func documentViewer(principal platformmiddleware.Principal) hrisservice.DocumentViewer {
-	return hrisservice.DocumentViewer{ActorID: principal.UserID, CanViewIdentity: principalHas(principal, permissionIdentityView)}
+func documentViewer(r *http.Request, principal platformmiddleware.Principal) hrisservice.DocumentViewer {
+	return hrisservice.DocumentViewer{
+		ActorID:         principal.UserID,
+		CanViewIdentity: principalHas(principal, permissionIdentityView),
+		ViaMCP:          clientvia.IsMCP(r),
+	}
 }
 
 func principalOrUnauthorized(w http.ResponseWriter, r *http.Request) (platformmiddleware.Principal, bool) {
@@ -112,7 +117,7 @@ func (h *PayslipsHandler) list(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Query validation failed", map[string]string{"year": "required", "month": "required"})
 		return
 	}
-	result, err := h.service.List(r.Context(), documentViewer(principal), year, month)
+	result, err := h.service.List(r.Context(), documentViewer(r, principal), year, month)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -134,7 +139,7 @@ func (h *PayslipsHandler) history(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = parsed
 	}
-	result, err := h.service.History(r.Context(), documentViewer(principal), chi.URLParam(r, "employeeID"), limit)
+	result, err := h.service.History(r.Context(), documentViewer(r, principal), chi.URLParam(r, "employeeID"), limit)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -167,7 +172,7 @@ func (h *PayslipsHandler) get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := h.service.Get(r.Context(), documentViewer(principal), chi.URLParam(r, "payslipID"))
+	result, err := h.service.Get(r.Context(), documentViewer(r, principal), chi.URLParam(r, "payslipID"))
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -185,7 +190,7 @@ func (h *PayslipsHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "payslipID")
-	result, changed, err := h.service.Update(r.Context(), documentViewer(principal), id, input)
+	result, changed, err := h.service.Update(r.Context(), documentViewer(r, principal), id, input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -271,7 +276,7 @@ func (h *PayslipsHandler) recipient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	source := strings.TrimSpace(r.URL.Query().Get("source"))
-	result, err := h.service.Recipient(r.Context(), documentViewer(principal), chi.URLParam(r, "payslipID"), source)
+	result, err := h.service.Recipient(r.Context(), documentViewer(r, principal), chi.URLParam(r, "payslipID"), source)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -288,7 +293,7 @@ func (h *PayslipsHandler) sendPreview(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, err := h.service.SendPreview(r.Context(), documentViewer(principal), input)
+	result, err := h.service.SendPreview(r.Context(), documentViewer(r, principal), input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -308,7 +313,7 @@ func (h *PayslipsHandler) send(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	id := chi.URLParam(r, "payslipID")
-	result, err := h.service.Send(r.Context(), documentViewer(principal), id, input.RecipientSource)
+	result, err := h.service.Send(r.Context(), documentViewer(r, principal), id, input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -327,7 +332,7 @@ func (h *PayslipsHandler) sendBatch(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	prepared, err := h.service.PrepareBatch(r.Context(), documentViewer(principal), input)
+	prepared, err := h.service.PrepareBatch(r.Context(), documentViewer(r, principal), input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -350,7 +355,7 @@ func (h *PayslipsHandler) voidReissue(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, audits, err := h.service.VoidReissue(r.Context(), documentViewer(principal), chi.URLParam(r, "payslipID"), input.Reason)
+	result, audits, err := h.service.VoidReissue(r.Context(), documentViewer(r, principal), chi.URLParam(r, "payslipID"), input.Reason)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -420,6 +425,16 @@ func writeDocumentError(ctx context.Context, w http.ResponseWriter, err error, f
 		response.WriteError(w, http.StatusConflict, "DOCUMENT_MAIL_NOT_READY", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrDocumentRecipientUnavailable):
 		response.WriteError(w, http.StatusConflict, "RECIPIENT_UNAVAILABLE", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrDocumentExpectedRecipientRequired):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"expected_recipient": "required"})
+	case errors.Is(err, hrisservice.ErrDocumentExpectedRecipientsRequired):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"expected_recipients": "required"})
+	case errors.Is(err, hrisservice.ErrDocumentRecipientMismatch):
+		response.WriteError(w, http.StatusConflict, "RECIPIENT_MISMATCH", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrDocumentRecipientRestricted):
+		response.WriteError(w, http.StatusConflict, "MCP_RECIPIENT_NOT_ALLOWED", err.Error(), nil)
+	case errors.Is(err, hrisservice.ErrDocumentCcRestricted):
+		response.WriteError(w, http.StatusConflict, "MCP_CC_NOT_ALLOWED", err.Error(), map[string]string{"cc": "mcp"})
 	default:
 		response.WriteInternalError(ctx, w, err, fallback)
 	}

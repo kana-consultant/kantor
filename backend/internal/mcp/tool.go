@@ -30,6 +30,27 @@ type EndpointMeta struct {
 	Paginated      bool
 	PerPageDefault int
 	PerPageMax     int // 0 = no enforced cap
+	// Body documents the JSON request body; the schema stays a free-form
+	// object, so this text is what tells an AI client which fields exist.
+	Body string
+	// Destructive marks a non-DELETE tool whose effect cannot be undone (an
+	// e-mail goes out, a sent document is voided, a contract is closed).
+	Destructive bool
+	// OpenWorld marks a tool that reaches people outside the API (e-mail).
+	OpenWorld bool
+	// RequireConfirm makes the tool refuse to run unless the call carries
+	// confirm=true, so an AI client has to stop and ask the human first.
+	RequireConfirm bool
+}
+
+// confirmArg is the top-level tool argument RequireConfirm tools need. It is
+// never forwarded to the API.
+const confirmArg = "confirm"
+
+const confirmArgDescription = "Set to true only after the human has seen exactly who will receive what and has explicitly approved this send in the conversation; the approved address(es) go in the body as expected_recipient(s). Never set it on your own initiative."
+
+func (t ToolSpec) requiresConfirm() bool {
+	return t.Meta != nil && t.Meta.RequireConfirm
 }
 
 func (t ToolSpec) hasBody() bool {
@@ -51,10 +72,22 @@ func (t ToolSpec) inputSchema() map[string]interface{} {
 	properties["query"] = t.querySchema()
 
 	if t.hasBody() {
+		bodyDescription := "JSON request body for this endpoint."
+		if t.Meta != nil && t.Meta.Body != "" {
+			bodyDescription = "JSON request body: " + t.Meta.Body
+		}
 		properties["body"] = map[string]interface{}{
 			"type":        "object",
-			"description": "JSON request body for this endpoint.",
+			"description": bodyDescription,
 		}
+	}
+
+	if t.requiresConfirm() {
+		properties[confirmArg] = map[string]interface{}{
+			"type":        "boolean",
+			"description": confirmArgDescription,
+		}
+		required = append(required, confirmArg)
 	}
 
 	schema := map[string]interface{}{
@@ -118,14 +151,18 @@ func (t ToolSpec) descriptor() map[string]interface{} {
 	if t.Meta != nil && t.Meta.Description != "" {
 		description = t.Meta.Description + " (" + t.Method + " " + t.PathTemplate + ")"
 	}
+	annotations := map[string]interface{}{
+		"readOnlyHint":    t.Method == http.MethodGet,
+		"destructiveHint": t.Method == http.MethodDelete || (t.Meta != nil && t.Meta.Destructive),
+		"idempotentHint":  t.Method == http.MethodGet || t.Method == http.MethodPut || t.Method == http.MethodDelete,
+	}
+	if t.Meta != nil && t.Meta.OpenWorld {
+		annotations["openWorldHint"] = true
+	}
 	return map[string]interface{}{
 		"name":        t.Name,
 		"description": description,
 		"inputSchema": t.inputSchema(),
-		"annotations": map[string]interface{}{
-			"readOnlyHint":    t.Method == http.MethodGet,
-			"destructiveHint": t.Method == http.MethodDelete,
-			"idempotentHint":  t.Method == http.MethodGet || t.Method == http.MethodPut || t.Method == http.MethodDelete,
-		},
+		"annotations": annotations,
 	}
 }

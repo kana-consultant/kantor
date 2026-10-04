@@ -33,18 +33,28 @@ var excludedSuffixes = []string{
 	// the context window. Keep them off the tool surface.
 	"/export",
 	"/extension/download",
+	// Rendered HR documents: binary, and the PKWT prints the full NIK and
+	// account number. The JSON routes next to them only carry masked values.
+	"/pdf",
+	"/docx",
 }
 
 // excludedContains drops credential and OAuth self-management endpoints: an AI
 // client must not mint or revoke its own tokens or approve OAuth grants. It also
 // drops file-serving routes, which return binary blobs, and the mail
 // credential / email-delivery routes: an AI client must not rewire where
-// tenant or document email goes, send it, or read who was mailed what. HR
-// document data stays off the surface too: employee identity (NIK, birth
-// data) behind /hr-profile, the company profile + logo that every
-// generated document carries, payslips (amounts, PDFs, sending) and
-// employment contracts (PKWT/NDA with full NIK, account number and
-// compensation; sending).
+// tenant or document email goes or page through the delivery history (the
+// latest delivery of a document is part of that document's JSON). Employee identity
+// (NIK, birth data) behind /hr-profile and the company profile + logo that
+// every generated document carries stay off the surface too.
+//
+// The payslip and contract workflow routes (/hris/payslips, /hris/contracts)
+// ARE tools: they run under the caller's own permissions and return salary
+// amounts but only masked account numbers and no NIK. The API applies its
+// MCP send rules to the requests built here (clientvia): a document goes only
+// to the login e-mail of a linked account, the call must name the address
+// the human approved, and a contract cannot be cc'd. The send tools also need
+// confirm=true (see RequireConfirm); the rendered files above stay excluded.
 var excludedContains = []string{
 	"/auth/pat",
 	"/oauth",
@@ -54,8 +64,6 @@ var excludedContains = []string{
 	"/email-deliveries",
 	"/hr-profile",
 	"/settings/company-profile",
-	"/hris/payslips",
-	"/hris/contracts",
 }
 
 // BuildCatalog derives the MCP tool surface from the live chi route table, so it

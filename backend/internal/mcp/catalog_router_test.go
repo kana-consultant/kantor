@@ -1,6 +1,8 @@
 package mcp_test
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -12,6 +14,13 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/mcp"
 )
 
+type countingExecutor struct{ calls int }
+
+func (e *countingExecutor) Execute(*http.Request) (int, []byte, error) {
+	e.calls++
+	return http.StatusOK, []byte(`{"success":true}`), nil
+}
+
 // sensitiveRouteFragments must never appear in the MCP tool surface. Each
 // phase that adds one of these route families adds its fragment here (and to
 // excludedContains in catalog.go).
@@ -21,8 +30,36 @@ var sensitiveRouteFragments = []string{
 	"/email-deliveries",
 	"/hr-profile",
 	"/settings/company-profile",
-	"/hris/payslips",
-	"/hris/contracts",
+}
+
+// renderedDocumentSuffixes are the binary payslip/contract files: the PKWT
+// prints the full NIK and account number, so they never become tools.
+var renderedDocumentSuffixes = []string{"/pdf", "/docx"}
+
+// documentWorkflowTools are the payslip and contract tools an AI client gets.
+// The value says whether the tool e-mails an employee and so needs
+// confirm=true.
+var documentWorkflowTools = map[string]bool{
+	"get_hris_payslips":                         false,
+	"post_hris_payslips_generate":               false,
+	"post_hris_payslips_send_preview":           false,
+	"post_hris_payslips_send_batch":             true,
+	"get_hris_payslips_employee_employeeid":     false,
+	"get_hris_payslips_payslipid":               false,
+	"put_hris_payslips_payslipid":               false,
+	"get_hris_payslips_payslipid_recipient":     false,
+	"post_hris_payslips_payslipid_send":         true,
+	"post_hris_payslips_payslipid_void_reissue": false,
+	"get_hris_contracts":                        false,
+	"post_hris_contracts":                       false,
+	"get_hris_contracts_contractid":             false,
+	"put_hris_contracts_contractid":             false,
+	"get_hris_contracts_contractid_preflight":   false,
+	"post_hris_contracts_contractid_generate":   false,
+	"post_hris_contracts_contractid_renew":      false,
+	"patch_hris_contracts_contractid_status":    false,
+	"get_hris_contracts_contractid_recipient":   false,
+	"post_hris_contracts_contractid_send":       true,
 }
 
 // TestCatalogFromRealRouterExcludesSensitiveRoutes builds the catalog from the
@@ -43,12 +80,109 @@ func TestCatalogFromRealRouterExcludesSensitiveRoutes(t *testing.T) {
 	}
 
 	names := make(map[string]bool, len(tools))
+	byName := make(map[string]mcp.ToolSpec, len(tools))
 	for _, tool := range tools {
 		names[tool.Name] = true
+		byName[tool.Name] = tool
 		for _, fragment := range sensitiveRouteFragments {
 			if strings.Contains(tool.PathTemplate, fragment) {
 				t.Errorf("tool %s (%s %s) exposes excluded route fragment %q", tool.Name, tool.Method, tool.PathTemplate, fragment)
 			}
+		}
+		for _, suffix := range renderedDocumentSuffixes {
+			if strings.HasSuffix(tool.PathTemplate, suffix) {
+				t.Errorf("tool %s (%s %s) exposes a rendered document", tool.Name, tool.Method, tool.PathTemplate)
+			}
+		}
+	}
+
+	// The payslip and contract workflow is on the surface, every tool with a
+	// curated description, and exactly the e-mail sending tools need confirm.
+	for name, sendsEmail := range documentWorkflowTools {
+		tool, ok := byName[name]
+		if !ok {
+			t.Errorf("expected document workflow tool %s in the catalog", name)
+			continue
+		}
+		if tool.Meta == nil || tool.Meta.Description == "" {
+			t.Errorf("%s has no curated description (annotation key does not match the route?)", name)
+			continue
+		}
+		if tool.Meta.RequireConfirm != sendsEmail {
+			t.Errorf("%s: RequireConfirm = %v, want %v", name, tool.Meta.RequireConfirm, sendsEmail)
+		}
+		if (tool.Method == http.MethodPost || tool.Method == http.MethodPut || tool.Method == http.MethodPatch) && tool.Meta.Body == "" {
+			t.Errorf("%s takes a body but its fields are not documented", name)
+		}
+	}
+	// Irreversible document actions are flagged for clients that ask before
+	// running destructive tools.
+	for _, name := range []string{
+		"post_hris_payslips_send_batch",
+		"post_hris_payslips_payslipid_send",
+		"post_hris_contracts_contractid_send",
+		"post_hris_payslips_payslipid_void_reissue",
+		"patch_hris_contracts_contractid_status",
+	} {
+		if tool, ok := byName[name]; ok && (tool.Meta == nil || !tool.Meta.Destructive) {
+			t.Errorf("%s must be marked Destructive", name)
+		}
+	}
+
+	// The gate itself, for every gated tool of the real catalog: without
+	// confirm=true the API is never called.
+	executor := &countingExecutor{}
+	server := mcp.NewServer(tools, executor, "", "test")
+	gated := 0
+	for _, tool := range tools {
+		if tool.Meta == nil || !tool.Meta.RequireConfirm {
+			continue
+		}
+		gated++
+		arguments := map[string]interface{}{"body": map[string]interface{}{"ids": []string{"x"}, "expected_recipient": "a@b.test"}}
+		for _, param := range tool.PathParams {
+			arguments[param] = "11111111-1111-1111-1111-111111111111"
+		}
+		call := func(confirm interface{}) {
+			if confirm != nil {
+				arguments["confirm"] = confirm
+			} else {
+				delete(arguments, "confirm")
+			}
+			message, err := json.Marshal(map[string]interface{}{
+				"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+				"params": map[string]interface{}{"name": tool.Name, "arguments": arguments},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			server.Handle(context.Background(), message, "Bearer token", "tenant.example.com")
+		}
+		for _, unconfirmed := range []interface{}{nil, false, "true", 1} {
+			call(unconfirmed)
+			if executor.calls != 0 {
+				t.Fatalf("%s reached the API with confirm=%v", tool.Name, unconfirmed)
+			}
+		}
+		call(true)
+		if executor.calls != 1 {
+			t.Fatalf("%s did not reach the API with confirm=true", tool.Name)
+		}
+		executor.calls = 0
+	}
+	if gated != 3 {
+		t.Errorf("expected 3 gated tools in the real catalog, got %d", gated)
+	}
+
+	for _, tool := range tools {
+		if !strings.Contains(tool.PathTemplate, "/hris/payslips") && !strings.Contains(tool.PathTemplate, "/hris/contracts") {
+			if tool.Meta != nil && tool.Meta.RequireConfirm {
+				t.Errorf("unexpected confirm gate on %s", tool.Name)
+			}
+			continue
+		}
+		if _, ok := documentWorkflowTools[tool.Name]; !ok {
+			t.Errorf("new payslip/contract tool %s is not in documentWorkflowTools: decide whether it needs confirm=true and add it", tool.Name)
 		}
 	}
 

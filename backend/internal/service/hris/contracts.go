@@ -1874,6 +1874,14 @@ func (s *ContractsService) Send(ctx context.Context, viewer ContractViewer, id s
 	if err != nil {
 		return ContractSendResult{}, err
 	}
+	if err := viewer.guardSend(recipient, input.ExpectedRecipient); err != nil {
+		return ContractSendResult{}, err
+	}
+	// A cc mailbox gets the full NIK, account number and compensation, and
+	// the caller picks it: not something an AI client may add.
+	if viewer.ViaMCP && len(input.Cc) > 0 {
+		return ContractSendResult{}, ErrDocumentCcRestricted
+	}
 	company, err := s.company.Profile(ctx)
 	if err != nil {
 		return ContractSendResult{}, err
@@ -1905,7 +1913,7 @@ func (s *ContractsService) Send(ctx context.Context, viewer ContractViewer, id s
 	}
 
 	delivery, sendErr := s.mailer.DeliverQueued(ctx, queued)
-	audit := contractAuditValues(contract)
+	audit := viewer.auditValues(contractAuditValues(contract))
 	audit["format"] = format
 	audit["recipient"] = MaskEmail(recipient.Address)
 	audit["recipient_source"] = recipient.Source

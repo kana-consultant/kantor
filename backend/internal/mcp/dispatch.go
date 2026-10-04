@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/kana-consultant/kantor/backend/internal/clientvia"
 )
 
 // Executor runs a built HTTP request against the Kantor API and returns the
@@ -111,6 +113,9 @@ func (t ToolSpec) buildRequest(ctx context.Context, baseURL string, args map[str
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "application/json")
+	// Handlers apply stricter rules to calls an AI client makes for the user
+	// (document e-mail goes only to a login address the human confirmed).
+	req.Header.Set(clientvia.Header, clientvia.MCP)
 	return req, nil
 }
 
