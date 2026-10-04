@@ -89,10 +89,11 @@ type UpdateContractRequest struct {
 
 // SendContractRequest e-mails the PKWT and the NDA together. recipient_source
 // as for payslips (default, login, employee, personal); cc only on the domain
-// of the company HR contact e-mail.
+// of the company HR contact e-mail. expected_recipient as for payslips.
 type SendContractRequest struct {
-	RecipientSource string   `json:"recipient_source" validate:"omitempty,oneof=default login employee personal"`
-	Cc              []string `json:"cc" validate:"max=5,dive,required,max=254"`
+	RecipientSource   string   `json:"recipient_source" validate:"omitempty,oneof=default login employee personal"`
+	Cc                []string `json:"cc" validate:"max=5,dive,required,max=254"`
+	ExpectedRecipient string   `json:"expected_recipient" validate:"omitempty,max=254"`
 }
 
 // UpdateContractStatusRequest: signed (signed_at defaults to today), ended

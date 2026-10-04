@@ -98,6 +98,16 @@ func (s *Server) callTool(ctx context.Context, req request, authHeader string, h
 		return newError(req.ID, codeInvalidParams, "unknown tool: "+params.Name)
 	}
 
+	if tool.requiresConfirm() && !confirmed(params.Arguments) {
+		// A tool result (not a protocol error), so the model reads what to do.
+		return newResult(req.ID, map[string]interface{}{
+			"content": []map[string]interface{}{
+				{"type": "text", "text": confirmRequiredText},
+			},
+			"isError": true,
+		})
+	}
+
 	httpReq, err := tool.buildRequest(ctx, s.baseURL, params.Arguments, authHeader, host)
 	if err != nil {
 		return newError(req.ID, codeInvalidParams, err.Error())
@@ -114,6 +124,26 @@ func (s *Server) callTool(ctx context.Context, req request, authHeader string, h
 		},
 		"isError": status >= 400,
 	})
+}
+
+const confirmRequiredText = "Nothing was sent. This tool e-mails documents to employees and cannot be undone. " +
+	"First show the human who will receive what (payslips: send-preview or recipient; contracts: recipient), " +
+	"wait for their explicit approval in the conversation, then call the tool again with confirm=true " +
+	"and the approved address(es) in the body as expected_recipient(s)."
+
+// confirmed reports whether the call carries the literal JSON true for the
+// confirm argument; "true", 1 and friends do not count.
+func confirmed(args map[string]json.RawMessage) bool {
+	raw, ok := args[confirmArg]
+	if !ok {
+		return false
+	}
+	var value interface{}
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return false
+	}
+	flag, isBool := value.(bool)
+	return isBool && flag
 }
 
 // maxToolResponseBytes caps a single tool result so one over-broad query cannot

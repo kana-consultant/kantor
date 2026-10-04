@@ -32,15 +32,24 @@ type PayslipManualLineRequest struct {
 
 // SendPayslipRequest: recipient_source is default (login e-mail, or the
 // employee e-mail when unlinked), login, employee or personal (HR profile).
+// expected_recipient is the address the sender was shown: when set, the send
+// is refused unless it resolves to exactly that address (required for calls
+// through the MCP tool surface).
 type SendPayslipRequest struct {
-	RecipientSource string `json:"recipient_source" validate:"omitempty,oneof=default login employee personal"`
+	RecipientSource   string `json:"recipient_source" validate:"omitempty,oneof=default login employee personal"`
+	ExpectedRecipient string `json:"expected_recipient" validate:"omitempty,max=254"`
 }
 
 // SendPayslipBatchRequest sends several slips in the background. Slips that
 // were already sent are skipped unless include_already_sent.
+// expected_recipients maps payslip id -> the address the sender was shown
+// (send-preview): when set, the batch is refused unless every slip that would
+// be sent is listed with exactly its resolved address (required for calls
+// through the MCP tool surface).
 type SendPayslipBatchRequest struct {
-	IDs                []string `json:"ids" validate:"required,min=1,max=200,dive,uuid"`
-	IncludeAlreadySent bool     `json:"include_already_sent"`
+	IDs                []string          `json:"ids" validate:"required,min=1,max=200,dive,uuid"`
+	IncludeAlreadySent bool              `json:"include_already_sent"`
+	ExpectedRecipients map[string]string `json:"expected_recipients" validate:"omitempty,max=200,dive,keys,uuid,endkeys,max=254"`
 }
 
 // VoidReissuePayslipRequest voids a sent slip and creates its replacement.

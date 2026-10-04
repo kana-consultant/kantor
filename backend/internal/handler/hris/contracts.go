@@ -67,9 +67,9 @@ func (h *ContractsHandler) RegisterRoutes(router chi.Router) {
 	).Post("/{contractID}/send", h.send)
 }
 
-func contractViewer(principal platformmiddleware.Principal) hrisservice.ContractViewer {
+func contractViewer(r *http.Request, principal platformmiddleware.Principal) hrisservice.ContractViewer {
 	return hrisservice.ContractViewer{
-		DocumentViewer:  documentViewer(principal),
+		DocumentViewer:  documentViewer(r, principal),
 		CanViewSalary:   principalHas(principal, permissionSalaryView),
 		CanViewContract: principalHas(principal, permissionContractView),
 	}
@@ -108,7 +108,7 @@ func (h *ContractsHandler) list(w http.ResponseWriter, r *http.Request) {
 		}
 		filter.Limit = limit
 	}
-	result, err := h.service.List(r.Context(), contractViewer(principal), filter)
+	result, err := h.service.List(r.Context(), contractViewer(r, principal), filter)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -121,7 +121,7 @@ func (h *ContractsHandler) get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := h.service.Get(r.Context(), contractViewer(principal), chi.URLParam(r, "contractID"))
+	result, err := h.service.Get(r.Context(), contractViewer(r, principal), chi.URLParam(r, "contractID"))
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -138,7 +138,7 @@ func (h *ContractsHandler) create(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, audit, err := h.service.Create(r.Context(), contractViewer(principal), input)
+	result, audit, err := h.service.Create(r.Context(), contractViewer(r, principal), input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -157,7 +157,7 @@ func (h *ContractsHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "contractID")
-	result, changed, audit, err := h.service.Update(r.Context(), contractViewer(principal), id, input)
+	result, changed, audit, err := h.service.Update(r.Context(), contractViewer(r, principal), id, input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -178,7 +178,7 @@ func (h *ContractsHandler) preflight(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := h.service.Preflight(r.Context(), contractViewer(principal), chi.URLParam(r, "contractID"))
+	result, err := h.service.Preflight(r.Context(), contractViewer(r, principal), chi.URLParam(r, "contractID"))
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -191,7 +191,7 @@ func (h *ContractsHandler) generate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, audit, err := h.service.Generate(r.Context(), contractViewer(principal), chi.URLParam(r, "contractID"))
+	result, audit, err := h.service.Generate(r.Context(), contractViewer(r, principal), chi.URLParam(r, "contractID"))
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -205,7 +205,7 @@ func (h *ContractsHandler) renew(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, audit, err := h.service.Renew(r.Context(), contractViewer(principal), chi.URLParam(r, "contractID"))
+	result, audit, err := h.service.Renew(r.Context(), contractViewer(r, principal), chi.URLParam(r, "contractID"))
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -223,7 +223,7 @@ func (h *ContractsHandler) status(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(h.validator, w, r, &input) {
 		return
 	}
-	result, audit, err := h.service.SetStatus(r.Context(), contractViewer(principal), chi.URLParam(r, "contractID"), input)
+	result, audit, err := h.service.SetStatus(r.Context(), contractViewer(r, principal), chi.URLParam(r, "contractID"), input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -313,7 +313,7 @@ func (h *ContractsHandler) recipient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	source := strings.TrimSpace(r.URL.Query().Get("source"))
-	result, err := h.service.Recipient(r.Context(), contractViewer(principal), chi.URLParam(r, "contractID"), source)
+	result, err := h.service.Recipient(r.Context(), contractViewer(r, principal), chi.URLParam(r, "contractID"), source)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -339,7 +339,7 @@ func (h *ContractsHandler) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "contractID")
-	result, err := h.service.Send(r.Context(), contractViewer(principal), id, input)
+	result, err := h.service.Send(r.Context(), contractViewer(r, principal), id, input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return

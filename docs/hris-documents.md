@@ -228,8 +228,16 @@ payslip (employment status, job title) and the PKWT five-year check.
   written before this release are left as they are unless the opt-in
   `AUDIT_SCRUB_EXISTING=true` is run after a verified backup
   ([details](deployment.md#audit-log-redaction)).
-- **MCP**: the document, HR profile, email-delivery and mail/company settings routes are not
-  exposed as MCP tools.
+- **MCP**: the payslip and contract workflow (list, generate, edit, preview, send, status)
+  is available as MCP tools under the caller's own permissions. Through MCP a document is
+  mailed only to the login e-mail of the employee's linked account, the call must repeat
+  the address the human approved (`expected_recipient`), contract cc is not possible, and
+  the send tools need `confirm: true` ([details](mcp.md#payslips-and-contracts)). These
+  tools return salary amounts, so they put payroll figures into the AI provider's context;
+  they do not return the NIK or the full account number, and the personal e-mail only
+  masked. The rendered
+  PDF/DOCX files, the HR profile (identity), the email-delivery history route and the
+  mail/company settings are not exposed.
 - **Retention**: generated PDFs and the delivery log are kept until deleted; there is no
   automatic purge. Keep them as long as your payroll and employment record policy requires.
 - **Encryption key**: do not rotate `DATA_ENCRYPTION_KEY` until a re-encryption tool exists
@@ -259,6 +267,7 @@ generated:
 - **New audit entries show `"[redacted]"`** for amounts, account numbers, NIK and secrets.
   Entries written before the upgrade keep their values; they change only if an admin runs
   the opt-in scrub after a backup ([details](deployment.md#audit-log-redaction)).
-- **MCP**: the tools for `/admin/settings/mail-delivery` (and the document, HR profile,
-  company profile and email-delivery routes) are no longer exposed; AI clients that used
-  them must use the web app.
+- **MCP**: the tool for `/admin/settings/mail-delivery` is no longer exposed (nor are the
+  HR profile, company profile, document-mail settings and email-delivery routes); AI
+  clients that used it must use the web app. Payslips and contracts do have MCP tools
+  ([details](mcp.md#payslips-and-contracts)).

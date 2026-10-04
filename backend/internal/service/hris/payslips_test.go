@@ -714,12 +714,12 @@ func TestPayslipSendVoidReissueKeepsItems(t *testing.T) {
 	id := *generated.Generated[0].PayslipID
 
 	// No PDF yet: sending is refused.
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, ""); !errors.Is(err, ErrPayslipPDFNotReady) {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, hrisdto.SendPayslipRequest{}); !errors.Is(err, ErrPayslipPDFNotReady) {
 		t.Fatalf("send without PDF err = %v", err)
 	}
 	f.repo.setRenderReady(id)
 
-	sent, err := f.service.Send(f.ctx, payslipTestViewer, id, "")
+	sent, err := f.service.Send(f.ctx, payslipTestViewer, id, hrisdto.SendPayslipRequest{})
 	if err != nil {
 		t.Fatalf("send: %v", err)
 	}
@@ -767,7 +767,7 @@ func TestPayslipSendVoidReissueKeepsItems(t *testing.T) {
 
 	// The reissue's e-mail says which slip it replaces.
 	f.repo.setRenderReady(reissue.ID)
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, reissue.ID, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, reissue.ID, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatalf("send reissue: %v", err)
 	}
 	reissueMail := f.sender.delivered[len(f.sender.delivered)-1]
@@ -806,7 +806,7 @@ func TestPayslipLateApprovalRollsToNextSlip(t *testing.T) {
 	equalIDs(t, sepSlip.BonusIDs, "kinerja")
 	equalIDs(t, sepSlip.ReimbursementIDs, "r-early") // r1/r2 are paid on 25 Sep, after generation
 	f.repo.setRenderReady(sepID)
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, sepID, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, sepID, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1031,7 +1031,7 @@ func (f *payslipFixture) sendSeptember(t *testing.T) model.Payslip {
 	generated := f.generate(t, 2026, 9, "e-budi")
 	id := *generated.Generated[0].PayslipID
 	f.repo.setRenderReady(id)
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatalf("send september: %v", err)
 	}
 	slip, _ := f.repo.GetByID(f.ctx, id)
@@ -1075,11 +1075,11 @@ func TestPayslipItemsNeverPaidTwice(t *testing.T) {
 	f.repo.slips[novSlip.ID] = novSlip
 	f.repo.setRenderReady(octSlip.ID)
 	f.repo.setRenderReady(novSlip.ID)
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, octSlip.ID, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, octSlip.ID, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatalf("send october: %v", err)
 	}
 	delivered := len(f.sender.delivered)
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, novSlip.ID, ""); !errors.Is(err, ErrPayslipItemsTaken) || !strings.Contains(err.Error(), octSlip.DocNumber) {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, novSlip.ID, hrisdto.SendPayslipRequest{}); !errors.Is(err, ErrPayslipItemsTaken) || !strings.Contains(err.Error(), octSlip.DocNumber) {
 		t.Fatalf("send november err = %v", err)
 	}
 	batch, err := f.service.PrepareBatch(f.ctx, payslipTestViewer, hrisdto.SendPayslipBatchRequest{IDs: []string{novSlip.ID}})
@@ -1100,7 +1100,7 @@ func TestPayslipItemsNeverPaidTwice(t *testing.T) {
 		t.Fatalf("regenerated november = %v / %v", regenerated.BonusIDs, regenerated.ReimbursementIDs)
 	}
 	f.repo.setRenderReady(novSlip.ID)
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, novSlip.ID, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, novSlip.ID, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatalf("send regenerated november: %v", err)
 	}
 }
@@ -1142,7 +1142,7 @@ func TestPayslipSendRefusesChangedItems(t *testing.T) {
 	f.repo.setRenderReady(id)
 
 	f.compensation.bonuses["e-budi"][1].ApprovalStatus = "rejected"
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, ""); !errors.Is(err, ErrPayslipItemsChanged) {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, hrisdto.SendPayslipRequest{}); !errors.Is(err, ErrPayslipItemsChanged) {
 		t.Fatalf("rejected bonus err = %v", err)
 	}
 	f.compensation.bonuses["e-budi"][1].ApprovalStatus = "approved"
@@ -1197,10 +1197,10 @@ func TestPayslipVoidReissueIgnoresLaterItems(t *testing.T) {
 	// Both can be sent: they share nothing.
 	f.repo.setRenderReady(reissue.ID)
 	f.repo.setRenderReady(octSlip.ID)
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, reissue.ID, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, reissue.ID, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatalf("send reissue: %v", err)
 	}
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, octSlip.ID, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, octSlip.ID, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatalf("send october: %v", err)
 	}
 }
@@ -1234,7 +1234,7 @@ func TestPayslipSendDetectsConcurrentEdit(t *testing.T) {
 		f.repo.slips[id] = slip
 		f.repo.mu.Unlock()
 	}
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, ""); !errors.Is(err, ErrPayslipStateChanged) {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, hrisdto.SendPayslipRequest{}); !errors.Is(err, ErrPayslipStateChanged) {
 		t.Fatalf("send after a concurrent edit err = %v", err)
 	}
 	if len(f.sender.delivered) != 0 || len(f.deliveries.cancelled) != 1 {
@@ -1264,7 +1264,7 @@ func TestPayslipAmountEndpointsLogAccess(t *testing.T) {
 	f.repo.setRenderReady(id)
 
 	f.compensation.failLog = true
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, ""); err == nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, hrisdto.SendPayslipRequest{}); err == nil {
 		t.Fatal("send must fail when the access cannot be logged")
 	}
 	if len(f.sender.delivered) != 0 {
@@ -1274,7 +1274,7 @@ func TestPayslipAmountEndpointsLogAccess(t *testing.T) {
 		t.Fatal("update must fail when the access cannot be logged")
 	}
 	f.compensation.failLog = false
-	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, ""); err != nil {
+	if _, err := f.service.Send(f.ctx, payslipTestViewer, id, hrisdto.SendPayslipRequest{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.compensation.accessLog[len(f.compensation.accessLog)-1]; got != "payslip_send:e-budi" {

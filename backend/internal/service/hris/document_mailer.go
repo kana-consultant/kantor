@@ -57,6 +57,15 @@ var (
 	ErrDocumentRecipientSourceBad    = errors.New("sumber penerima harus default, login, employee, atau personal")
 	ErrDocumentDeliveryForbidden     = errors.New("anda tidak memiliki izin melihat riwayat pengiriman dokumen ini")
 	ErrDocumentDeliveryReferenceType = errors.New("reference_type harus payslip atau contract")
+
+	// The three below guard sends made through the MCP tool surface (and any
+	// send that names the address it expects).
+	ErrDocumentRecipientRestricted       = errors.New("lewat MCP, dokumen hanya dapat dikirim ke email login akun karyawan yang terhubung; kirim dokumen ini dari aplikasi web")
+	ErrDocumentExpectedRecipientRequired = errors.New("expected_recipient wajib diisi dengan alamat penerima yang sudah diperlihatkan kepada dan disetujui oleh pengguna (lihat recipient)")
+	// ErrDocumentExpectedRecipientsRequired is the batch form of the above.
+	ErrDocumentExpectedRecipientsRequired = errors.New("expected_recipients wajib diisi: satu alamat untuk setiap slip yang akan dikirim, persis seperti recipients di send-preview yang sudah disetujui pengguna")
+	ErrDocumentRecipientMismatch          = errors.New("alamat penerima tidak sama dengan yang disetujui pengguna; periksa lagi penerimanya (recipient atau send-preview) dan minta persetujuan ulang")
+	ErrDocumentCcRestricted               = errors.New("lewat MCP, kontrak tidak dapat dikirim dengan CC; kirim dari aplikasi web bila perlu CC")
 )
 
 type documentMailSender interface {
@@ -156,10 +165,53 @@ type ResolvedRecipient struct {
 
 // DocumentViewer is the caller of a document endpoint. A personal e-mail
 // address is identity data (Phase 2): it is shown in full only with
-// hris:employee_identity:view, and each such response is access-logged.
+// hris:employee_identity:view, never through the MCP tool surface, and each
+// full response is access-logged.
 type DocumentViewer struct {
 	ActorID         string
 	CanViewIdentity bool
+	// ViaMCP marks a call made through the MCP tool surface: an AI client
+	// acts for the user. Such a call may only mail the login address of a
+	// linked account and must name the address the human approved.
+	ViaMCP bool
+}
+
+// mcpRecipientAllowed reports whether a call through the MCP tool surface
+// may mail this recipient: only the login address of a linked account, which
+// nobody but that user can change (with their password). employees.email and
+// the personal e-mail can be edited by other people, and employees.email by
+// other tools on the same surface.
+func mcpRecipientAllowed(recipient ResolvedRecipient) bool {
+	return recipient.Source == model.EmailRecipientSourceLogin
+}
+
+// auditValues marks the audit metadata of a document action taken through
+// the MCP tool surface (an AI client acting for the user).
+func (v DocumentViewer) auditValues(values map[string]any) map[string]any {
+	if v.ViaMCP && values != nil {
+		values["via"] = "mcp"
+	}
+	return values
+}
+
+// guardSend checks the resolved recipient of a send against what the caller
+// may mail and what the human approved. expected is the address the human
+// was shown: optional for the web app, required through MCP.
+func (v DocumentViewer) guardSend(recipient ResolvedRecipient, expected string) error {
+	if v.ViaMCP && !mcpRecipientAllowed(recipient) {
+		return ErrDocumentRecipientRestricted
+	}
+	expected = strings.ToLower(strings.TrimSpace(expected))
+	if expected == "" {
+		if v.ViaMCP {
+			return ErrDocumentExpectedRecipientRequired
+		}
+		return nil
+	}
+	if expected != recipient.Address {
+		return ErrDocumentRecipientMismatch
+	}
+	return nil
 }
 
 // personalReveal masks personal addresses for viewers without identity
@@ -179,7 +231,7 @@ func (p *personalReveal) address(employeeID string, address string, source strin
 	if source != model.EmailRecipientSourcePersonal || strings.TrimSpace(address) == "" {
 		return address
 	}
-	if !p.viewer.CanViewIdentity {
+	if !p.viewer.CanViewIdentity || p.viewer.ViaMCP {
 		return MaskEmail(address)
 	}
 	if employeeID != "" {

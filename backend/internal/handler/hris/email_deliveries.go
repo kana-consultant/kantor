@@ -38,7 +38,7 @@ func (h *EmailDeliveriesHandler) list(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "reference_type dan reference_id wajib diisi", map[string]string{"reference_type": "required", "reference_id": "required"})
 		return
 	}
-	result, err := h.mailer.ListDeliveries(r.Context(), referenceType, referenceID, documentPermissionChecker(principal), documentViewer(principal))
+	result, err := h.mailer.ListDeliveries(r.Context(), referenceType, referenceID, documentPermissionChecker(principal), documentViewer(r, principal))
 	if err != nil {
 		writeDocumentError(r.Context(), w, err, "Terjadi kesalahan saat memuat riwayat pengiriman")
 		return

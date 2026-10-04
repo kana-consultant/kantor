@@ -13,6 +13,10 @@ var endpointAnnotations = map[string]EndpointMeta{
 			qe("status", "Employment status filter.", "active", "probation", "resigned", "terminated"),
 		},
 	},
+	"PUT /api/v1/hris/employees/{employeeID}": {
+		Description: "Update an employee record. This is a FULL replacement of the editable fields: read the employee first and send every field again. Through MCP the e-mail cannot be changed (send the stored one; change it in the web app). A masked bank_account_number (******1234) keeps the stored number",
+		Body:        "{full_name, email, position, date_joined: \"YYYY-MM-DD\", employment_status: \"active\" | \"probation\" | \"resigned\" | \"terminated\", phone?, department?, address?, emergency_contact?, avatar_url?, bank_account_number?, bank_name?, linkedin_profile?, ssh_keys?}",
+	},
 	"GET /api/v1/hris/salary-safety": {
 		Description: "Salary-safety per employee for a month: actual tracked hours (whole month, weekends and today included) vs. the monthly target pro-rated by weekdays elapsed through yesterday (or month end for past months) since max(1st, date_joined). safe = actual >= expected_hours_to_date, at_risk = below; short_days/absent_days are warnings only. no_data with reason no_user, future_month or target_not_applicable (Part Time, Internship, Project Based, Outsourcing). Hours are in 0.01 h (actual rounded down, target rounded up), so monthly_active_hours >= expected_hours_to_date exactly when safe. Employees who have not started yet (date_joined after today) are not listed. meta holds the evaluated period and the current period in the policy timezone.",
 		Query: []QueryParam{
@@ -55,6 +59,113 @@ var endpointAnnotations = map[string]EndpointMeta{
 	"GET /api/v1/hris/reimbursements/summary": {
 		Description: "Reimbursement summary for a period",
 		Query:       []QueryParam{qi("month", "Month 1-12."), qi("year", "Year.")},
+	},
+
+	// ---- HRIS documents: payslips ----
+	// Every payslip tool needs the matching hris:payslip:* permission AND
+	// hris:salary:view. The rendered PDF/DOCX are not tools. Through MCP a
+	// document can only be mailed to the login e-mail of the employee's linked
+	// account, and the send must name that address (expected_recipient[s]).
+	"GET /api/v1/hris/payslips": {
+		Description: "Payslips of one month: one row per employee, either a stored slip (status draft or sent) or a live preview that is not stored yet (status none, preview=true). Each row has employee_id, payslip_id, totals, warnings, blocked (cannot be generated, e.g. no salary record), render_status (none/pending/rendering/ready/failed), has_pdf and last_delivery. The response also has summary counts, pdf_available (false = the server cannot make PDFs, render_status then stays none) and document_mail_ready. Returns salary amounts for every employee",
+		Query: []QueryParam{
+			qi("year", "Period year (required)."),
+			qi("month", "Period month 1-12 (required)."),
+		},
+	},
+	"POST /api/v1/hris/payslips/generate": {
+		Description: "Create or rebuild DRAFT payslips for a month. No e-mail is sent. Returns generated[] and skipped[] (with the reason); the PDFs render in the background, so poll the payslip detail tool until render_status is ready before sending. Rebuilding a draft without pay_date resets its pay date to the default",
+		Body:        "{year: integer, month: 1-12, employee_ids: [employee uuid] (the employee_id values of GET /hris/payslips rows; max 500), pay_date?: \"YYYY-MM-DD\" (default: the company payday moved back to a weekday)}",
+	},
+	"GET /api/v1/hris/payslips/employee/{employeeID}": {
+		Description: "Payslip history of one employee, newest first",
+		Query:       []QueryParam{qi("limit", "Maximum rows, 1-120.")},
+	},
+	"GET /api/v1/hris/payslips/{payslipID}": {
+		Description: "One payslip: header (the account number is masked), earnings, deductions, reimbursements, manual lines, totals, warnings, render state and last delivery",
+	},
+	"PUT /api/v1/hris/payslips/{payslipID}": {
+		Description: "Edit a DRAFT payslip's note and manual adjustment lines and re-render it. Both fields REPLACE what is stored, so read the slip first and ALWAYS send both: leaving manual_lines out removes every adjustment line (the amounts change), leaving note out clears the note. A sent slip cannot be edited (use void-reissue)",
+		Body:        "{note: string (one line, max 120 characters; \"\" clears it), manual_lines: [{label: string (max 60), amount: integer rupiah (positive = earning, negative = deduction), keterangan?: string (max 60)}] (max 5; [] removes every line)}",
+	},
+	"GET /api/v1/hris/payslips/{payslipID}/recipient": {
+		Description: "Who would receive this payslip e-mail: recipient address, recipient_source and is_new (differs from the last delivery to this employee). Sends nothing. Through MCP only a recipient_source of login can be sent to; anything else has to be sent from the web app",
+		Query:       []QueryParam{qe("source", "Recipient source (default: login e-mail, or the employee e-mail when no account is linked).", "default", "login", "employee", "personal")},
+	},
+	"POST /api/v1/hris/payslips/send-preview": {
+		Description: "Preview a batch send: recipients[] (payslip_id, employee_name, recipient) of every slip that would be mailed, skipped[] with the reason (through MCP also every slip whose employee has no linked login account: those must be sent from the web app) and whether document e-mail is ready. Sends nothing. Show the recipients to the human before send-batch",
+		Body:        "{ids: [payslip uuid] (max 200), include_already_sent?: boolean (default false: slips already sent are skipped)}",
+	},
+	"POST /api/v1/hris/payslips/send-batch": {
+		Description:    "SENDS E-MAIL and cannot be undone: queues the payslip PDF of every listed slip to the login e-mail of its employee. Before calling: run send-preview, show the human every recipient and get an explicit yes; then pass confirm=true and expected_recipients with exactly the addresses the human approved. The call is refused (nothing is sent) if an address differs from what the server resolves now. Returns queued[] and skipped[]; delivery results appear as last_delivery on each payslip",
+		Body:           "{ids: [payslip uuid] (max 200), expected_recipients: {payslip uuid: recipient address from send-preview} (one entry for every slip to be sent), include_already_sent?: boolean (default false)}",
+		Destructive:    true,
+		OpenWorld:      true,
+		RequireConfirm: true,
+	},
+	"POST /api/v1/hris/payslips/{payslipID}/send": {
+		Description:    "SENDS E-MAIL and cannot be undone: sends this payslip PDF to the login e-mail of the employee. Before calling: call the recipient tool, tell the human the address and get an explicit yes; then pass confirm=true and expected_recipient with that address. Refused (nothing is sent) when the employee has no linked login account or the address differs from what the server resolves now. The response says whether it was sent (sent, error_category, error_message)",
+		Body:           "{expected_recipient: the address returned by the recipient tool and approved by the human}",
+		Destructive:    true,
+		OpenWorld:      true,
+		RequireConfirm: true,
+	},
+	"POST /api/v1/hris/payslips/{payslipID}/void-reissue": {
+		Description: "Void a SENT payslip and create its replacement draft (same number with -R<n>). The voided slip stays on record and this cannot be undone, so ask the human first. The replacement still has to be sent",
+		Body:        "{reason: string (3-200 characters)}",
+		Destructive: true,
+	},
+
+	// ---- HRIS documents: employment contracts ----
+	// hris:contract:view / :manage / :send. Compensation is returned and
+	// editable only with hris:salary:view. The rendered files are not tools.
+	"GET /api/v1/hris/contracts": {
+		Description: "List employment contracts with status (draft, generated, sent, signed, ended, cancelled), document numbers, render state, last delivery and the notice/expired flags",
+		Query: []QueryParam{
+			qs("employee_id", "Restrict to one employee (UUID)."),
+			qe("status", "Contract status filter.", "draft", "generated", "sent", "signed", "ended", "cancelled"),
+			qe("type", "Contract type filter.", "PKWT", "PKWTT", "MAGANG"),
+			qs("search", "Free-text search."),
+			qi("limit", "Maximum rows, 1-500."),
+		},
+	},
+	"POST /api/v1/hris/contracts": {
+		Description: "Create a contract DRAFT for an employee. A PKWT later produces two documents (PKWT + NDA/HKI); PKWTT and MAGANG are record-only. Nothing is generated or sent yet",
+		Body:        "{employee_id: uuid, contract_type: \"PKWT\" | \"PKWTT\" | \"MAGANG\", is_record_only?: boolean (record only, no documents), start_date: \"YYYY-MM-DD\", end_date?: \"YYYY-MM-DD\" (required for PKWT), job_title: string, department?, supervisor_name?, work_location?, work_mode?: \"wfo\" | \"hybrid\" | \"remote\", work_mode_detail?, pkwt_basis?: one Indonesian sentence, job_description?: one Indonesian sentence (max 600), work_days?, work_hours?, weekly_hours?: integer (default 40), notice_days?: integer (default 30), compensation?: {base_salary, fixed_allowance} in rupiah (needs hris:salary:view; omitted = prefilled from the salary record), benefits?: [{name, value?, notes?}] (max 10), incident_report_hours?, non_solicit_months?, confidentiality_years?, prior_works?: [{title, description?, year?: \"YYYY\"}] (max 10), document_date?: \"YYYY-MM-DD\", document_city?}",
+	},
+	"GET /api/v1/hris/contracts/{contractID}": {
+		Description: "One contract with every term. compensation is present only when the caller has hris:salary:view",
+	},
+	"PUT /api/v1/hris/contracts/{contractID}": {
+		Description: "Edit a contract that is a draft, generated, or sent but not signed. This is a FULL replacement: read the contract first and send every field again (an omitted compensation, document_date or document_city keeps the stored value; any other omitted field is cleared or reset to its default). A generated or sent contract goes back to draft (a sent one with revision+1, same numbers) and must be generated again before it can be sent; a signed contract cannot be edited (use renew)",
+		Body:        "{contract_type: \"PKWT\" | \"PKWTT\" | \"MAGANG\", is_record_only?, start_date: \"YYYY-MM-DD\", end_date?: \"YYYY-MM-DD\", job_title, department?, supervisor_name?, work_location?, work_mode?: \"wfo\" | \"hybrid\" | \"remote\", work_mode_detail?, pkwt_basis?, job_description?, work_days?, work_hours?, weekly_hours?, notice_days?, compensation?: {base_salary, fixed_allowance}, benefits?: [{name, value?, notes?}], incident_report_hours?, non_solicit_months?, confidentiality_years?, prior_works?: [{title, description?, year?}], document_date?, document_city?}",
+	},
+	"GET /api/v1/hris/contracts/{contractID}/preflight": {
+		Description: "What a contract still needs before its documents can be generated: ready, missing[] (scope company, identity, employee or contract) and warnings[]. Company profile and employee identity data can only be completed in the web app",
+	},
+	"POST /api/v1/hris/contracts/{contractID}/generate": {
+		Description: "Generate the documents of a contract (PKWT + NDA/HKI). The first generation assigns the official document numbers, which then stay fixed; the PDFs render in the background, so poll the contract until render_status is ready. Fails listing the missing fields when preflight is not ready. No e-mail is sent",
+		Body:        "{} (no fields)",
+	},
+	"POST /api/v1/hris/contracts/{contractID}/renew": {
+		Description: "Create a renewal DRAFT that continues a signed or ended contract with an end date; it starts the day after that end date",
+		Body:        "{} (no fields)",
+	},
+	"PATCH /api/v1/hris/contracts/{contractID}/status": {
+		Description: "Mark a contract signed, ended or cancelled. This cannot be undone, so ask the human first",
+		Body:        "{status: \"signed\" | \"ended\" | \"cancelled\", signed_at?: \"YYYY-MM-DD\" (default today, not in the future), ended_at?: \"YYYY-MM-DD\" (default today, not in the future), end_notes?: string (max 500)}",
+		Destructive: true,
+	},
+	"GET /api/v1/hris/contracts/{contractID}/recipient": {
+		Description: "Who would receive this contract e-mail: recipient address, recipient_source and is_new. Sends nothing. Through MCP only a recipient_source of login can be sent to, and without cc; anything else has to be sent from the web app",
+		Query:       []QueryParam{qe("source", "Recipient source (default: login e-mail, or the employee e-mail when no account is linked).", "default", "login", "employee", "personal")},
+	},
+	"POST /api/v1/hris/contracts/{contractID}/send": {
+		Description:    "SENDS E-MAIL and cannot be undone: sends the PKWT and the NDA/HKI PDFs together to the login e-mail of the employee. Before calling: call the recipient tool, tell the human the address and get an explicit yes; then pass confirm=true and expected_recipient with that address. Refused (nothing is sent) when the employee has no linked login account, when a cc is given (cc is web-only) or when the address differs from what the server resolves now. The response says whether it was sent (sent, error_category, error_message)",
+		Body:           "{expected_recipient: the address returned by the recipient tool and approved by the human}",
+		Destructive:    true,
+		OpenWorld:      true,
+		RequireConfirm: true,
 	},
 
 	// ---- Marketing ----
