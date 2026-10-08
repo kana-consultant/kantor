@@ -84,6 +84,9 @@ const searchSchema = z.object({
   view: z.enum(["kanban", "table"]).optional().catch("kanban"),
 });
 
+// Campaign ids are UUIDs (8-4-4-4-12 hex, as Postgres prints them).
+const CAMPAIGN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type DetailTab = "overview" | "attachments" | "metrics" | "leads" | "activity";
 
 const detailTabLabels: Record<DetailTab, string> = {
@@ -164,8 +167,15 @@ function MarketingCampaignsPage() {
         return;
       }
 
-      const campaignId = decodeURIComponent(hash.slice("#campaign:".length)).trim();
-      if (!campaignId) {
+      // The id ends up in API paths, so only a real campaign id (a UUID) is
+      // accepted; a crafted or broken hash is ignored.
+      let campaignId = "";
+      try {
+        campaignId = decodeURIComponent(hash.slice("#campaign:".length)).trim();
+      } catch {
+        return;
+      }
+      if (!CAMPAIGN_ID_PATTERN.test(campaignId)) {
         return;
       }
 
