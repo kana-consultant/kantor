@@ -1,19 +1,10 @@
-export type CampaignChannel =
-  | "instagram"
-  | "facebook"
-  | "google_ads"
-  | "tiktok"
-  | "youtube"
-  | "email"
-  | "other";
+import type { adsMetricPlatforms, campaignChannels, campaignStatuses } from "@/lib/marketing";
 
-export type CampaignStatus =
-  | "ideation"
-  | "planning"
-  | "in_production"
-  | "live"
-  | "completed"
-  | "archived";
+// The value lists live in lib/marketing.ts (one `as const` array each) so the
+// types, zod schemas and option lists can never drift apart.
+export type CampaignChannel = (typeof campaignChannels)[number];
+
+export type CampaignStatus = (typeof campaignStatuses)[number];
 
 export interface Campaign {
   id: string;
@@ -70,9 +61,19 @@ export interface CampaignColumn {
   name: string;
   position: number;
   color?: string | null;
+  // The stage (campaign status) this lane stands for; null for a custom lane,
+  // which never changes a campaign's status.
+  stage?: CampaignStatus | null;
   created_at: string;
   campaigns?: Campaign[];
   campaign_count?: number;
+}
+
+export interface CampaignPICOption {
+  id: string;
+  full_name: string;
+  position: string;
+  avatar_url?: string | null;
 }
 
 export interface CampaignFilters {
@@ -108,13 +109,7 @@ export interface CampaignsListResponse {
   };
 }
 
-export type AdsMetricPlatform =
-  | "instagram"
-  | "facebook"
-  | "google_ads"
-  | "tiktok"
-  | "youtube"
-  | "other";
+export type AdsMetricPlatform = (typeof adsMetricPlatforms)[number];
 
 export interface AdsMetric {
   id: string;

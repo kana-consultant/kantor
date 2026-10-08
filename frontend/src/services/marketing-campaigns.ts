@@ -6,6 +6,7 @@ import type {
   CampaignDetail,
   CampaignFilters,
   CampaignFormValues,
+  CampaignPICOption,
   CampaignsListResponse,
 } from "@/types/marketing";
 import type { PaginationMeta } from "@/types/project";
@@ -13,10 +14,12 @@ import type { PaginationMeta } from "@/types/project";
 export const campaignsKeys = {
   all: ["marketing", "campaigns"] as const,
   list: (filters: CampaignFilters) => [...campaignsKeys.all, "list", { ...filters }] as const,
+  allOptions: () => [...campaignsKeys.all, "all-options"] as const,
   detail: (campaignId: string) => [...campaignsKeys.all, "detail", campaignId] as const,
   activities: (campaignId: string) => [...campaignsKeys.all, "activities", campaignId] as const,
   kanban: () => [...campaignsKeys.all, "kanban"] as const,
   columns: () => [...campaignsKeys.all, "columns"] as const,
+  picOptions: () => [...campaignsKeys.all, "pic-options"] as const,
 };
 
 export async function listCampaigns(filters: CampaignFilters): Promise<CampaignsListResponse> {
@@ -58,8 +61,39 @@ export async function listCampaigns(filters: CampaignFilters): Promise<Campaigns
   };
 }
 
+// Every campaign, for option lists (e.g. the Ads Metrics campaign select): a
+// campaign past the first page must still be selectable. The API returns at
+// most 100 per page, so this reads page after page until it has them all.
+export async function listAllCampaigns() {
+  const perPage = 100;
+  const items: CampaignsListResponse["items"] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await listCampaigns({
+      page,
+      perPage,
+      search: "",
+      channel: "",
+      status: "",
+      pic: "",
+      dateFrom: "",
+      dateTo: "",
+    });
+    items.push(...response.items);
+    if (response.items.length < perPage || (response.meta.total > 0 && items.length >= response.meta.total)) {
+      break;
+    }
+  }
+  return items;
+}
+
 export async function listCampaignKanban() {
   return authRequestJSON<CampaignColumn[]>("/marketing/campaigns/kanban", { method: "GET" });
+}
+
+// People who can be picked as campaign PIC. Marketing-scoped (needs only
+// marketing:campaign:view), so marketing users need no HRIS permission.
+export async function listCampaignPICOptions() {
+  return authRequestJSON<CampaignPICOption[]>("/marketing/campaigns/pic-options", { method: "GET" });
 }
 
 export async function getCampaign(campaignId: string) {

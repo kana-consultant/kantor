@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useRestoreFocus } from "@/hooks/use-restore-focus";
 import { cn } from "@/lib/utils";
 
 type DrawerSize = "md" | "lg";
@@ -90,6 +91,8 @@ export const DrawerContent = forwardRef<
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
 
+  useRestoreFocus(open);
+
   useEffect(() => {
     if (!rendered || !open) {
       return undefined;
@@ -113,15 +116,65 @@ export const DrawerContent = forwardRef<
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onOpenChangeRef.current(false);
+      if (event.key !== "Escape" || event.defaultPrevented) {
+        return;
       }
+      // A dialog opened from the drawer (e.g. a delete confirmation) sits on
+      // top of it and handles this Escape itself; only the topmost modal
+      // closes, so a single Escape never dismisses both.
+      const modals = document.querySelectorAll('[role="dialog"][aria-modal="true"]:not([data-state="closed"])');
+      const topmost = modals[modals.length - 1];
+      if (topmost && contentRef.current && topmost !== contentRef.current) {
+        return;
+      }
+      event.preventDefault();
+      onOpenChangeRef.current(false);
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [dismissible, open]);
+
+  // Keep Tab inside the drawer (it is modal), as DialogContent does. A dialog
+  // stacked on top traps Tab itself.
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handleTab = (event: KeyboardEvent) => {
+      const node = contentRef.current;
+      if (event.key !== "Tab" || !node || event.defaultPrevented) {
+        return;
+      }
+      const modals = document.querySelectorAll('[role="dialog"][aria-modal="true"]:not([data-state="closed"])');
+      if (modals[modals.length - 1] !== node) {
+        return;
+      }
+      const elements = getFocusableElements(node);
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const active = document.activeElement;
+      if (!first || !last) {
+        event.preventDefault();
+        node.focus();
+        return;
+      }
+      if (!active || !node.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && (active === first || active === node)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleTab);
+    return () => document.removeEventListener("keydown", handleTab);
+  }, [open]);
 
   if (!context.rendered || typeof document === "undefined") {
     return null;
@@ -130,7 +183,7 @@ export const DrawerContent = forwardRef<
   const state = context.open ? "open" : "closed";
 
   return createPortal(
-    <div className="fixed inset-0 z-[95]">
+    <div className="fixed inset-0 z-[95]" data-modal-root={state}>
       <button
         aria-label="Close drawer"
         className={cn(
@@ -158,6 +211,8 @@ export const DrawerContent = forwardRef<
             sizeClassNames[size],
             className,
           )}
+          data-drawer-panel=""
+          data-size={size}
           data-state={state}
           ref={(node) => {
             contentRef.current = node;
@@ -265,10 +320,16 @@ function useDrawerContext() {
   return context;
 }
 
+// The elements Tab can reach, in order. A control taken out of the tab order
+// (tabIndex -1, e.g. the inactive tabs of a tab list) or not rendered (no
+// layout box) is skipped: the trap wraps from the last reachable one.
 function getFocusableElements(container: HTMLElement) {
   return Array.from(
     container.querySelectorAll<HTMLElement>(
       'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     ),
-  ).filter((element) => !element.hasAttribute("aria-hidden"));
+  ).filter(
+    (element) =>
+      !element.hasAttribute("aria-hidden") && element.tabIndex >= 0 && element.getClientRects().length > 0,
+  );
 }

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { FormEvent, ReactNode } from "react";
 
 import {
@@ -43,6 +44,16 @@ export function FormModal({
   size = "lg",
   children,
 }: FormModalProps) {
+  // The banner sits at the top of the scrollable body. After a failed submit
+  // the user is usually scrolled down to the last field, so bring it into
+  // view whenever a new error arrives; role="alert" announces it.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [error]);
+
   return (
     <Dialog dismissible={!isLoading} onOpenChange={(open) => (!open ? onClose() : undefined)} open={isOpen}>
       <DialogContent size={size}>
@@ -56,7 +67,11 @@ export function FormModal({
           </DialogHeader>
           <DialogBody>
             {error ? (
-              <div className="mb-4 rounded-md border border-error/20 bg-error-light px-4 py-3 text-sm text-error">
+              <div
+                className="mb-4 scroll-mt-4 rounded-md border border-error/20 bg-error-light px-4 py-3 text-sm text-error"
+                ref={errorRef}
+                role="alert"
+              >
                 {error}
               </div>
             ) : null}

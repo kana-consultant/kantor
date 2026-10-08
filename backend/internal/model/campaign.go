@@ -37,14 +37,32 @@ type CampaignAttachment struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// CampaignColumn is one lane of the campaign board.
+//
+// Stage is the campaigns.status the lane stands for; exactly one lane per
+// tenant carries each stage and that lane cannot be deleted. A nil Stage is
+// a custom lane: campaigns can be parked in it without changing their status.
+//
+// CampaignCount is always present. Campaigns is present (possibly empty) on
+// the kanban response and left out of the plain column list.
 type CampaignColumn struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	Position    int        `json:"position"`
 	Color       *string    `json:"color,omitempty"`
+	Stage       *string    `json:"stage"`
 	CreatedAt   time.Time  `json:"created_at"`
-	Campaigns   []Campaign `json:"campaigns,omitempty"`
-	CampaignsNo int        `json:"campaign_count,omitempty"`
+	Campaigns   []Campaign `json:"campaigns,omitzero"`
+	CampaignsNo int        `json:"campaign_count"`
+}
+
+// CampaignPICOption is one entry of the person-in-charge picker: just enough
+// to show and choose an employee, without any HR data.
+type CampaignPICOption struct {
+	ID        string  `json:"id"`
+	FullName  string  `json:"full_name"`
+	Position  string  `json:"position"`
+	AvatarURL *string `json:"avatar_url,omitempty"`
 }
 
 type CampaignActivity struct {

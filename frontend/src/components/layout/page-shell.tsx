@@ -25,8 +25,6 @@ export function PageShell({ children }: PropsWithChildren) {
       data-module={module.key}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-[-10%] top-[-10%] h-64 w-64 rounded-full bg-module/8 blur-3xl sm:h-80 sm:w-80" />
-        <div className="absolute bottom-[-14%] right-[-8%] h-72 w-72 rounded-full bg-module/10 blur-3xl sm:h-96 sm:w-96" />
         <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-white/40 to-transparent dark:from-white/[0.03]" />
       </div>
 
@@ -41,7 +39,7 @@ export function PageShell({ children }: PropsWithChildren) {
 
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-slate-950/58 transition lg:hidden",
+          "fixed inset-0 z-40 bg-[rgba(23,43,77,0.5)] transition lg:hidden",
           isMobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={() => setMobileOpen(false)}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -52,6 +53,7 @@ func (h *CampaignsHandler) RegisterRoutes(router chi.Router) {
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/", h.listCampaigns)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/export", h.export)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/kanban", h.kanban)
+	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/pic-options", h.listPICOptions)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/{campaignID}", h.getCampaign)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:view")).Get("/{campaignID}/activities", h.listActivities)
 	router.With(platformmiddleware.RequirePermission("marketing:campaign:edit")).Put("/{campaignID}", h.updateCampaign)
@@ -120,6 +122,18 @@ func (h *CampaignsHandler) kanban(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items, nil)
 }
 
+// listPICOptions serves the person-in-charge picker of the campaign form and
+// filter. It needs only marketing:campaign:view, so marketing users without
+// any HRIS permission can still assign a PIC; it returns no HR data.
+func (h *CampaignsHandler) listPICOptions(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.ListPICOptions(r.Context())
+	if err != nil {
+		h.writeError(r.Context(), w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, items, nil)
+}
+
 func (h *CampaignsHandler) getCampaign(w http.ResponseWriter, r *http.Request) {
 	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
 	if !ok {
@@ -162,12 +176,18 @@ func (h *CampaignsHandler) updateCampaign(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	item, err := h.service.UpdateCampaign(r.Context(), campaignID, input, principal.UserID)
+	item, previousStatus, err := h.service.UpdateCampaign(r.Context(), campaignID, input, principal.UserID)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return
 	}
-	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "campaign", campaignID, nil, input)
+	// One audit row per edit. When the edit also changed the stage, the row
+	// carries the previous one, and the activity feed words it as a move.
+	var oldValue interface{}
+	if previousStatus != "" && previousStatus != item.Campaign.Status {
+		oldValue = map[string]string{"status": previousStatus}
+	}
+	platformmiddleware.AuditLog(r.Context(), "update", "marketing", "campaign", campaignID, oldValue, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
 
@@ -352,7 +372,10 @@ func (h *CampaignsHandler) updateColumn(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	columnID := chi.URLParam(r, "columnID")
+	columnID, ok := validateCampaignUUIDParam(w, "columnID", chi.URLParam(r, "columnID"))
+	if !ok {
+		return
+	}
 	item, err := h.service.UpdateColumn(r.Context(), columnID, input)
 	if err != nil {
 		h.writeError(r.Context(), w, err)
@@ -367,7 +390,10 @@ func (h *CampaignsHandler) deleteColumn(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	columnID := chi.URLParam(r, "columnID")
+	columnID, ok := validateCampaignUUIDParam(w, "columnID", chi.URLParam(r, "columnID"))
+	if !ok {
+		return
+	}
 	if err := h.service.DeleteColumn(r.Context(), columnID); err != nil {
 		h.writeError(r.Context(), w, err)
 		return
@@ -430,8 +456,22 @@ func (h *CampaignsHandler) parseListQuery(w http.ResponseWriter, r *http.Request
 	return query, true
 }
 
+// writeError maps the service errors to responses. Everything a caller can
+// cause is a 4xx with a code (and details naming the field where there is
+// one); only an error nobody mapped is a 500.
 func (h *CampaignsHandler) writeError(ctx context.Context, w http.ResponseWriter, err error) {
+	var (
+		validationErr    *marketingservice.CampaignValidationError
+		stageUnavailable *marketingservice.CampaignStageUnavailableError
+	)
 	switch {
+	case errors.As(err, &validationErr):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", validationErr.Message, map[string]string{validationErr.Field: validationErr.Rule})
+	case errors.As(err, &stageUnavailable):
+		slog.WarnContext(ctx, "campaign stage has no board column", "stage", stageUnavailable.Stage, "error", stageUnavailable.Cause)
+		response.WriteError(w, http.StatusConflict, "CAMPAIGN_STAGE_UNAVAILABLE",
+			fmt.Sprintf("The campaign board has no column for the stage %q. Try again, or ask a marketing admin to check the board columns.", stageUnavailable.Stage),
+			map[string]string{"status": "stage_unavailable", "stage": stageUnavailable.Stage})
 	case errors.Is(err, marketingservice.ErrCampaignNotFound):
 		response.WriteError(w, http.StatusNotFound, "CAMPAIGN_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, marketingservice.ErrCampaignColumnNotFound):
@@ -442,6 +482,10 @@ func (h *CampaignsHandler) writeError(ctx context.Context, w http.ResponseWriter
 		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"pic_employee_id": "not found"})
 	case errors.Is(err, marketingservice.ErrCampaignColumnInUse):
 		response.WriteError(w, http.StatusConflict, "CAMPAIGN_COLUMN_IN_USE", err.Error(), nil)
+	case errors.Is(err, marketingservice.ErrCampaignColumnProtected):
+		response.WriteError(w, http.StatusConflict, "CAMPAIGN_COLUMN_PROTECTED", err.Error(), nil)
+	case errors.Is(err, marketingservice.ErrCampaignColumnNameTaken):
+		response.WriteError(w, http.StatusConflict, "CAMPAIGN_COLUMN_NAME_TAKEN", err.Error(), map[string]string{"name": "taken"})
 	default:
 		response.WriteInternalError(ctx, w, err, "An unexpected error occurred")
 	}

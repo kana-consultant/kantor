@@ -466,7 +466,7 @@ export function Topbar() {
 
         <div className="relative" ref={profileRef}>
           <button
-            className="flex items-center gap-2 rounded-full border border-border/70 bg-surface/92 px-2 py-1.5 shadow-sm transition hover:border-border hover:shadow-md sm:gap-3"
+            className="flex items-center gap-2 rounded-full border border-border/70 bg-surface px-2 py-1.5 shadow-sm transition hover:border-border hover:shadow-md sm:gap-3"
             onClick={() => {
               setIsProfileOpen((value) => !value);
               setIsNotificationsOpen(false);

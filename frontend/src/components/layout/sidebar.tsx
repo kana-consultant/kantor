@@ -257,7 +257,7 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate, onToggl
         "relative flex h-full shrink-0 flex-col transition-all duration-200 ease-in-out",
         mobile
           ? "h-full w-full rounded-[28px] border border-border/80 bg-surface shadow-[0_28px_64px_-28px_rgba(15,23,42,0.55)]"
-          : "rounded-[24px] border border-border/70 bg-surface/92 shadow-[0_24px_56px_-32px_rgba(15,23,42,0.38)] backdrop-blur-xl",
+          : "rounded-[24px] border border-border/70 bg-surface shadow-[0_24px_56px_-32px_rgba(15,23,42,0.38)]",
         !mobile && (collapsed ? "w-[68px]" : "w-[256px]")
       )}
     >
