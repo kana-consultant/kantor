@@ -66,6 +66,14 @@ function MarketingDashboardPage() {
     [campaignsQuery.data],
   );
 
+  // Same definition as the marketing overview (ideation up to live): completed
+  // and archived campaigns are not active.
+  const activeCampaignCount = (campaignsQuery.data ?? []).reduce(
+    (total, column) =>
+      total + (column.campaigns ?? []).filter((campaign) => campaign.status !== "completed" && campaign.status !== "archived").length,
+    0,
+  );
+
   const currentCampaignMetrics = thisMonthMetricsQuery.data?.items ?? [];
   const currentSpent = currentCampaignMetrics.reduce((total, row) => total + row.total_spent, 0);
   const previousSpent = (lastMonthMetricsQuery.data?.items ?? []).reduce((total, row) => total + row.total_spent, 0);
@@ -87,7 +95,7 @@ function MarketingDashboardPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-4">
-        <SummaryCard label="Campaign aktif" value={String((campaignsQuery.data ?? []).reduce((total, column) => total + (column.campaigns?.length ?? 0), 0))} />
+        <SummaryCard label="Campaign aktif" value={String(activeCampaignCount)} />
         <SummaryCard label="Ads spent bulan ini" value={formatIDR(currentSpent)} />
         <SummaryCard label="Ads spent bulan lalu" value={formatIDR(previousSpent)} />
         <SummaryCard label="Conversion rate leads" value={`${(leadSummary?.conversion_rate ?? 0).toFixed(2)}%`} />
