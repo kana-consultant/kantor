@@ -61,6 +61,9 @@
     --mkt-light: 255 235 230;
     --mkt-dark: 191 38 0;
     --error-light: 255 235 230;
+    /* Error text on surfaces: #FF5630 is 3.2:1 on white, too light for
+       12-14px messages; keep --error for borders and icons. */
+    --error-strong: 191 38 0; /* #BF2600, 6.0:1 on white */
     --success: 54 179 126;
     --success-light: 227 252 239;
     --warning: 255 171 0;
@@ -107,6 +110,7 @@
     --mkt-light: 90 47 39;
     --mkt-dark: 255 235 230;
     --error-light: 90 47 39;
+    --error-strong: 255 139 115; /* #FF8B73, 6.2:1 on the dark surface */
     --success-light: 32 61 49;
     --warning-light: 87 64 10;
     --info-light: 16 73 84;
@@ -180,5 +184,44 @@
 
   .page-transition {
     @apply motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-200;
+  }
+}
+
+/*
+ * Toasts while a drawer is open: they must not cover the drawer's controls.
+ * The drawer is anchored right, so:
+ * - when there is room beside it, the toasts stack at the top just left of
+ *   the drawer, over the backdrop (md drawer 480px, lg 640px, toast 360px,
+ *   16px gaps);
+ * - otherwise (a phone, where the drawer fills the screen) they sit over the
+ *   drawer header, which holds only its title, kept clear of the close button
+ *   on the right (24px padding + 36px button + 8px), and stack on top of one
+ *   another (newest in front) instead of reaching down into the drawer body.
+ * Kept outside @layer so the rules are never purged; their selectors outrank
+ * the container's utility classes.
+ */
+body:has([data-drawer-panel][data-state="open"]) [data-toast-region] {
+  display: grid;
+  left: 1rem;
+  right: 4.25rem;
+  width: auto;
+  margin-left: auto;
+}
+
+body:has([data-drawer-panel][data-state="open"]) [data-toast-region] > * {
+  grid-area: 1 / 1;
+}
+
+@media (min-width: 872px) {
+  body:has([data-drawer-panel][data-size="md"][data-state="open"]) [data-toast-region] {
+    display: flex;
+    right: calc(480px + 1rem);
+  }
+}
+
+@media (min-width: 1032px) {
+  body:has([data-drawer-panel][data-size="lg"][data-state="open"]) [data-toast-region] {
+    display: flex;
+    right: calc(640px + 1rem);
   }
 }

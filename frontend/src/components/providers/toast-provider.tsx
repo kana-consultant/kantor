@@ -51,7 +51,12 @@ export function ToastProvider() {
   }, [items, dismiss]);
 
   return (
-    <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-full max-w-[360px] flex-col gap-3">
+    // Toasts stack top-right. While a drawer is open they move out of its
+    // way (see [data-toast-region] in index.css).
+    <div
+      className="pointer-events-none fixed right-4 top-4 z-[100] flex w-full max-w-[360px] flex-col gap-3"
+      data-toast-region=""
+    >
       {items.map((item) => {
         const tone = toneClasses[item.tone];
         const Icon = tone.icon;

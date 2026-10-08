@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import { inputBaseClassName } from "@/components/ui/input";
 import { formatRupiahInput, parseRupiahInput } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
@@ -7,10 +8,13 @@ interface CurrencyInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> {
   value?: number;
   onValueChange?: (value: number) => void;
+  // "field" gives it the shared Input look (forms that mix it with Input and
+  // Select); "default" keeps the original compact look used by HRIS.
+  variant?: "default" | "field";
 }
 
 const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ className, onValueChange, placeholder = "0", value = 0, ...props }, ref) => (
+  ({ className, onValueChange, placeholder = "0", value = 0, variant = "default", ...props }, ref) => (
     <div className="relative">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-text-secondary">
         Rp
@@ -18,7 +22,9 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
       <input
         {...props}
         className={cn(
-          "flex h-10 w-full rounded-sm border-[1.5px] border-transparent bg-surface-muted py-2 pl-10 pr-3 text-[14px] font-mono tabular-nums text-text-primary shadow-none outline-none transition-all duration-150 placeholder:text-text-tertiary focus-visible:border-[#4C9AFF] focus-visible:bg-surface focus-visible:shadow-focus disabled:cursor-not-allowed disabled:text-text-tertiary",
+          variant === "field"
+            ? cn(inputBaseClassName, "h-11 py-2 pl-10 pr-3 font-mono tabular-nums")
+            : "flex h-10 w-full rounded-sm border-[1.5px] border-transparent bg-surface-muted py-2 pl-10 pr-3 text-[14px] font-mono tabular-nums text-text-primary shadow-none outline-none transition-all duration-150 placeholder:text-text-tertiary focus-visible:border-[#4C9AFF] focus-visible:bg-surface focus-visible:shadow-focus disabled:cursor-not-allowed disabled:text-text-tertiary",
           className,
         )}
         inputMode="numeric"

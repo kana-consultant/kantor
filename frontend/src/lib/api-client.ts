@@ -61,13 +61,28 @@ export async function requestEnvelope<TData>(
     headers.set("X-Requested-With", "XMLHttpRequest");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: "include",
+    });
+  } catch (error) {
+    // fetch rejects with a TypeError only when the server cannot be reached
+    // (offline, DNS, refused connection, CORS); aborts keep their own error.
+    if (error instanceof TypeError) {
+      throw new ApiError(0, "Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.");
+    }
+    throw error;
+  }
 
-  const payload = (await response.json()) as ApiSuccess<TData> | ApiFailure;
+  // A proxy error page (502/504 HTML), a 413 from the web server or an empty
+  // body is not JSON; report it as an ApiError instead of a parse error.
+  const payload = (await response.json().catch(() => null)) as ApiSuccess<TData> | ApiFailure | null;
+  if (payload === null) {
+    throw new ApiError(response.status, "Server tidak merespons dengan benar. Coba lagi.");
+  }
 
   if (!response.ok || !payload.success) {
     if ("error" in payload) {

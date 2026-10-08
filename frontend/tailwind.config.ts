@@ -96,6 +96,7 @@ const config: Config = {
         error: {
           DEFAULT: "hsl(var(--error) / <alpha-value>)",
           light: "rgb(var(--error-light) / <alpha-value>)",
+          strong: "rgb(var(--error-strong) / <alpha-value>)",
         },
         info: {
           DEFAULT: "rgb(var(--info) / <alpha-value>)",
@@ -128,6 +129,7 @@ const config: Config = {
           lost: "#F4F5F7",
         },
         platform: {
+          meta: "#0866FF",
           instagram: "#E4405F",
           facebook: "#1877F2",
           google: "#4285F4",

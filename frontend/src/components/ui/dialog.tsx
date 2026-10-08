@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useRestoreFocus } from "@/hooks/use-restore-focus";
 import { cn } from "@/lib/utils";
 
 type DialogSize = "sm" | "md" | "lg" | "xl";
@@ -103,6 +104,8 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
     const context = useDialogContext();
     const contentRef = useRef<HTMLDivElement | null>(null);
 
+    useRestoreFocus(context.open);
+
     useEffect(() => {
       if (!context.rendered) {
         return undefined;
@@ -186,7 +189,7 @@ export const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
     const state = context.open ? "open" : "closed";
 
     return createPortal(
-      <div className="fixed inset-0 z-[110]">
+      <div className="fixed inset-0 z-[110]" data-modal-root={state}>
         <button
           aria-label="Close dialog"
           className={cn(
