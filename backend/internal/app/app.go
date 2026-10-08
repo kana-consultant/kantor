@@ -134,23 +134,9 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("seed tenants: %w", err)
 	}
 
-	// Seed RBAC defaults and finance categories per-tenant.
-	financeRepositoryForSeed := hrisrepo.NewFinanceRepository(pool)
-	waRepositoryForSeed := warepo.New(pool)
-	if err := platformmiddleware.ForEachTenant(ctx, pool, func(tCtx context.Context, t tenant.Info) error {
-		if err := rbac.SeedDefaults(tCtx, pool); err != nil {
-			return fmt.Errorf("seed rbac defaults for tenant %s: %w", t.Slug, err)
-		}
-		if err := financeRepositoryForSeed.SeedDefaultCategories(tCtx); err != nil {
-			return fmt.Errorf("seed finance categories for tenant %s: %w", t.Slug, err)
-		}
-		if result, err := waRepositoryForSeed.EnsureDefaultTemplates(tCtx); err != nil {
-			return fmt.Errorf("seed wa templates for tenant %s: %w", t.Slug, err)
-		} else if result.InsertedCount > 0 {
-			slog.InfoContext(tCtx, "seeded wa templates", "tenant", t.Slug, "inserted", result.InsertedCount, "slugs", result.InsertedSlugs)
-		}
-		return nil
-	}); err != nil {
+	// Seed RBAC defaults, finance categories, WA templates and the campaign
+	// stage columns per tenant (tenant_defaults.go).
+	if err := platformmiddleware.ForEachTenant(ctx, pool, newTenantDefaultsSeeder(pool).seed); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("seed per-tenant defaults: %w", err)
 	}

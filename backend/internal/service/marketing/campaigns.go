@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	shareddto "github.com/kana-consultant/kantor/backend/internal/dto"
@@ -21,6 +24,43 @@ var (
 	ErrCampaignAttachmentNotFound = errors.New("campaign attachment not found")
 	ErrCampaignPICNotFound        = errors.New("campaign pic employee not found")
 	ErrCampaignColumnInUse        = errors.New("campaign column still has campaigns assigned")
+	ErrCampaignColumnProtected    = errors.New("this column is the lane of a campaign stage and cannot be deleted; rename it instead")
+	ErrCampaignColumnNameTaken    = errors.New("another campaign column already has this name")
+	// ErrCampaignStageUnavailable is matched by *CampaignStageUnavailableError.
+	ErrCampaignStageUnavailable = errors.New("campaign stage has no board column")
+)
+
+// CampaignValidationError is a request the validator let through but the
+// campaign rules reject. Field is the JSON field it belongs to and Rule the
+// short reason, both returned in the error details.
+type CampaignValidationError struct {
+	Field   string
+	Rule    string
+	Message string
+}
+
+func (e *CampaignValidationError) Error() string { return e.Message }
+
+// CampaignStageUnavailableError: the board has no column for Stage, and
+// creating it on the spot did not work either (Cause, when known).
+type CampaignStageUnavailableError struct {
+	Stage string
+	Cause error
+}
+
+func (e *CampaignStageUnavailableError) Error() string {
+	return fmt.Sprintf("the campaign board has no column for the stage %q", e.Stage)
+}
+
+func (e *CampaignStageUnavailableError) Is(target error) bool {
+	return target == ErrCampaignStageUnavailable
+}
+
+func (e *CampaignStageUnavailableError) Unwrap() error { return e.Cause }
+
+const (
+	campaignNameMinLength       = 3
+	campaignColumnNameMinLength = 2
 )
 
 type campaignsRepository interface {
@@ -28,11 +68,12 @@ type campaignsRepository interface {
 	CreateCampaign(ctx context.Context, params marketingrepo.UpsertCampaignParams) (model.Campaign, error)
 	ListCampaigns(ctx context.Context, params marketingrepo.ListCampaignsParams) ([]model.Campaign, int64, error)
 	GetCampaignByID(ctx context.Context, campaignID string) (model.Campaign, error)
-	UpdateCampaign(ctx context.Context, campaignID string, params marketingrepo.UpsertCampaignParams) (model.Campaign, error)
+	UpdateCampaign(ctx context.Context, campaignID string, params marketingrepo.UpsertCampaignParams) (model.Campaign, string, error)
 	DeleteCampaign(ctx context.Context, campaignID string) error
 	ListKanban(ctx context.Context) ([]model.CampaignColumn, error)
 	MoveCampaign(ctx context.Context, campaignID string, columnID string, position int, movedBy string) (model.Campaign, error)
 	ListColumns(ctx context.Context) ([]model.CampaignColumn, error)
+	ListPICOptions(ctx context.Context) ([]model.CampaignPICOption, error)
 	CreateColumn(ctx context.Context, params marketingrepo.CreateCampaignColumnParams) (model.CampaignColumn, error)
 	UpdateColumn(ctx context.Context, columnID string, params marketingrepo.UpdateCampaignColumnParams) (model.CampaignColumn, error)
 	DeleteColumn(ctx context.Context, columnID string) error
@@ -76,17 +117,13 @@ func NewCampaignsService(
 }
 
 func (s *CampaignsService) CreateCampaign(ctx context.Context, request marketingdto.CreateCampaignRequest, actorID string) (CampaignDetail, error) {
-	startDate, err := shareddto.ParseDateOnly(request.StartDate)
+	name, startDate, endDate, err := normalizeCampaignInput(request.Name, request.StartDate, request.EndDate)
 	if err != nil {
 		return CampaignDetail{}, err
 	}
 
-	endDate, err := shareddto.ParseDateOnly(request.EndDate)
-	if err != nil {
-		return CampaignDetail{}, err
-	}
 	item, err := s.repo.CreateCampaign(ctx, marketingrepo.UpsertCampaignParams{
-		Name:           strings.TrimSpace(request.Name),
+		Name:           name,
 		Description:    trimOptionalString(request.Description),
 		Channel:        request.Channel,
 		BudgetAmount:   request.BudgetAmount,
@@ -149,18 +186,17 @@ func (s *CampaignsService) GetCampaign(ctx context.Context, campaignID string) (
 	}, nil
 }
 
-func (s *CampaignsService) UpdateCampaign(ctx context.Context, campaignID string, request marketingdto.UpdateCampaignRequest, actorID string) (CampaignDetail, error) {
-	startDate, err := shareddto.ParseDateOnly(request.StartDate)
+// UpdateCampaign saves the campaign. The second return value is the stage
+// the campaign had before; it differs from the returned campaign's status
+// exactly when this update moved the card to another stage lane.
+func (s *CampaignsService) UpdateCampaign(ctx context.Context, campaignID string, request marketingdto.UpdateCampaignRequest, actorID string) (CampaignDetail, string, error) {
+	name, startDate, endDate, err := normalizeCampaignInput(request.Name, request.StartDate, request.EndDate)
 	if err != nil {
-		return CampaignDetail{}, err
+		return CampaignDetail{}, "", err
 	}
 
-	endDate, err := shareddto.ParseDateOnly(request.EndDate)
-	if err != nil {
-		return CampaignDetail{}, err
-	}
-	item, err := s.repo.UpdateCampaign(ctx, campaignID, marketingrepo.UpsertCampaignParams{
-		Name:           strings.TrimSpace(request.Name),
+	item, previousStatus, err := s.repo.UpdateCampaign(ctx, campaignID, marketingrepo.UpsertCampaignParams{
+		Name:           name,
 		Description:    trimOptionalString(request.Description),
 		Channel:        request.Channel,
 		BudgetAmount:   request.BudgetAmount,
@@ -173,10 +209,11 @@ func (s *CampaignsService) UpdateCampaign(ctx context.Context, campaignID string
 		ActorID:        actorID,
 	})
 	if err != nil {
-		return CampaignDetail{}, mapCampaignError(err)
+		return CampaignDetail{}, "", mapCampaignError(err)
 	}
 
-	return s.GetCampaign(ctx, item.ID)
+	detail, err := s.GetCampaign(ctx, item.ID)
+	return detail, previousStatus, err
 }
 
 func (s *CampaignsService) DeleteCampaign(ctx context.Context, campaignID string) error {
@@ -188,6 +225,12 @@ func (s *CampaignsService) ListKanban(ctx context.Context) ([]model.CampaignColu
 	return items, mapCampaignError(err)
 }
 
+// MoveCampaign moves the card and then records the move and, when the
+// campaign just went live, notifies the campaign editors. Both follow-ups
+// happen after the move is committed and are best effort: a failure there is
+// logged and the moved campaign is still returned, because the move itself
+// succeeded and reporting an error would make the client undo a change that
+// is already stored.
 func (s *CampaignsService) MoveCampaign(ctx context.Context, campaignID string, request marketingdto.MoveCampaignRequest, actorID string) (CampaignDetail, error) {
 	existing, err := s.repo.GetCampaignByID(ctx, campaignID)
 	if err != nil {
@@ -199,18 +242,18 @@ func (s *CampaignsService) MoveCampaign(ctx context.Context, campaignID string, 
 		return CampaignDetail{}, mapCampaignError(err)
 	}
 
-	if err := s.repo.LogActivity(ctx, item.ID, actorID, "campaign_moved", map[string]any{
+	if logErr := s.repo.LogActivity(ctx, item.ID, actorID, "campaign_moved", map[string]any{
 		"from_status": existing.Status,
 		"to_status":   item.Status,
 		"column_id":   item.ColumnID,
 		"column_name": valueOrFallback(item.ColumnName, "another stage"),
-	}); err != nil {
-		return CampaignDetail{}, err
+	}); logErr != nil {
+		slog.WarnContext(ctx, "campaign moved but the activity entry was not written", "campaign_id", item.ID, "error", logErr)
 	}
 
 	if existing.Status != item.Status && item.Status == "live" {
 		if notifyErr := s.notifyCampaignLive(ctx, item); notifyErr != nil {
-			return CampaignDetail{}, notifyErr
+			slog.WarnContext(ctx, "campaign moved to live but the notification was not sent", "campaign_id", item.ID, "error", notifyErr)
 		}
 	}
 
@@ -280,9 +323,18 @@ func (s *CampaignsService) ListColumns(ctx context.Context) ([]model.CampaignCol
 	return items, mapCampaignError(err)
 }
 
+// ListPICOptions lists the employees that can be put in charge of a campaign.
+func (s *CampaignsService) ListPICOptions(ctx context.Context) ([]model.CampaignPICOption, error) {
+	return s.repo.ListPICOptions(ctx)
+}
+
 func (s *CampaignsService) CreateColumn(ctx context.Context, request marketingdto.CreateCampaignColumnRequest) (model.CampaignColumn, error) {
+	name, err := normalizeCampaignColumnName(request.Name)
+	if err != nil {
+		return model.CampaignColumn{}, err
+	}
 	item, err := s.repo.CreateColumn(ctx, marketingrepo.CreateCampaignColumnParams{
-		Name:     strings.TrimSpace(request.Name),
+		Name:     name,
 		Color:    trimOptionalString(request.Color),
 		Position: request.Position,
 	})
@@ -290,8 +342,12 @@ func (s *CampaignsService) CreateColumn(ctx context.Context, request marketingdt
 }
 
 func (s *CampaignsService) UpdateColumn(ctx context.Context, columnID string, request marketingdto.UpdateCampaignColumnRequest) (model.CampaignColumn, error) {
+	name, err := normalizeCampaignColumnName(request.Name)
+	if err != nil {
+		return model.CampaignColumn{}, err
+	}
 	item, err := s.repo.UpdateColumn(ctx, columnID, marketingrepo.UpdateCampaignColumnParams{
-		Name:  strings.TrimSpace(request.Name),
+		Name:  name,
 		Color: trimOptionalString(request.Color),
 	})
 	return item, mapCampaignError(err)
@@ -306,7 +362,12 @@ func (s *CampaignsService) ReorderColumns(ctx context.Context, request marketing
 }
 
 func mapCampaignError(err error) error {
+	var stageUnavailable *marketingrepo.CampaignStageUnavailableError
 	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &stageUnavailable):
+		return &CampaignStageUnavailableError{Stage: stageUnavailable.Stage, Cause: stageUnavailable.Cause}
 	case errors.Is(err, marketingrepo.ErrCampaignNotFound):
 		return ErrCampaignNotFound
 	case errors.Is(err, marketingrepo.ErrCampaignColumnNotFound):
@@ -317,9 +378,63 @@ func mapCampaignError(err error) error {
 		return ErrCampaignPICNotFound
 	case errors.Is(err, marketingrepo.ErrCampaignColumnInUse):
 		return ErrCampaignColumnInUse
+	case errors.Is(err, marketingrepo.ErrCampaignColumnProtected):
+		return ErrCampaignColumnProtected
+	case errors.Is(err, marketingrepo.ErrCampaignColumnNameTaken):
+		return ErrCampaignColumnNameTaken
+	case errors.Is(err, marketingrepo.ErrCampaignColumnReorderInvalid):
+		return &CampaignValidationError{Field: "column_ids", Rule: "incomplete", Message: "column_ids must list every campaign column exactly once"}
+	case errors.Is(err, marketingrepo.ErrCampaignDateRange):
+		return errCampaignEndBeforeStart()
+	case errors.Is(err, marketingrepo.ErrCampaignChannelInvalid):
+		return &CampaignValidationError{Field: "channel", Rule: "oneof", Message: "channel is not one of the allowed channels"}
 	default:
 		return err
 	}
+}
+
+func errCampaignEndBeforeStart() error {
+	return &CampaignValidationError{Field: "end_date", Rule: "before_start_date", Message: "end_date must not be before start_date"}
+}
+
+// normalizeCampaignInput applies the rules the struct validator cannot: the
+// name is measured after trimming (a name of spaces is not a name) and the
+// end date must not precede the start date.
+func normalizeCampaignInput(rawName string, rawStart shareddto.DateOnly, rawEnd shareddto.DateOnly) (string, time.Time, time.Time, error) {
+	name := strings.TrimSpace(rawName)
+	if utf8.RuneCountInString(name) < campaignNameMinLength {
+		return "", time.Time{}, time.Time{}, &CampaignValidationError{
+			Field:   "name",
+			Rule:    "min",
+			Message: fmt.Sprintf("name must have at least %d characters", campaignNameMinLength),
+		}
+	}
+
+	startDate, err := shareddto.ParseDateOnly(rawStart)
+	if err != nil {
+		return "", time.Time{}, time.Time{}, &CampaignValidationError{Field: "start_date", Rule: "datetime", Message: "start_date must be a date (YYYY-MM-DD)"}
+	}
+	endDate, err := shareddto.ParseDateOnly(rawEnd)
+	if err != nil {
+		return "", time.Time{}, time.Time{}, &CampaignValidationError{Field: "end_date", Rule: "datetime", Message: "end_date must be a date (YYYY-MM-DD)"}
+	}
+	if endDate.Before(startDate) {
+		return "", time.Time{}, time.Time{}, errCampaignEndBeforeStart()
+	}
+
+	return name, startDate, endDate, nil
+}
+
+func normalizeCampaignColumnName(raw string) (string, error) {
+	name := strings.TrimSpace(raw)
+	if utf8.RuneCountInString(name) < campaignColumnNameMinLength {
+		return "", &CampaignValidationError{
+			Field:   "name",
+			Rule:    "min",
+			Message: fmt.Sprintf("name must have at least %d characters", campaignColumnNameMinLength),
+		}
+	}
+	return name, nil
 }
 
 func trimOptionalString(value *string) *string {

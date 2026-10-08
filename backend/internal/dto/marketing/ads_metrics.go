@@ -4,7 +4,7 @@ import dto "github.com/kana-consultant/kantor/backend/internal/dto"
 
 type CreateAdsMetricRequest struct {
 	CampaignID  string       `json:"campaign_id" validate:"required,uuid4"`
-	Platform    string       `json:"platform" validate:"required,oneof=instagram facebook google_ads tiktok youtube other"`
+	Platform    string       `json:"platform" validate:"required,ads_platform"`
 	PeriodStart dto.DateOnly `json:"period_start" validate:"required,datetime=2006-01-02"`
 	PeriodEnd   dto.DateOnly `json:"period_end" validate:"required,datetime=2006-01-02"`
 	AmountSpent int64        `json:"amount_spent" validate:"min=0"`
@@ -22,16 +22,16 @@ type BatchCreateAdsMetricsRequest struct {
 }
 
 type ListAdsMetricsQuery struct {
-	Page       int    `validate:"omitempty,min=1"`
-	PerPage    int    `validate:"omitempty,min=1,max=100"`
-	CampaignID string `validate:"omitempty,uuid4"`
-	Platform   string `validate:"omitempty,oneof=instagram facebook google_ads tiktok youtube other"`
-	DateFrom   string `validate:"omitempty,datetime=2006-01-02"`
-	DateTo     string `validate:"omitempty,datetime=2006-01-02"`
+	Page       int    `json:"page" validate:"omitempty,min=1"`
+	PerPage    int    `json:"per_page" validate:"omitempty,min=1,max=100"`
+	CampaignID string `json:"campaign_id" validate:"omitempty,uuid4"`
+	Platform   string `json:"platform" validate:"omitempty,ads_platform"`
+	DateFrom   string `json:"date_from" validate:"omitempty,datetime=2006-01-02"`
+	DateTo     string `json:"date_to" validate:"omitempty,datetime=2006-01-02"`
 }
 
 type AdsMetricsSummaryQuery struct {
-	GroupBy  string `validate:"required,oneof=campaign platform month"`
-	DateFrom string `validate:"omitempty,datetime=2006-01-02"`
-	DateTo   string `validate:"omitempty,datetime=2006-01-02"`
+	GroupBy  string `json:"group_by" validate:"required,oneof=campaign platform month"`
+	DateFrom string `json:"date_from" validate:"omitempty,datetime=2006-01-02"`
+	DateTo   string `json:"date_to" validate:"omitempty,datetime=2006-01-02"`
 }

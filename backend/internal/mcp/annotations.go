@@ -1,5 +1,31 @@
 package mcp
 
+import (
+	"strings"
+
+	marketingdto "github.com/kana-consultant/kantor/backend/internal/dto/marketing"
+)
+
+// Body hints of the marketing write tools. The allowed values come from the
+// lists the request validators use, so the hints cannot drift from the API.
+var (
+	campaignBodyHint = "{name: string (3-180), channel: " + quotedChoice(marketingdto.CampaignChannels) +
+		", status: " + quotedChoice(marketingdto.CampaignStages) +
+		", budget_amount: integer rupiah >= 0, start_date: \"YYYY-MM-DD\", end_date: \"YYYY-MM-DD\" (not before start_date)" +
+		", pic_employee_id?: employee uuid from the pic-options tool (null = no PIC), description?: string (max 5000), brief_text?: string (max 20000), budget_currency?: string (default IDR)}"
+	adsMetricBodyHint = "{campaign_id: campaign uuid, platform: " + quotedChoice(marketingdto.AdsMetricPlatforms) +
+		", period_start: \"YYYY-MM-DD\", period_end: \"YYYY-MM-DD\", amount_spent: integer rupiah >= 0, impressions: integer >= 0, clicks: integer >= 0, conversions: integer >= 0, revenue: integer rupiah >= 0, notes?: string}"
+)
+
+// quotedChoice renders values as "a" | "b" | "c".
+func quotedChoice(values []string) string {
+	quoted := make([]string, len(values))
+	for index, value := range values {
+		quoted[index] = "\"" + value + "\""
+	}
+	return strings.Join(quoted, " | ")
+}
+
 // endpointAnnotations enriches data-heavy list/query routes with their real
 // filters + pagination. Keyed by "METHOD path"; unlisted routes stay generic.
 var endpointAnnotations = map[string]EndpointMeta{
@@ -174,27 +200,68 @@ var endpointAnnotations = map[string]EndpointMeta{
 		Paginated:   true, PerPageDefault: 12, PerPageMax: 100,
 		Query: []QueryParam{
 			qs("search", "Free-text search."),
-			qs("channel", "Channel filter."),
-			qs("status", "Status filter."),
-			qs("pic", "Person-in-charge filter."),
+			qe("channel", "Channel filter.", marketingdto.CampaignChannels...),
+			qe("status", "Stage filter (the campaign's status).", marketingdto.CampaignStages...),
+			qs("pic", "Person-in-charge filter (employee UUID from the pic-options tool)."),
 			qs("date_from", "On/after this date (YYYY-MM-DD)."),
 			qs("date_to", "On/before this date (YYYY-MM-DD)."),
 		},
+	},
+	"POST /api/v1/marketing/campaigns": {
+		Description: "Create a marketing campaign. status is the stage; the card is placed at the end of the board column that stands for that stage (the column whose stage equals the status, whatever its name)",
+		Body:        campaignBodyHint,
+	},
+	"PUT /api/v1/marketing/campaigns/{campaignID}": {
+		Description: "Update a marketing campaign. This is a FULL replacement of the editable fields: read the campaign first and send every field again. The card only moves when status changes (to the end of that stage's column); with an unchanged status it stays where it is, custom columns included",
+		Body:        campaignBodyHint,
+	},
+	"GET /api/v1/marketing/campaigns/pic-options": {
+		Description: "Employees that can be the person in charge (PIC) of a campaign: id, full_name, position. Use an id as pic_employee_id or as the pic filter",
+	},
+	"PATCH /api/v1/marketing/campaigns/{campaignID}/move": {
+		Description: "Move a campaign card to a board column. A column with a stage sets the campaign's status to that stage; a custom column (stage null) keeps the status unchanged",
+		Body:        "{column_id: column uuid from the columns tool, position: integer >= 1 (1 = top of the column)}",
+	},
+	"GET /api/v1/marketing/columns": {
+		Description: "List the campaign board columns in order. stage is the campaign status a column stands for (" + strings.Join(marketingdto.CampaignStages, ", ") + "); exactly one column carries each stage. stage null is a custom column",
+	},
+	"POST /api/v1/marketing/columns": {
+		Description: "Add a custom column (stage null) to the campaign board. Campaigns parked in a custom column keep their status. Column names are unique",
+		Body:        "{name: string (2-80), color?: string (e.g. \"#0EA5E9\"), position?: integer >= 1 (default: after the last column)}",
+	},
+	"PUT /api/v1/marketing/columns/{columnID}": {
+		Description: "Rename or recolour a campaign board column. Renaming a stage column is safe: it keeps its stage, so campaigns with that status still land in it. Omit color to keep the current one",
+		Body:        "{name: string (2-80), color?: string (\"\" clears it)}",
+	},
+	"DELETE /api/v1/marketing/columns/{columnID}": {
+		Description: "Delete an empty custom column of the campaign board. A column with a stage cannot be deleted (409 CAMPAIGN_COLUMN_PROTECTED; rename it instead), nor a column that still holds campaigns (409 CAMPAIGN_COLUMN_IN_USE)",
+	},
+	"PATCH /api/v1/marketing/columns/reorder": {
+		Description: "Set the order of the campaign board columns",
+		Body:        "{column_ids: [column uuid]} listing EVERY column of the board exactly once, in the new order",
 	},
 	"GET /api/v1/marketing/ads-metrics": {
 		Description: "List ads metrics with filters",
 		Paginated:   true, PerPageDefault: 20, PerPageMax: 100,
 		Query: []QueryParam{
 			qs("campaign_id", "Filter by campaign (UUID)."),
-			qs("platform", "Ad platform filter."),
+			qe("platform", "Ad platform filter.", marketingdto.AdsMetricPlatforms...),
 			qs("date_from", "On/after this date (YYYY-MM-DD)."),
 			qs("date_to", "On/before this date (YYYY-MM-DD)."),
 		},
 	},
+	"POST /api/v1/marketing/ads-metrics": {
+		Description: "Record ad spend and results of a campaign on one platform for a period",
+		Body:        adsMetricBodyHint,
+	},
+	"PUT /api/v1/marketing/ads-metrics/{metricID}": {
+		Description: "Update an ads metric. FULL replacement: send every field again",
+		Body:        adsMetricBodyHint,
+	},
 	"GET /api/v1/marketing/ads-metrics/summary": {
 		Description: "Aggregated ads metrics summary",
 		Query: []QueryParam{
-			qs("group_by", "Grouping dimension."),
+			qe("group_by", "Grouping dimension (default month).", "campaign", "platform", "month"),
 			qs("date_from", "On/after this date (YYYY-MM-DD)."),
 			qs("date_to", "On/before this date (YYYY-MM-DD)."),
 		},

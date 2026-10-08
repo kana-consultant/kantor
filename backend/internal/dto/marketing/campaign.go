@@ -4,39 +4,41 @@ import dto "github.com/kana-consultant/kantor/backend/internal/dto"
 
 type CreateCampaignRequest struct {
 	Name           string       `json:"name" validate:"required,min=3,max=180"`
-	Description    *string      `json:"description"`
-	Channel        string       `json:"channel" validate:"required,oneof=instagram facebook google_ads tiktok youtube email other"`
+	Description    *string      `json:"description" validate:"omitempty,max=5000"`
+	Channel        string       `json:"channel" validate:"required,campaign_channel"`
 	BudgetAmount   int64        `json:"budget_amount" validate:"min=0"`
 	BudgetCurrency string       `json:"budget_currency" validate:"omitempty,max=8"`
 	PICEmployeeID  *string      `json:"pic_employee_id" validate:"omitempty,uuid4"`
 	StartDate      dto.DateOnly `json:"start_date" validate:"required,datetime=2006-01-02"`
 	EndDate        dto.DateOnly `json:"end_date" validate:"required,datetime=2006-01-02"`
-	BriefText      *string      `json:"brief_text"`
-	Status         string       `json:"status" validate:"required,oneof=ideation planning in_production live completed archived"`
+	BriefText      *string      `json:"brief_text" validate:"omitempty,max=20000"`
+	Status         string       `json:"status" validate:"required,campaign_stage"`
 }
 
 type UpdateCampaignRequest struct {
 	Name           string       `json:"name" validate:"required,min=3,max=180"`
-	Description    *string      `json:"description"`
-	Channel        string       `json:"channel" validate:"required,oneof=instagram facebook google_ads tiktok youtube email other"`
+	Description    *string      `json:"description" validate:"omitempty,max=5000"`
+	Channel        string       `json:"channel" validate:"required,campaign_channel"`
 	BudgetAmount   int64        `json:"budget_amount" validate:"min=0"`
 	BudgetCurrency string       `json:"budget_currency" validate:"omitempty,max=8"`
 	PICEmployeeID  *string      `json:"pic_employee_id" validate:"omitempty,uuid4"`
 	StartDate      dto.DateOnly `json:"start_date" validate:"required,datetime=2006-01-02"`
 	EndDate        dto.DateOnly `json:"end_date" validate:"required,datetime=2006-01-02"`
-	BriefText      *string      `json:"brief_text"`
-	Status         string       `json:"status" validate:"required,oneof=ideation planning in_production live completed archived"`
+	BriefText      *string      `json:"brief_text" validate:"omitempty,max=20000"`
+	Status         string       `json:"status" validate:"required,campaign_stage"`
 }
 
+// ListCampaignsQuery is filled from the query string. The json tags only
+// name the fields in validation details (page, per_page, date_from, ...).
 type ListCampaignsQuery struct {
-	Page     int    `validate:"omitempty,min=1"`
-	PerPage  int    `validate:"omitempty,min=1,max=100"`
-	Search   string `validate:"omitempty,max=180"`
-	Channel  string `validate:"omitempty,oneof=instagram facebook google_ads tiktok youtube email other"`
-	Status   string `validate:"omitempty,oneof=ideation planning in_production live completed archived"`
-	PIC      string `validate:"omitempty,uuid4"`
-	DateFrom string `validate:"omitempty,datetime=2006-01-02"`
-	DateTo   string `validate:"omitempty,datetime=2006-01-02"`
+	Page     int    `json:"page" validate:"omitempty,min=1"`
+	PerPage  int    `json:"per_page" validate:"omitempty,min=1,max=100"`
+	Search   string `json:"search" validate:"omitempty,max=180"`
+	Channel  string `json:"channel" validate:"omitempty,campaign_channel"`
+	Status   string `json:"status" validate:"omitempty,campaign_stage"`
+	PIC      string `json:"pic" validate:"omitempty,uuid4"`
+	DateFrom string `json:"date_from" validate:"omitempty,datetime=2006-01-02"`
+	DateTo   string `json:"date_to" validate:"omitempty,datetime=2006-01-02"`
 }
 
 type MoveCampaignRequest struct {

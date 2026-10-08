@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	repository "github.com/kana-consultant/kantor/backend/internal/repository"
@@ -23,6 +23,17 @@ var (
 	ErrCampaignAttachmentNotFound = errors.New("campaign attachment not found")
 	ErrCampaignPICNotFound        = errors.New("campaign pic employee not found")
 	ErrCampaignColumnInUse        = errors.New("campaign column still has campaigns assigned")
+	// ErrCampaignColumnProtected: the column carries a stage and cannot be deleted.
+	ErrCampaignColumnProtected = errors.New("campaign stage column cannot be deleted")
+	// ErrCampaignColumnNameTaken: another column of the tenant has this name.
+	ErrCampaignColumnNameTaken = errors.New("campaign column name is already in use")
+	// ErrCampaignColumnReorderInvalid: the reorder payload does not list every
+	// column of the board exactly once.
+	ErrCampaignColumnReorderInvalid = errors.New("column reorder payload must list every campaign column exactly once")
+	// ErrCampaignDateRange and ErrCampaignChannelInvalid are the database
+	// CHECKs behind the request validation, for writers that got past it.
+	ErrCampaignDateRange      = errors.New("campaign end date is before its start date")
+	ErrCampaignChannelInvalid = errors.New("campaign channel is not allowed")
 )
 
 type CampaignsRepository struct {
@@ -60,6 +71,8 @@ type CreateCampaignColumnParams struct {
 	Position *int
 }
 
+// UpdateCampaignColumnParams: a nil Color keeps the stored colour, an empty
+// one clears it.
 type UpdateCampaignColumnParams struct {
 	Name  string
 	Color *string
@@ -99,11 +112,17 @@ func (r *CampaignsRepository) CreateCampaign(ctx context.Context, params UpsertC
 	if err != nil {
 		return model.Campaign{}, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	defer rollbackTx(tx)
+
+	// Resolve the lane first: a stage without a column is repaired here, and
+	// if it cannot be, nothing has been written yet.
+	column, err := r.findStageColumn(ctx, tx, params.Status)
+	if err != nil {
+		return model.Campaign{}, err
+	}
+	if err = lockColumnsForPlacement(ctx, tx, column.ID); err != nil {
+		return model.Campaign{}, err
+	}
 
 	var campaignID string
 	err = tx.QueryRow(
@@ -128,12 +147,7 @@ func (r *CampaignsRepository) CreateCampaign(ctx context.Context, params UpsertC
 		params.ActorID,
 	).Scan(&campaignID)
 	if err != nil {
-		return model.Campaign{}, err
-	}
-
-	column, err := r.findColumnForStatus(ctx, tx, params.Status)
-	if err != nil {
-		return model.Campaign{}, err
+		return model.Campaign{}, mapCampaignDBError(err)
 	}
 
 	position, err := r.resolveCampaignInsertPosition(ctx, tx, column.ID, nil)
@@ -245,7 +259,7 @@ func (r *CampaignsRepository) ListCampaigns(ctx context.Context, params ListCamp
 		LEFT JOIN campaign_attachments ON campaign_attachments.campaign_id = campaigns.id
 		WHERE %s
 		GROUP BY campaigns.id, employees.full_name, employees.avatar_url, campaign_column_assignments.column_id, campaign_columns.name, campaign_columns.color, campaign_column_assignments.position, campaign_columns.position
-		ORDER BY COALESCE(campaign_columns.position, 9999) ASC, COALESCE(campaign_column_assignments.position, 9999) ASC, campaigns.updated_at DESC
+		ORDER BY COALESCE(campaign_columns.position, 9999) ASC, COALESCE(campaign_column_assignments.position, 9999) ASC, campaigns.updated_at DESC, campaigns.id ASC
 		LIMIT $%d OFFSET $%d
 	`, whereClause, index, index+1)
 	args = append(args, params.PerPage, offset)
@@ -315,25 +329,41 @@ func (r *CampaignsRepository) GetCampaignByID(ctx context.Context, campaignID st
 	return item, nil
 }
 
-func (r *CampaignsRepository) UpdateCampaign(ctx context.Context, campaignID string, params UpsertCampaignParams) (model.Campaign, error) {
+// UpdateCampaign saves the campaign fields. The card is moved (to the end of
+// the lane that carries the new stage) only when the stage changed or the
+// campaign sits in no lane at all; an edit that keeps the stage leaves the
+// card exactly where it is, custom lanes included. The second return value
+// is the stage before the update.
+func (r *CampaignsRepository) UpdateCampaign(ctx context.Context, campaignID string, params UpsertCampaignParams) (model.Campaign, string, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
 	if err := r.ensureEmployeeExists(ctx, params.PICEmployeeID); err != nil {
-		return model.Campaign{}, err
+		return model.Campaign{}, "", err
 	}
 
 	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
-		return model.Campaign{}, err
+		return model.Campaign{}, "", err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	defer rollbackTx(tx)
 
-	tag, err := tx.Exec(
+	var (
+		previousStatus string
+		assigned       bool
+	)
+	err = tx.QueryRow(ctx, `SELECT status FROM campaigns WHERE id = $1::uuid FOR UPDATE`, campaignID).Scan(&previousStatus)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Campaign{}, "", ErrCampaignNotFound
+		}
+		return model.Campaign{}, "", err
+	}
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM campaign_column_assignments WHERE campaign_id = $1::uuid)`, campaignID).Scan(&assigned); err != nil {
+		return model.Campaign{}, "", err
+	}
+
+	_, err = tx.Exec(
 		ctx,
 		`
 			UPDATE campaigns
@@ -364,25 +394,26 @@ func (r *CampaignsRepository) UpdateCampaign(ctx context.Context, campaignID str
 		params.Status,
 	)
 	if err != nil {
-		return model.Campaign{}, err
-	}
-	if tag.RowsAffected() == 0 {
-		return model.Campaign{}, ErrCampaignNotFound
+		return model.Campaign{}, "", mapCampaignDBError(err)
 	}
 
-	column, err := r.findColumnForStatus(ctx, tx, params.Status)
-	if err != nil {
-		return model.Campaign{}, err
-	}
-	if err = r.moveCampaignWithinTx(ctx, tx, campaignID, column.ID, nil, params.ActorID, params.Status); err != nil {
-		return model.Campaign{}, err
+	if params.Status != previousStatus || !assigned {
+		column, err := r.findStageColumn(ctx, tx, params.Status)
+		if err != nil {
+			return model.Campaign{}, "", err
+		}
+		status := params.Status
+		if err = r.moveCampaignWithinTx(ctx, tx, campaignID, column.ID, nil, params.ActorID, &status); err != nil {
+			return model.Campaign{}, "", err
+		}
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		return model.Campaign{}, err
+		return model.Campaign{}, "", err
 	}
 
-	return r.GetCampaignByID(ctx, campaignID)
+	item, err := r.GetCampaignByID(ctx, campaignID)
+	return item, previousStatus, err
 }
 
 func (r *CampaignsRepository) DeleteCampaign(ctx context.Context, campaignID string) error {
@@ -469,6 +500,8 @@ func (r *CampaignsRepository) ListKanban(ctx context.Context) ([]model.CampaignC
 	return columns, rows.Err()
 }
 
+// MoveCampaign puts the card into a lane. A lane that carries a stage sets
+// the campaign's status to it; a custom lane leaves the status as it is.
 func (r *CampaignsRepository) MoveCampaign(ctx context.Context, campaignID string, columnID string, position int, movedBy string) (model.Campaign, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -477,18 +510,14 @@ func (r *CampaignsRepository) MoveCampaign(ctx context.Context, campaignID strin
 	if err != nil {
 		return model.Campaign{}, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	defer rollbackTx(tx)
 
-	status, err := r.statusForColumnID(ctx, tx, columnID)
+	stage, err := r.stageForColumnID(ctx, tx, columnID)
 	if err != nil {
 		return model.Campaign{}, err
 	}
 
-	if err = r.moveCampaignWithinTx(ctx, tx, campaignID, columnID, &position, movedBy, status); err != nil {
+	if err = r.moveCampaignWithinTx(ctx, tx, campaignID, columnID, &position, movedBy, stage); err != nil {
 		return model.Campaign{}, err
 	}
 
@@ -499,14 +528,23 @@ func (r *CampaignsRepository) MoveCampaign(ctx context.Context, campaignID strin
 	return r.GetCampaignByID(ctx, campaignID)
 }
 
+// ListColumns returns the board's lanes in order, each with the number of
+// campaigns in it.
 func (r *CampaignsRepository) ListColumns(ctx context.Context) ([]model.CampaignColumn, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
 
 	rows, err := repository.DB(ctx, r.db).Query(ctx, `
-		SELECT id::text, name, position, color, created_at
+		SELECT
+			campaign_columns.id::text,
+			campaign_columns.name,
+			campaign_columns.position,
+			campaign_columns.color,
+			campaign_columns.stage,
+			campaign_columns.created_at,
+			(SELECT COUNT(*) FROM campaign_column_assignments WHERE campaign_column_assignments.column_id = campaign_columns.id)::int
 		FROM campaign_columns
-		ORDER BY position ASC, created_at ASC
+		ORDER BY campaign_columns.position ASC, campaign_columns.created_at ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -516,7 +554,7 @@ func (r *CampaignsRepository) ListColumns(ctx context.Context) ([]model.Campaign
 	items := make([]model.CampaignColumn, 0)
 	for rows.Next() {
 		var item model.CampaignColumn
-		if err := rows.Scan(&item.ID, &item.Name, &item.Position, &item.Color, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Position, &item.Color, &item.Stage, &item.CreatedAt, &item.CampaignsNo); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -525,6 +563,40 @@ func (r *CampaignsRepository) ListColumns(ctx context.Context) ([]model.Campaign
 	return items, rows.Err()
 }
 
+// ListPICOptions returns the employees a campaign can be assigned to: the
+// current staff (active or on probation) plus anyone who still is the person
+// in charge of a campaign, so an existing choice can always be shown and
+// filtered on. Only id, name, position and avatar leave the table.
+func (r *CampaignsRepository) ListPICOptions(ctx context.Context) ([]model.CampaignPICOption, error) {
+	ctx, cancel := repository.QueryContext(ctx)
+	defer cancel()
+
+	rows, err := repository.DB(ctx, r.db).Query(ctx, `
+		SELECT employees.id::text, employees.full_name, employees.position, employees.avatar_url
+		FROM employees
+		WHERE employees.employment_status IN ('active', 'probation')
+			OR EXISTS (SELECT 1 FROM campaigns WHERE campaigns.pic_employee_id = employees.id)
+		ORDER BY LOWER(employees.full_name) ASC, employees.id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]model.CampaignPICOption, 0)
+	for rows.Next() {
+		var item model.CampaignPICOption
+		if err := rows.Scan(&item.ID, &item.FullName, &item.Position, &item.AvatarURL); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
+// CreateColumn adds a custom lane (no stage) at the requested position, or
+// after the last lane when none is given.
 func (r *CampaignsRepository) CreateColumn(ctx context.Context, params CreateCampaignColumnParams) (model.CampaignColumn, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -533,19 +605,22 @@ func (r *CampaignsRepository) CreateColumn(ctx context.Context, params CreateCam
 	if err != nil {
 		return model.CampaignColumn{}, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	defer rollbackTx(tx)
 
-	position, err := r.resolveColumnInsertPosition(ctx, tx, params.Position)
+	if err = lockCampaignColumnLayout(ctx, tx); err != nil {
+		return model.CampaignColumn{}, err
+	}
+	maxPosition, err := maxColumnPosition(ctx, tx)
 	if err != nil {
 		return model.CampaignColumn{}, err
 	}
-
-	if _, err = tx.Exec(ctx, `UPDATE campaign_columns SET position = position + 1 WHERE position >= $1`, position); err != nil {
-		return model.CampaignColumn{}, err
+	position := maxPosition + 1
+	if params.Position != nil && *params.Position <= maxPosition {
+		position = max(*params.Position, 1)
+		// Make room: every lane from `position` on moves one step right.
+		if err = shiftColumnPositions(ctx, tx, maxPosition, `position >= $2`, position, 1); err != nil {
+			return model.CampaignColumn{}, err
+		}
 	}
 
 	var item model.CampaignColumn
@@ -554,12 +629,12 @@ func (r *CampaignsRepository) CreateColumn(ctx context.Context, params CreateCam
 		`
 			INSERT INTO campaign_columns (name, position, color)
 			VALUES ($1, $2, NULLIF($3, ''))
-			RETURNING id::text, name, position, color, created_at
+			RETURNING id::text, name, position, color, stage, created_at
 		`,
 		params.Name,
 		position,
 		nullableString(params.Color),
-	).Scan(&item.ID, &item.Name, &item.Position, &item.Color, &item.CreatedAt)
+	).Scan(&item.ID, &item.Name, &item.Position, &item.Color, &item.Stage, &item.CreatedAt)
 	if err != nil {
 		return model.CampaignColumn{}, mapCampaignDBError(err)
 	}
@@ -571,23 +646,31 @@ func (r *CampaignsRepository) CreateColumn(ctx context.Context, params CreateCam
 	return item, nil
 }
 
+// UpdateColumn renames and/or recolours a lane. It never changes the lane's
+// stage: a renamed stage lane keeps standing for the same status.
 func (r *CampaignsRepository) UpdateColumn(ctx context.Context, columnID string, params UpdateCampaignColumnParams) (model.CampaignColumn, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
+
+	var color interface{}
+	if params.Color != nil {
+		color = strings.TrimSpace(*params.Color)
+	}
 
 	var item model.CampaignColumn
 	err := repository.DB(ctx, r.db).QueryRow(
 		ctx,
 		`
 			UPDATE campaign_columns
-			SET name = $2, color = NULLIF($3, '')
+			SET name = $2, color = CASE WHEN $3::text IS NULL THEN color ELSE NULLIF($3::text, '') END
 			WHERE id = $1::uuid
-			RETURNING id::text, name, position, color, created_at
+			RETURNING id::text, name, position, color, stage, created_at,
+				(SELECT COUNT(*) FROM campaign_column_assignments WHERE campaign_column_assignments.column_id = campaign_columns.id)::int
 		`,
 		columnID,
 		params.Name,
-		nullableString(params.Color),
-	).Scan(&item.ID, &item.Name, &item.Position, &item.Color, &item.CreatedAt)
+		color,
+	).Scan(&item.ID, &item.Name, &item.Position, &item.Color, &item.Stage, &item.CreatedAt, &item.CampaignsNo)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.CampaignColumn{}, ErrCampaignColumnNotFound
@@ -598,89 +681,130 @@ func (r *CampaignsRepository) UpdateColumn(ctx context.Context, columnID string,
 	return item, nil
 }
 
+// DeleteColumn removes an empty custom lane and closes the gap it leaves. A
+// lane that carries a stage is never deleted (ErrCampaignColumnProtected).
 func (r *CampaignsRepository) DeleteColumn(ctx context.Context, columnID string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
-
-	var campaignCount int
-	if err := repository.DB(ctx, r.db).QueryRow(ctx, `SELECT COUNT(*) FROM campaign_column_assignments WHERE column_id = $1::uuid`, columnID).Scan(&campaignCount); err != nil {
-		return err
-	}
-	if campaignCount > 0 {
-		return ErrCampaignColumnInUse
-	}
 
 	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	defer rollbackTx(tx)
 
-	var position int
-	err = tx.QueryRow(ctx, `DELETE FROM campaign_columns WHERE id = $1::uuid RETURNING position`, columnID).Scan(&position)
+	if err = lockCampaignColumnLayout(ctx, tx); err != nil {
+		return err
+	}
+
+	var (
+		stage    *string
+		position int
+	)
+	err = tx.QueryRow(ctx, `SELECT stage, position FROM campaign_columns WHERE id = $1::uuid FOR UPDATE`, columnID).Scan(&stage, &position)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrCampaignColumnNotFound
 		}
 		return err
 	}
+	if stage != nil {
+		return ErrCampaignColumnProtected
+	}
 
-	if _, err = tx.Exec(ctx, `UPDATE campaign_columns SET position = position - 1 WHERE position > $1`, position); err != nil {
+	var campaignCount int
+	if err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM campaign_column_assignments WHERE column_id = $1::uuid`, columnID).Scan(&campaignCount); err != nil {
+		return err
+	}
+	if campaignCount > 0 {
+		return ErrCampaignColumnInUse
+	}
+
+	if _, err = tx.Exec(ctx, `DELETE FROM campaign_columns WHERE id = $1::uuid`, columnID); err != nil {
+		return err
+	}
+
+	maxPosition, err := maxColumnPosition(ctx, tx)
+	if err != nil {
+		return err
+	}
+	// Close the gap: every lane after the deleted one moves one step left.
+	if err = shiftColumnPositions(ctx, tx, maxPosition, `position > $2`, position, -1); err != nil {
 		return err
 	}
 
 	return tx.Commit(ctx)
 }
 
+// ReorderColumns sets the lane order. columnIDs must list every lane of the
+// board exactly once (ErrCampaignColumnReorderInvalid otherwise); that is
+// checked before anything is written.
 func (r *CampaignsRepository) ReorderColumns(ctx context.Context, columnIDs []string) error {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
+
+	requested := make(map[string]struct{}, len(columnIDs))
+	for _, columnID := range columnIDs {
+		key := strings.ToLower(strings.TrimSpace(columnID))
+		if _, exists := requested[key]; exists {
+			return ErrCampaignColumnReorderInvalid
+		}
+		requested[key] = struct{}{}
+	}
 
 	tx, err := repository.DB(ctx, r.db).Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	defer rollbackTx(tx)
 
-	var count int
-	if err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM campaign_columns`).Scan(&count); err != nil {
+	// Under the layout lock no lane can be added or removed between the
+	// check below and the writes.
+	if err = lockCampaignColumnLayout(ctx, tx); err != nil {
 		return err
 	}
-	if count != len(columnIDs) {
-		return fmt.Errorf("column reorder payload must contain every campaign column")
+
+	rows, err := tx.Query(ctx, `SELECT id::text FROM campaign_columns`)
+	if err != nil {
+		return err
+	}
+	existing := 0
+	for rows.Next() {
+		var columnID string
+		if err := rows.Scan(&columnID); err != nil {
+			rows.Close()
+			return err
+		}
+		if _, ok := requested[columnID]; !ok {
+			rows.Close()
+			return ErrCampaignColumnReorderInvalid
+		}
+		existing++
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if existing != len(requested) {
+		return ErrCampaignColumnReorderInvalid
 	}
 
-	seen := make(map[string]struct{}, len(columnIDs))
-	for index, columnID := range columnIDs {
-		if _, exists := seen[columnID]; exists {
-			return fmt.Errorf("column reorder payload contains duplicate column ids")
-		}
-		seen[columnID] = struct{}{}
-
-		tag, execErr := tx.Exec(ctx, `UPDATE campaign_columns SET position = $2 WHERE id = $1::uuid`, columnID, -(index + 1))
-		if execErr != nil {
-			return execErr
-		}
-		if tag.RowsAffected() == 0 {
-			return ErrCampaignColumnNotFound
-		}
-	}
-
-	for index, columnID := range columnIDs {
-		tag, execErr := tx.Exec(ctx, `UPDATE campaign_columns SET position = $2 WHERE id = $1::uuid`, columnID, index+1)
-		if execErr != nil {
-			return execErr
-		}
-		if tag.RowsAffected() == 0 {
-			return ErrCampaignColumnNotFound
+	// (tenant_id, position) is unique and checked row by row, so park every
+	// lane on a negative position first and then set the final ones.
+	for _, final := range []bool{false, true} {
+		for index, columnID := range columnIDs {
+			position := -(index + 1)
+			if final {
+				position = index + 1
+			}
+			tag, err := tx.Exec(ctx, `UPDATE campaign_columns SET position = $2 WHERE id = $1::uuid`, columnID, position)
+			if err != nil {
+				return err
+			}
+			if tag.RowsAffected() == 0 {
+				// The check above makes this unreachable; kept as a guard.
+				return ErrCampaignColumnNotFound
+			}
 		}
 	}
 
@@ -770,6 +894,15 @@ func (r *CampaignsRepository) DeleteAttachment(ctx context.Context, campaignID s
 	return item, nil
 }
 
+// ListActivities is the campaign's activity feed: one entry per action. A
+// move and an upload are each written twice to audit_logs (the request audit
+// row "move" / "upload_attachments" and the descriptive row "campaign_moved" /
+// "attachment_uploaded"); the feed shows the descriptive one. The upload rows
+// are written in the upload's transaction, so they always exist. The
+// "campaign_moved" row is written after the move commits and is best effort,
+// so a "move" row is hidden only when the same user's "campaign_moved" row for
+// this campaign was written just before it (the handler writes "move" right
+// after the service returns); otherwise the move would vanish from the feed.
 func (r *CampaignsRepository) ListActivities(ctx context.Context, campaignID string) ([]model.CampaignActivity, error) {
 	ctx, cancel := repository.QueryContext(ctx)
 	defer cancel()
@@ -786,6 +919,12 @@ func (r *CampaignsRepository) ListActivities(ctx context.Context, campaignID str
 			CASE
 				WHEN audit_logs.action = 'campaign_moved' THEN CONCAT('Moved to ', COALESCE(audit_logs.new_value->>'column_name', 'another stage'))
 				WHEN audit_logs.action = 'attachment_uploaded' THEN CONCAT('Uploaded ', COALESCE(audit_logs.new_value->>'file_name', 'an attachment'))
+				WHEN audit_logs.action = 'update'
+					AND audit_logs.old_value->>'status' IS NOT NULL
+					AND audit_logs.new_value->>'status' IS NOT NULL
+					AND audit_logs.old_value->>'status' <> audit_logs.new_value->>'status'
+					THEN CONCAT('Updated and moved to ', INITCAP(REPLACE(audit_logs.new_value->>'status', '_', ' ')))
+				WHEN audit_logs.action = 'move' THEN 'Moved to another lane'
 				ELSE REPLACE(INITCAP(REPLACE(audit_logs.action, '_', ' ')), '  ', ' ')
 			END AS description,
 			audit_logs.user_id::text,
@@ -794,6 +933,20 @@ func (r *CampaignsRepository) ListActivities(ctx context.Context, campaignID str
 		FROM audit_logs
 		LEFT JOIN users ON users.id = audit_logs.user_id
 		WHERE audit_logs.module = 'marketing' AND audit_logs.resource = 'campaign' AND audit_logs.resource_id = $1
+			AND audit_logs.action <> 'upload_attachments'
+			AND NOT (
+				audit_logs.action = 'move'
+				AND EXISTS (
+					SELECT 1
+					FROM audit_logs AS described
+					WHERE described.module = 'marketing'
+						AND described.resource = 'campaign'
+						AND described.resource_id = audit_logs.resource_id
+						AND described.action = 'campaign_moved'
+						AND described.user_id IS NOT DISTINCT FROM audit_logs.user_id
+						AND described.created_at BETWEEN audit_logs.created_at - INTERVAL '10 seconds' AND audit_logs.created_at
+				)
+			)
 		ORDER BY audit_logs.created_at DESC
 	`, campaignID)
 	if err != nil {
@@ -873,8 +1026,13 @@ func (r *CampaignsRepository) FindAttachmentPath(ctx context.Context, campaignID
 	return "", ErrCampaignAttachmentNotFound
 }
 
-func (r *CampaignsRepository) moveCampaignWithinTx(ctx context.Context, tx pgx.Tx, campaignID string, destinationColumnID string, requestedPosition *int, movedBy string, status string) error {
-	if err := r.ensureCampaignExists(ctx, tx, campaignID); err != nil {
+// moveCampaignWithinTx places the card in destinationColumnID (at the end when
+// requestedPosition is nil) and sets the campaign's status to *status. A nil
+// status (custom lane) keeps the status the campaign has.
+func (r *CampaignsRepository) moveCampaignWithinTx(ctx context.Context, tx pgx.Tx, campaignID string, destinationColumnID string, requestedPosition *int, movedBy string, status *string) error {
+	// Lock order, the same for every writer: the campaign, then the lanes.
+	// The campaign lock keeps its placement stable while it is read here.
+	if err := r.lockCampaign(ctx, tx, campaignID); err != nil {
 		return err
 	}
 	if err := r.ensureColumnExists(ctx, tx, destinationColumnID); err != nil {
@@ -889,6 +1047,27 @@ func (r *CampaignsRepository) moveCampaignWithinTx(ctx context.Context, tx pgx.T
 		if errors.Is(err, pgx.ErrNoRows) {
 			currentAssigned = false
 		} else {
+			return err
+		}
+	}
+
+	lanes := []string{destinationColumnID}
+	if currentAssigned && currentColumnID != destinationColumnID {
+		lanes = append(lanes, currentColumnID)
+	}
+	if err := lockColumnsForPlacement(ctx, tx, lanes...); err != nil {
+		return err
+	}
+	// The requested position is an index into the lane as the board shows
+	// it. Deleting a campaign leaves a gap in its lane, so number the lanes
+	// 1..n first; otherwise "after the last card" can land before it.
+	if err := compactLanePositions(ctx, tx, lanes...); err != nil {
+		return err
+	}
+	if currentAssigned {
+		// Read the position again under the lane lock: a concurrent move in
+		// the same lane may have shifted this card in the meantime.
+		if err := tx.QueryRow(ctx, `SELECT position FROM campaign_column_assignments WHERE campaign_id = $1::uuid`, campaignID).Scan(&currentPosition); err != nil {
 			return err
 		}
 	}
@@ -948,13 +1127,15 @@ func (r *CampaignsRepository) moveCampaignWithinTx(ctx context.Context, tx pgx.T
 		return err
 	}
 
-	_, err = tx.Exec(ctx, `UPDATE campaigns SET status = $2, updated_at = NOW() WHERE id = $1::uuid`, campaignID, status)
+	_, err = tx.Exec(ctx, `UPDATE campaigns SET status = COALESCE($2, status), updated_at = NOW() WHERE id = $1::uuid`, campaignID, status)
 	return err
 }
 
-func (r *CampaignsRepository) ensureCampaignExists(ctx context.Context, tx queryExecutor, campaignID string) error {
+// lockCampaign locks the campaign row for the rest of the transaction
+// (ErrCampaignNotFound when there is none).
+func (r *CampaignsRepository) lockCampaign(ctx context.Context, tx queryExecutor, campaignID string) error {
 	var exists bool
-	err := tx.QueryRow(ctx, `SELECT TRUE FROM campaigns WHERE id = $1::uuid`, campaignID).Scan(&exists)
+	err := tx.QueryRow(ctx, `SELECT TRUE FROM campaigns WHERE id = $1::uuid FOR UPDATE`, campaignID).Scan(&exists)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrCampaignNotFound
@@ -962,6 +1143,52 @@ func (r *CampaignsRepository) ensureCampaignExists(ctx context.Context, tx query
 		return err
 	}
 	return nil
+}
+
+// lockColumnsForPlacement serialises the writers that compute card positions
+// in the given lanes. Without it two requests placing a card in the same lane
+// at the same time both read the same "last position" and end up sharing it.
+// The lanes are locked in id order, so two moves between the same pair of
+// lanes in opposite directions cannot deadlock. FOR NO KEY UPDATE is enough:
+// it excludes other placements (and a delete of the lane) but not the
+// foreign-key checks of unrelated inserts.
+func lockColumnsForPlacement(ctx context.Context, tx pgx.Tx, columnIDs ...string) error {
+	rows, err := tx.Query(ctx, `
+		SELECT id FROM campaign_columns
+		WHERE id = ANY($1::uuid[])
+		ORDER BY id
+		FOR NO KEY UPDATE
+	`, columnIDs)
+	if err != nil {
+		return err
+	}
+	rows.Close()
+	return rows.Err()
+}
+
+// compactLanePositions renumbers the cards of the given lanes 1..n in the
+// order the board shows them (position, then campaign creation). Only cards
+// whose position changes are written, and moved_at/moved_by are left alone:
+// the order stays the same, nothing is moved. The caller holds the lane locks.
+func compactLanePositions(ctx context.Context, tx pgx.Tx, columnIDs ...string) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE campaign_column_assignments AS assignment
+		SET position = ordered.position
+		FROM (
+			SELECT
+				campaign_column_assignments.campaign_id,
+				ROW_NUMBER() OVER (
+					PARTITION BY campaign_column_assignments.column_id
+					ORDER BY campaign_column_assignments.position, campaigns.created_at, campaigns.id
+				)::int AS position
+			FROM campaign_column_assignments
+			INNER JOIN campaigns ON campaigns.id = campaign_column_assignments.campaign_id
+			WHERE campaign_column_assignments.column_id = ANY($1::uuid[])
+		) AS ordered
+		WHERE assignment.campaign_id = ordered.campaign_id
+			AND assignment.position <> ordered.position
+	`, columnIDs)
+	return err
 }
 
 func (r *CampaignsRepository) ensureColumnExists(ctx context.Context, tx queryExecutor, columnID string) error {
@@ -990,48 +1217,6 @@ func (r *CampaignsRepository) ensureEmployeeExists(ctx context.Context, employee
 	return nil
 }
 
-func (r *CampaignsRepository) findColumnForStatus(ctx context.Context, tx queryExecutor, status string) (model.CampaignColumn, error) {
-	rows, err := tx.Query(ctx, `SELECT id::text, name, position, color, created_at FROM campaign_columns ORDER BY position ASC, created_at ASC`)
-	if err != nil {
-		return model.CampaignColumn{}, err
-	}
-	defer rows.Close()
-
-	target := strings.TrimSpace(status)
-	for rows.Next() {
-		var item model.CampaignColumn
-		if err := rows.Scan(&item.ID, &item.Name, &item.Position, &item.Color, &item.CreatedAt); err != nil {
-			return model.CampaignColumn{}, err
-		}
-		if canonicalCampaignState(item.Name) == target {
-			return item, nil
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return model.CampaignColumn{}, err
-	}
-
-	return model.CampaignColumn{}, ErrCampaignColumnNotFound
-}
-
-func (r *CampaignsRepository) statusForColumnID(ctx context.Context, tx queryExecutor, columnID string) (string, error) {
-	var name string
-	err := tx.QueryRow(ctx, `SELECT name FROM campaign_columns WHERE id = $1::uuid`, columnID).Scan(&name)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrCampaignColumnNotFound
-		}
-		return "", err
-	}
-
-	status := canonicalCampaignState(name)
-	if status == "" {
-		return "planning", nil
-	}
-	return status, nil
-}
-
 func (r *CampaignsRepository) maxCampaignPosition(ctx context.Context, tx queryExecutor, columnID string) (int, error) {
 	var maxPosition int
 	err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(position), 0) FROM campaign_column_assignments WHERE column_id = $1::uuid`, columnID).Scan(&maxPosition)
@@ -1052,18 +1237,25 @@ func (r *CampaignsRepository) resolveCampaignInsertPosition(ctx context.Context,
 	return *requested, nil
 }
 
-func (r *CampaignsRepository) resolveColumnInsertPosition(ctx context.Context, tx queryExecutor, requested *int) (int, error) {
+func maxColumnPosition(ctx context.Context, tx queryExecutor) (int, error) {
 	var maxPosition int
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(position), 0) FROM campaign_columns`).Scan(&maxPosition); err != nil {
-		return 0, err
+	err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(position), 0) FROM campaign_columns`).Scan(&maxPosition)
+	return maxPosition, err
+}
+
+// shiftColumnPositions adds delta to the position of every lane matching
+// where ($2 = pivot). (tenant_id, position) is unique and not deferrable, so
+// Postgres checks it row by row and a plain "position = position + 1" collides
+// with the neighbour that has not moved yet. The lanes are therefore first
+// lifted above every position in use ($1 = offset) and then brought down to
+// their final value; neither step can meet an occupied position.
+func shiftColumnPositions(ctx context.Context, tx pgx.Tx, maxPosition int, where string, pivot int, delta int) error {
+	offset := max(maxPosition, 0) + 2
+	if _, err := tx.Exec(ctx, `UPDATE campaign_columns SET position = position + $1 WHERE `+where, offset, pivot); err != nil {
+		return err
 	}
-	if requested == nil || *requested > maxPosition+1 {
-		return maxPosition + 1, nil
-	}
-	if *requested < 1 {
-		return 1, nil
-	}
-	return *requested, nil
+	_, err := tx.Exec(ctx, `UPDATE campaign_columns SET position = position - $1 + $3 WHERE position > $2`, offset, maxPosition+1, delta)
+	return err
 }
 
 func scanCampaign(rows pgx.Rows, item *model.Campaign) error {
@@ -1146,6 +1338,8 @@ func nullableUUID(value *string) interface{} {
 	return strings.TrimSpace(*value)
 }
 
+// mapCampaignDBError turns the constraint violations a caller can cause into
+// typed errors, so they are answered with 4xx instead of 500.
 func mapCampaignDBError(err error) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
@@ -1155,6 +1349,12 @@ func mapCampaignDBError(err error) error {
 	switch pgErr.ConstraintName {
 	case "campaigns_pic_employee_id_fkey":
 		return ErrCampaignPICNotFound
+	case "uq_campaign_columns_tenant_name":
+		return ErrCampaignColumnNameTaken
+	case "chk_campaigns_date_range":
+		return ErrCampaignDateRange
+	case "chk_campaigns_channel":
+		return ErrCampaignChannelInvalid
 	}
 
 	return err
