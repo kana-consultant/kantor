@@ -52,7 +52,35 @@ var (
 	ErrSignedCopyInvalid   = errors.New("salinan bertanda tangan harus berupa file PDF (maks. 15 MB)")
 	ErrNoSignedCopy        = errors.New("belum ada salinan bertanda tangan")
 	ErrSignedDateInvalid   = errors.New("tanggal tanda tangan tidak valid")
+
+	// Send rules of MCP calls (an AI client acting for the user).
+	ErrMCPRecipientRestricted    = errors.New("lewat MCP, dokumen legal hanya dapat dikirim ke email pihak yang tersimpan di Daftar Pihak; kirim ke alamat lain dari aplikasi web")
+	ErrExpectedRecipientRequired = errors.New("expected_recipient wajib diisi dengan alamat penerima yang sudah diperlihatkan kepada dan disetujui pengguna (default_recipient di detail dokumen)")
+	ErrRecipientMismatch         = errors.New("alamat penerima tidak sama dengan yang disetujui pengguna; periksa lagi penerimanya dan minta persetujuan ulang")
 )
+
+// checkSendRecipient applies the recipient rules. A given expected address
+// must match the recipient. An MCP call must name the approved address and
+// may only send to the party's stored e-mail: an AI client cannot redirect a
+// document that prints identity and account numbers to an address of its
+// choosing.
+func checkSendRecipient(partyEmail string, recipient string, expected string, viaMCP bool) error {
+	recipient = strings.ToLower(strings.TrimSpace(recipient))
+	expected = strings.ToLower(strings.TrimSpace(expected))
+	if expected != "" && expected != recipient {
+		return ErrRecipientMismatch
+	}
+	if !viaMCP {
+		return nil
+	}
+	if expected == "" {
+		return ErrExpectedRecipientRequired
+	}
+	if party := strings.ToLower(strings.TrimSpace(partyEmail)); party == "" || party != recipient {
+		return ErrMCPRecipientRestricted
+	}
+	return nil
+}
 
 // FieldsError reports invalid or missing form values, keyed by field.
 type FieldsError struct {
@@ -929,7 +957,7 @@ func (s *Service) attachment(ctx context.Context, doc model.LegalDocument) (mail
 	return mail.Attachment{}, "", ErrPDFNotReady
 }
 
-func (s *Service) Send(ctx context.Context, actorID string, id string, recipient string) (SendResult, error) {
+func (s *Service) Send(ctx context.Context, actorID string, id string, recipient string, expected string, viaMCP bool) (SendResult, error) {
 	doc, err := s.getDocument(ctx, id)
 	if err != nil {
 		return SendResult{}, err
@@ -950,6 +978,9 @@ func (s *Service) Send(ctx context.Context, actorID string, id string, recipient
 	}
 	party, err := s.getParty(ctx, doc.PartyID)
 	if err != nil {
+		return SendResult{}, err
+	}
+	if err := checkSendRecipient(party.Email, address, expected, viaMCP); err != nil {
 		return SendResult{}, err
 	}
 	attachment, format, err := s.attachment(ctx, doc)
@@ -1007,6 +1038,9 @@ func (s *Service) Send(ctx context.Context, actorID string, id string, recipient
 	audit := map[string]any{
 		"doc_type": doc.DocType, "doc_number": number, "format": format,
 		"recipient": hrisservice.MaskEmail(address), "recipient_is_party_email": strings.EqualFold(address, party.Email),
+	}
+	if viaMCP {
+		audit["via"] = "mcp"
 	}
 	result := SendResult{Audit: audit}
 	if sendErr != nil {

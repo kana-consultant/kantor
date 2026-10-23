@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 
+	"github.com/kana-consultant/kantor/backend/internal/clientvia"
 	legaldto "github.com/kana-consultant/kantor/backend/internal/dto/legal"
 	"github.com/kana-consultant/kantor/backend/internal/httputil"
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
@@ -114,6 +115,12 @@ func (h *Handler) writeError(ctx context.Context, w http.ResponseWriter, err err
 		response.WriteError(w, http.StatusConflict, "LEGAL_DOCUMENT_PDF_NOT_READY", err.Error(), nil)
 	case errors.Is(err, hrisservice.ErrDocumentMailNotReady):
 		response.WriteError(w, http.StatusConflict, "DOCUMENT_MAIL_NOT_READY", err.Error(), nil)
+	case errors.Is(err, legalservice.ErrExpectedRecipientRequired):
+		response.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), map[string]string{"expected_recipient": "required"})
+	case errors.Is(err, legalservice.ErrRecipientMismatch):
+		response.WriteError(w, http.StatusConflict, "RECIPIENT_MISMATCH", err.Error(), nil)
+	case errors.Is(err, legalservice.ErrMCPRecipientRestricted):
+		response.WriteError(w, http.StatusConflict, "MCP_RECIPIENT_NOT_ALLOWED", err.Error(), nil)
 	case errors.Is(err, legalservice.ErrNoSignedCopy):
 		response.WriteError(w, http.StatusNotFound, "LEGAL_SIGNED_COPY_NOT_FOUND", err.Error(), nil)
 	case errors.Is(err, legalservice.ErrPartyTypeNotAllowed), errors.Is(err, legalservice.ErrRelatedInvalid),
@@ -256,6 +263,21 @@ func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) {
 // optional file (the scanned signed PDF).
 func (h *Handler) markSigned(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "documentID")
+	// JSON {signed_at}: no scan (the MCP tool and API clients).
+	if strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+		var input legaldto.SignedRequest
+		if !httputil.DecodeAndValidate(h.validator, w, r, &input) {
+			return
+		}
+		result, err := h.service.MarkSigned(r.Context(), id, input.SignedAt, nil)
+		if err != nil {
+			h.writeError(r.Context(), w, err)
+			return
+		}
+		platformmiddleware.AuditLog(r.Context(), "mark_signed", auditModule, auditDocument, id, nil, map[string]any{"doc_type": result.DocType, "signed_at": result.SignedAt, "scan_uploaded": false})
+		response.WriteJSON(w, http.StatusOK, result, nil)
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, legalservice.MaxSignedCopyBytes+multipartOverhead)
 	if err := r.ParseMultipartForm(legalservice.MaxSignedCopyBytes + multipartOverhead); err != nil {
 		if platformmiddleware.IsBodyTooLargeError(err) {
@@ -354,7 +376,7 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "documentID")
-	result, err := h.service.Send(r.Context(), principal.UserID, id, input.Recipient)
+	result, err := h.service.Send(r.Context(), principal.UserID, id, input.Recipient, input.ExpectedRecipient, clientvia.IsMCP(r))
 	if err != nil {
 		h.writeError(r.Context(), w, err)
 		return

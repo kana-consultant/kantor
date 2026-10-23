@@ -71,6 +71,15 @@ type DocumentRequest struct {
 // e-mail, shown to the user before sending).
 type SendRequest struct {
 	Recipient string `json:"recipient" validate:"required,email,max=254"`
+	// ExpectedRecipient is the address the human approved. Required on MCP
+	// calls (see the handler); optional for the web app.
+	ExpectedRecipient string `json:"expected_recipient" validate:"omitempty,email,max=254"`
+}
+
+// SignedRequest is the JSON form of marking a document signed (no scan); the
+// web app sends multipart form data with the scan.
+type SignedRequest struct {
+	SignedAt string `json:"signed_at" validate:"required,datetime=2006-01-02"`
 }
 
 type RelatedDocument struct {

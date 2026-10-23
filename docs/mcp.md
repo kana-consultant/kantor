@@ -105,10 +105,8 @@ settings), public auth flows (login, register, password reset), mail
 credential / delivery routes (`/admin/settings/mail-delivery`,
 `/admin/settings/document-mail`, the `/email-deliveries` history route), the
 employee identity (`/hris/employees/{id}/hr-profile`), the company profile
-(`/admin/settings/company-profile` including its `/logo`), the Dokumen Legal
-routes (`/operational/legal-documents`, `/operational/legal-parties`: party NIK,
-NPWP and account numbers, and e-mail to outside addresses) and every rendered
-document (`.../pdf`, `.../docx`): those are binary, and the PKWT prints the full NIK
+(`/admin/settings/company-profile` including its `/logo`) and every rendered
+document (`.../pdf`, `.../docx`, the signed copy of a legal document): those are binary, and the PKWT prints the full NIK
 and account number. Employee tools return the bank account number masked
 (`******7890`) unless the token's user holds `hris:employee_identity:view` or owns
 the record. For the mail settings, the HR profile, the company profile and the
@@ -185,3 +183,22 @@ Limits to know:
 - **Large tenants.** A tool result is cut at 100 KB and these lists are not
   paginated: `get_hris_payslips` reaches the limit at roughly 100 stored slips,
   `get_hris_contracts` returns up to 500 rows (use `limit`, `status`, `employee_id`).
+
+### Dokumen Legal
+
+The legal documents of Operasional (freelance partnership, subcontract, SOW,
+SLA, handover report) and their parties are tools as well, under the caller's
+own `operational:legal_document:*` permissions:
+- `get_operational_legal_documents_types` returns each type's form fields; the
+  `fields` object of create and update is keyed by them.
+- Parties can be listed, created, edited and deleted. Their identity, NPWP and
+  account numbers are accepted on input and only ever returned masked.
+- Documents can be listed, created, edited, generated, cancelled and marked
+  signed (`{signed_at}`; uploading the scanned copy is web-only). The PDF,
+  DOCX and signed scan stay off the surface.
+- `post_operational_legal_documents_documentid_send` e-mails the PDF to the
+  party and needs `confirm: true`. Through MCP it only sends to the party's
+  stored e-mail (the document's `default_recipient`); the body must carry it
+  as both `recipient` and `expected_recipient`. Another address
+  (`MCP_RECIPIENT_NOT_ALLOWED`) is web-only. Audit rows of these sends carry
+  `via: "mcp"`.

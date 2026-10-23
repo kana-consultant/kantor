@@ -126,8 +126,9 @@ func (s *Server) callTool(ctx context.Context, req request, authHeader string, h
 	})
 }
 
-const confirmRequiredText = "Nothing was sent. This tool e-mails documents to employees and cannot be undone. " +
-	"First show the human who will receive what (payslips: send-preview or recipient; contracts: recipient), " +
+const confirmRequiredText = "Nothing was sent. This tool e-mails documents and cannot be undone. " +
+	"First show the human who will receive what (payslips: send-preview or recipient; contracts: recipient; " +
+	"legal documents: the document's default_recipient), " +
 	"wait for their explicit approval in the conversation, then call the tool again with confirm=true " +
 	"and the approved address(es) in the body as expected_recipient(s)."
 
