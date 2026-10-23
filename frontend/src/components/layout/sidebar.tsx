@@ -1,4 +1,5 @@
 import {
+  Scale,
   Activity,
   ChevronsLeft,
   X,
@@ -85,6 +86,12 @@ const sections: NavSection[] = [
         label: "Domains",
         icon: Globe,
         permission: permissions.operationalDomainView,
+      },
+      {
+        to: "/operational/legal-documents",
+        label: "Dokumen Legal",
+        icon: Scale,
+        permission: permissions.operationalLegalView,
       },
     ],
   },

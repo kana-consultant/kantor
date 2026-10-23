@@ -5,7 +5,7 @@
 export type PayslipStatus = "none" | "draft" | "sent" | "void";
 export type DocumentRenderStatus = "none" | "pending" | "rendering" | "ready" | "failed";
 export type EmailDeliveryStatus = "queued" | "sending" | "sent" | "failed";
-export type EmailRecipientSource = "login" | "employee" | "personal" | "self";
+export type EmailRecipientSource = "login" | "employee" | "personal" | "self" | "party";
 /** Recipient choice for a single send; "default" = login e-mail, or the employee e-mail when unlinked. */
 export type PayslipRecipientChoice = "default" | "login" | "employee" | "personal";
 
@@ -234,7 +234,7 @@ export interface PayslipSendPreviewResponse {
 
 export interface EmailDelivery {
   id: string;
-  kind: "payslip" | "contract" | "test";
+  kind: "payslip" | "contract" | "test" | "legal";
   reference_type?: string;
   reference_id?: string;
   recipient: string;
