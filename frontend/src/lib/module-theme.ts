@@ -1,4 +1,5 @@
 import {
+  Scale,
   BarChart3,
   Building2,
   CreditCard,
@@ -66,6 +67,10 @@ const breadcrumbRules: Array<{
   match: (pathname: string) => boolean;
   meta: BreadcrumbMeta;
 }> = [
+  {
+    match: (pathname) => pathname.startsWith("/operational/legal-documents"),
+    meta: { module: moduleThemes.ops, title: "Dokumen Legal", icon: Scale },
+  },
   {
     match: (pathname) => pathname.startsWith("/operational/projects"),
     meta: { module: moduleThemes.ops, title: "Projects", icon: FolderKanban },

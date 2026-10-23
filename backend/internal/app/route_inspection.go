@@ -9,6 +9,7 @@ import (
 	adminhandler "github.com/kana-consultant/kantor/backend/internal/handler/admin"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
 	hrishandler "github.com/kana-consultant/kantor/backend/internal/handler/hris"
+	legalhandler "github.com/kana-consultant/kantor/backend/internal/handler/legal"
 	marketinghandler "github.com/kana-consultant/kantor/backend/internal/handler/marketing"
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
@@ -27,8 +28,9 @@ import (
 // the inspected route table complete.
 func BuildRouteTableForInspection(cfg config.Config) (chi.Routes, error) {
 	application := &App{
-		cfg:     cfg,
-		metrics: metrics.NewRegistry(),
+		cfg:          cfg,
+		metrics:      metrics.NewRegistry(),
+		legalHandler: legalhandler.NewHandler(nil),
 	}
 
 	handler, err := application.buildRouter(

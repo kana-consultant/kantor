@@ -204,9 +204,15 @@ var baselinePermissionVersions = map[int][]string{
 		"hris:payslip:manage",
 		"hris:payslip:send",
 	},
+	// v3: Dokumen Legal (Admin only, like v2).
+	3: {
+		"operational:legal_document:view",
+		"operational:legal_document:manage",
+		"operational:legal_document:send",
+	},
 }
 
-const currentBaselineVersion = 2
+const currentBaselineVersion = 3
 
 func ensureBaselinePermissions(ctx context.Context, tx pgx.Tx, roleIDs map[string]string) error {
 	// The applied version is the highest of the legacy marker

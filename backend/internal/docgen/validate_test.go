@@ -40,6 +40,20 @@ func TestEmbeddedTemplatesSections(t *testing.T) {
 		TemplatePKWT: {"benefit"},
 		TemplateNDA:  {"karya_terdahulu"},
 		TemplateSlip: {"gaji", "potongan", "reimbursement"},
+
+		TemplateFreelance: {"pekerjaan"},
+		TemplateSubcontract: {
+			"kontraktor_badan_usaha", "kontraktor_badan_usaha", "kontraktor_badan_usaha", "kontraktor_badan_usaha",
+			"subkontraktor_badan_usaha", "subkontraktor_badan_usaha", "subkontraktor_badan_usaha", "subkontraktor_badan_usaha",
+			"termin", "subkontraktor_swift", "bayar_setelah_klien_bayar", "bayar_setelah_klien_bayar",
+			"subkontraktor_swift", "bayar_setelah_klien_bayar", "bayar_setelah_klien_bayar",
+		},
+		TemplateSOW: {
+			"lingkup_dalam", "lingkup_luar", "deliverable", "milestone",
+			"kriteria_penerimaan", "asumsi", "kewajiban_klien", "tim",
+		},
+		TemplateSLA:  {"komponen", "severity", "kredit_layanan", "eskalasi"},
+		TemplateBAST: {"item_serah_terima", "catatan"},
 	}
 	for id, sections := range want {
 		tpl := mustLoad(t, id)

@@ -78,6 +78,7 @@ export const recipientSourceLabels: Record<EmailRecipientSource, string> = {
   employee: "Email data karyawan",
   personal: "Email pribadi",
   self: "Email sendiri",
+  party: "Email pihak",
 };
 
 type Tone = "neutral" | "info" | "success" | "warning" | "error" | "muted";

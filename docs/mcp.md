@@ -105,7 +105,9 @@ settings), public auth flows (login, register, password reset), mail
 credential / delivery routes (`/admin/settings/mail-delivery`,
 `/admin/settings/document-mail`, the `/email-deliveries` history route), the
 employee identity (`/hris/employees/{id}/hr-profile`), the company profile
-(`/admin/settings/company-profile` including its `/logo`) and every rendered
+(`/admin/settings/company-profile` including its `/logo`), the Dokumen Legal
+routes (`/operational/legal-documents`, `/operational/legal-parties`: party NIK,
+NPWP and account numbers, and e-mail to outside addresses) and every rendered
 document (`.../pdf`, `.../docx`): those are binary, and the PKWT prints the full NIK
 and account number. Employee tools return the bank account number masked
 (`******7890`) unless the token's user holds `hris:employee_identity:view` or owns

@@ -1,0 +1,129 @@
+## word/header1.xml
+PT Contoh Teknologi Nusantara	RAHASIA | CONFIDENTIAL
+## word/document.xml
+PERJANJIAN KEMITRAAN JASA PROFESIONAL (FREELANCE)
+PROFESSIONAL SERVICES (FREELANCE) PARTNERSHIP AGREEMENT
+No. 007/FRL/CTN/X/2026
+Perjanjian Kemitraan Jasa Profesional ini (selanjutnya disebut "Perjanjian") dibuat dan ditandatangani di Jakarta pada tanggal 1 Oktober 2026 oleh dan antara:
+This Professional Services Partnership Agreement (hereinafter referred to as the "Agreement") is made and signed in Jakarta on 1 October 2026 by and between:
+1.	PT Contoh Teknologi Nusantara, suatu perseroan terbatas yang didirikan berdasarkan hukum Negara Republik Indonesia, berkedudukan di Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110, bergerak di bidang pengembangan perangkat lunak dan konsultasi kecerdasan artifisial, dalam hal ini diwakili oleh Rudi Hartono selaku Direktur, yang berwenang bertindak untuk dan atas nama perseroan tersebut, selanjutnya disebut "Perusahaan".
+1.	PT Contoh Teknologi Nusantara, a limited liability company established under the laws of the Republic of Indonesia, domiciled at Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110, engaged in pengembangan perangkat lunak dan konsultasi kecerdasan artifisial, in this matter represented by Rudi Hartono as Direktur, duly authorised to act for and on behalf of the company, hereinafter referred to as the "Company".
+2.	Andi Pratama, pemegang Kartu Tanda Penduduk dengan NIK 3174020101950002, NPWP 12.345.678.9-012.000, beralamat di Jl. Kenanga No. 12, Depok, nomor telepon 0813-0000-2222, email andi.pratama@example.com, bertindak untuk dan atas nama diri sendiri, selanjutnya disebut "Mitra".
+2.	Andi Pratama, holder of Indonesian identity card (NIK) number 3174020101950002, tax ID (NPWP) 12.345.678.9-012.000, residing at Jl. Kenanga No. 12, Depok, phone 0813-0000-2222, email andi.pratama@example.com, acting for and on his/her own behalf, hereinafter referred to as the "Partner".
+Perusahaan dan Mitra secara bersama-sama disebut "Para Pihak". Para Pihak sepakat untuk mengadakan kerja sama jasa profesional dengan ketentuan sebagai berikut:
+The Company and the Partner are jointly referred to as the "Parties". The Parties agree to enter into a professional services cooperation on the following terms:
+Pasal 1 — Ruang Lingkup Jasa
+Article 1 — Scope of Services
+1.1	Mitra akan memberikan jasa profesional kepada Perusahaan berupa: pengembangan frontend (React) dan integrasi API untuk proyek klien ("Jasa").
+1.2	Rincian pekerjaan, deliverable, dan tenggat waktu ditetapkan dalam Lampiran A dan/atau dalam surat perintah kerja (work order) tertulis yang disepakati Para Pihak dari waktu ke waktu.
+1.3	Mitra menentukan sendiri cara, metode, alat kerja, dan waktu kerjanya, dengan tetap memenuhi deliverable dan tenggat waktu yang disepakati.
+1.1	The Partner shall provide professional services to the Company consisting of: pengembangan frontend (React) dan integrasi API untuk proyek klien (the "Services").
+1.2	Details of work, deliverables and deadlines are set out in Appendix A and/or in written work orders agreed by the Parties from time to time.
+1.3	The Partner determines its own manner, method, tools and working time, while meeting the agreed deliverables and deadlines.
+Pasal 2 — Hubungan Hukum
+Article 2 — Legal Relationship
+2.1	Hubungan Para Pihak adalah hubungan kemitraan antara pihak yang mandiri, dan bukan hubungan kerja antara pengusaha dan pekerja. Tidak ada ketentuan dalam Perjanjian ini yang dapat ditafsirkan sebagai hubungan kerja, persekutuan, atau keagenan.
+2.2	Mitra bertanggung jawab sendiri atas kewajiban jaminan sosial, asuransi, dan perpajakannya, kecuali pemotongan pajak yang wajib dilakukan Perusahaan menurut peraturan perundang-undangan.
+2.3	Mitra bebas memberikan jasa kepada pihak lain, sepanjang tidak menimbulkan benturan kepentingan dan tidak melanggar kewajiban kerahasiaan berdasarkan Perjanjian ini.
+2.1	The relationship between the Parties is a partnership between independent parties and is not an employment relationship between employer and employee. Nothing in this Agreement shall be construed as creating an employment, partnership-in-law or agency relationship.
+2.2	The Partner is solely responsible for its own social security, insurance and tax obligations, except for tax withholding that the Company must perform under the laws and regulations.
+2.3	The Partner is free to provide services to other parties, provided that no conflict of interest arises and the confidentiality obligations under this Agreement are not breached.
+Pasal 3 — Jangka Waktu
+Article 3 — Term
+Perjanjian ini berlaku sejak tanggal 1 Oktober 2026 sampai dengan tanggal 31 Desember 2026, dan dapat diperpanjang berdasarkan kesepakatan tertulis Para Pihak.
+This Agreement is valid from 1 October 2026 until 31 December 2026, and may be extended by written agreement of the Parties.
+Pasal 4 — Imbalan Jasa dan Pembayaran
+Article 4 — Fees and Payment
+4.1	Imbalan jasa ditetapkan dengan skema per proyek / per project sebesar Rp15.000.000 per milestone, atau sebagaimana ditetapkan dalam Lampiran A/work order.
+4.2	Mitra menyampaikan tagihan (invoice) beserta bukti penyelesaian pekerjaan setiap milestone selesai / upon completion of each milestone. Perusahaan membayar tagihan yang telah disetujui paling lambat 14 hari kalender sejak tagihan diterima lengkap.
+4.3	Pembayaran dilakukan melalui transfer ke rekening: Bank Mandiri, nomor rekening 1400001234567, atas nama Andi Pratama.
+4.4	Perusahaan akan memotong PPh Pasal 21 atas imbalan jasa sesuai peraturan perpajakan dan memberikan bukti potong kepada Mitra.
+4.5	Biaya operasional hanya diganti apabila telah disetujui tertulis oleh Perusahaan sebelumnya dan didukung bukti yang sah.
+4.1	The service fee is set under a per proyek / per project scheme at IDR 15.000.000 per milestone, or as set out in Appendix A/a work order.
+4.2	The Partner shall submit an invoice together with proof of completed work setiap milestone selesai / upon completion of each milestone. The Company shall pay approved invoices no later than 14 calendar days after receipt of a complete invoice.
+4.3	Payment shall be made by transfer to: Bank Mandiri, account number 1400001234567, account holder Andi Pratama.
+4.4	The Company shall withhold Article 21 Income Tax on the fee in accordance with tax regulations and provide the withholding slip to the Partner.
+4.5	Out-of-pocket expenses are reimbursed only if approved in writing by the Company in advance and supported by valid evidence.
+Pasal 5 — Deliverable dan Penerimaan
+Article 5 — Deliverables and Acceptance
+Perusahaan akan memeriksa setiap deliverable dalam 5 hari kerja sejak diserahkan dan memberikan persetujuan atau catatan perbaikan. Mitra wajib melakukan perbaikan tanpa biaya tambahan sebanyak-banyaknya 2 kali untuk hal yang masih dalam lingkup pekerjaan. Apabila Perusahaan tidak memberikan tanggapan dalam jangka waktu tersebut, deliverable dianggap diterima.
+The Company shall review each deliverable within 5 working days of submission and provide approval or revision notes. The Partner shall make revisions at no additional cost up to 2 times for matters within scope. If the Company does not respond within that period, the deliverable is deemed accepted.
+Pasal 6 — Standar Kerja dan Jaminan
+Article 6 — Work Standards and Warranties
+Mitra menjamin bahwa:
+a.	Jasa dilaksanakan secara profesional sesuai standar industri yang wajar;
+b.	Deliverable merupakan karya orisinal Mitra dan tidak melanggar hak kekayaan intelektual pihak lain;
+c.	Deliverable tidak mengandung kode berbahaya, pintu belakang (backdoor), atau komponen berlisensi yang bertentangan dengan kebijakan Perusahaan;
+d.	Penggunaan alat bantu AI dalam menghasilkan deliverable diungkapkan kepada Perusahaan apabila diminta, dan tidak melibatkan pemasukan Informasi Rahasia ke layanan yang belum disetujui Perusahaan.
+The Partner warrants that:
+a.	The Services are performed professionally in line with reasonable industry standards;
+b.	The deliverables are the Partner's original work and do not infringe third-party intellectual property rights;
+c.	The deliverables contain no malicious code, backdoors or licensed components conflicting with Company policy;
+d.	The use of AI tools in producing deliverables is disclosed to the Company upon request, and does not involve inputting Confidential Information into services not approved by the Company.
+Pasal 7 — Kerahasiaan dan Data Pribadi
+Article 7 — Confidentiality and Personal Data
+Mitra wajib merahasiakan seluruh informasi bisnis, teknis, dan data klien yang diperoleh dalam pelaksanaan Perjanjian ini, menggunakannya hanya untuk pelaksanaan Jasa, dan memproses data pribadi hanya sesuai instruksi Perusahaan dan peraturan perundang-undangan mengenai pelindungan data pribadi. Kewajiban ini tetap berlaku selama 3 tahun setelah Perjanjian berakhir.
+The Partner shall keep confidential all business and technical information and client data obtained in performing this Agreement, use it solely for performing the Services, and process personal data only on the Company's instructions and in accordance with the laws and regulations on personal data protection. This obligation survives for 3 years after this Agreement ends.
+Pasal 8 — Hak Kekayaan Intelektual
+Article 8 — Intellectual Property
+8.1	Seluruh deliverable dan hak kekayaan intelektual atasnya menjadi milik Perusahaan. Mitra dengan ini mengalihkan seluruh hak ekonomi atas deliverable kepada Perusahaan, yang berlaku efektif sejak imbalan atas deliverable tersebut dibayar.
+8.2	Alat, pustaka, atau materi yang telah dimiliki Mitra sebelum Perjanjian ini ("Materi Terdahulu") tetap menjadi milik Mitra. Apabila Materi Terdahulu dimasukkan ke dalam deliverable, Mitra memberikan kepada Perusahaan lisensi non-eksklusif, bebas royalti, tidak dapat dicabut, dan berlaku di seluruh dunia untuk menggunakannya sebagai bagian dari deliverable.
+8.1	All deliverables and the intellectual property rights therein belong to the Company. The Partner hereby assigns all economic rights in the deliverables to the Company, effective upon payment of the fee for such deliverables.
+8.2	Tools, libraries or materials owned by the Partner before this Agreement ("Pre-existing Materials") remain the Partner's property. If Pre-existing Materials are incorporated into a deliverable, the Partner grants the Company a non-exclusive, royalty-free, irrevocable, worldwide licence to use them as part of the deliverable.
+Pasal 9 — Larangan Membujuk
+Article 9 — Non-Solicitation
+Selama Perjanjian ini berlaku dan 12 bulan setelahnya, Mitra tidak akan menawarkan jasa secara langsung kepada klien Perusahaan yang dikenalnya melalui Perjanjian ini untuk pekerjaan yang sejenis, tanpa persetujuan tertulis Perusahaan.
+During this Agreement and for 12 months thereafter, the Partner shall not directly offer services to Company clients introduced through this Agreement for similar work, without the Company's written consent.
+Pasal 10 — Pengakhiran
+Article 10 — Termination
+10.1	Masing-masing Pihak dapat mengakhiri Perjanjian ini dengan pemberitahuan tertulis 14 hari sebelumnya.
+10.2	Perusahaan dapat mengakhiri Perjanjian ini seketika apabila Mitra melakukan pelanggaran berat, termasuk pelanggaran kerahasiaan.
+10.3	Dalam hal pengakhiran, Perusahaan membayar imbalan atas pekerjaan yang telah diselesaikan dan diterima sampai tanggal pengakhiran, dan Mitra wajib menyerahkan seluruh hasil pekerjaan serta mengembalikan akses dan materi Perusahaan.
+10.1	Either Party may terminate this Agreement with 14 days' prior written notice.
+10.2	The Company may terminate this Agreement immediately if the Partner commits a serious breach, including a breach of confidentiality.
+10.3	Upon termination, the Company shall pay for work completed and accepted up to the termination date, and the Partner shall hand over all work results and return Company access and materials.
+Pasal 11 — Hukum yang Berlaku dan Penyelesaian Sengketa
+Article 11 — Governing Law and Dispute Resolution
+Perjanjian ini tunduk pada hukum Negara Republik Indonesia. Sengketa diselesaikan secara musyawarah dalam 30 hari; apabila tidak tercapai mufakat, sengketa diselesaikan melalui Pengadilan Negeri Jakarta Selatan.
+This Agreement is governed by the laws of the Republic of Indonesia. Disputes shall be settled amicably within 30 days; failing agreement, disputes shall be settled through the South Jakarta District Court.
+Pasal 12 — Ketentuan Lain
+Article 12 — Miscellaneous
+12.1	Perubahan atas Perjanjian ini hanya sah apabila dibuat tertulis dan ditandatangani Para Pihak.
+12.2	Mitra tidak dapat mengalihkan pekerjaan kepada pihak lain tanpa persetujuan tertulis Perusahaan.
+12.3	Perjanjian ini dibuat dalam Bahasa Indonesia dan Bahasa Inggris. Apabila terdapat perbedaan penafsiran antara kedua versi bahasa, maka yang berlaku adalah versi Bahasa Indonesia.
+12.1	Amendments to this Agreement are valid only if made in writing and signed by the Parties.
+12.2	The Partner may not delegate work to other parties without the Company's written consent.
+12.3	This Agreement is made in the Indonesian and English languages. In the event of any discrepancy in interpretation between the two versions, the version in the Indonesian language shall prevail.
+Jakarta, 1 Oktober 2026
+PERUSAHAAN
+COMPANY
+PT Contoh Teknologi Nusantara
+ 
+Rudi Hartono
+Direktur
+MITRA
+PARTNER
+ 
+e-Meterai Rp10.000
+Andi Pratama
+ 
+LAMPIRAN A — Daftar Pekerjaan  |  APPENDIX A — Work List
+No
+Pekerjaan / Work
+Deliverable
+Tenggat / Deadline
+Imbalan / Fee (IDR)
+1
+Dashboard admin
+Source code + deploy staging
+31 Okt 2026
+15.000.000
+2
+Integrasi API chatbot
+Source code + dokumentasi
+30 Nov 2026
+15.000.000
+Total
+30.000.000
+## word/footer1.xml
+No. 007/FRL/CTN/X/2026	Hal. / Page  / 

@@ -140,6 +140,13 @@ func DefaultPermissions() []PermissionDefinition {
 		{ID: "operational:column:manage", ModuleID: ModuleOperational, Resource: "column", Action: "manage", Description: "Tambah edit hapus dan reorder kolom kanban"},
 		{ID: "operational:assignment_rule:view", ModuleID: ModuleOperational, Resource: "assignment_rule", Action: "view", Description: "Melihat assignment rules"},
 		{ID: "operational:assignment_rule:manage", ModuleID: ModuleOperational, Resource: "assignment_rule", Action: "manage", Description: "Mengelola assignment rules"},
+		// Dokumen Legal: agreements with outside parties (freelance,
+		// subcontract, SOW, SLA, BAST). Sensitive (party NIK, NPWP and
+		// account numbers; e-mail to outside addresses) and Admin-only by
+		// default.
+		{ID: "operational:legal_document:view", ModuleID: ModuleOperational, Resource: "legal_document", Action: "view", Description: "Melihat dokumen legal (freelance, subkontrak, SOW, SLA, BAST), PDF-nya, dan daftar pihak", IsSensitive: true},
+		{ID: "operational:legal_document:manage", ModuleID: ModuleOperational, Resource: "legal_document", Action: "manage", Description: "Membuat, mengubah, generate, menandai ditandatangani, dan membatalkan dokumen legal, serta mengelola daftar pihak (NIK, NPWP, rekening)", IsSensitive: true},
+		{ID: "operational:legal_document:send", ModuleID: ModuleOperational, Resource: "legal_document", Action: "send", Description: "Mengirim dokumen legal lewat email ke pihak luar", IsSensitive: true},
 		{ID: "operational:tracker:view", ModuleID: ModuleOperational, Resource: "tracker", Action: "view", Description: "Melihat aktivitas tracker sendiri"},
 		{ID: "operational:tracker:view_team", ModuleID: ModuleOperational, Resource: "tracker", Action: "view_team", Description: "Melihat aktivitas tracker seluruh tim", IsSensitive: true},
 		{ID: "operational:tracker:manage_domains", ModuleID: ModuleOperational, Resource: "tracker", Action: "manage_domains", Description: "Mengelola domain categories tracker"},
@@ -267,6 +274,10 @@ var managerExcludedPermissions = map[string]struct{}{
 	"hris:payslip:view":           {},
 	"hris:payslip:manage":         {},
 	"hris:payslip:send":           {},
+
+	"operational:legal_document:view":   {},
+	"operational:legal_document:manage": {},
+	"operational:legal_document:send":   {},
 }
 
 func managerCanAccess(permission PermissionDefinition) bool {
