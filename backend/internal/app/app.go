@@ -32,6 +32,7 @@ import (
 	authhandler "github.com/kana-consultant/kantor/backend/internal/handler/auth"
 	fileshandler "github.com/kana-consultant/kantor/backend/internal/handler/files"
 	hrishandler "github.com/kana-consultant/kantor/backend/internal/handler/hris"
+	legalhandler "github.com/kana-consultant/kantor/backend/internal/handler/legal"
 	marketinghandler "github.com/kana-consultant/kantor/backend/internal/handler/marketing"
 	notificationshandler "github.com/kana-consultant/kantor/backend/internal/handler/notifications"
 	operationalhandler "github.com/kana-consultant/kantor/backend/internal/handler/operational"
@@ -44,6 +45,7 @@ import (
 	auditrepo "github.com/kana-consultant/kantor/backend/internal/repository/audit"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
+	legalrepo "github.com/kana-consultant/kantor/backend/internal/repository/legal"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	notificationsrepo "github.com/kana-consultant/kantor/backend/internal/repository/notifications"
 	operationalrepo "github.com/kana-consultant/kantor/backend/internal/repository/operational"
@@ -54,6 +56,7 @@ import (
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 	filesservice "github.com/kana-consultant/kantor/backend/internal/service/files"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
+	legalservice "github.com/kana-consultant/kantor/backend/internal/service/legal"
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
 	notificationsservice "github.com/kana-consultant/kantor/backend/internal/service/notifications"
 	operationalservice "github.com/kana-consultant/kantor/backend/internal/service/operational"
@@ -73,6 +76,8 @@ type App struct {
 	// auditRepository backs the opt-in audit_logs redaction scrub of
 	// existing rows, a background job (see auditScrubJob).
 	auditRepository *auditrepo.Repository
+	// legalHandler serves /operational/legal-documents and legal-parties.
+	legalHandler *legalhandler.Handler
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -274,6 +279,14 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	// The active contract gives a payslip its status kerja and jabatan.
 	payslipsService.SetContractSource(contractsService)
 
+	// Dokumen Legal (Operasional): agreements with outside parties, on the
+	// same worker, encrypted storage, numbering and document mailer.
+	legalService := legalservice.NewService(legalrepo.NewPartiesRepository(pool), legalrepo.NewDocumentsRepository(pool), documentSequencesRepository, companyProfileService, emailDeliveriesRepository, documentWorker, documentStore, documentMailer, encrypter)
+	if err := documentWorker.Register(legalservice.NewRenderHandler(legalService)); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("register legal document renderer: %w", err)
+	}
+
 	// Wire event triggers
 	kanbanService.SetTaskAssignNotifier(whatsappService)
 	kanbanService.SetTaskAssignNotifier(emailDeliveryService)
@@ -290,6 +303,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		metrics:              metrics.NewRegistry(),
 		accessTokenBlacklist: accessTokenBlacklist,
 		auditRepository:      auditRepository,
+		legalHandler:         legalhandler.NewHandler(legalService),
 	}
 	router, err := application.buildRouter(
 		auditService,
@@ -563,6 +577,10 @@ func (a *App) buildRouter(
 					module.With(platformmiddleware.RequirePermission("operational:task:view")).Get("/tasks/mine", kanbanHandler.ListMyTasks)
 					module.Route("/vps", vpsHandler.RegisterRoutes)
 					module.Route("/domains", domainHandler.RegisterRoutes)
+					if a.legalHandler != nil {
+						module.Route("/legal-documents", a.legalHandler.RegisterDocumentRoutes)
+						module.Route("/legal-parties", a.legalHandler.RegisterPartyRoutes)
+					}
 				})
 
 				protected.Route("/discord-reminder", func(r chi.Router) {

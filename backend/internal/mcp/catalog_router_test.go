@@ -30,6 +30,8 @@ var sensitiveRouteFragments = []string{
 	"/email-deliveries",
 	"/hr-profile",
 	"/settings/company-profile",
+	"/legal-documents",
+	"/legal-parties",
 }
 
 // renderedDocumentSuffixes are the binary payslip/contract files: the PKWT
@@ -216,6 +218,9 @@ func TestCatalogFromRealRouterExcludesSensitiveRoutes(t *testing.T) {
 		"GET /api/v1/admin/settings/company-profile/logo",
 		"POST /api/v1/admin/settings/company-profile/logo",
 		"DELETE /api/v1/admin/settings/company-profile/logo",
+		"GET /api/v1/operational/legal-documents",
+		"POST /api/v1/operational/legal-documents/{documentID}/send",
+		"GET /api/v1/operational/legal-parties",
 		"GET /api/v1/hris/employees/{employeeID}/hr-profile",
 		"PUT /api/v1/hris/employees/{employeeID}/hr-profile",
 		"GET /api/v1/hris/payslips",

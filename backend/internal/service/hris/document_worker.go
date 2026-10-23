@@ -577,10 +577,14 @@ func (w *DocumentWorker) auditOutcome(ctx context.Context, state *documentRender
 	if state.failure != "" {
 		value["reason"] = state.failure
 	}
+	module := "hris"
+	if handler, ok := w.handler(state.job.Kind).(interface{ AuditModule() string }); ok {
+		module = handler.AuditModule()
+	}
 	w.audit(ctx, auditservice.Entry{
 		UserID:     state.prepared.ActorID,
 		Action:     "render",
-		Module:     "hris",
+		Module:     module,
 		Resource:   state.job.Kind,
 		ResourceID: state.job.ID,
 		NewValue:   value,

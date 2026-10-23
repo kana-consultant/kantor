@@ -1,0 +1,137 @@
+## word/header1.xml
+PT Contoh Teknologi Nusantara	RAHASIA | CONFIDENTIAL
+## word/document.xml
+PERJANJIAN TINGKAT LAYANAN
+SERVICE LEVEL AGREEMENT (SLA)
+No. 005/SLA/CTN/I/2027
+Perjanjian Tingkat Layanan ini ("SLA") merupakan bagian yang tidak terpisahkan dari Perjanjian Induk dan mengatur standar layanan dukungan dan pemeliharaan yang diberikan Penyedia kepada Klien.
+This Service Level Agreement ("SLA") forms an integral part of the Master Agreement and sets out the support and maintenance service standards provided by the Provider to the Client.
+1. Informasi Layanan  |  Service Information
+Penyedia / Provider
+PT Contoh Teknologi Nusantara — Jakarta Selatan
+Klien / Client
+PT Contoh Industri Nusantara — Jl. Sudirman Kav. 1, Jakarta Pusat
+Perjanjian Induk / Master Agreement
+No. 012/MSA/CTN/IX/2026 tanggal / dated 15 September 2026
+Layanan / Service
+Dukungan & pemeliharaan Asisten Virtual Internal
+Periode / Period
+16 Januari 2027 – 15 Januari 2028
+Model Deployment / Deployment
+On-premise (server Klien)
+Biaya Layanan / Service Fee
+IDR 12.500.000 per bulan / month (belum termasuk PPN)
+2. Komponen yang Dicakup  |  Covered Components
+No
+Komponen / Component
+Lingkungan / Environment
+Catatan / Notes
+1
+Aplikasi chat & API
+Produksi
+
+2
+Pipeline ingestion
+Produksi
+Sinkronisasi harian
+3. Jam dan Kanal Dukungan  |  Support Hours and Channels
+Jam Layanan / Support Hours
+Senin–Jumat 09.00–17.00 WIB (kecuali hari libur nasional)
+Kanal / Channels
+Portal tiket, email support@contoh.co.id, WhatsApp
+Dukungan di Luar Jam / After-hours
+Hanya Severity 1, via WhatsApp hotline
+Bahasa / Language
+Bahasa Indonesia, English
+4. Tingkat Keparahan dan Target Waktu  |  Severity Levels and Target Times
+Level
+Definisi / Definition
+Respons / Response
+Pemulihan / Resolution
+Update
+S1
+Layanan tidak dapat digunakan sama sekali
+1 jam (24x7)
+8 jam
+Tiap 2 jam
+S2
+Fungsi utama terganggu, ada workaround
+4 jam kerja
+2 hari kerja
+Harian
+S3
+Gangguan minor / pertanyaan
+1 hari kerja
+5 hari kerja
+Saat selesai
+Waktu respons dihitung sejak tiket tercatat pada kanal resmi dan hanya berjalan pada jam layanan, kecuali untuk level yang ditetapkan berlaku 24x7. "Pemulihan" berarti layanan kembali berfungsi, termasuk melalui solusi sementara (workaround). | Response time runs from ticket logging on an official channel and only during support hours, except for levels designated 24x7. "Resolution" means service restored, including via a workaround.
+5. Target Ketersediaan  |  Availability Target
+5.1	Penyedia menargetkan ketersediaan layanan sebesar 99,5% per bulan kalender, dihitung dengan rumus: (Total Menit dalam Bulan − Menit Gangguan) ÷ Total Menit dalam Bulan × 100%.
+5.2	Menit gangguan tidak mencakup pemeliharaan terjadwal dan kejadian yang dikecualikan pada Bagian 7.
+5.3	Untuk deployment on-premise, target ketersediaan hanya berlaku atas komponen perangkat lunak Penyedia dan tidak mencakup infrastruktur, jaringan, dan perangkat keras yang dikelola Klien.
+5.1	The Provider targets service availability of 99,5% per calendar month, calculated as: (Total Minutes in Month − Downtime Minutes) ÷ Total Minutes in Month × 100%.
+5.2	Downtime excludes scheduled maintenance and events excluded under Section 7.
+5.3	For on-premise deployments, the availability target applies only to the Provider's software components and excludes infrastructure, network and hardware managed by the Client.
+6. Pemeliharaan Terjadwal  |  Scheduled Maintenance
+Pemeliharaan terjadwal dilakukan pada Sabtu 22.00–02.00 WIB dengan pemberitahuan kepada Klien paling lambat 3 hari sebelumnya. Pemeliharaan darurat untuk keamanan dapat dilakukan sewaktu-waktu dengan pemberitahuan secepatnya.
+Scheduled maintenance takes place during Sabtu 22.00–02.00 WIB with notice to the Client at least 3 days in advance. Emergency security maintenance may be performed at any time with notice as soon as possible.
+7. Pengecualian  |  Exclusions
+SLA ini tidak berlaku atas gangguan yang disebabkan oleh:
+a.	Keadaan kahar;
+b.	Infrastruktur, jaringan, perangkat keras, atau sistem yang dikelola Klien atau pihak ketiga yang ditunjuk Klien;
+c.	Gangguan layanan pihak ketiga di luar kendali Penyedia, termasuk penyedia model AI, cloud, atau API eksternal;
+d.	Penggunaan yang tidak sesuai dokumentasi, atau perubahan konfigurasi yang dilakukan tanpa persetujuan Penyedia;
+e.	Penangguhan layanan karena keterlambatan pembayaran.
+This SLA does not apply to disruptions caused by:
+a.	Force majeure;
+b.	Infrastructure, network, hardware or systems managed by the Client or third parties appointed by the Client;
+c.	Third-party service outages beyond the Provider's control, including AI model, cloud or external API providers;
+d.	Use not in accordance with documentation, or configuration changes made without the Provider's approval;
+e.	Service suspension due to late payment.
+8. Kompensasi Layanan  |  Service Credits
+Ketersediaan Bulanan / Monthly Availability
+Kredit Layanan / Service Credit (% biaya bulanan / monthly fee)
+99,0% – < 99,5%
+5%
+98,0% – < 99,0%
+10%
+< 98,0%
+20%
+Total kredit dalam satu bulan dibatasi maksimal 20% dari biaya layanan bulan tersebut dan diberikan sebagai potongan tagihan berikutnya. Klien mengajukan klaim paling lambat 15 hari setelah akhir bulan. Kredit layanan merupakan satu-satunya kompensasi atas tidak tercapainya target SLA. | Total credits in a month are capped at 20% of that month's fee and applied against the next invoice. Claims must be submitted within 15 days after month end. Service credits are the sole remedy for missed SLA targets.
+9. Matriks Eskalasi  |  Escalation Matrix
+Level
+Nama / Name
+Jabatan / Title
+Kontak / Contact
+1
+Tim Support
+Support Engineer
+support@contoh.co.id
+2
+Rina Kusuma
+Project Manager
+rina@contoh.co.id
+3
+Rudi Hartono
+CEO
+rudi.hartono@contoh.co.id
+10. Pelaporan dan Kewajiban Klien  |  Reporting and Client Responsibilities
+10.1	Penyedia menyampaikan laporan layanan bulanan (ketersediaan, jumlah tiket per level, capaian SLA) paling lambat tanggal 10 bulan berikutnya.
+10.2	Klien wajib menunjuk PIC, melaporkan gangguan melalui kanal resmi dengan informasi yang memadai, serta memberikan akses yang diperlukan untuk penanganan.
+10.1	The Provider delivers a monthly service report (availability, ticket count per level, SLA attainment) no later than the 10 day of the following month.
+10.2	The Client shall appoint a PIC, report incidents through official channels with adequate information, and provide the access required for handling.
+Jakarta, 16 Januari 2027
+PENYEDIA
+PROVIDER
+PT Contoh Teknologi Nusantara
+ 
+Rudi Hartono
+Direktur
+KLIEN
+CLIENT
+PT Contoh Industri Nusantara
+ 
+Budi Santoso
+VP Information Technology
+## word/footer1.xml
+No. 005/SLA/CTN/I/2027	Hal. / Page  / 

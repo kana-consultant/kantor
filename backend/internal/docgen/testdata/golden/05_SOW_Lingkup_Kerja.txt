@@ -1,0 +1,173 @@
+## word/header1.xml
+PT Contoh Teknologi Nusantara	RAHASIA | CONFIDENTIAL
+## word/document.xml
+LINGKUP KERJA
+STATEMENT OF WORK (SOW)
+No. 013/SOW/CTN/X/2026
+Lingkup Kerja ini ("SOW") merupakan bagian yang tidak terpisahkan dari Perjanjian Induk sebagaimana disebut di bawah. Hal-hal yang tidak diatur dalam SOW ini tunduk pada Perjanjian Induk.
+This Statement of Work ("SOW") forms an integral part of the Master Agreement referred to below. Matters not governed by this SOW are subject to the Master Agreement.
+1. Informasi Proyek  |  Project Information
+Penyedia / Provider
+PT Contoh Teknologi Nusantara — Jakarta Selatan
+Klien / Client
+PT Contoh Industri Nusantara — Jl. Sudirman Kav. 1, Jakarta Pusat
+Perjanjian Induk / Master Agreement
+No. 012/MSA/CTN/IX/2026 tanggal / dated 15 September 2026
+Nama Proyek / Project Name
+Asisten Virtual Internal (RAG On-Premise)
+Kode Proyek / Project Code
+CIN-RAG-01
+Periode / Period
+5 Oktober 2026 – 31 Januari 2027
+Model Deployment / Deployment
+On-premise (server Klien)
+PIC Penyedia / Provider PIC
+Rina Kusuma (rina@contoh.co.id)
+PIC Klien / Client PIC
+Sari Wulandari (sari@contoh.co.id)
+2. Latar Belakang dan Tujuan  |  Background and Objectives
+Latar Belakang / Background
+Karyawan Klien menghabiskan waktu lama mencari SOP dan kebijakan internal yang tersebar di berbagai folder.
+Tujuan / Objectives
+Menyediakan asisten virtual berbasis RAG yang menjawab pertanyaan karyawan dari dokumen internal, berjalan on-premise.
+Indikator Keberhasilan / Success Metrics
+Akurasi jawaban ≥ 85% pada set uji 200 pertanyaan; waktu respons rata-rata < 5 detik.
+3. Lingkup Pekerjaan  |  Scope of Work
+3.1 Termasuk dalam lingkup | In scope
+No
+Pekerjaan / Activity
+1
+Instalasi LLM open-weight dan vector database di server Klien
+2
+Ingestion hingga 5.000 dokumen (PDF, DOCX)
+3
+Antarmuka chat web dengan SSO Klien
+3.2 Di luar lingkup | Out of scope
+No
+Pekerjaan / Activity
+1
+Pengadaan perangkat keras/GPU
+2
+Digitalisasi dokumen fisik (scan/OCR massal)
+Pekerjaan yang tidak tercantum pada butir 3.1 dianggap di luar lingkup dan hanya dapat dikerjakan melalui permintaan perubahan (Bagian 9). | Work not listed in 3.1 is out of scope and may only be performed through a change request (Section 9).
+4. Deliverable  |  Deliverables
+No
+Deliverable
+Deskripsi / Description
+Format
+Target
+D1
+Dokumen desain solusi
+Arsitektur, alur data, rencana keamanan
+PDF
+19 Okt 2026
+D2
+Aplikasi asisten virtual
+Terinstal di server Klien, lulus UAT
+Software
+15 Des 2026
+D3
+Dokumentasi & pelatihan admin
+Manual admin + 1 sesi pelatihan
+PDF + sesi
+15 Jan 2027
+5. Jadwal, Milestone, dan Pembayaran  |  Schedule, Milestones and Payment
+Milestone
+Deliverable Terkait / Related
+Target
+%
+Nilai / Amount
+M1 — Desain disetujui
+D1
+19 Okt 2026
+30%
+60.000.000
+M2 — UAT lulus
+D2
+15 Des 2026
+50%
+100.000.000
+M3 — Handover
+D3
+15 Jan 2027
+20%
+40.000.000
+Total (belum termasuk PPN)
+IDR 200.000.000
+Penagihan dilakukan setelah Berita Acara Serah Terima (BAST) milestone terkait ditandatangani. Pembayaran jatuh tempo 30 hari kalender sejak tagihan diterima. | Invoicing follows the signing of the BAST for the relevant milestone. Payment is due 30 calendar days after receipt of invoice.
+6. Kriteria dan Prosedur Penerimaan  |  Acceptance Criteria and Procedure
+No
+Kriteria Penerimaan / Acceptance Criterion
+1
+Akurasi ≥ 85% pada set uji yang disepakati
+2
+Tidak ada temuan Severity 1 atau 2 yang terbuka
+
+Prosedur
+Procedure
+a.	Penyedia menyerahkan deliverable beserta bukti pengujian kepada Klien.
+b.	Klien melakukan pengujian penerimaan (UAT) dan memberikan persetujuan atau daftar temuan tertulis dalam 5 hari kerja.
+c.	Temuan yang berada dalam lingkup diperbaiki Penyedia dan diserahkan ulang untuk pengujian atas temuan tersebut.
+d.	Apabila Klien tidak memberikan tanggapan dalam jangka waktu butir (b), atau menggunakan deliverable untuk operasional, deliverable dianggap diterima.
+e.	Penerimaan dituangkan dalam BAST yang ditandatangani Para Pihak.
+a.	The Provider submits the deliverable with test evidence to the Client.
+b.	The Client performs user acceptance testing (UAT) and provides written approval or a list of findings within 5 working days.
+c.	In-scope findings are fixed by the Provider and resubmitted for testing of those findings.
+d.	If the Client does not respond within the period in (b), or uses the deliverable in production, the deliverable is deemed accepted.
+e.	Acceptance is recorded in a BAST signed by the Parties.
+7. Asumsi dan Kewajiban Klien  |  Assumptions and Client Responsibilities
+7.1 Asumsi | Assumptions
+No
+Asumsi / Assumption
+1
+Server dengan spesifikasi minimum telah tersedia sebelum 1 November 2026
+7.2 Kewajiban Klien | Client responsibilities
+No
+Kewajiban / Responsibility
+Tenggat / Due
+1
+Menyediakan akses VPN dan akun server
+12 Okt 2026
+2
+Menyediakan set uji 200 pertanyaan beserta jawaban acuan
+31 Okt 2026
+Keterlambatan pemenuhan kewajiban Klien dapat menggeser jadwal secara proporsional. | Delays in Client responsibilities may shift the schedule proportionally.
+8. Tim dan Tata Kelola  |  Team and Governance
+Pihak / Party
+Peran / Role
+Nama / Name
+Tanggung Jawab / Responsibility
+Penyedia
+Project Manager
+Rina Kusuma
+Jadwal, laporan, eskalasi
+Penyedia
+AI Engineer
+Rina Kartika Sari
+Pipeline RAG & evaluasi
+Klien
+Product Owner
+Sari Wulandari
+Prioritas & UAT
+Rapat status proyek dilaksanakan setiap minggu (Senin) / weekly (Monday). Laporan kemajuan disampaikan melalui email dan KANTOR. | Project status meetings are held setiap minggu (Senin) / weekly (Monday). Progress reports are delivered via email dan KANTOR.
+9. Manajemen Perubahan  |  Change Management
+Setiap perubahan lingkup, jadwal, atau biaya diajukan melalui formulir permintaan perubahan (change request) yang memuat uraian perubahan, dampak terhadap jadwal dan biaya, serta persetujuan tertulis kedua Pihak. Perubahan tidak dikerjakan sebelum disetujui.
+Any change to scope, schedule or cost is submitted through a change request form describing the change, its impact on schedule and cost, and the written approval of both Parties. Changes are not implemented before approval.
+10. Data dan Keamanan  |  Data and Security
+Pemrosesan data milik Klien, termasuk data pribadi, dalam proyek ini tunduk pada ketentuan pelindungan data dalam Perjanjian Induk dan/atau Perjanjian Pemrosesan Data yang berlaku. Lingkungan pemrosesan data: seluruhnya di server on-premise Klien; tidak ada data yang keluar dari jaringan Klien.
+Processing of Client data, including personal data, in this project is subject to the data protection provisions of the Master Agreement and/or the applicable Data Processing Agreement. Data processing environment: seluruhnya di server on-premise Klien; tidak ada data yang keluar dari jaringan Klien.
+Jakarta, 1 Oktober 2026
+PENYEDIA
+PROVIDER
+PT Contoh Teknologi Nusantara
+ 
+Rudi Hartono
+Direktur
+KLIEN
+CLIENT
+PT Contoh Industri Nusantara
+ 
+Budi Santoso
+VP Information Technology
+## word/footer1.xml
+No. 013/SOW/CTN/X/2026	Hal. / Page  / 

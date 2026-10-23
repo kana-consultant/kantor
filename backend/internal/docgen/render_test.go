@@ -23,6 +23,15 @@ var loopFields = map[TemplateID]map[string]int{
 	TemplatePKWT: {"benefit": 1},
 	TemplateNDA:  {"karya_terdahulu": 1},
 	TemplateSlip: {"gaji": 1, "potongan": 1, "reimbursement": 1},
+
+	TemplateFreelance:   {"pekerjaan": 1},
+	TemplateSubcontract: {"termin": 1},
+	TemplateSOW: {
+		"lingkup_dalam": 1, "lingkup_luar": 1, "deliverable": 1, "milestone": 1,
+		"kriteria_penerimaan": 1, "asumsi": 1, "kewajiban_klien": 1, "tim": 1,
+	},
+	TemplateSLA:  {"komponen": 1, "severity": 1, "kredit_layanan": 1, "eskalasi": 1},
+	TemplateBAST: {"item_serah_terima": 1, "catatan": 1},
 }
 
 func listLen(t *testing.T, p Payload, key string) int {

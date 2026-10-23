@@ -21,6 +21,14 @@ const (
 	TemplatePKWT TemplateID = "01_PKWT_Perjanjian_Kerja_Waktu_Tertentu.docx"
 	TemplateNDA  TemplateID = "02_NDA_dan_Pengalihan_HKI_Karyawan.docx"
 	TemplateSlip TemplateID = "08_Slip_Gaji.docx"
+
+	// Legal documents with parties outside the company (Operasional > Dokumen
+	// Legal).
+	TemplateFreelance   TemplateID = "03_Perjanjian_Kemitraan_Freelance.docx"
+	TemplateSubcontract TemplateID = "04_Perjanjian_Subkontrak.docx"
+	TemplateSOW         TemplateID = "05_SOW_Lingkup_Kerja.docx"
+	TemplateSLA         TemplateID = "06_SLA_Perjanjian_Tingkat_Layanan.docx"
+	TemplateBAST        TemplateID = "07_BAST_Berita_Acara_Serah_Terima.docx"
 )
 
 // slipLogoMedia is the image behind the logo slot of the payslip. The
@@ -34,11 +42,14 @@ var templateLogoMedia = map[TemplateID]string{
 
 // TemplateIDs lists every embedded template.
 func TemplateIDs() []TemplateID {
-	return []TemplateID{TemplatePKWT, TemplateNDA, TemplateSlip}
+	return []TemplateID{
+		TemplatePKWT, TemplateNDA, TemplateFreelance, TemplateSubcontract,
+		TemplateSOW, TemplateSLA, TemplateBAST, TemplateSlip,
+	}
 }
 
 var loadTemplates = sync.OnceValues(func() (map[TemplateID]*Template, error) {
-	out := make(map[TemplateID]*Template, 3)
+	out := make(map[TemplateID]*Template, len(TemplateIDs()))
 	for _, id := range TemplateIDs() {
 		raw, err := templateFS.ReadFile("templates/" + string(id))
 		if err != nil {

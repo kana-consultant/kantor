@@ -1,0 +1,144 @@
+## word/header1.xml
+PT Contoh Teknologi Nusantara	RAHASIA | CONFIDENTIAL
+## word/document.xml
+PERJANJIAN SUBKONTRAK
+SUBCONTRACT AGREEMENT
+No. 004/SUB/CTN/X/2026
+Perjanjian Subkontrak ini (selanjutnya disebut "Perjanjian") dibuat dan ditandatangani di Jakarta pada tanggal 1 Oktober 2026 oleh dan antara:
+This Subcontract Agreement (hereinafter referred to as the "Agreement") is made and signed in Jakarta on 1 October 2026 by and between:
+1.	PT Contoh Teknologi Nusantara, suatu badan usaha yang didirikan berdasarkan hukum Negara Republik Indonesia / the Republic of Indonesia, berkedudukan di Jakarta Selatan, Indonesia, dalam hal ini diwakili oleh Rudi Hartono selaku Direktur / Director, email legal@contoh.co.id, selanjutnya disebut "Kontraktor Utama".
+1.	PT Contoh Teknologi Nusantara, a business entity established under the laws of Negara Republik Indonesia / the Republic of Indonesia, domiciled at Jakarta Selatan, Indonesia, in this matter represented by Rudi Hartono as Direktur / Director, email legal@contoh.co.id, hereinafter referred to as the "Main Contractor".
+2.	Dimas Nugroho, perorangan pemegang identitas No. NIK 3175030303930003, NPWP 98.765.432.1-015.000, beralamat di Jl. Anggrek No. 7, Jakarta Timur, bertindak untuk dan atas nama diri sendiri, email dimas@example.com, selanjutnya disebut "Subkontraktor".
+2.	Dimas Nugroho, an individual holding identity No. NIK 3175030303930003, tax ID 98.765.432.1-015.000, residing at Jl. Anggrek No. 7, Jakarta Timur, acting on his/her own behalf, email dimas@example.com, hereinafter referred to as the "Subcontractor".
+Para Pihak terlebih dahulu menerangkan hal-hal sebagai berikut:
+a.	Bahwa Kontraktor Utama telah atau akan mengadakan perjanjian dengan PT Contoh Industri Nusantara ("Klien") untuk proyek Asisten Virtual Internal (RAG On-Premise) berdasarkan perjanjian No. 012/MSA/CTN/IX/2026 ("Kontrak Induk");
+b.	Bahwa Kontraktor Utama bermaksud menyerahkan sebagian pekerjaan dalam proyek tersebut kepada Subkontraktor, dan Subkontraktor memiliki keahlian serta bersedia melaksanakannya.
+The Parties first declare the following:
+a.	Whereas the Main Contractor has entered or will enter into an agreement with PT Contoh Industri Nusantara (the "Client") for the Asisten Virtual Internal (RAG On-Premise) project under agreement No. 012/MSA/CTN/IX/2026 (the "Prime Contract");
+b.	Whereas the Main Contractor intends to subcontract part of the work in that project to the Subcontractor, and the Subcontractor has the expertise and is willing to perform it.
+Pasal 1 — Lingkup Pekerjaan
+Article 1 — Scope of Work
+1.1	Subkontraktor akan melaksanakan pekerjaan berupa: pengembangan modul ingestion dokumen dan evaluasi retrieval ("Pekerjaan").
+1.2	Rincian Pekerjaan, deliverable, kriteria penerimaan, dan jadwal diatur dalam Lingkup Kerja (Statement of Work) No. 004/SOW-SUB/CTN/X/2026 yang merupakan bagian yang tidak terpisahkan dari Perjanjian ini. Apabila terdapat pertentangan, ketentuan Perjanjian ini yang berlaku kecuali SOW secara tegas menyatakan sebaliknya.
+1.1	The Subcontractor shall perform the following work: pengembangan modul ingestion dokumen dan evaluasi retrieval (the "Work").
+1.2	Details of the Work, deliverables, acceptance criteria and schedule are set out in Statement of Work No. 004/SOW-SUB/CTN/X/2026, which forms an integral part of this Agreement. In case of conflict, this Agreement prevails unless the SOW expressly states otherwise.
+Pasal 2 — Jangka Waktu
+Article 2 — Term
+Perjanjian ini berlaku sejak tanggal 5 Oktober 2026 sampai dengan tanggal 31 Desember 2026, atau sampai seluruh Pekerjaan diterima, mana yang lebih akhir, kecuali diakhiri lebih awal berdasarkan Perjanjian ini.
+This Agreement is valid from 5 October 2026 until 31 December 2026, or until all Work has been accepted, whichever is later, unless terminated earlier under this Agreement.
+Pasal 3 — Nilai Kontrak dan Pembayaran
+Article 3 — Contract Value and Payment
+3.1	Nilai Perjanjian adalah IDR 45.000.000 (empat puluh lima juta rupiah), sudah termasuk pajak yang berlaku / inclusive of applicable taxes, dibayarkan dengan skema per milestone sesuai jadwal berikut:
+3.1	The contract value is IDR 45.000.000, sudah termasuk pajak yang berlaku / inclusive of applicable taxes, payable under a per milestone scheme according to the following schedule:
+Termin / Stage
+Milestone / Deliverable
+Target
+%
+Nilai / Amount
+1
+Modul ingestion (PDF, DOCX) selesai UAT
+31 Okt 2026
+40%
+18.000.000
+2
+Evaluasi retrieval + laporan
+30 Nov 2026
+40%
+18.000.000
+3
+Handover & dokumentasi
+15 Des 2026
+20%
+9.000.000
+Total
+IDR 45.000.000
+
+3.2	Subkontraktor menerbitkan tagihan setelah Berita Acara Serah Terima (BAST) atas milestone terkait ditandatangani. Kontraktor Utama membayar tagihan yang lengkap dan benar paling lambat 14 hari kalender sejak diterima.
+3.3	Pembayaran dilakukan ke rekening Subkontraktor: Bank BNI, nomor rekening 0987654321, atas nama Dimas Nugroho.
+3.4	Masing-masing Pihak menanggung pajaknya sendiri. Kontraktor Utama akan melakukan pemotongan pajak yang diwajibkan peraturan perundang-undangan dan memberikan bukti potongnya. Biaya transfer ditanggung oleh masing-masing Pihak pengirim dan penerima.
+3.5	Kewajiban pembayaran Kontraktor Utama tidak bergantung pada pembayaran dari Klien.
+3.2	The Subcontractor shall issue an invoice after the Minutes of Handover (BAST) for the relevant milestone are signed. The Main Contractor shall pay complete and correct invoices no later than 14 calendar days after receipt.
+3.3	Payment shall be made to the Subcontractor's account: Bank BNI, account number 0987654321, account holder Dimas Nugroho.
+3.4	Each Party bears its own taxes. The Main Contractor shall withhold taxes required by law and provide the withholding slip. Transfer fees are borne by the respective sending and receiving Parties.
+3.5	The Main Contractor's payment obligations are not conditional on payment by the Client.
+Pasal 4 — Personel
+Article 4 — Personnel
+4.1	Subkontraktor menunjuk Dimas Nugroho sebagai penanggung jawab (PIC). Penggantian personel kunci wajib mendapat persetujuan Kontraktor Utama.
+4.2	Personel Subkontraktor sepenuhnya berada di bawah tanggung jawab Subkontraktor, termasuk upah, jaminan sosial, pajak, dan kepatuhan terhadap peraturan ketenagakerjaan. Tidak ada hubungan kerja antara personel Subkontraktor dengan Kontraktor Utama atau Klien.
+4.1	The Subcontractor appoints Dimas Nugroho as person in charge (PIC). Replacement of key personnel requires the Main Contractor's approval.
+4.2	The Subcontractor's personnel are entirely the Subcontractor's responsibility, including wages, social security, taxes and compliance with manpower regulations. No employment relationship exists between the Subcontractor's personnel and the Main Contractor or the Client.
+Pasal 5 — Kepatuhan terhadap Kontrak Induk
+Article 5 — Compliance with the Prime Contract
+Subkontraktor wajib mematuhi ketentuan Kontrak Induk yang relevan dengan Pekerjaan dan telah diberitahukan secara tertulis oleh Kontraktor Utama, termasuk ketentuan keamanan informasi, akses sistem, dan kode etik Klien. Subkontraktor tidak boleh berkomunikasi langsung dengan Klien mengenai lingkup, harga, atau komersial tanpa persetujuan Kontraktor Utama.
+The Subcontractor shall comply with the provisions of the Prime Contract relevant to the Work that the Main Contractor has notified in writing, including the Client's information security, system access and code of conduct requirements. The Subcontractor shall not communicate directly with the Client on scope, pricing or commercial matters without the Main Contractor's approval.
+Pasal 6 — Penerimaan Pekerjaan dan Perubahan
+Article 6 — Acceptance and Changes
+6.1	Kontraktor Utama memeriksa deliverable dalam 5 hari kerja sejak diserahkan. Deliverable yang memenuhi kriteria penerimaan dituangkan dalam BAST. Apabila tidak ada tanggapan dalam jangka waktu tersebut, deliverable dianggap diterima.
+6.2	Setiap perubahan lingkup, jadwal, atau nilai hanya berlaku apabila disepakati melalui permintaan perubahan (change request) tertulis yang ditandatangani Para Pihak.
+6.1	The Main Contractor shall review deliverables within 5 working days of submission. Deliverables meeting the acceptance criteria shall be recorded in a BAST. If there is no response within that period, the deliverable is deemed accepted.
+6.2	Any change to scope, schedule or value is effective only if agreed through a written change request signed by the Parties.
+Pasal 7 — Kerahasiaan
+Article 7 — Confidentiality
+Masing-masing Pihak wajib merahasiakan informasi rahasia Pihak lainnya dan Klien, termasuk informasi teknis, komersial, dan data, serta menggunakannya hanya untuk pelaksanaan Perjanjian ini. Kewajiban ini tetap berlaku selama 3 tahun setelah Perjanjian berakhir.
+Each Party shall keep confidential the confidential information of the other Party and the Client, including technical and commercial information and data, and use it only for performing this Agreement. This obligation survives for 3 years after this Agreement ends.
+Pasal 8 — Pelindungan Data Pribadi
+Article 8 — Personal Data Protection
+Dalam hal Pekerjaan melibatkan pemrosesan data pribadi, Subkontraktor bertindak sebagai prosesor atas instruksi Kontraktor Utama, wajib menerapkan langkah keamanan teknis dan organisasional yang memadai, tidak memindahkan data ke luar lingkungan yang disetujui, memberitahukan insiden kebocoran data paling lambat 24 jam sejak diketahui, serta menghapus atau mengembalikan data pada akhir Pekerjaan, sesuai peraturan perundang-undangan mengenai pelindungan data pribadi.
+Where the Work involves processing personal data, the Subcontractor acts as a processor on the Main Contractor's instructions, shall implement adequate technical and organisational security measures, shall not transfer data outside approved environments, shall notify any data breach within 24 hours of becoming aware of it, and shall delete or return the data at the end of the Work, in accordance with the laws and regulations on personal data protection.
+Pasal 9 — Hak Kekayaan Intelektual
+Article 9 — Intellectual Property
+9.1	Hak kekayaan intelektual atas deliverable yang dibuat khusus untuk Pekerjaan beralih kepada Kontraktor Utama (atau kepada Klien apabila diwajibkan oleh Kontrak Induk) sejak pembayaran atas milestone terkait diterima penuh oleh Subkontraktor.
+9.2	Masing-masing Pihak tetap memiliki hak kekayaan intelektual atas produk, perangkat lunak, kerangka kerja, dan materi yang telah dimilikinya sebelum atau di luar Perjanjian ini ("HKI Latar"). HKI Latar tidak beralih berdasarkan Perjanjian ini. Apabila HKI Latar diperlukan untuk menggunakan deliverable, pemiliknya memberikan lisensi non-eksklusif sebatas yang diperlukan untuk penggunaan deliverable tersebut.
+9.1	Intellectual property rights in deliverables created specifically for the Work transfer to the Main Contractor (or to the Client where required by the Prime Contract) upon the Subcontractor's receipt of full payment for the relevant milestone.
+9.2	Each Party retains its intellectual property in products, software, frameworks and materials owned before or outside this Agreement ("Background IP"). Background IP does not transfer under this Agreement. Where Background IP is needed to use a deliverable, its owner grants a non-exclusive licence limited to what is required to use that deliverable.
+Pasal 10 — Larangan Membujuk
+Article 10 — Non-Solicitation
+Selama Perjanjian ini berlaku dan 12 bulan setelahnya: (a) Subkontraktor tidak akan menawarkan jasa secara langsung kepada Klien untuk pekerjaan yang sama atau serupa dengan Pekerjaan tanpa persetujuan tertulis Kontraktor Utama; dan (b) masing-masing Pihak tidak akan merekrut personel Pihak lainnya yang terlibat dalam Pekerjaan.
+During this Agreement and for 12 months thereafter: (a) the Subcontractor shall not directly offer the Client services identical or similar to the Work without the Main Contractor's written consent; and (b) neither Party shall recruit the other Party's personnel involved in the Work.
+Pasal 11 — Jaminan dan Batas Tanggung Jawab
+Article 11 — Warranties and Limitation of Liability
+11.1	Subkontraktor menjamin Pekerjaan dilaksanakan secara profesional, deliverable orisinal dan tidak melanggar hak pihak lain, serta akan memperbaiki cacat yang dilaporkan dalam 30 hari sejak BAST tanpa biaya tambahan.
+11.2	Tanggung jawab total masing-masing Pihak berdasarkan Perjanjian ini dibatasi sebesar nilai yang telah dibayarkan berdasarkan Perjanjian ini, dan tidak ada Pihak yang bertanggung jawab atas kerugian tidak langsung atau kehilangan keuntungan. Pembatasan ini tidak berlaku terhadap pelanggaran kerahasiaan, pelanggaran hak kekayaan intelektual, pelanggaran pelindungan data pribadi, atau kesengajaan.
+11.1	The Subcontractor warrants that the Work is performed professionally, deliverables are original and do not infringe third-party rights, and it will fix defects reported within 30 days after the BAST at no additional cost.
+11.2	Each Party's total liability under this Agreement is limited to the amount paid under this Agreement, and neither Party is liable for indirect losses or loss of profit. This limitation does not apply to breach of confidentiality, infringement of intellectual property rights, breach of personal data protection, or wilful misconduct.
+Pasal 12 — Pengakhiran
+Article 12 — Termination
+12.1	Kontraktor Utama dapat mengakhiri Perjanjian ini dengan pemberitahuan tertulis 14 hari sebelumnya, atau seketika apabila Kontrak Induk berakhir.
+12.2	Masing-masing Pihak dapat mengakhiri Perjanjian ini apabila Pihak lainnya melakukan pelanggaran material dan tidak memperbaikinya dalam 14 hari sejak menerima pemberitahuan tertulis.
+12.3	Dalam hal pengakhiran, Kontraktor Utama membayar Pekerjaan yang telah diselesaikan secara proporsional sampai tanggal pengakhiran, dan Subkontraktor menyerahkan seluruh hasil Pekerjaan serta mengembalikan akses dan data.
+12.1	The Main Contractor may terminate this Agreement with 14 days' prior written notice, or immediately if the Prime Contract ends.
+12.2	Either Party may terminate this Agreement if the other Party commits a material breach and fails to remedy it within 14 days of receiving written notice.
+12.3	Upon termination, the Main Contractor shall pay proportionally for Work completed up to the termination date, and the Subcontractor shall hand over all Work results and return access and data.
+Pasal 13 — Keadaan Kahar
+Article 13 — Force Majeure
+Tidak ada Pihak yang bertanggung jawab atas keterlambatan atau kegagalan pelaksanaan kewajiban akibat keadaan di luar kendali wajarnya, termasuk bencana alam, perang, kerusuhan, epidemi, atau tindakan pemerintah, dengan ketentuan Pihak yang terdampak memberitahukan Pihak lainnya dalam 7 hari.
+Neither Party is liable for delay or failure to perform obligations due to circumstances beyond its reasonable control, including natural disasters, war, riots, epidemics or government actions, provided the affected Party notifies the other Party within 7 days.
+Pasal 14 — Hukum yang Berlaku dan Penyelesaian Sengketa
+Article 14 — Governing Law and Dispute Resolution
+Perjanjian ini tunduk pada hukum Negara Republik Indonesia. Sengketa diselesaikan secara musyawarah dalam 30 hari; apabila tidak tercapai mufakat, sengketa diselesaikan secara final melalui Pengadilan Negeri Jakarta Selatan.
+This Agreement is governed by the laws of the Republic of Indonesia. Disputes shall be settled amicably within 30 days; failing agreement, disputes shall be finally settled through the South Jakarta District Court.
+Pasal 15 — Ketentuan Lain
+Article 15 — Miscellaneous
+15.1	Subkontraktor tidak dapat mengalihkan atau mensubkontrakkan kembali Pekerjaan tanpa persetujuan tertulis Kontraktor Utama.
+15.2	Perubahan atas Perjanjian ini hanya sah apabila dibuat tertulis dan ditandatangani Para Pihak.
+15.3	Perjanjian ini dibuat dalam Bahasa Indonesia dan Bahasa Inggris. Apabila terdapat perbedaan penafsiran, yang berlaku adalah versi Bahasa Indonesia.
+15.4	Perjanjian ini dapat ditandatangani secara elektronik dan dalam beberapa rangkap, yang secara bersama-sama merupakan satu perjanjian.
+15.1	The Subcontractor may not assign or further subcontract the Work without the Main Contractor's written consent.
+15.2	Amendments to this Agreement are valid only if made in writing and signed by the Parties.
+15.3	This Agreement is made in the Indonesian and English languages. In case of discrepancy, the Indonesian version prevails.
+15.4	This Agreement may be signed electronically and in counterparts, which together constitute one agreement.
+Jakarta, 1 Oktober 2026
+KONTRAKTOR UTAMA
+MAIN CONTRACTOR
+PT Contoh Teknologi Nusantara
+ 
+Rudi Hartono
+Direktur / Director
+SUBKONTRAKTOR
+SUBCONTRACTOR
+Dimas Nugroho
+e-Meterai Rp10.000
+Dimas Nugroho
+Subkontraktor / Subcontractor
+## word/footer1.xml
+No. 004/SUB/CTN/X/2026	Hal. / Page  / 

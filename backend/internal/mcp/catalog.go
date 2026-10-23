@@ -64,6 +64,10 @@ var excludedContains = []string{
 	"/email-deliveries",
 	"/hr-profile",
 	"/settings/company-profile",
+	// Dokumen Legal: party NIK/NPWP/account numbers and e-mail to outside
+	// addresses stay web-only.
+	"/legal-documents",
+	"/legal-parties",
 }
 
 // BuildCatalog derives the MCP tool surface from the live chi route table, so it

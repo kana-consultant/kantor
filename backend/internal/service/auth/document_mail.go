@@ -376,12 +376,12 @@ func (s *DocumentMailService) credentials(ctx context.Context) (mail.Credentials
 
 func validateDocumentMailRequest(req DocumentMailRequest) error {
 	switch req.Kind {
-	case model.EmailDeliveryKindContract, model.EmailDeliveryKindPayslip, model.EmailDeliveryKindTest:
+	case model.EmailDeliveryKindContract, model.EmailDeliveryKindPayslip, model.EmailDeliveryKindTest, model.EmailDeliveryKindLegal:
 	default:
 		return fmt.Errorf("%w: kind %q", ErrDocumentMailInvalidRequest, req.Kind)
 	}
 	switch req.RecipientSource {
-	case model.EmailRecipientSourceLogin, model.EmailRecipientSourceEmployee, model.EmailRecipientSourcePersonal, model.EmailRecipientSourceSelf:
+	case model.EmailRecipientSourceLogin, model.EmailRecipientSourceEmployee, model.EmailRecipientSourcePersonal, model.EmailRecipientSourceSelf, model.EmailRecipientSourceParty:
 	default:
 		return fmt.Errorf("%w: recipient source %q", ErrDocumentMailInvalidRequest, req.RecipientSource)
 	}

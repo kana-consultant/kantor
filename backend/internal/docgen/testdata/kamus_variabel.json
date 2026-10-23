@@ -539,6 +539,1911 @@
         ]
       }
     },
+    "03_Perjanjian_Kemitraan_Freelance.docx": {
+      "jumlah_variabel": 37,
+      "variabel": {
+        "perusahaan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama PT pemberi kerja",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "007/FRL/CTN/X/2026"
+        },
+        "dokumen_kota": {
+          "tipe": "string",
+          "deskripsi": "Kota tempat penandatanganan",
+          "sumber_kantor": "input (default: kota perusahaan)",
+          "contoh": "Jakarta"
+        },
+        "dokumen_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Indonesia (1 Oktober 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 Oktober 2026"
+        },
+        "dokumen_tanggal_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Inggris (1 October 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 October 2026"
+        },
+        "perusahaan_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat domisili PT",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110"
+        },
+        "perusahaan_jenis_usaha": {
+          "tipe": "string",
+          "deskripsi": "Bidang usaha PT",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "pengembangan perangkat lunak dan konsultasi kecerdasan artifisial"
+        },
+        "perusahaan_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama direksi/penanda tangan berwenang",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Rudi Hartono"
+        },
+        "perusahaan_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan (sesuai Anggaran Dasar)",
+          "sumber_kantor": "BARU: profil tenant/perusahaan",
+          "contoh": "Direktur"
+        },
+        "mitra_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama freelancer",
+          "sumber_kantor": "BARU: tabel mitra/vendor",
+          "contoh": "Andi Pratama"
+        },
+        "mitra_nik": {
+          "tipe": "string",
+          "deskripsi": "NIK freelancer",
+          "sumber_kantor": "BARU: mitra.nik",
+          "contoh": "3174020101950002"
+        },
+        "mitra_npwp": {
+          "tipe": "string",
+          "deskripsi": "NPWP freelancer",
+          "sumber_kantor": "BARU: mitra.npwp",
+          "contoh": "12.345.678.9-012.000"
+        },
+        "mitra_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat freelancer",
+          "sumber_kantor": "BARU: mitra.alamat",
+          "contoh": "Jl. Kenanga No. 12, Depok"
+        },
+        "mitra_telepon": {
+          "tipe": "string",
+          "deskripsi": "Telepon",
+          "sumber_kantor": "BARU: mitra.telepon",
+          "contoh": "0813-0000-2222"
+        },
+        "mitra_email": {
+          "tipe": "string",
+          "deskripsi": "Email",
+          "sumber_kantor": "BARU: mitra.email",
+          "contoh": "andi.pratama@example.com"
+        },
+        "lingkup_jasa": {
+          "tipe": "string",
+          "deskripsi": "Ringkasan jasa freelancer",
+          "sumber_kantor": "input",
+          "contoh": "pengembangan frontend (React) dan integrasi API untuk proyek klien"
+        },
+        "tanggal_mulai": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_mulai",
+          "contoh": "1 Oktober 2026"
+        },
+        "tanggal_berakhir": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_berakhir",
+          "contoh": "31 Desember 2026"
+        },
+        "tanggal_mulai_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Inggris)",
+          "sumber_kantor": "hitung",
+          "contoh": "1 October 2026"
+        },
+        "tanggal_berakhir_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Inggris)",
+          "sumber_kantor": "hitung",
+          "contoh": "31 December 2026"
+        },
+        "skema_fee": {
+          "tipe": "string",
+          "deskripsi": "per proyek / per jam / retainer bulanan (bilingual)",
+          "sumber_kantor": "input",
+          "contoh": "per proyek / per project"
+        },
+        "nilai_fee": {
+          "tipe": "string",
+          "deskripsi": "Nilai fee, format 15.000.000",
+          "sumber_kantor": "input",
+          "contoh": "15.000.000"
+        },
+        "satuan_fee": {
+          "tipe": "string",
+          "deskripsi": "Satuan fee, mis. per milestone / per jam",
+          "sumber_kantor": "input",
+          "contoh": "per milestone"
+        },
+        "periode_tagihan": {
+          "tipe": "string",
+          "deskripsi": "Kapan freelancer menagih",
+          "sumber_kantor": "input",
+          "contoh": "setiap milestone selesai / upon completion of each milestone"
+        },
+        "termin_bayar_hari": {
+          "tipe": "string",
+          "deskripsi": "Jatuh tempo pembayaran (hari kalender)",
+          "sumber_kantor": "default 14–30",
+          "contoh": "14"
+        },
+        "mitra_bank": {
+          "tipe": "string",
+          "deskripsi": "Bank",
+          "sumber_kantor": "BARU: mitra.bank",
+          "contoh": "Mandiri"
+        },
+        "mitra_norek": {
+          "tipe": "string",
+          "deskripsi": "No. rekening",
+          "sumber_kantor": "BARU: mitra.norek",
+          "contoh": "1400001234567"
+        },
+        "mitra_nama_rekening": {
+          "tipe": "string",
+          "deskripsi": "Nama pemilik rekening",
+          "sumber_kantor": "BARU: mitra.nama_rekening",
+          "contoh": "Andi Pratama"
+        },
+        "hari_review": {
+          "tipe": "string",
+          "deskripsi": "Masa pemeriksaan deliverable (hari kerja)",
+          "sumber_kantor": "default 5",
+          "contoh": "5"
+        },
+        "jumlah_revisi": {
+          "tipe": "string",
+          "deskripsi": "Jumlah revisi gratis",
+          "sumber_kantor": "default 2",
+          "contoh": "2"
+        },
+        "masa_kerahasiaan_tahun": {
+          "tipe": "string",
+          "deskripsi": "Durasi kewajiban kerahasiaan setelah berakhir (tahun)",
+          "sumber_kantor": "default 3",
+          "contoh": "3"
+        },
+        "masa_non_solicit_bulan": {
+          "tipe": "string",
+          "deskripsi": "Durasi larangan membujuk (bulan)",
+          "sumber_kantor": "default 12",
+          "contoh": "12"
+        },
+        "hari_pemberitahuan": {
+          "tipe": "string",
+          "deskripsi": "Hari pemberitahuan sebelum berakhir/pengakhiran",
+          "sumber_kantor": "input (default 30 untuk PKWT, 14 untuk freelance/subkon)",
+          "contoh": "14"
+        },
+        "forum_sengketa": {
+          "tipe": "string",
+          "deskripsi": "Forum sengketa (ID), mis. Pengadilan Negeri Jakarta Selatan / BANI",
+          "sumber_kantor": "input",
+          "contoh": "Pengadilan Negeri Jakarta Selatan"
+        },
+        "forum_sengketa_en": {
+          "tipe": "string",
+          "deskripsi": "Forum sengketa (EN)",
+          "sumber_kantor": "input",
+          "contoh": "the South Jakarta District Court"
+        },
+        "pekerjaan": {
+          "tipe": "array",
+          "deskripsi": "LOOP daftar pekerjaan freelance: no, nama, deliverable, tenggat, fee",
+          "sumber_kantor": "input / ada: operational projects & tasks",
+          "field_item": [
+            "no",
+            "nama",
+            "deliverable",
+            "tenggat",
+            "fee"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "nama": "Dashboard admin",
+              "deliverable": "Source code + deploy staging",
+              "tenggat": "31 Okt 2026",
+              "fee": "15.000.000"
+            },
+            {
+              "no": "2",
+              "nama": "Integrasi API chatbot",
+              "deliverable": "Source code + dokumentasi",
+              "tenggat": "30 Nov 2026",
+              "fee": "15.000.000"
+            }
+          ]
+        },
+        "total_fee": {
+          "tipe": "string",
+          "deskripsi": "Total fee Lampiran A",
+          "sumber_kantor": "hitung",
+          "contoh": "30.000.000"
+        }
+      },
+      "contoh_payload": {
+        "perusahaan_nama": "PT Contoh Teknologi Nusantara",
+        "perusahaan_alamat": "Jl. Contoh Raya No. 10, Kebayoran Baru, Jakarta Selatan 12110",
+        "perusahaan_jenis_usaha": "pengembangan perangkat lunak dan konsultasi kecerdasan artifisial",
+        "perusahaan_penandatangan_nama": "Rudi Hartono",
+        "perusahaan_penandatangan_jabatan": "Direktur",
+        "dokumen_nomor": "007/FRL/CTN/X/2026",
+        "dokumen_kota": "Jakarta",
+        "dokumen_tanggal": "1 Oktober 2026",
+        "dokumen_tanggal_en": "1 October 2026",
+        "mitra_nama": "Andi Pratama",
+        "mitra_nik": "3174020101950002",
+        "mitra_npwp": "12.345.678.9-012.000",
+        "mitra_alamat": "Jl. Kenanga No. 12, Depok",
+        "mitra_telepon": "0813-0000-2222",
+        "mitra_email": "andi.pratama@example.com",
+        "mitra_bank": "Mandiri",
+        "mitra_norek": "1400001234567",
+        "mitra_nama_rekening": "Andi Pratama",
+        "lingkup_jasa": "pengembangan frontend (React) dan integrasi API untuk proyek klien",
+        "tanggal_mulai": "1 Oktober 2026",
+        "tanggal_berakhir": "31 Desember 2026",
+        "tanggal_mulai_en": "1 October 2026",
+        "tanggal_berakhir_en": "31 December 2026",
+        "skema_fee": "per proyek / per project",
+        "nilai_fee": "15.000.000",
+        "satuan_fee": "per milestone",
+        "periode_tagihan": "setiap milestone selesai / upon completion of each milestone",
+        "termin_bayar_hari": "14",
+        "hari_review": "5",
+        "jumlah_revisi": "2",
+        "masa_kerahasiaan_tahun": "3",
+        "masa_non_solicit_bulan": "12",
+        "hari_pemberitahuan": "14",
+        "forum_sengketa": "Pengadilan Negeri Jakarta Selatan",
+        "forum_sengketa_en": "the South Jakarta District Court",
+        "pekerjaan": [
+          {
+            "no": "1",
+            "nama": "Dashboard admin",
+            "deliverable": "Source code + deploy staging",
+            "tenggat": "31 Okt 2026",
+            "fee": "15.000.000"
+          },
+          {
+            "no": "2",
+            "nama": "Integrasi API chatbot",
+            "deliverable": "Source code + dokumentasi",
+            "tenggat": "30 Nov 2026",
+            "fee": "15.000.000"
+          }
+        ],
+        "total_fee": "30.000.000"
+      }
+    },
+    "04_Perjanjian_Subkontrak.docx": {
+      "jumlah_variabel": 49,
+      "variabel": {
+        "kontraktor_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama Kontraktor Utama (default perusahaan saat hire freelancer/vendor)",
+          "sumber_kantor": "profil tenant atau input",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "004/SUB/CTN/X/2026"
+        },
+        "dokumen_kota": {
+          "tipe": "string",
+          "deskripsi": "Kota tempat penandatanganan",
+          "sumber_kantor": "input (default: kota perusahaan)",
+          "contoh": "Jakarta"
+        },
+        "dokumen_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Indonesia (1 Oktober 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 Oktober 2026"
+        },
+        "dokumen_tanggal_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Inggris (1 October 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 October 2026"
+        },
+        "kontraktor_badan_usaha": {
+          "tipe": "boolean",
+          "deskripsi": "BOOLEAN: true = badan usaha, false = perorangan (mengubah paragraf identitas)",
+          "sumber_kantor": "input",
+          "contoh": true
+        },
+        "kontraktor_email": {
+          "tipe": "string",
+          "deskripsi": "Email",
+          "sumber_kantor": "input",
+          "contoh": "legal@contoh.co.id"
+        },
+        "subkontraktor_badan_usaha": {
+          "tipe": "boolean",
+          "deskripsi": "BOOLEAN: true = badan usaha, false = perorangan",
+          "sumber_kantor": "input",
+          "contoh": false
+        },
+        "subkontraktor_email": {
+          "tipe": "string",
+          "deskripsi": "Email",
+          "sumber_kantor": "mitra.email",
+          "contoh": "dimas@example.com"
+        },
+        "klien_akhir_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama klien akhir proyek (boleh \"Klien yang dirahasiakan\")",
+          "sumber_kantor": "ada: marketing leads / proyek",
+          "contoh": "PT Contoh Industri Nusantara"
+        },
+        "proyek_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama proyek",
+          "sumber_kantor": "ada: operational projects.name",
+          "contoh": "Asisten Virtual Internal (RAG On-Premise)"
+        },
+        "kontrak_induk_nomor": {
+          "tipe": "string",
+          "deskripsi": "No. kontrak dengan klien akhir",
+          "sumber_kantor": "input",
+          "contoh": "012/MSA/CTN/IX/2026"
+        },
+        "lingkup_pekerjaan": {
+          "tipe": "string",
+          "deskripsi": "Ringkasan pekerjaan subkon",
+          "sumber_kantor": "input",
+          "contoh": "pengembangan modul ingestion dokumen dan evaluasi retrieval"
+        },
+        "sow_nomor": {
+          "tipe": "string",
+          "deskripsi": "No. SOW terkait",
+          "sumber_kantor": "hitung: nomor SOW",
+          "contoh": "004/SOW-SUB/CTN/X/2026"
+        },
+        "tanggal_mulai": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_mulai",
+          "contoh": "5 Oktober 2026"
+        },
+        "tanggal_berakhir": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_berakhir",
+          "contoh": "31 Desember 2026"
+        },
+        "tanggal_mulai_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Inggris)",
+          "sumber_kantor": "hitung",
+          "contoh": "5 October 2026"
+        },
+        "tanggal_berakhir_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Inggris)",
+          "sumber_kantor": "hitung",
+          "contoh": "31 December 2026"
+        },
+        "mata_uang": {
+          "tipe": "string",
+          "deskripsi": "IDR / USD / SGD",
+          "sumber_kantor": "input",
+          "contoh": "IDR"
+        },
+        "nilai_kontrak": {
+          "tipe": "string",
+          "deskripsi": "Nilai kontrak",
+          "sumber_kantor": "input",
+          "contoh": "45.000.000"
+        },
+        "nilai_kontrak_terbilang": {
+          "tipe": "string",
+          "deskripsi": "Nilai kontrak dalam huruf (ID)",
+          "sumber_kantor": "hitung",
+          "contoh": "empat puluh lima juta rupiah"
+        },
+        "ketentuan_pajak": {
+          "tipe": "string",
+          "deskripsi": "mis. \"belum termasuk PPN\" / \"sudah termasuk pajak\"",
+          "sumber_kantor": "input",
+          "contoh": "sudah termasuk pajak yang berlaku / inclusive of applicable taxes"
+        },
+        "skema_pembayaran": {
+          "tipe": "string",
+          "deskripsi": "per milestone / bulanan / lump sum",
+          "sumber_kantor": "input",
+          "contoh": "per milestone"
+        },
+        "termin": {
+          "tipe": "array",
+          "deskripsi": "LOOP termin subkon: no, milestone, target_tanggal, persen, nilai",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "milestone",
+            "target_tanggal",
+            "persen",
+            "nilai"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "milestone": "Modul ingestion (PDF, DOCX) selesai UAT",
+              "target_tanggal": "31 Okt 2026",
+              "persen": "40%",
+              "nilai": "18.000.000"
+            },
+            {
+              "no": "2",
+              "milestone": "Evaluasi retrieval + laporan",
+              "target_tanggal": "30 Nov 2026",
+              "persen": "40%",
+              "nilai": "18.000.000"
+            },
+            {
+              "no": "3",
+              "milestone": "Handover & dokumentasi",
+              "target_tanggal": "15 Des 2026",
+              "persen": "20%",
+              "nilai": "9.000.000"
+            }
+          ]
+        },
+        "termin_bayar_hari": {
+          "tipe": "string",
+          "deskripsi": "Jatuh tempo pembayaran (hari kalender)",
+          "sumber_kantor": "default 14–30",
+          "contoh": "14"
+        },
+        "subkontraktor_bank": {
+          "tipe": "string",
+          "deskripsi": "Bank",
+          "sumber_kantor": "mitra.bank",
+          "contoh": "BNI"
+        },
+        "subkontraktor_norek": {
+          "tipe": "string",
+          "deskripsi": "No. rekening",
+          "sumber_kantor": "mitra.norek",
+          "contoh": "0987654321"
+        },
+        "subkontraktor_nama_rekening": {
+          "tipe": "string",
+          "deskripsi": "Nama pemilik rekening",
+          "sumber_kantor": "mitra.nama_rekening",
+          "contoh": "Dimas Nugroho"
+        },
+        "subkontraktor_swift": {
+          "tipe": "string",
+          "deskripsi": "Kode SWIFT (kosongkan untuk bank lokal — kalimat SWIFT otomatis hilang)",
+          "sumber_kantor": "input",
+          "contoh": ""
+        },
+        "bayar_setelah_klien_bayar": {
+          "tipe": "boolean",
+          "deskripsi": "BOOLEAN: true = bayar subkon setelah klien bayar (pay-when-paid, dibatasi batas_bayar_hari)",
+          "sumber_kantor": "input (default false)",
+          "contoh": false
+        },
+        "subkontraktor_pic": {
+          "tipe": "string",
+          "deskripsi": "PIC Subkontraktor",
+          "sumber_kantor": "input",
+          "contoh": "Dimas Nugroho"
+        },
+        "hari_review": {
+          "tipe": "string",
+          "deskripsi": "Masa pemeriksaan deliverable (hari kerja)",
+          "sumber_kantor": "default 5",
+          "contoh": "5"
+        },
+        "masa_kerahasiaan_tahun": {
+          "tipe": "string",
+          "deskripsi": "Durasi kewajiban kerahasiaan setelah berakhir (tahun)",
+          "sumber_kantor": "default 3",
+          "contoh": "3"
+        },
+        "jam_lapor_insiden": {
+          "tipe": "string",
+          "deskripsi": "Batas waktu lapor insiden data (jam)",
+          "sumber_kantor": "default 24",
+          "contoh": "24"
+        },
+        "masa_non_solicit_bulan": {
+          "tipe": "string",
+          "deskripsi": "Durasi larangan membujuk (bulan)",
+          "sumber_kantor": "default 12",
+          "contoh": "12"
+        },
+        "masa_garansi_hari": {
+          "tipe": "string",
+          "deskripsi": "Masa perbaikan cacat (hari)",
+          "sumber_kantor": "default 30",
+          "contoh": "30"
+        },
+        "hari_pemberitahuan": {
+          "tipe": "string",
+          "deskripsi": "Hari pemberitahuan sebelum berakhir/pengakhiran",
+          "sumber_kantor": "input (default 30 untuk PKWT, 14 untuk freelance/subkon)",
+          "contoh": "14"
+        },
+        "hari_perbaikan": {
+          "tipe": "string",
+          "deskripsi": "Masa perbaikan pelanggaran (cure period, hari)",
+          "sumber_kantor": "default 14",
+          "contoh": "14"
+        },
+        "hukum_yang_berlaku": {
+          "tipe": "string",
+          "deskripsi": "Hukum yang berlaku (ID)",
+          "sumber_kantor": "default Negara Republik Indonesia",
+          "contoh": "Negara Republik Indonesia"
+        },
+        "forum_sengketa": {
+          "tipe": "string",
+          "deskripsi": "Forum sengketa (ID), mis. Pengadilan Negeri Jakarta Selatan / BANI",
+          "sumber_kantor": "input",
+          "contoh": "Pengadilan Negeri Jakarta Selatan"
+        },
+        "hukum_yang_berlaku_en": {
+          "tipe": "string",
+          "deskripsi": "Hukum yang berlaku (EN)",
+          "sumber_kantor": "default the Republic of Indonesia",
+          "contoh": "the Republic of Indonesia"
+        },
+        "forum_sengketa_en": {
+          "tipe": "string",
+          "deskripsi": "Forum sengketa (EN)",
+          "sumber_kantor": "input",
+          "contoh": "the South Jakarta District Court"
+        },
+        "bahasa_yang_berlaku": {
+          "tipe": "string",
+          "deskripsi": "Versi bahasa yang berlaku (ID)",
+          "sumber_kantor": "default Bahasa Indonesia",
+          "contoh": "Bahasa Indonesia"
+        },
+        "bahasa_yang_berlaku_en": {
+          "tipe": "string",
+          "deskripsi": "Versi bahasa yang berlaku (EN)",
+          "sumber_kantor": "default Indonesian",
+          "contoh": "Indonesian"
+        },
+        "kontraktor_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan (untuk perorangan = nama sendiri)",
+          "sumber_kantor": "input",
+          "contoh": "Rudi Hartono"
+        },
+        "kontraktor_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan",
+          "sumber_kantor": "input",
+          "contoh": "Direktur / Director"
+        },
+        "subkontraktor_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama Subkontraktor",
+          "sumber_kantor": "BARU: tabel mitra/vendor",
+          "contoh": "Dimas Nugroho"
+        },
+        "subkontraktor_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan",
+          "sumber_kantor": "input",
+          "contoh": "Dimas Nugroho"
+        },
+        "subkontraktor_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan",
+          "sumber_kantor": "input",
+          "contoh": "Subkontraktor / Subcontractor"
+        }
+      },
+      "contoh_payload": {
+        "dokumen_nomor": "004/SUB/CTN/X/2026",
+        "dokumen_kota": "Jakarta",
+        "dokumen_tanggal": "1 Oktober 2026",
+        "dokumen_tanggal_en": "1 October 2026",
+        "kontraktor_badan_usaha": true,
+        "kontraktor_nama": "PT Contoh Teknologi Nusantara",
+        "kontraktor_negara": "Negara Republik Indonesia / the Republic of Indonesia",
+        "kontraktor_alamat": "Jakarta Selatan, Indonesia",
+        "kontraktor_penandatangan_nama": "Rudi Hartono",
+        "kontraktor_penandatangan_jabatan": "Direktur / Director",
+        "kontraktor_email": "legal@contoh.co.id",
+        "kontraktor_no_identitas": "",
+        "kontraktor_npwp": "",
+        "subkontraktor_badan_usaha": false,
+        "subkontraktor_nama": "Dimas Nugroho",
+        "subkontraktor_no_identitas": "NIK 3175030303930003",
+        "subkontraktor_npwp": "98.765.432.1-015.000",
+        "subkontraktor_alamat": "Jl. Anggrek No. 7, Jakarta Timur",
+        "subkontraktor_email": "dimas@example.com",
+        "subkontraktor_negara": "",
+        "subkontraktor_penandatangan_nama": "Dimas Nugroho",
+        "subkontraktor_penandatangan_jabatan": "Subkontraktor / Subcontractor",
+        "subkontraktor_pic": "Dimas Nugroho",
+        "subkontraktor_bank": "BNI",
+        "subkontraktor_norek": "0987654321",
+        "subkontraktor_nama_rekening": "Dimas Nugroho",
+        "subkontraktor_swift": "",
+        "klien_akhir_nama": "PT Contoh Industri Nusantara",
+        "proyek_nama": "Asisten Virtual Internal (RAG On-Premise)",
+        "kontrak_induk_nomor": "012/MSA/CTN/IX/2026",
+        "lingkup_pekerjaan": "pengembangan modul ingestion dokumen dan evaluasi retrieval",
+        "sow_nomor": "004/SOW-SUB/CTN/X/2026",
+        "tanggal_mulai": "5 Oktober 2026",
+        "tanggal_berakhir": "31 Desember 2026",
+        "tanggal_mulai_en": "5 October 2026",
+        "tanggal_berakhir_en": "31 December 2026",
+        "mata_uang": "IDR",
+        "nilai_kontrak": "45.000.000",
+        "nilai_kontrak_terbilang": "empat puluh lima juta rupiah",
+        "ketentuan_pajak": "sudah termasuk pajak yang berlaku / inclusive of applicable taxes",
+        "skema_pembayaran": "per milestone",
+        "termin": [
+          {
+            "no": "1",
+            "milestone": "Modul ingestion (PDF, DOCX) selesai UAT",
+            "target_tanggal": "31 Okt 2026",
+            "persen": "40%",
+            "nilai": "18.000.000"
+          },
+          {
+            "no": "2",
+            "milestone": "Evaluasi retrieval + laporan",
+            "target_tanggal": "30 Nov 2026",
+            "persen": "40%",
+            "nilai": "18.000.000"
+          },
+          {
+            "no": "3",
+            "milestone": "Handover & dokumentasi",
+            "target_tanggal": "15 Des 2026",
+            "persen": "20%",
+            "nilai": "9.000.000"
+          }
+        ],
+        "termin_bayar_hari": "14",
+        "bayar_setelah_klien_bayar": false,
+        "batas_bayar_hari": "60",
+        "hari_review": "5",
+        "masa_kerahasiaan_tahun": "3",
+        "jam_lapor_insiden": "24",
+        "masa_non_solicit_bulan": "12",
+        "masa_garansi_hari": "30",
+        "hari_pemberitahuan": "14",
+        "hari_perbaikan": "14",
+        "hukum_yang_berlaku": "Negara Republik Indonesia",
+        "hukum_yang_berlaku_en": "the Republic of Indonesia",
+        "forum_sengketa": "Pengadilan Negeri Jakarta Selatan",
+        "forum_sengketa_en": "the South Jakarta District Court",
+        "bahasa_yang_berlaku": "Bahasa Indonesia",
+        "bahasa_yang_berlaku_en": "Indonesian"
+      }
+    },
+    "05_SOW_Lingkup_Kerja.docx": {
+      "jumlah_variabel": 41,
+      "variabel": {
+        "penyedia_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama penyedia (perusahaan)",
+          "sumber_kantor": "profil tenant",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "013/SOW/CTN/X/2026"
+        },
+        "penyedia_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat penyedia",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Jakarta Selatan"
+        },
+        "klien_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama klien",
+          "sumber_kantor": "ada: marketing leads.company",
+          "contoh": "PT Contoh Industri Nusantara"
+        },
+        "klien_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat klien",
+          "sumber_kantor": "BARU: lead/klien.alamat",
+          "contoh": "Jl. Sudirman Kav. 1, Jakarta Pusat"
+        },
+        "perjanjian_induk_nomor": {
+          "tipe": "string",
+          "deskripsi": "No. MSA/perjanjian induk",
+          "sumber_kantor": "input",
+          "contoh": "012/MSA/CTN/IX/2026"
+        },
+        "perjanjian_induk_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal MSA",
+          "sumber_kantor": "input",
+          "contoh": "15 September 2026"
+        },
+        "proyek_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama proyek",
+          "sumber_kantor": "ada: operational projects.name",
+          "contoh": "Asisten Virtual Internal (RAG On-Premise)"
+        },
+        "proyek_kode": {
+          "tipe": "string",
+          "deskripsi": "Kode proyek",
+          "sumber_kantor": "ada: projects.id / kode",
+          "contoh": "CIN-RAG-01"
+        },
+        "tanggal_mulai": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_mulai",
+          "contoh": "5 Oktober 2026"
+        },
+        "tanggal_berakhir": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_berakhir",
+          "contoh": "31 Januari 2027"
+        },
+        "mode_deployment": {
+          "tipe": "string",
+          "deskripsi": "On-premise / Cloud / Hybrid",
+          "sumber_kantor": "input",
+          "contoh": "On-premise (server Klien)"
+        },
+        "penyedia_pic_nama": {
+          "tipe": "string",
+          "deskripsi": "PIC penyedia",
+          "sumber_kantor": "ada: project members",
+          "contoh": "Rina Kusuma"
+        },
+        "penyedia_pic_email": {
+          "tipe": "string",
+          "deskripsi": "Email PIC penyedia",
+          "sumber_kantor": "ada: users.email",
+          "contoh": "rina@contoh.co.id"
+        },
+        "klien_pic_nama": {
+          "tipe": "string",
+          "deskripsi": "PIC klien",
+          "sumber_kantor": "ada: leads.contact_name",
+          "contoh": "Sari Wulandari"
+        },
+        "klien_pic_email": {
+          "tipe": "string",
+          "deskripsi": "Email PIC klien",
+          "sumber_kantor": "ada: leads.email",
+          "contoh": "sari@contoh.co.id"
+        },
+        "proyek_latar_belakang": {
+          "tipe": "string",
+          "deskripsi": "Latar belakang proyek",
+          "sumber_kantor": "input",
+          "contoh": "Karyawan Klien menghabiskan waktu lama mencari SOP dan kebijakan internal yang tersebar di berbagai folder."
+        },
+        "proyek_tujuan": {
+          "tipe": "string",
+          "deskripsi": "Tujuan proyek",
+          "sumber_kantor": "input",
+          "contoh": "Menyediakan asisten virtual berbasis RAG yang menjawab pertanyaan karyawan dari dokumen internal, berjalan on-premise."
+        },
+        "proyek_indikator_keberhasilan": {
+          "tipe": "string",
+          "deskripsi": "Metrik keberhasilan",
+          "sumber_kantor": "input",
+          "contoh": "Akurasi jawaban ≥ 85% pada set uji 200 pertanyaan; waktu respons rata-rata < 5 detik."
+        },
+        "lingkup_dalam": {
+          "tipe": "array",
+          "deskripsi": "LOOP in-scope: no, item",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "item"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "item": "Instalasi LLM open-weight dan vector database di server Klien"
+            },
+            {
+              "no": "2",
+              "item": "Ingestion hingga 5.000 dokumen (PDF, DOCX)"
+            },
+            {
+              "no": "3",
+              "item": "Antarmuka chat web dengan SSO Klien"
+            }
+          ]
+        },
+        "lingkup_luar": {
+          "tipe": "array",
+          "deskripsi": "LOOP out-of-scope: no, item",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "item"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "item": "Pengadaan perangkat keras/GPU"
+            },
+            {
+              "no": "2",
+              "item": "Digitalisasi dokumen fisik (scan/OCR massal)"
+            }
+          ]
+        },
+        "deliverable": {
+          "tipe": "array",
+          "deskripsi": "LOOP deliverable: no, nama, deskripsi, format, target_tanggal",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "nama",
+            "deskripsi",
+            "format",
+            "target_tanggal"
+          ],
+          "contoh": [
+            {
+              "no": "D1",
+              "nama": "Dokumen desain solusi",
+              "deskripsi": "Arsitektur, alur data, rencana keamanan",
+              "format": "PDF",
+              "target_tanggal": "19 Okt 2026"
+            },
+            {
+              "no": "D2",
+              "nama": "Aplikasi asisten virtual",
+              "deskripsi": "Terinstal di server Klien, lulus UAT",
+              "format": "Software",
+              "target_tanggal": "15 Des 2026"
+            },
+            {
+              "no": "D3",
+              "nama": "Dokumentasi & pelatihan admin",
+              "deskripsi": "Manual admin + 1 sesi pelatihan",
+              "format": "PDF + sesi",
+              "target_tanggal": "15 Jan 2027"
+            }
+          ]
+        },
+        "milestone": {
+          "tipe": "array",
+          "deskripsi": "LOOP milestone: nama, deliverable_terkait, target_tanggal, persen, nilai",
+          "sumber_kantor": "input",
+          "field_item": [
+            "nama",
+            "deliverable_terkait",
+            "target_tanggal",
+            "persen",
+            "nilai"
+          ],
+          "contoh": [
+            {
+              "nama": "M1 — Desain disetujui",
+              "deliverable_terkait": "D1",
+              "target_tanggal": "19 Okt 2026",
+              "persen": "30%",
+              "nilai": "60.000.000"
+            },
+            {
+              "nama": "M2 — UAT lulus",
+              "deliverable_terkait": "D2",
+              "target_tanggal": "15 Des 2026",
+              "persen": "50%",
+              "nilai": "100.000.000"
+            },
+            {
+              "nama": "M3 — Handover",
+              "deliverable_terkait": "D3",
+              "target_tanggal": "15 Jan 2027",
+              "persen": "20%",
+              "nilai": "40.000.000"
+            }
+          ]
+        },
+        "ketentuan_pajak": {
+          "tipe": "string",
+          "deskripsi": "mis. \"belum termasuk PPN\" / \"sudah termasuk pajak\"",
+          "sumber_kantor": "input",
+          "contoh": "belum termasuk PPN"
+        },
+        "mata_uang": {
+          "tipe": "string",
+          "deskripsi": "IDR / USD / SGD",
+          "sumber_kantor": "input",
+          "contoh": "IDR"
+        },
+        "nilai_total": {
+          "tipe": "string",
+          "deskripsi": "Total nilai proyek",
+          "sumber_kantor": "hitung dari milestone",
+          "contoh": "200.000.000"
+        },
+        "termin_bayar_hari": {
+          "tipe": "string",
+          "deskripsi": "Jatuh tempo pembayaran (hari kalender)",
+          "sumber_kantor": "default 14–30",
+          "contoh": "30"
+        },
+        "kriteria_penerimaan": {
+          "tipe": "array",
+          "deskripsi": "LOOP kriteria penerimaan: no, item",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "item"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "item": "Akurasi ≥ 85% pada set uji yang disepakati"
+            },
+            {
+              "no": "2",
+              "item": "Tidak ada temuan Severity 1 atau 2 yang terbuka"
+            }
+          ]
+        },
+        "hari_review": {
+          "tipe": "string",
+          "deskripsi": "Masa pemeriksaan deliverable (hari kerja)",
+          "sumber_kantor": "default 5",
+          "contoh": "5"
+        },
+        "asumsi": {
+          "tipe": "array",
+          "deskripsi": "LOOP asumsi: no, item",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "item"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "item": "Server dengan spesifikasi minimum telah tersedia sebelum 1 November 2026"
+            }
+          ]
+        },
+        "kewajiban_klien": {
+          "tipe": "array",
+          "deskripsi": "LOOP kewajiban klien: no, item, tenggat",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "item",
+            "tenggat"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "item": "Menyediakan akses VPN dan akun server",
+              "tenggat": "12 Okt 2026"
+            },
+            {
+              "no": "2",
+              "item": "Menyediakan set uji 200 pertanyaan beserta jawaban acuan",
+              "tenggat": "31 Okt 2026"
+            }
+          ]
+        },
+        "tim": {
+          "tipe": "array",
+          "deskripsi": "LOOP tim: pihak, peran, nama, tanggung_jawab",
+          "sumber_kantor": "ada: project members + input",
+          "field_item": [
+            "pihak",
+            "peran",
+            "nama",
+            "tanggung_jawab"
+          ],
+          "contoh": [
+            {
+              "pihak": "Penyedia",
+              "peran": "Project Manager",
+              "nama": "Rina Kusuma",
+              "tanggung_jawab": "Jadwal, laporan, eskalasi"
+            },
+            {
+              "pihak": "Penyedia",
+              "peran": "AI Engineer",
+              "nama": "Rina Kartika Sari",
+              "tanggung_jawab": "Pipeline RAG & evaluasi"
+            },
+            {
+              "pihak": "Klien",
+              "peran": "Product Owner",
+              "nama": "Sari Wulandari",
+              "tanggung_jawab": "Prioritas & UAT"
+            }
+          ]
+        },
+        "frekuensi_rapat": {
+          "tipe": "string",
+          "deskripsi": "Frekuensi rapat status",
+          "sumber_kantor": "input",
+          "contoh": "setiap minggu (Senin) / weekly (Monday)"
+        },
+        "kanal_laporan": {
+          "tipe": "string",
+          "deskripsi": "Kanal laporan progres",
+          "sumber_kantor": "input",
+          "contoh": "email dan KANTOR"
+        },
+        "lingkungan_data": {
+          "tipe": "string",
+          "deskripsi": "Lokasi/lingkungan pemrosesan data",
+          "sumber_kantor": "input",
+          "contoh": "seluruhnya di server on-premise Klien; tidak ada data yang keluar dari jaringan Klien"
+        },
+        "dokumen_kota": {
+          "tipe": "string",
+          "deskripsi": "Kota tempat penandatanganan",
+          "sumber_kantor": "input (default: kota perusahaan)",
+          "contoh": "Jakarta"
+        },
+        "dokumen_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Indonesia (1 Oktober 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "1 Oktober 2026"
+        },
+        "penyedia_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan penyedia",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Rudi Hartono"
+        },
+        "penyedia_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Direktur"
+        },
+        "klien_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan klien",
+          "sumber_kantor": "input",
+          "contoh": "Budi Santoso"
+        },
+        "klien_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan klien",
+          "sumber_kantor": "input",
+          "contoh": "VP Information Technology"
+        }
+      },
+      "contoh_payload": {
+        "dokumen_nomor": "013/SOW/CTN/X/2026",
+        "dokumen_kota": "Jakarta",
+        "dokumen_tanggal": "1 Oktober 2026",
+        "dokumen_tanggal_en": "1 October 2026",
+        "penyedia_nama": "PT Contoh Teknologi Nusantara",
+        "penyedia_alamat": "Jakarta Selatan",
+        "penyedia_penandatangan_nama": "Rudi Hartono",
+        "penyedia_penandatangan_jabatan": "Direktur",
+        "klien_nama": "PT Contoh Industri Nusantara",
+        "klien_alamat": "Jl. Sudirman Kav. 1, Jakarta Pusat",
+        "klien_penandatangan_nama": "Budi Santoso",
+        "klien_penandatangan_jabatan": "VP Information Technology",
+        "perjanjian_induk_nomor": "012/MSA/CTN/IX/2026",
+        "perjanjian_induk_tanggal": "15 September 2026",
+        "proyek_nama": "Asisten Virtual Internal (RAG On-Premise)",
+        "proyek_kode": "CIN-RAG-01",
+        "tanggal_mulai": "5 Oktober 2026",
+        "tanggal_berakhir": "31 Januari 2027",
+        "mode_deployment": "On-premise (server Klien)",
+        "penyedia_pic_nama": "Rina Kusuma",
+        "penyedia_pic_email": "rina@contoh.co.id",
+        "klien_pic_nama": "Sari Wulandari",
+        "klien_pic_email": "sari@contoh.co.id",
+        "proyek_latar_belakang": "Karyawan Klien menghabiskan waktu lama mencari SOP dan kebijakan internal yang tersebar di berbagai folder.",
+        "proyek_tujuan": "Menyediakan asisten virtual berbasis RAG yang menjawab pertanyaan karyawan dari dokumen internal, berjalan on-premise.",
+        "proyek_indikator_keberhasilan": "Akurasi jawaban ≥ 85% pada set uji 200 pertanyaan; waktu respons rata-rata < 5 detik.",
+        "lingkup_dalam": [
+          {
+            "no": "1",
+            "item": "Instalasi LLM open-weight dan vector database di server Klien"
+          },
+          {
+            "no": "2",
+            "item": "Ingestion hingga 5.000 dokumen (PDF, DOCX)"
+          },
+          {
+            "no": "3",
+            "item": "Antarmuka chat web dengan SSO Klien"
+          }
+        ],
+        "lingkup_luar": [
+          {
+            "no": "1",
+            "item": "Pengadaan perangkat keras/GPU"
+          },
+          {
+            "no": "2",
+            "item": "Digitalisasi dokumen fisik (scan/OCR massal)"
+          }
+        ],
+        "deliverable": [
+          {
+            "no": "D1",
+            "nama": "Dokumen desain solusi",
+            "deskripsi": "Arsitektur, alur data, rencana keamanan",
+            "format": "PDF",
+            "target_tanggal": "19 Okt 2026"
+          },
+          {
+            "no": "D2",
+            "nama": "Aplikasi asisten virtual",
+            "deskripsi": "Terinstal di server Klien, lulus UAT",
+            "format": "Software",
+            "target_tanggal": "15 Des 2026"
+          },
+          {
+            "no": "D3",
+            "nama": "Dokumentasi & pelatihan admin",
+            "deskripsi": "Manual admin + 1 sesi pelatihan",
+            "format": "PDF + sesi",
+            "target_tanggal": "15 Jan 2027"
+          }
+        ],
+        "milestone": [
+          {
+            "nama": "M1 — Desain disetujui",
+            "deliverable_terkait": "D1",
+            "target_tanggal": "19 Okt 2026",
+            "persen": "30%",
+            "nilai": "60.000.000"
+          },
+          {
+            "nama": "M2 — UAT lulus",
+            "deliverable_terkait": "D2",
+            "target_tanggal": "15 Des 2026",
+            "persen": "50%",
+            "nilai": "100.000.000"
+          },
+          {
+            "nama": "M3 — Handover",
+            "deliverable_terkait": "D3",
+            "target_tanggal": "15 Jan 2027",
+            "persen": "20%",
+            "nilai": "40.000.000"
+          }
+        ],
+        "mata_uang": "IDR",
+        "nilai_total": "200.000.000",
+        "ketentuan_pajak": "belum termasuk PPN",
+        "termin_bayar_hari": "30",
+        "kriteria_penerimaan": [
+          {
+            "no": "1",
+            "item": "Akurasi ≥ 85% pada set uji yang disepakati"
+          },
+          {
+            "no": "2",
+            "item": "Tidak ada temuan Severity 1 atau 2 yang terbuka"
+          }
+        ],
+        "hari_review": "5",
+        "asumsi": [
+          {
+            "no": "1",
+            "item": "Server dengan spesifikasi minimum telah tersedia sebelum 1 November 2026"
+          }
+        ],
+        "kewajiban_klien": [
+          {
+            "no": "1",
+            "item": "Menyediakan akses VPN dan akun server",
+            "tenggat": "12 Okt 2026"
+          },
+          {
+            "no": "2",
+            "item": "Menyediakan set uji 200 pertanyaan beserta jawaban acuan",
+            "tenggat": "31 Okt 2026"
+          }
+        ],
+        "tim": [
+          {
+            "pihak": "Penyedia",
+            "peran": "Project Manager",
+            "nama": "Rina Kusuma",
+            "tanggung_jawab": "Jadwal, laporan, eskalasi"
+          },
+          {
+            "pihak": "Penyedia",
+            "peran": "AI Engineer",
+            "nama": "Rina Kartika Sari",
+            "tanggung_jawab": "Pipeline RAG & evaluasi"
+          },
+          {
+            "pihak": "Klien",
+            "peran": "Product Owner",
+            "nama": "Sari Wulandari",
+            "tanggung_jawab": "Prioritas & UAT"
+          }
+        ],
+        "frekuensi_rapat": "setiap minggu (Senin) / weekly (Monday)",
+        "kanal_laporan": "email dan KANTOR",
+        "lingkungan_data": "seluruhnya di server on-premise Klien; tidak ada data yang keluar dari jaringan Klien"
+      }
+    },
+    "06_SLA_Perjanjian_Tingkat_Layanan.docx": {
+      "jumlah_variabel": 34,
+      "variabel": {
+        "penyedia_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama penyedia (perusahaan)",
+          "sumber_kantor": "profil tenant",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "005/SLA/CTN/I/2027"
+        },
+        "penyedia_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat penyedia",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Jakarta Selatan"
+        },
+        "klien_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama klien",
+          "sumber_kantor": "ada: marketing leads.company",
+          "contoh": "PT Contoh Industri Nusantara"
+        },
+        "klien_alamat": {
+          "tipe": "string",
+          "deskripsi": "Alamat klien",
+          "sumber_kantor": "BARU: lead/klien.alamat",
+          "contoh": "Jl. Sudirman Kav. 1, Jakarta Pusat"
+        },
+        "perjanjian_induk_nomor": {
+          "tipe": "string",
+          "deskripsi": "No. MSA/perjanjian induk",
+          "sumber_kantor": "input",
+          "contoh": "012/MSA/CTN/IX/2026"
+        },
+        "perjanjian_induk_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal MSA",
+          "sumber_kantor": "input",
+          "contoh": "15 September 2026"
+        },
+        "layanan_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama layanan yang di-support",
+          "sumber_kantor": "input",
+          "contoh": "Dukungan & pemeliharaan Asisten Virtual Internal"
+        },
+        "tanggal_mulai": {
+          "tipe": "string",
+          "deskripsi": "Tanggal mulai (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_mulai",
+          "contoh": "16 Januari 2027"
+        },
+        "tanggal_berakhir": {
+          "tipe": "string",
+          "deskripsi": "Tanggal berakhir (format Indonesia)",
+          "sumber_kantor": "input / BARU: kontrak.tanggal_berakhir",
+          "contoh": "15 Januari 2028"
+        },
+        "mode_deployment": {
+          "tipe": "string",
+          "deskripsi": "On-premise / Cloud / Hybrid",
+          "sumber_kantor": "input",
+          "contoh": "On-premise (server Klien)"
+        },
+        "mata_uang": {
+          "tipe": "string",
+          "deskripsi": "IDR / USD / SGD",
+          "sumber_kantor": "input",
+          "contoh": "IDR"
+        },
+        "biaya_layanan": {
+          "tipe": "string",
+          "deskripsi": "Biaya layanan",
+          "sumber_kantor": "input",
+          "contoh": "12.500.000"
+        },
+        "periode_biaya": {
+          "tipe": "string",
+          "deskripsi": "bulan / tahun",
+          "sumber_kantor": "input",
+          "contoh": "bulan / month"
+        },
+        "ketentuan_pajak": {
+          "tipe": "string",
+          "deskripsi": "mis. \"belum termasuk PPN\" / \"sudah termasuk pajak\"",
+          "sumber_kantor": "input",
+          "contoh": "belum termasuk PPN"
+        },
+        "komponen": {
+          "tipe": "array",
+          "deskripsi": "LOOP komponen: no, nama, lingkungan, catatan",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "nama",
+            "lingkungan",
+            "catatan"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "nama": "Aplikasi chat & API",
+              "lingkungan": "Produksi",
+              "catatan": ""
+            },
+            {
+              "no": "2",
+              "nama": "Pipeline ingestion",
+              "lingkungan": "Produksi",
+              "catatan": "Sinkronisasi harian"
+            }
+          ]
+        },
+        "jam_layanan": {
+          "tipe": "string",
+          "deskripsi": "Jam dukungan",
+          "sumber_kantor": "input",
+          "contoh": "Senin–Jumat 09.00–17.00 WIB (kecuali hari libur nasional)"
+        },
+        "kanal_dukungan": {
+          "tipe": "string",
+          "deskripsi": "Kanal dukungan",
+          "sumber_kantor": "input",
+          "contoh": "Portal tiket, email support@contoh.co.id, WhatsApp"
+        },
+        "dukungan_luar_jam": {
+          "tipe": "string",
+          "deskripsi": "Dukungan di luar jam",
+          "sumber_kantor": "input",
+          "contoh": "Hanya Severity 1, via WhatsApp hotline"
+        },
+        "severity": {
+          "tipe": "array",
+          "deskripsi": "LOOP severity: level, definisi, respons, pemulihan, update",
+          "sumber_kantor": "template default (lihat contoh)",
+          "field_item": [
+            "level",
+            "definisi",
+            "respons",
+            "pemulihan",
+            "update"
+          ],
+          "contoh": [
+            {
+              "level": "S1",
+              "definisi": "Layanan tidak dapat digunakan sama sekali",
+              "respons": "1 jam (24x7)",
+              "pemulihan": "8 jam",
+              "update": "Tiap 2 jam"
+            },
+            {
+              "level": "S2",
+              "definisi": "Fungsi utama terganggu, ada workaround",
+              "respons": "4 jam kerja",
+              "pemulihan": "2 hari kerja",
+              "update": "Harian"
+            },
+            {
+              "level": "S3",
+              "definisi": "Gangguan minor / pertanyaan",
+              "respons": "1 hari kerja",
+              "pemulihan": "5 hari kerja",
+              "update": "Saat selesai"
+            }
+          ]
+        },
+        "target_uptime": {
+          "tipe": "string",
+          "deskripsi": "Target ketersediaan (%), mis. 99,5",
+          "sumber_kantor": "input",
+          "contoh": "99,5"
+        },
+        "jendela_pemeliharaan": {
+          "tipe": "string",
+          "deskripsi": "Jendela maintenance",
+          "sumber_kantor": "input",
+          "contoh": "Sabtu 22.00–02.00 WIB"
+        },
+        "hari_pemberitahuan_pemeliharaan": {
+          "tipe": "string",
+          "deskripsi": "Pemberitahuan maintenance (hari)",
+          "sumber_kantor": "default 3",
+          "contoh": "3"
+        },
+        "kredit_layanan": {
+          "tipe": "array",
+          "deskripsi": "LOOP service credit: rentang, kredit",
+          "sumber_kantor": "template default",
+          "field_item": [
+            "rentang",
+            "kredit"
+          ],
+          "contoh": [
+            {
+              "rentang": "99,0% – < 99,5%",
+              "kredit": "5%"
+            },
+            {
+              "rentang": "98,0% – < 99,0%",
+              "kredit": "10%"
+            },
+            {
+              "rentang": "< 98,0%",
+              "kredit": "20%"
+            }
+          ]
+        },
+        "maks_kredit_persen": {
+          "tipe": "string",
+          "deskripsi": "Batas kredit (%)",
+          "sumber_kantor": "default 20",
+          "contoh": "20"
+        },
+        "hari_klaim": {
+          "tipe": "string",
+          "deskripsi": "Batas klaim kredit (hari)",
+          "sumber_kantor": "default 15",
+          "contoh": "15"
+        },
+        "eskalasi": {
+          "tipe": "array",
+          "deskripsi": "LOOP eskalasi: level, nama, jabatan, kontak",
+          "sumber_kantor": "ada: users",
+          "field_item": [
+            "level",
+            "nama",
+            "jabatan",
+            "kontak"
+          ],
+          "contoh": [
+            {
+              "level": "1",
+              "nama": "Tim Support",
+              "jabatan": "Support Engineer",
+              "kontak": "support@contoh.co.id"
+            },
+            {
+              "level": "2",
+              "nama": "Rina Kusuma",
+              "jabatan": "Project Manager",
+              "kontak": "rina@contoh.co.id"
+            },
+            {
+              "level": "3",
+              "nama": "Rudi Hartono",
+              "jabatan": "CEO",
+              "kontak": "rudi.hartono@contoh.co.id"
+            }
+          ]
+        },
+        "tanggal_laporan": {
+          "tipe": "string",
+          "deskripsi": "Tanggal laporan bulanan",
+          "sumber_kantor": "default 10",
+          "contoh": "10"
+        },
+        "dokumen_kota": {
+          "tipe": "string",
+          "deskripsi": "Kota tempat penandatanganan",
+          "sumber_kantor": "input (default: kota perusahaan)",
+          "contoh": "Jakarta"
+        },
+        "dokumen_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Indonesia (1 Oktober 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "16 Januari 2027"
+        },
+        "penyedia_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan penyedia",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Rudi Hartono"
+        },
+        "penyedia_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Direktur"
+        },
+        "klien_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan klien",
+          "sumber_kantor": "input",
+          "contoh": "Budi Santoso"
+        },
+        "klien_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan klien",
+          "sumber_kantor": "input",
+          "contoh": "VP Information Technology"
+        }
+      },
+      "contoh_payload": {
+        "dokumen_nomor": "005/SLA/CTN/I/2027",
+        "dokumen_kota": "Jakarta",
+        "dokumen_tanggal": "16 Januari 2027",
+        "dokumen_tanggal_en": "1 October 2026",
+        "penyedia_nama": "PT Contoh Teknologi Nusantara",
+        "penyedia_alamat": "Jakarta Selatan",
+        "penyedia_penandatangan_nama": "Rudi Hartono",
+        "penyedia_penandatangan_jabatan": "Direktur",
+        "klien_nama": "PT Contoh Industri Nusantara",
+        "klien_alamat": "Jl. Sudirman Kav. 1, Jakarta Pusat",
+        "klien_penandatangan_nama": "Budi Santoso",
+        "klien_penandatangan_jabatan": "VP Information Technology",
+        "perjanjian_induk_nomor": "012/MSA/CTN/IX/2026",
+        "perjanjian_induk_tanggal": "15 September 2026",
+        "layanan_nama": "Dukungan & pemeliharaan Asisten Virtual Internal",
+        "tanggal_mulai": "16 Januari 2027",
+        "tanggal_berakhir": "15 Januari 2028",
+        "mode_deployment": "On-premise (server Klien)",
+        "mata_uang": "IDR",
+        "biaya_layanan": "12.500.000",
+        "periode_biaya": "bulan / month",
+        "ketentuan_pajak": "belum termasuk PPN",
+        "komponen": [
+          {
+            "no": "1",
+            "nama": "Aplikasi chat & API",
+            "lingkungan": "Produksi",
+            "catatan": ""
+          },
+          {
+            "no": "2",
+            "nama": "Pipeline ingestion",
+            "lingkungan": "Produksi",
+            "catatan": "Sinkronisasi harian"
+          }
+        ],
+        "jam_layanan": "Senin–Jumat 09.00–17.00 WIB (kecuali hari libur nasional)",
+        "kanal_dukungan": "Portal tiket, email support@contoh.co.id, WhatsApp",
+        "dukungan_luar_jam": "Hanya Severity 1, via WhatsApp hotline",
+        "severity": [
+          {
+            "level": "S1",
+            "definisi": "Layanan tidak dapat digunakan sama sekali",
+            "respons": "1 jam (24x7)",
+            "pemulihan": "8 jam",
+            "update": "Tiap 2 jam"
+          },
+          {
+            "level": "S2",
+            "definisi": "Fungsi utama terganggu, ada workaround",
+            "respons": "4 jam kerja",
+            "pemulihan": "2 hari kerja",
+            "update": "Harian"
+          },
+          {
+            "level": "S3",
+            "definisi": "Gangguan minor / pertanyaan",
+            "respons": "1 hari kerja",
+            "pemulihan": "5 hari kerja",
+            "update": "Saat selesai"
+          }
+        ],
+        "target_uptime": "99,5",
+        "jendela_pemeliharaan": "Sabtu 22.00–02.00 WIB",
+        "hari_pemberitahuan_pemeliharaan": "3",
+        "kredit_layanan": [
+          {
+            "rentang": "99,0% – < 99,5%",
+            "kredit": "5%"
+          },
+          {
+            "rentang": "98,0% – < 99,0%",
+            "kredit": "10%"
+          },
+          {
+            "rentang": "< 98,0%",
+            "kredit": "20%"
+          }
+        ],
+        "maks_kredit_persen": "20",
+        "hari_klaim": "15",
+        "eskalasi": [
+          {
+            "level": "1",
+            "nama": "Tim Support",
+            "jabatan": "Support Engineer",
+            "kontak": "support@contoh.co.id"
+          },
+          {
+            "level": "2",
+            "nama": "Rina Kusuma",
+            "jabatan": "Project Manager",
+            "kontak": "rina@contoh.co.id"
+          },
+          {
+            "level": "3",
+            "nama": "Rudi Hartono",
+            "jabatan": "CEO",
+            "kontak": "rudi.hartono@contoh.co.id"
+          }
+        ],
+        "tanggal_laporan": "10"
+      }
+    },
+    "07_BAST_Berita_Acara_Serah_Terima.docx": {
+      "jumlah_variabel": 24,
+      "variabel": {
+        "penyedia_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama penyedia (perusahaan)",
+          "sumber_kantor": "profil tenant",
+          "contoh": "PT Contoh Teknologi Nusantara"
+        },
+        "dokumen_nomor": {
+          "tipe": "string",
+          "deskripsi": "Nomor dokumen, mis. 021/PKWT/CTN/X/2026",
+          "sumber_kantor": "hitung: auto-numbering per jenis dokumen",
+          "contoh": "013/BAST/CTN/XII/2026"
+        },
+        "hari": {
+          "tipe": "string",
+          "deskripsi": "Nama hari (Indonesia) untuk BAST",
+          "sumber_kantor": "hitung dari dokumen_tanggal",
+          "contoh": "Selasa"
+        },
+        "dokumen_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Indonesia (1 Oktober 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "15 Desember 2026"
+        },
+        "dokumen_kota": {
+          "tipe": "string",
+          "deskripsi": "Kota tempat penandatanganan",
+          "sumber_kantor": "input (default: kota perusahaan)",
+          "contoh": "Jakarta"
+        },
+        "hari_en": {
+          "tipe": "string",
+          "deskripsi": "Nama hari (Inggris)",
+          "sumber_kantor": "hitung dari dokumen_tanggal",
+          "contoh": "Tuesday"
+        },
+        "dokumen_tanggal_en": {
+          "tipe": "string",
+          "deskripsi": "Tanggal dokumen, format Inggris (1 October 2026)",
+          "sumber_kantor": "hitung dari tanggal generate",
+          "contoh": "15 December 2026"
+        },
+        "penyedia_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan penyedia",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Rudi Hartono"
+        },
+        "penyedia_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan",
+          "sumber_kantor": "profil tenant",
+          "contoh": "Direktur"
+        },
+        "klien_penandatangan_nama": {
+          "tipe": "string",
+          "deskripsi": "Penanda tangan klien",
+          "sumber_kantor": "input",
+          "contoh": "Budi Santoso"
+        },
+        "klien_penandatangan_jabatan": {
+          "tipe": "string",
+          "deskripsi": "Jabatan penanda tangan klien",
+          "sumber_kantor": "input",
+          "contoh": "VP Information Technology"
+        },
+        "klien_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama klien",
+          "sumber_kantor": "ada: marketing leads.company",
+          "contoh": "PT Contoh Industri Nusantara"
+        },
+        "kontrak_nomor": {
+          "tipe": "string",
+          "deskripsi": "No. kontrak/SPK acuan BAST",
+          "sumber_kantor": "input",
+          "contoh": "012/MSA/CTN/IX/2026 jo. 013/SOW/CTN/X/2026"
+        },
+        "kontrak_tanggal": {
+          "tipe": "string",
+          "deskripsi": "Tanggal kontrak",
+          "sumber_kantor": "input",
+          "contoh": "15 September 2026"
+        },
+        "proyek_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama proyek",
+          "sumber_kantor": "ada: operational projects.name",
+          "contoh": "Asisten Virtual Internal (RAG On-Premise)"
+        },
+        "termin_ke": {
+          "tipe": "string",
+          "deskripsi": "Nomor termin",
+          "sumber_kantor": "input",
+          "contoh": "2"
+        },
+        "milestone_nama": {
+          "tipe": "string",
+          "deskripsi": "Nama milestone",
+          "sumber_kantor": "input",
+          "contoh": "M2 — UAT lulus"
+        },
+        "uat_referensi": {
+          "tipe": "string",
+          "deskripsi": "Referensi dokumen UAT (atau \"-\")",
+          "sumber_kantor": "input",
+          "contoh": "UAT-CIN-RAG-01 (12 Desember 2026)"
+        },
+        "item_serah_terima": {
+          "tipe": "array",
+          "deskripsi": "LOOP item BAST: no, nama, deskripsi, jumlah, status",
+          "sumber_kantor": "input / dari deliverable SOW",
+          "field_item": [
+            "no",
+            "nama",
+            "deskripsi",
+            "jumlah",
+            "status"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "nama": "Aplikasi asisten virtual v1.0",
+              "deskripsi": "Terinstal di server produksi Klien",
+              "jumlah": "1 paket",
+              "status": "Diterima"
+            },
+            {
+              "no": "2",
+              "nama": "Laporan UAT",
+              "deskripsi": "Akurasi 88% pada 200 pertanyaan",
+              "jumlah": "1 dokumen",
+              "status": "Diterima"
+            }
+          ]
+        },
+        "status_penerimaan": {
+          "tipe": "string",
+          "deskripsi": "Diterima Penuh / Diterima dengan Catatan (bilingual)",
+          "sumber_kantor": "input",
+          "contoh": "Diterima dengan catatan / Accepted with notes"
+        },
+        "catatan": {
+          "tipe": "array",
+          "deskripsi": "LOOP catatan BAST: no, isi, tenggat (kosongkan array jika tidak ada)",
+          "sumber_kantor": "input",
+          "field_item": [
+            "no",
+            "isi",
+            "tenggat"
+          ],
+          "contoh": [
+            {
+              "no": "1",
+              "isi": "Perbaikan tampilan riwayat chat di browser Safari",
+              "tenggat": "22 Des 2026"
+            }
+          ]
+        },
+        "mata_uang": {
+          "tipe": "string",
+          "deskripsi": "IDR / USD / SGD",
+          "sumber_kantor": "input",
+          "contoh": "IDR"
+        },
+        "nilai_termin": {
+          "tipe": "string",
+          "deskripsi": "Nilai tagihan termin",
+          "sumber_kantor": "hitung dari milestone",
+          "contoh": "100.000.000"
+        },
+        "masa_garansi": {
+          "tipe": "string",
+          "deskripsi": "Masa garansi, mis. 3 bulan / 3 months",
+          "sumber_kantor": "input",
+          "contoh": "3 bulan / 3 months"
+        }
+      },
+      "contoh_payload": {
+        "dokumen_nomor": "013/BAST/CTN/XII/2026",
+        "dokumen_kota": "Jakarta",
+        "dokumen_tanggal": "15 Desember 2026",
+        "dokumen_tanggal_en": "15 December 2026",
+        "penyedia_nama": "PT Contoh Teknologi Nusantara",
+        "penyedia_alamat": "Jakarta Selatan",
+        "penyedia_penandatangan_nama": "Rudi Hartono",
+        "penyedia_penandatangan_jabatan": "Direktur",
+        "klien_nama": "PT Contoh Industri Nusantara",
+        "klien_alamat": "Jl. Sudirman Kav. 1, Jakarta Pusat",
+        "klien_penandatangan_nama": "Budi Santoso",
+        "klien_penandatangan_jabatan": "VP Information Technology",
+        "perjanjian_induk_nomor": "012/MSA/CTN/IX/2026",
+        "perjanjian_induk_tanggal": "15 September 2026",
+        "hari": "Selasa",
+        "hari_en": "Tuesday",
+        "kontrak_nomor": "012/MSA/CTN/IX/2026 jo. 013/SOW/CTN/X/2026",
+        "kontrak_tanggal": "15 September 2026",
+        "proyek_nama": "Asisten Virtual Internal (RAG On-Premise)",
+        "termin_ke": "2",
+        "milestone_nama": "M2 — UAT lulus",
+        "uat_referensi": "UAT-CIN-RAG-01 (12 Desember 2026)",
+        "item_serah_terima": [
+          {
+            "no": "1",
+            "nama": "Aplikasi asisten virtual v1.0",
+            "deskripsi": "Terinstal di server produksi Klien",
+            "jumlah": "1 paket",
+            "status": "Diterima"
+          },
+          {
+            "no": "2",
+            "nama": "Laporan UAT",
+            "deskripsi": "Akurasi 88% pada 200 pertanyaan",
+            "jumlah": "1 dokumen",
+            "status": "Diterima"
+          }
+        ],
+        "status_penerimaan": "Diterima dengan catatan / Accepted with notes",
+        "catatan": [
+          {
+            "no": "1",
+            "isi": "Perbaikan tampilan riwayat chat di browser Safari",
+            "tenggat": "22 Des 2026"
+          }
+        ],
+        "mata_uang": "IDR",
+        "nilai_termin": "100.000.000",
+        "masa_garansi": "3 bulan / 3 months"
+      }
+    },
     "08_Slip_Gaji.docx": {
       "jumlah_variabel": 25,
       "variabel": {

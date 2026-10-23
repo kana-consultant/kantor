@@ -1,0 +1,72 @@
+## word/header1.xml
+PT Contoh Teknologi Nusantara	RAHASIA | CONFIDENTIAL
+## word/document.xml
+BERITA ACARA SERAH TERIMA PEKERJAAN
+MINUTES OF WORK HANDOVER (BAST)
+No. 013/BAST/CTN/XII/2026
+Pada hari ini, Selasa, tanggal 15 Desember 2026, bertempat di Jakarta, yang bertanda tangan di bawah ini:
+On this day, Tuesday, 15 December 2026, in Jakarta, the undersigned:
+1.	Rudi Hartono, Direktur, bertindak untuk dan atas nama PT Contoh Teknologi Nusantara, selanjutnya disebut "PIHAK PERTAMA" (yang menyerahkan);
+2.	Budi Santoso, VP Information Technology, bertindak untuk dan atas nama PT Contoh Industri Nusantara, selanjutnya disebut "PIHAK KEDUA" (yang menerima).
+1.	Rudi Hartono, Direktur, acting for and on behalf of PT Contoh Teknologi Nusantara, hereinafter the "FIRST PARTY" (handing over);
+2.	Budi Santoso, VP Information Technology, acting for and on behalf of PT Contoh Industri Nusantara, hereinafter the "SECOND PARTY" (receiving).
+Berdasarkan perjanjian/SPK sebagaimana tercantum di bawah, PIHAK PERTAMA telah menyerahkan dan PIHAK KEDUA telah menerima hasil pekerjaan dengan rincian sebagai berikut:
+Pursuant to the agreement/work order stated below, the FIRST PARTY has handed over and the SECOND PARTY has received the work results as detailed below:
+Referensi Kontrak / Contract Ref.
+No. 012/MSA/CTN/IX/2026 jo. 013/SOW/CTN/X/2026 tanggal / dated 15 September 2026
+Proyek / Project
+Asisten Virtual Internal (RAG On-Premise)
+Termin / Milestone
+Termin 2 — M2 — UAT lulus
+Referensi UAT / UAT Ref.
+UAT-CIN-RAG-01 (12 Desember 2026)
+Rincian Hasil Pekerjaan  |  Handover Items
+No
+Item
+Deskripsi / Description
+Jumlah / Qty
+Status
+1
+Aplikasi asisten virtual v1.0
+Terinstal di server produksi Klien
+1 paket
+Diterima
+2
+Laporan UAT
+Akurasi 88% pada 200 pertanyaan
+1 dokumen
+Diterima
+Status Penerimaan  |  Acceptance Status
+Status / Status
+Diterima dengan catatan / Accepted with notes
+Catatan yang wajib ditindaklanjuti (jika ada) | Follow-up notes (if any)
+No
+Catatan / Note
+Tenggat / Due
+1
+Perbaikan tampilan riwayat chat di browser Safari
+22 Des 2026
+
+1.	Dengan ditandatanganinya Berita Acara ini, pekerjaan untuk termin tersebut dinyatakan telah diserahterimakan, dan PIHAK PERTAMA berhak mengajukan tagihan pembayaran Termin 2 sebesar IDR 100.000.000 sesuai ketentuan perjanjian.
+2.	Catatan yang tercantum di atas (jika ada) tidak menunda penerimaan dan akan diselesaikan PIHAK PERTAMA sesuai tenggat yang disepakati.
+3.	Masa garansi/pemeliharaan selama 3 bulan / 3 months berlaku terhitung sejak tanggal Berita Acara ini.
+4.	Berita Acara ini dibuat dengan sebenarnya dalam 2 (dua) rangkap atau secara elektronik untuk dipergunakan sebagaimana mestinya.
+1.	By signing these Minutes, the work for the stated milestone is deemed handed over, and the FIRST PARTY is entitled to invoice Milestone 2 in the amount of IDR 100.000.000 under the agreement.
+2.	The notes above (if any) do not delay acceptance and shall be resolved by the FIRST PARTY by the agreed due dates.
+3.	A warranty/maintenance period of 3 bulan / 3 months applies from the date of these Minutes.
+4.	These Minutes are made truthfully in 2 (two) counterparts or electronically to be used as appropriate.
+
+PIHAK PERTAMA
+FIRST PARTY
+PT Contoh Teknologi Nusantara
+ 
+Rudi Hartono
+Direktur
+PIHAK KEDUA
+SECOND PARTY
+PT Contoh Industri Nusantara
+ 
+Budi Santoso
+VP Information Technology
+## word/footer1.xml
+No. 013/BAST/CTN/XII/2026	Hal. / Page  / 
