@@ -194,6 +194,75 @@ var endpointAnnotations = map[string]EndpointMeta{
 		RequireConfirm: true,
 	},
 
+	// ---- Dokumen Legal (Operasional) ----
+	"GET /api/v1/operational/legal-documents/types": {
+		Description: "The five legal document types (freelance, subcontract, sow, sla, bast) with their form fields: key, label, type (text, textarea, date \"YYYY-MM-DD\", money/number/percent as integers, email, select (one of options[].value), bool, list = array of row objects with the columns' keys), required, default and show_when. Read it before create/update: fields is an object keyed by these field keys",
+	},
+	"GET /api/v1/operational/legal-documents": {
+		Description: "List legal documents (newest change first) with type, status (draft, generated, sent, signed, cancelled), number, party and render state",
+		Query: []QueryParam{
+			qe("type", "Document type filter.", "freelance", "subcontract", "sow", "sla", "bast"),
+			qe("status", "Status filter.", "draft", "generated", "sent", "signed", "cancelled"),
+			qs("party_id", "Restrict to one party (UUID)."),
+			qs("search", "Free-text search on title, party name and number."),
+		},
+	},
+	"POST /api/v1/operational/legal-documents": {
+		Description: "Create a legal document DRAFT for a party (see the legal-parties tools; freelance needs a person, the others accept a person or a company). Missing fields get the type's defaults; nothing is generated or sent yet",
+		Body:        "{doc_type: \"freelance\" | \"subcontract\" | \"sow\" | \"sla\" | \"bast\", title: string (list label), party_id: uuid, related_document_id?: uuid (bast only: the SOW it hands over), fields: {field_key: value} per the types tool, document_date?: \"YYYY-MM-DD\" (default: the generate date), document_city?: string (default: the company city)}",
+	},
+	"GET /api/v1/operational/legal-documents/{documentID}": {
+		Description: "One legal document: fields, party (identity, NPWP and account numbers masked), number, status, render state (pdf_ready), missing (required fields still empty), company_missing, deliveries, mail_ready and default_recipient (the party's stored e-mail, the only address the send tool accepts)",
+	},
+	"PUT /api/v1/operational/legal-documents/{documentID}": {
+		Description: "Edit a legal document that is not signed or cancelled. FULL replacement: read it first and send title, party_id, related_document_id and the whole fields object again. A generated or sent document goes back to draft (same number) and must be generated again",
+		Body:        "{title: string, party_id: uuid, related_document_id?: uuid | null, fields: {field_key: value}, document_date?: \"YYYY-MM-DD\" | null, document_city?: string | null}",
+	},
+	"DELETE /api/v1/operational/legal-documents/{documentID}": {
+		Description: "Delete a draft that never received a number (use the cancel tool for numbered documents)",
+	},
+	"POST /api/v1/operational/legal-documents/{documentID}/generate": {
+		Description: "Check the document is complete (422 lists the missing fields), assign its number once (kept by later edits) and queue the PDF. The PDF is ready when the document's pdf_ready is true (usually within a minute)",
+		Body:        "{} (no fields)",
+	},
+	"POST /api/v1/operational/legal-documents/{documentID}/cancel": {
+		Description: "Cancel a document that is not signed. It can no longer be edited, generated or sent; the number stays recorded",
+		Body:        "{} (no fields)",
+		Destructive: true,
+	},
+	"POST /api/v1/operational/legal-documents/{documentID}/signed": {
+		Description: "Record that a generated or sent document has been signed, with the signing date. Uploading the scanned signed copy is web-only",
+		Body:        "{signed_at: \"YYYY-MM-DD\" (not in the future)}",
+	},
+	"POST /api/v1/operational/legal-documents/{documentID}/send": {
+		Description:    "SENDS E-MAIL to a party outside the company and cannot be undone: attaches the document PDF. Before calling: get the document, tell the human its default_recipient and the document number, and get an explicit yes; then pass confirm=true with recipient and expected_recipient both set to that address. Through MCP only the party's stored e-mail is accepted (another address is web-only). The response says whether it was sent (sent, error_category, error_message)",
+		Body:           "{recipient: the party's stored e-mail (default_recipient), expected_recipient: the same address, approved by the human}",
+		Destructive:    true,
+		OpenWorld:      true,
+		RequireConfirm: true,
+	},
+	"GET /api/v1/operational/legal-parties": {
+		Description: "List the parties of legal documents (freelancers, subcontractors, clients) with masked identity, NPWP and account numbers and their document count",
+		Query: []QueryParam{
+			qs("search", "Search on name or e-mail."),
+			qe("type", "Party type filter.", "person", "company"),
+		},
+	},
+	"POST /api/v1/operational/legal-parties": {
+		Description: "Add a party. The identity number (NIK for a person, NIB for a company), NPWP and account number are stored encrypted and only ever returned masked",
+		Body:        "{party_type: \"person\" | \"company\", name: string, address?: string, jurisdiction?: string (company: the law it was established under; default Indonesia), id_number?: string, tax_id?: string, representative_name?: string (company signatory), representative_title?: string, contact_name?: string, email?: string (default recipient of documents), phone?: string, bank_name?: string, bank_account_number?: string, bank_account_holder?: string, bank_swift?: string (foreign banks), notes?: string}",
+	},
+	"GET /api/v1/operational/legal-parties/{partyID}": {
+		Description: "One party with masked identity, NPWP and account numbers",
+	},
+	"PUT /api/v1/operational/legal-parties/{partyID}": {
+		Description: "Edit a party. FULL replacement of the plain fields (send them all again); id_number, tax_id and bank_account_number keep the stored value when omitted and are cleared when sent as \"\"",
+		Body:        "{party_type: \"person\" | \"company\", name, address?, jurisdiction?, id_number?, tax_id?, representative_name?, representative_title?, contact_name?, email?, phone?, bank_name?, bank_account_number?, bank_account_holder?, bank_swift?, notes?}",
+	},
+	"DELETE /api/v1/operational/legal-parties/{partyID}": {
+		Description: "Delete a party that has no documents (409 otherwise)",
+	},
+
 	// ---- Marketing ----
 	"GET /api/v1/marketing/campaigns": {
 		Description: "List marketing campaigns with filters",

@@ -30,13 +30,11 @@ var sensitiveRouteFragments = []string{
 	"/email-deliveries",
 	"/hr-profile",
 	"/settings/company-profile",
-	"/legal-documents",
-	"/legal-parties",
 }
 
 // renderedDocumentSuffixes are the binary payslip/contract files: the PKWT
 // prints the full NIK and account number, so they never become tools.
-var renderedDocumentSuffixes = []string{"/pdf", "/docx"}
+var renderedDocumentSuffixes = []string{"/pdf", "/docx", "/signed-copy"}
 
 // documentWorkflowTools are the payslip and contract tools an AI client gets.
 // The value says whether the tool e-mails an employee and so needs
@@ -62,6 +60,22 @@ var documentWorkflowTools = map[string]bool{
 	"patch_hris_contracts_contractid_status":    false,
 	"get_hris_contracts_contractid_recipient":   false,
 	"post_hris_contracts_contractid_send":       true,
+
+	"get_operational_legal_documents_types":                false,
+	"get_operational_legal_documents":                      false,
+	"post_operational_legal_documents":                     false,
+	"get_operational_legal_documents_documentid":           false,
+	"put_operational_legal_documents_documentid":           false,
+	"delete_operational_legal_documents_documentid":        false,
+	"post_operational_legal_documents_documentid_generate": false,
+	"post_operational_legal_documents_documentid_cancel":   false,
+	"post_operational_legal_documents_documentid_signed":   false,
+	"post_operational_legal_documents_documentid_send":     true,
+	"get_operational_legal_parties":                        false,
+	"post_operational_legal_parties":                       false,
+	"get_operational_legal_parties_partyid":                false,
+	"put_operational_legal_parties_partyid":                false,
+	"delete_operational_legal_parties_partyid":             false,
 }
 
 // TestCatalogFromRealRouterExcludesSensitiveRoutes builds the catalog from the
@@ -125,6 +139,8 @@ func TestCatalogFromRealRouterExcludesSensitiveRoutes(t *testing.T) {
 		"post_hris_contracts_contractid_send",
 		"post_hris_payslips_payslipid_void_reissue",
 		"patch_hris_contracts_contractid_status",
+		"post_operational_legal_documents_documentid_send",
+		"post_operational_legal_documents_documentid_cancel",
 	} {
 		if tool, ok := byName[name]; ok && (tool.Meta == nil || !tool.Meta.Destructive) {
 			t.Errorf("%s must be marked Destructive", name)
@@ -172,19 +188,20 @@ func TestCatalogFromRealRouterExcludesSensitiveRoutes(t *testing.T) {
 		}
 		executor.calls = 0
 	}
-	if gated != 3 {
-		t.Errorf("expected 3 gated tools in the real catalog, got %d", gated)
+	if gated != 4 {
+		t.Errorf("expected 4 gated tools in the real catalog, got %d", gated)
 	}
 
 	for _, tool := range tools {
-		if !strings.Contains(tool.PathTemplate, "/hris/payslips") && !strings.Contains(tool.PathTemplate, "/hris/contracts") {
+		if !strings.Contains(tool.PathTemplate, "/hris/payslips") && !strings.Contains(tool.PathTemplate, "/hris/contracts") &&
+			!strings.Contains(tool.PathTemplate, "/operational/legal-") {
 			if tool.Meta != nil && tool.Meta.RequireConfirm {
 				t.Errorf("unexpected confirm gate on %s", tool.Name)
 			}
 			continue
 		}
 		if _, ok := documentWorkflowTools[tool.Name]; !ok {
-			t.Errorf("new payslip/contract tool %s is not in documentWorkflowTools: decide whether it needs confirm=true and add it", tool.Name)
+			t.Errorf("new document tool %s is not in documentWorkflowTools: decide whether it needs confirm=true and add it", tool.Name)
 		}
 	}
 

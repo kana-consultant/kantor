@@ -37,6 +37,8 @@ var excludedSuffixes = []string{
 	// account number. The JSON routes next to them only carry masked values.
 	"/pdf",
 	"/docx",
+	// The signed scan of a legal document (binary PDF).
+	"/signed-copy",
 }
 
 // excludedContains drops credential and OAuth self-management endpoints: an AI
@@ -64,10 +66,6 @@ var excludedContains = []string{
 	"/email-deliveries",
 	"/hr-profile",
 	"/settings/company-profile",
-	// Dokumen Legal: party NIK/NPWP/account numbers and e-mail to outside
-	// addresses stay web-only.
-	"/legal-documents",
-	"/legal-parties",
 }
 
 // BuildCatalog derives the MCP tool surface from the live chi route table, so it

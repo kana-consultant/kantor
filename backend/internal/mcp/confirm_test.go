@@ -209,13 +209,14 @@ func TestPlainToolDescriptorUnchanged(t *testing.T) {
 	}
 }
 
-// Among the curated annotations, exactly the three document send tools are
+// Among the curated annotations, exactly the four document send tools are
 // gated (the real-router test checks the same on the built catalog).
 func TestOnlyDocumentSendToolsRequireConfirm(t *testing.T) {
 	want := map[string]bool{
-		"POST /api/v1/hris/payslips/send-batch":         true,
-		"POST /api/v1/hris/payslips/{payslipID}/send":   true,
-		"POST /api/v1/hris/contracts/{contractID}/send": true,
+		"POST /api/v1/hris/payslips/send-batch":                      true,
+		"POST /api/v1/hris/payslips/{payslipID}/send":                true,
+		"POST /api/v1/hris/contracts/{contractID}/send":              true,
+		"POST /api/v1/operational/legal-documents/{documentID}/send": true,
 	}
 	for key, meta := range endpointAnnotations {
 		if meta.RequireConfirm != want[key] {

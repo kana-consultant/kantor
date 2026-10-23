@@ -258,10 +258,13 @@ function LegalDocumentPage() {
                   <Save className="h-4 w-4" />
                   Simpan
                 </Button>
-                <Button disabled={generateMutation.isPending || renderBusy} onClick={() => generateMutation.mutate()} type="button" variant="ops">
-                  <Wand2 className="h-4 w-4" />
-                  {doc.doc_number ? "Generate ulang" : "Generate"}
-                </Button>
+                {/* A sent document is edited first (it goes back to draft), then generated again. */}
+                {doc.status === "draft" || doc.status === "generated" ? (
+                  <Button disabled={generateMutation.isPending || renderBusy} onClick={() => generateMutation.mutate()} type="button" variant="ops">
+                    <Wand2 className="h-4 w-4" />
+                    {doc.doc_number ? "Generate ulang" : "Generate"}
+                  </Button>
+                ) : null}
               </>
             ) : null}
             {canSend && (issued || doc.status === "signed") ? (
