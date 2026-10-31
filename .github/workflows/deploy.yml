@@ -141,6 +141,8 @@ jobs:
           # commit production runs, to see what the host config alone changes).
           # aysiem is a private input of the other machines (vps1-3): a stub
           # stands in for it so this job never fetches a repo it has no key for.
+          # Clan merges its specialArgs, which reads aysiem.packages.x86_64-linux,
+          # so the stub needs that (empty) attribute.
           kantor=.
           if [ -n "$KANTOR_REF" ]; then
             if ! [[ "$KANTOR_REF" =~ ^[0-9a-f]{40}$ ]]; then
@@ -150,7 +152,7 @@ jobs:
             kantor="github:kana-consultant/kantor/$KANTOR_REF"
           fi
           mkdir -p /tmp/flake-stub
-          echo '{ outputs = _: { }; }' > /tmp/flake-stub/flake.nix
+          echo '{ outputs = _: { packages.x86_64-linux = { }; }; }' > /tmp/flake-stub/flake.nix
           SYSTEM=$(nix build \
             /tmp/nix-anywhere#nixosConfigurations.lp-covertplay.config.system.build.toplevel \
             --override-input kantor "$kantor" \
