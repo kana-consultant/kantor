@@ -200,6 +200,25 @@ set). A minimal host configuration:
   (`journalctl -u kantor-backend`). After `switch-to-configuration` the CI job polls the
   backend's `/readyz` on the server for up to ~3 minutes and fails if it never answers 200;
   it logs only the unit state and restart count, so read the journal on the server.
+- The CI workflow builds the whole host from its private configuration repository
+  (`nix-anywhere`, which also serves other sites) with `--override-input kantor .`, pins
+  nixpkgs to the revision production runs (`NIXPKGS_REV` in the workflow), and pushes the
+  system to Cachix. It switches the server only when the repository variable `AUTO_DEPLOY`
+  is `true`. Otherwise install the system from the run summary by hand, after comparing it
+  with the running one:
+
+  ```sh
+  SYSTEM=/nix/store/...-nixos-system-...          # "system" in the run summary
+  nix-store -r "$SYSTEM"                          # fetch it from Cachix
+  nix store diff-closures /run/current-system "$SYSTEM"
+  "$SYSTEM/bin/switch-to-configuration" dry-activate
+  nix-env -p /nix/var/nix/profiles/system --set "$SYSTEM"
+  "$SYSTEM/bin/switch-to-configuration" switch
+  ```
+
+  A manual run (`workflow_dispatch`) builds on any branch; with `kantor_ref` it builds that
+  Kantor commit instead (for example the one production runs, to see what the host
+  configuration alone changes). Such runs never deploy.
 
 ### First deploy of the HR documents feature
 
@@ -232,9 +251,9 @@ Before merging to `main`:
    `DOCUMENT_MAIL_DEV_SMTP_ADDR`: systemd lets `EnvironmentFile` override the module's
    values (for example `APP_ENV=development` would send document email to a Mailpit that
    does not exist). Leave `BANK_ACCOUNT_CLEAR_PLAINTEXT` and `AUDIT_SCRUB_EXISTING` unset.
-4. **Host flake lock**: the host configuration that imports this module (the `nix-config`
-   repository the deploy workflow clones) locks its `kantor` input to older code (currently
-   2026-07-01). After the merge, update that lock (`nix flake update kantor`) or deploy only
+4. **Host flake lock**: the host configuration that imports this module (the `nix-anywhere`
+   repository the deploy workflow clones, formerly `nix-config`) locks its `kantor` input to
+   older code (currently 2026-07-01). After the merge, update that lock (`nix flake update kantor`) or deploy only
    through the CI workflow, which builds with `--override-input kantor .`. A
    `nixos-rebuild switch` from the stale lock deploys the old code, which is a rollback.
 

@@ -6,11 +6,16 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      kantor_ref:
+        description: Full Kantor commit SHA to build instead of this run's commit (build only, never deploys)
+        required: false
+        default: ""
 
 # Production deploys (main) share one group and are never cancelled: a run
 # killed mid switch-to-configuration can leave the server half-switched. A
 # newer main push waits and supersedes only a still-pending one. PR runs and
-# workflow_dispatch on other branches only test, so each ref has its own
+# workflow_dispatch on other branches never deploy, so each ref has its own
 # group and a newer push cancels the older run.
 concurrency:
   group: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'deploy-production' || format('ci-{0}', github.ref) }}
@@ -58,7 +63,9 @@ jobs:
         run: npm run build
 
   build:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # main pushes build and may deploy (see AUTO_DEPLOY below). A manual run
+    # builds on any branch, so a workflow change can be tried before merge.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs:
       - backend-tests
       - frontend-build
@@ -67,6 +74,12 @@ jobs:
     # group for GitHub's 6-hour default (main runs took 2-16 minutes so far;
     # the first LibreOffice deploy downloads ~0.8 GiB more).
     timeout-minutes: 120
+    env:
+      # The nixpkgs revision production runs. nix-anywhere locks an older one
+      # (2026-03-27), and building with it would downgrade the whole host.
+      # Drop this override once nix-anywhere locks this revision (or a newer
+      # one rolled out on purpose).
+      NIXPKGS_REV: e52c192be9d7b2c4bd4aed326c8731b35f8bb75c
     outputs:
       system-path: ${{ steps.build.outputs.path }}
     steps:
@@ -74,34 +87,29 @@ jobs:
 
       - name: Setup SSH keys for private flake inputs
         env:
-          GH_FLAKE_A: ${{ secrets.GH_FLAKE_A }}
           GH_FLAKE_B: ${{ secrets.GH_FLAKE_B }}
+          NIX_ANYWHERE_SSH_KEY: ${{ secrets.NIX_ANYWHERE_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          echo "$GH_FLAKE_A" > ~/.ssh/flake-a
           echo "$GH_FLAKE_B" > ~/.ssh/flake-b
-          chmod 600 ~/.ssh/flake-a ~/.ssh/flake-b
+          echo "$NIX_ANYWHERE_SSH_KEY" > ~/.ssh/nix-anywhere
+          chmod 600 ~/.ssh/flake-b ~/.ssh/nix-anywhere
           GH_SCAN=$(ssh-keyscan github.com 2>/dev/null)
           echo "$GH_SCAN" >> ~/.ssh/known_hosts
-          echo "$GH_SCAN" | sed 's/^github.com/github.com-flake-a/' >> ~/.ssh/known_hosts
-          echo "$GH_SCAN" | sed 's/^github.com/github.com-flake-b/' >> ~/.ssh/known_hosts
+          echo "$GH_SCAN" | sed 's/^github.com/github.com-nix-anywhere/' >> ~/.ssh/known_hosts
           cat >> ~/.ssh/config <<EOF
-          # nix-config now addresses its private inputs by the real host
-          # (nix-config 760d50b); lp-covertplay is the only one this job
-          # actually fetches over ssh, so its deploy key serves github.com.
+          # nix-anywhere locks lp-covertplay as git+ssh://git@github.com/...;
+          # it is the only private input this job fetches, so its deploy key
+          # serves github.com. nix-anywhere itself is cloned through an alias
+          # with its own read-only deploy key.
           Host github.com
             User git
             IdentityFile ~/.ssh/flake-b
             IdentitiesOnly yes
-          Host github.com-flake-a
+          Host github.com-nix-anywhere
             HostName github.com
             User git
-            IdentityFile ~/.ssh/flake-a
-            IdentitiesOnly yes
-          Host github.com-flake-b
-            HostName github.com
-            User git
-            IdentityFile ~/.ssh/flake-b
+            IdentityFile ~/.ssh/nix-anywhere
             IdentitiesOnly yes
           EOF
           chmod 600 ~/.ssh/config
@@ -117,38 +125,70 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           installCommand: nix profile install nixpkgs#cachix
 
-      - name: Setup sops age key
+      # The host configuration moved from the GitLab nix-config to the
+      # private GitHub repo nix-anywhere (2026-10-30).
+      - name: Clone nix-anywhere
         run: |
-          mkdir -p ~/.config/sops/age
-          echo "${{ secrets.SOPS_AGE_KEY }}" > ~/.config/sops/age/keys.txt
-
-      - name: Clone nix-config
-        run: git clone https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/KeyCode17/nix-config.git /tmp/nix-config
+          git clone git@github.com-nix-anywhere:kana-consultant/nix-anywhere.git /tmp/nix-anywhere
+          echo "nix-anywhere $(git -C /tmp/nix-anywhere rev-parse HEAD)"
 
       - name: Build NixOS system
         id: build
+        env:
+          KANTOR_REF: ${{ inputs.kantor_ref }}
         run: |
-          # The lp-covertplay machine needs the kantor and lp-covertplay
-          # inputs. Override the other tenants' private flake inputs (used by
-          # other machines, e.g. porto/doc-project; absensi-perlinsos was added
-          # to nix-config on 2026-10-03) to the already-cloned nix-config so
-          # this job never fetches repos it has no CI credentials for.
+          # Kantor comes from this checkout, or from KANTOR_REF (for example the
+          # commit production runs, to see what the host config alone changes).
+          # aysiem is a private input of the other machines (vps1-3): a stub
+          # stands in for it so this job never fetches a repo it has no key for.
+          kantor=.
+          if [ -n "$KANTOR_REF" ]; then
+            if ! [[ "$KANTOR_REF" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "kantor_ref must be a full 40-character commit SHA"
+              exit 1
+            fi
+            kantor="github:kana-consultant/kantor/$KANTOR_REF"
+          fi
+          mkdir -p /tmp/flake-stub
+          echo '{ outputs = _: { }; }' > /tmp/flake-stub/flake.nix
           SYSTEM=$(nix build \
-            /tmp/nix-config#nixosConfigurations.lp-covertplay.config.system.build.toplevel \
-            --override-input kantor . \
-            --override-input saas-boilerplate path:/tmp/nix-config \
-            --override-input segmenter path:/tmp/nix-config \
-            --override-input segmenter-s52ai path:/tmp/nix-config \
-            --override-input wa-bot path:/tmp/nix-config \
-            --override-input absensi-perlinsos path:/tmp/nix-config \
+            /tmp/nix-anywhere#nixosConfigurations.lp-covertplay.config.system.build.toplevel \
+            --override-input kantor "$kantor" \
+            --override-input nixpkgs "github:NixOS/nixpkgs/$NIXPKGS_REV" \
+            --override-input aysiem path:/tmp/flake-stub \
             --print-out-paths --no-link)
           echo "path=$SYSTEM" >> "$GITHUB_OUTPUT"
 
       - name: Push to Cachix
         run: cachix push kantor-kana ${{ steps.build.outputs.path }}
 
+      - name: Summary
+        env:
+          SYSTEM: ${{ steps.build.outputs.path }}
+          KANTOR_REF: ${{ inputs.kantor_ref }}
+          DEPLOYS: ${{ github.ref == 'refs/heads/main' && vars.AUTO_DEPLOY == 'true' && !inputs.kantor_ref }}
+        run: |
+          {
+            echo "### lp-covertplay system"
+            echo
+            echo "- system: \`$SYSTEM\` (on Cachix kantor-kana)"
+            echo "- kantor: \`${KANTOR_REF:-$GITHUB_SHA}\`"
+            echo "- nix-anywhere: \`$(git -C /tmp/nix-anywhere rev-parse HEAD)\`"
+            echo "- nixpkgs: \`$NIXPKGS_REV\`"
+            echo
+            if [ "$DEPLOYS" = "true" ]; then
+              echo "This run deploys it."
+            else
+              echo "Not deployed: a deploy needs main, the repository variable AUTO_DEPLOY=true and no kantor_ref. Install it by hand (docs/deployment.md)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Off until the repository variable AUTO_DEPLOY is "true": the first
+      # builds from nix-anywhere are installed by hand on the server after
+      # comparing them with the running system. A kantor_ref run never
+      # deploys (it may be older than production).
       - name: Deploy to server
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.AUTO_DEPLOY == 'true' && !inputs.kantor_ref
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy-key
@@ -168,7 +208,7 @@ jobs:
             ${{ steps.build.outputs.path }}/bin/switch-to-configuration switch"
 
       - name: Check backend health
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.AUTO_DEPLOY == 'true' && !inputs.kantor_ref
         timeout-minutes: 10
         # Actions logs of this public repo are public: the remote script
         # prints only generic status, never journal lines, the unit's
