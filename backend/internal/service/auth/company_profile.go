@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -16,6 +19,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/docgen"
 	"github.com/kana-consultant/kantor/backend/internal/dto"
 	authrepo "github.com/kana-consultant/kantor/backend/internal/repository/auth"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 	"github.com/kana-consultant/kantor/backend/internal/tenant"
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
@@ -53,11 +57,17 @@ type companyProfileRepository interface {
 type CompanyProfileService struct {
 	repo       companyProfileRepository
 	uploadsDir string
+	storage    storage.Storage
 	now        func() time.Time
 }
 
 func NewCompanyProfileService(repo companyProfileRepository, uploadsDir string) *CompanyProfileService {
 	return &CompanyProfileService{repo: repo, uploadsDir: uploadsDir, now: time.Now}
+}
+
+// NewCompanyProfileServiceWithStorage initializes CompanyProfileService with a storage.Storage provider.
+func NewCompanyProfileServiceWithStorage(repo companyProfileRepository, st storage.Storage) *CompanyProfileService {
+	return &CompanyProfileService{repo: repo, storage: st, now: time.Now}
 }
 
 // CompanyProfileChange lists the fields a profile update changed, with their
@@ -152,12 +162,23 @@ func (s *CompanyProfileService) UploadLogo(ctx context.Context, actorID string, 
 		return dto.CompanyProfileResponse{}, err
 	}
 
-	path, err := s.logoPath(ctx)
+	relPath, err := s.logoRelativePath(ctx)
 	if err != nil {
 		return dto.CompanyProfileResponse{}, err
 	}
-	if err := uploads.WriteFileAtomic(path, processed, companyLogoFileMode, companyLogoDirMode); err != nil {
-		return dto.CompanyProfileResponse{}, fmt.Errorf("store company logo: %w", err)
+
+	if s.storage != nil {
+		if err := s.storage.Put(ctx, relPath, bytes.NewReader(processed), int64(len(processed)), "image/png"); err != nil {
+			return dto.CompanyProfileResponse{}, fmt.Errorf("store company logo: %w", err)
+		}
+	} else {
+		path, err := s.logoPath(ctx)
+		if err != nil {
+			return dto.CompanyProfileResponse{}, err
+		}
+		if err := uploads.WriteFileAtomic(path, processed, companyLogoFileMode, companyLogoDirMode); err != nil {
+			return dto.CompanyProfileResponse{}, fmt.Errorf("store company logo: %w", err)
+		}
 	}
 
 	now := s.now().UTC()
@@ -169,16 +190,31 @@ func (s *CompanyProfileService) UploadLogo(ctx context.Context, actorID string, 
 
 // DeleteLogo removes the tenant logo. removed is false when there was none.
 func (s *CompanyProfileService) DeleteLogo(ctx context.Context, actorID string) (dto.CompanyProfileResponse, bool, error) {
-	path, err := s.logoPath(ctx)
+	relPath, err := s.logoRelativePath(ctx)
 	if err != nil {
 		return dto.CompanyProfileResponse{}, false, err
 	}
 	removed := true
-	if err := os.Remove(path); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return dto.CompanyProfileResponse{}, false, fmt.Errorf("remove company logo: %w", err)
+	if s.storage != nil {
+		exists, _ := s.storage.Exists(ctx, relPath)
+		if !exists {
+			removed = false
+		} else {
+			if err := s.storage.Delete(ctx, relPath); err != nil {
+				return dto.CompanyProfileResponse{}, false, fmt.Errorf("remove company logo: %w", err)
+			}
 		}
-		removed = false
+	} else {
+		path, err := s.logoPath(ctx)
+		if err != nil {
+			return dto.CompanyProfileResponse{}, false, err
+		}
+		if err := os.Remove(path); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return dto.CompanyProfileResponse{}, false, fmt.Errorf("remove company logo: %w", err)
+			}
+			removed = false
+		}
 	}
 	if err := s.repo.SetCompanyLogoUpdatedAt(ctx, actorID, nil); err != nil {
 		return dto.CompanyProfileResponse{}, false, err
@@ -190,6 +226,22 @@ func (s *CompanyProfileService) DeleteLogo(ctx context.Context, actorID string) 
 // LogoPNG returns the processed tenant logo, or ErrCompanyLogoNotFound.
 // Document rendering passes it to docgen.WithLogo.
 func (s *CompanyProfileService) LogoPNG(ctx context.Context) ([]byte, error) {
+	relPath, err := s.logoRelativePath(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if s.storage != nil {
+		rc, _, err := s.storage.Get(ctx, relPath)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, ErrCompanyLogoNotFound
+			}
+			return nil, fmt.Errorf("read company logo: %w", err)
+		}
+		defer rc.Close()
+		return io.ReadAll(rc)
+	}
+
 	path, err := s.logoPath(ctx)
 	if err != nil {
 		return nil, err
@@ -229,6 +281,14 @@ func (s *CompanyProfileService) toResponse(ctx context.Context, record authrepo.
 }
 
 func (s *CompanyProfileService) hasLogo(ctx context.Context) (bool, error) {
+	relPath, err := s.logoRelativePath(ctx)
+	if err != nil {
+		return false, err
+	}
+	if s.storage != nil {
+		return s.storage.Exists(ctx, relPath)
+	}
+
 	path, err := s.logoPath(ctx)
 	if err != nil {
 		return false, err
@@ -241,6 +301,18 @@ func (s *CompanyProfileService) hasLogo(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("stat company logo: %w", err)
 	}
 	return info.Mode().IsRegular() && info.Size() > 0, nil
+}
+
+func (s *CompanyProfileService) logoRelativePath(ctx context.Context) (string, error) {
+	info, ok := tenant.FromContext(ctx)
+	if !ok {
+		return "", ErrCompanyTenantMissing
+	}
+	parsed, err := uuid.Parse(info.ID)
+	if err != nil {
+		return "", ErrCompanyTenantMissing
+	}
+	return path.Join(companyLogoDir, parsed.String(), companyLogoFilename), nil
 }
 
 func (s *CompanyProfileService) logoPath(ctx context.Context) (string, error) {

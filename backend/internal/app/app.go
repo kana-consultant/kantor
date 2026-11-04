@@ -52,6 +52,7 @@ import (
 	warepo "github.com/kana-consultant/kantor/backend/internal/repository/whatsapp"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	"github.com/kana-consultant/kantor/backend/internal/security"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 	auditservice "github.com/kana-consultant/kantor/backend/internal/service/audit"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
 	filesservice "github.com/kana-consultant/kantor/backend/internal/service/files"
@@ -78,6 +79,7 @@ type App struct {
 	auditRepository *auditrepo.Repository
 	// legalHandler serves /operational/legal-documents and legal-parties.
 	legalHandler *legalhandler.Handler
+	storage      storage.Storage
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -220,7 +222,33 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	subscriptionsService := hrisservice.NewSubscriptionsService(subscriptionsRepository, employeesRepository, encrypter, financeService)
 	hrisOverviewService := hrisservice.NewOverviewService(hrisOverviewRepository, employeesRepository, encrypter, payrollCache)
 	hrProfilesService := hrisservice.NewHRProfilesService(hrProfilesRepository, employeesRepository, encrypter)
-	companyProfileService := authservice.NewCompanyProfileService(authRepository, cfg.UploadsDir)
+	var storageProvider storage.Storage
+	if cfg.StorageDriver == "s3" {
+		s3Store, err := storage.NewS3Storage(ctx, storage.S3Config{
+			Endpoint:        cfg.StorageS3.Endpoint,
+			Bucket:          cfg.StorageS3.Bucket,
+			Region:          cfg.StorageS3.Region,
+			AccessKey:       cfg.StorageS3.AccessKey,
+			SecretKey:       cfg.StorageS3.SecretKey,
+			UsePathStyle:    cfg.StorageS3.UsePathStyle,
+			UseSSL:          cfg.StorageS3.UseSSL,
+			CustomKeyPrefix: cfg.StorageS3.KeyPrefix,
+		})
+		if err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("init s3 storage: %w", err)
+		}
+		storageProvider = s3Store
+	} else {
+		localStore, err := storage.NewLocalStorage(cfg.UploadsDir)
+		if err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("init local storage: %w", err)
+		}
+		storageProvider = localStore
+	}
+
+	companyProfileService := authservice.NewCompanyProfileServiceWithStorage(authRepository, storageProvider)
 
 	// Document engine: DOCX render + LibreOffice PDF, rendered in the
 	// background by the document worker. Document kinds (payslips,
@@ -230,12 +258,12 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		ProfileDir: cfg.Documents.LOProfileDir,
 		Timeout:    cfg.Documents.RenderTimeout,
 	})
-	documentStore := hrisservice.NewDocumentStore(cfg.UploadsDir, encrypter)
+	documentStore := hrisservice.NewDocumentStoreWithStorage(storageProvider, encrypter)
 	campaignsService := marketingservice.NewCampaignsService(campaignsRepository, authRepository, notificationsService)
 	adsMetricsService := marketingservice.NewAdsMetricsService(adsMetricsRepository)
 	leadsService := marketingservice.NewLeadsService(leadsRepository, authRepository, notificationsService)
 	marketingOverviewService := marketingservice.NewOverviewService(marketingOverviewRepository)
-	filesService := filesservice.New(cfg.UploadsDir, reimbursementsRepository, campaignsRepository, employeesRepository)
+	filesService := filesservice.NewWithStorage(storageProvider, cfg.UploadsDir, reimbursementsRepository, campaignsRepository, employeesRepository)
 
 	// WhatsApp Broadcast (per-tenant: client loaded from DB config on demand)
 	waRepository := warepo.New(pool)
@@ -304,6 +332,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		accessTokenBlacklist: accessTokenBlacklist,
 		auditRepository:      auditRepository,
 		legalHandler:         legalhandler.NewHandler(legalService),
+		storage:              storageProvider,
 	}
 	router, err := application.buildRouter(
 		auditService,
@@ -322,7 +351,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		operationalhandler.NewVPSHandler(vpsService),
 		operationalhandler.NewDomainHandler(domainService),
 		hrishandler.NewOverviewHandler(hrisOverviewService),
-		hrishandler.NewEmployeesHandler(employeesService, compensationService, cfg.UploadsDir, authRepository),
+		hrishandler.NewEmployeesHandlerWithStorage(employeesService, compensationService, storageProvider, cfg.UploadsDir, authRepository),
 		hrishandler.NewHRProfilesHandler(hrProfilesService),
 		hrishandler.NewPayslipsHandler(payslipsService),
 		hrishandler.NewContractsHandler(contractsService),
@@ -331,10 +360,10 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		hrishandler.NewCompensationHandler(compensationService),
 		hrishandler.NewCompensationPolicyHandler(compensationPolicyService),
 		hrishandler.NewFinanceHandler(financeService, authRepository),
-		hrishandler.NewReimbursementsHandler(reimbursementsService, cfg.UploadsDir, authRepository),
+		hrishandler.NewReimbursementsHandlerWithStorage(reimbursementsService, storageProvider, cfg.UploadsDir, authRepository),
 		hrishandler.NewSubscriptionsHandler(subscriptionsService, authRepository),
 		marketinghandler.NewOverviewHandler(marketingOverviewService),
-		marketinghandler.NewCampaignsHandler(campaignsService, cfg.UploadsDir, authRepository),
+		marketinghandler.NewCampaignsHandlerWithStorage(campaignsService, storageProvider, cfg.UploadsDir, authRepository),
 		marketinghandler.NewAdsMetricsHandler(adsMetricsService, authRepository),
 		marketinghandler.NewLeadsHandler(leadsService, authRepository),
 		notificationshandler.New(notificationsService),
@@ -408,7 +437,7 @@ func (a *App) buildRouter(
 	waHandler *wahandler.Handler,
 ) (http.Handler, error) {
 	router := chi.NewRouter()
-	authHandler := authhandler.New(authService, a.cfg)
+	authHandler := authhandler.NewWithStorage(authService, a.storage, a.cfg)
 	authHandler.SetDocumentMailService(documentMailService)
 	authHandler.SetCompanyProfileService(companyProfileService)
 	patHandler := authhandler.NewPATHandler(patService)

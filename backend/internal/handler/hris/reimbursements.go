@@ -23,6 +23,7 @@ import (
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
@@ -31,6 +32,7 @@ type ReimbursementsHandler struct {
 	users      exportutil.UserLookup
 	validator  *validator.Validate
 	uploadsDir string
+	storage    storage.Storage
 }
 
 const (
@@ -44,6 +46,17 @@ func NewReimbursementsHandler(service *hrisservice.ReimbursementsService, upload
 		users:      users,
 		validator:  newValidator(),
 		uploadsDir: uploadsDir,
+	}
+}
+
+// NewReimbursementsHandlerWithStorage creates a ReimbursementsHandler using a storage.Storage provider.
+func NewReimbursementsHandlerWithStorage(service *hrisservice.ReimbursementsService, st storage.Storage, uploadsDir string, users exportutil.UserLookup) *ReimbursementsHandler {
+	return &ReimbursementsHandler{
+		service:    service,
+		users:      users,
+		validator:  newValidator(),
+		uploadsDir: uploadsDir,
+		storage:    st,
 	}
 }
 
@@ -146,7 +159,7 @@ func (h *ReimbursementsHandler) update(w http.ResponseWriter, r *http.Request) {
 		h.writeError(r.Context(), w, err)
 		return
 	}
-	removeSavedAttachments(h.uploadsDir, removedAttachments)
+	h.removeSavedAttachments(r.Context(), removedAttachments)
 	platformmiddleware.AuditLog(r.Context(), "update", "hris", "reimbursement", reimbursementID, nil, input)
 	response.WriteJSON(w, http.StatusOK, item, nil)
 }
@@ -167,7 +180,7 @@ func (h *ReimbursementsHandler) deleteReimbursement(w http.ResponseWriter, r *ht
 		h.writeError(r.Context(), w, err)
 		return
 	}
-	removeSavedAttachments(h.uploadsDir, removedAttachments)
+	h.removeSavedAttachments(r.Context(), removedAttachments)
 	platformmiddleware.AuditLog(r.Context(), "delete", "hris", "reimbursement", reimbursementID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]bool{"deleted": true}, nil)
 }
@@ -199,7 +212,7 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 		return
 	}
 
-	paths, err := saveAttachments(h.uploadsDir, files)
+	paths, err := h.saveAttachments(r.Context(), files)
 	if err != nil {
 		switch {
 		case errors.Is(err, errAttachmentValidation):
@@ -212,12 +225,12 @@ func (h *ReimbursementsHandler) uploadAttachments(w http.ResponseWriter, r *http
 
 	reimbursementID, ok := validateReimbursementIDParam(w, chi.URLParam(r, "reimbursementID"))
 	if !ok {
-		removeSavedAttachments(h.uploadsDir, paths)
+		h.removeSavedAttachments(r.Context(), paths)
 		return
 	}
 	item, err := h.service.AddAttachments(r.Context(), reimbursementID, paths, principal.UserID, principal.Cached)
 	if err != nil {
-		removeSavedAttachments(h.uploadsDir, paths)
+		h.removeSavedAttachments(r.Context(), paths)
 		h.writeError(r.Context(), w, err)
 		return
 	}
@@ -405,15 +418,11 @@ var (
 	errAttachmentStorage    = errors.New("attachment storage failed")
 )
 
-func saveAttachments(baseUploadsDir string, files []*multipart.FileHeader) ([]string, error) {
-	dir := filepath.Join(baseUploadsDir, "reimbursements")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
-	}
-
+func (h *ReimbursementsHandler) saveAttachments(ctx context.Context, files []*multipart.FileHeader) ([]string, error) {
 	paths := make([]string, 0, len(files))
 	for _, file := range files {
-		if _, err := uploads.ValidateMultipartFile(uploads.KindReimbursement, file); err != nil {
+		validation, err := uploads.ValidateMultipartFile(uploads.KindReimbursement, file)
+		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errAttachmentValidation, err)
 		}
 
@@ -423,24 +432,49 @@ func saveAttachments(baseUploadsDir string, files []*multipart.FileHeader) ([]st
 		}
 
 		filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitizeFilename(file.Filename)
-		destinationPath := filepath.Join(dir, filename)
-		dst, err := os.Create(destinationPath)
-		if err != nil {
+		relKey := filepath.ToSlash(filepath.Join("reimbursements", filename))
+
+		if h.storage != nil {
+			err = h.storage.Put(ctx, relKey, src, file.Size, validation.ContentType)
 			_ = src.Close()
-			return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
-		}
-		if _, err := io.Copy(dst, src); err != nil {
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
+			}
+		} else {
+			dir := filepath.Join(h.uploadsDir, "reimbursements")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				_ = src.Close()
+				return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
+			}
+			destinationPath := filepath.Join(dir, filename)
+			dst, err := os.Create(destinationPath)
+			if err != nil {
+				_ = src.Close()
+				return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
+			}
+			if _, err := io.Copy(dst, src); err != nil {
+				_ = dst.Close()
+				_ = src.Close()
+				_ = os.Remove(destinationPath)
+				return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
+			}
 			_ = dst.Close()
 			_ = src.Close()
-			_ = os.Remove(destinationPath)
-			return nil, fmt.Errorf("%w: %w", errAttachmentStorage, err)
 		}
-		_ = dst.Close()
-		_ = src.Close()
-		paths = append(paths, filepath.ToSlash(filepath.Join("reimbursements", filename)))
+		paths = append(paths, relKey)
 	}
 
 	return paths, nil
+}
+
+func (h *ReimbursementsHandler) removeSavedAttachments(ctx context.Context, paths []string) {
+	for _, attachmentPath := range paths {
+		if h.storage != nil {
+			_ = h.storage.Delete(ctx, filepath.ToSlash(attachmentPath))
+		} else {
+			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(attachmentPath)))
+		}
+	}
 }
 
 func sanitizeFilename(value string) string {
@@ -457,10 +491,4 @@ func validateReimbursementIDParam(w http.ResponseWriter, reimbursementID string)
 		return "", false
 	}
 	return reimbursementID, true
-}
-
-func removeSavedAttachments(baseUploadsDir string, paths []string) {
-	for _, attachmentPath := range paths {
-		_ = os.Remove(filepath.Join(baseUploadsDir, filepath.FromSlash(attachmentPath)))
-	}
 }

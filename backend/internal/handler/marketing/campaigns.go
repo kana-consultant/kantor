@@ -24,6 +24,7 @@ import (
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	marketingservice "github.com/kana-consultant/kantor/backend/internal/service/marketing"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
@@ -32,6 +33,7 @@ type CampaignsHandler struct {
 	users      exportutil.UserLookup
 	validator  *validator.Validate
 	uploadsDir string
+	storage    storage.Storage
 }
 
 const (
@@ -45,6 +47,17 @@ func NewCampaignsHandler(service *marketingservice.CampaignsService, uploadsDir 
 		users:      users,
 		validator:  newValidator(),
 		uploadsDir: uploadsDir,
+	}
+}
+
+// NewCampaignsHandlerWithStorage creates a CampaignsHandler using a storage.Storage provider.
+func NewCampaignsHandlerWithStorage(service *marketingservice.CampaignsService, st storage.Storage, uploadsDir string, users exportutil.UserLookup) *CampaignsHandler {
+	return &CampaignsHandler{
+		service:    service,
+		users:      users,
+		validator:  newValidator(),
+		uploadsDir: uploadsDir,
+		storage:    st,
 	}
 }
 
@@ -259,7 +272,7 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	uploadedFiles, err := saveCampaignAttachments(h.uploadsDir, files)
+	uploadedFiles, err := h.saveCampaignAttachments(r.Context(), files)
 	if err != nil {
 		switch {
 		case errors.Is(err, errCampaignAttachmentValidation):
@@ -272,9 +285,7 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 
 	campaignID, ok := validateCampaignUUIDParam(w, "campaignID", chi.URLParam(r, "campaignID"))
 	if !ok {
-		for _, uploaded := range uploadedFiles {
-			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(uploaded.FilePath)))
-		}
+		h.removeCampaignFiles(r.Context(), uploadedFiles)
 		return
 	}
 	params := make([]marketingrepo.CreateCampaignAttachmentParams, 0, len(uploadedFiles))
@@ -291,9 +302,7 @@ func (h *CampaignsHandler) uploadAttachment(w http.ResponseWriter, r *http.Reque
 
 	result, err := h.service.AddAttachments(r.Context(), params)
 	if err != nil {
-		for _, uploaded := range uploadedFiles {
-			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(uploaded.FilePath)))
-		}
+		h.removeCampaignFiles(r.Context(), uploadedFiles)
 		h.writeError(r.Context(), w, err)
 		return
 	}
@@ -329,7 +338,11 @@ func (h *CampaignsHandler) deleteAttachment(w http.ResponseWriter, r *http.Reque
 		h.writeError(r.Context(), w, err)
 		return
 	}
-	_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(item.FilePath)))
+	if h.storage != nil {
+		_ = h.storage.Delete(r.Context(), filepath.ToSlash(item.FilePath))
+	} else {
+		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(item.FilePath)))
+	}
 	platformmiddleware.AuditLog(r.Context(), "delete", "marketing", "campaign_attachment", attachmentID, nil, nil)
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Campaign attachment deleted successfully"}, nil)
 }
@@ -503,12 +516,7 @@ var (
 	errCampaignAttachmentStorage    = errors.New("campaign attachment storage failed")
 )
 
-func saveCampaignAttachments(baseUploadsDir string, files []*multipart.FileHeader) ([]uploadedCampaignFile, error) {
-	dir := filepath.Join(baseUploadsDir, "campaigns")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
-	}
-
+func (h *CampaignsHandler) saveCampaignAttachments(ctx context.Context, files []*multipart.FileHeader) ([]uploadedCampaignFile, error) {
 	items := make([]uploadedCampaignFile, 0, len(files))
 	for _, file := range files {
 		validation, err := uploads.ValidateMultipartFile(uploads.KindCampaignAttachment, file)
@@ -523,32 +531,55 @@ func saveCampaignAttachments(baseUploadsDir string, files []*multipart.FileHeade
 		}
 
 		filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitizeCampaignFilename(file.Filename)
-		destinationPath := filepath.Join(dir, filename)
-		dst, err := os.Create(destinationPath)
-		if err != nil {
-			_ = src.Close()
-			return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
-		}
+		relKey := filepath.ToSlash(filepath.Join("campaigns", filename))
 
-		if _, err := io.Copy(dst, src); err != nil {
+		if h.storage != nil {
+			err = h.storage.Put(ctx, relKey, src, file.Size, contentType)
+			_ = src.Close()
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
+			}
+		} else {
+			dir := filepath.Join(h.uploadsDir, "campaigns")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				_ = src.Close()
+				return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
+			}
+			destinationPath := filepath.Join(dir, filename)
+			dst, err := os.Create(destinationPath)
+			if err != nil {
+				_ = src.Close()
+				return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
+			}
+			if _, err := io.Copy(dst, src); err != nil {
+				_ = dst.Close()
+				_ = src.Close()
+				_ = os.Remove(destinationPath)
+				return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
+			}
 			_ = dst.Close()
 			_ = src.Close()
-			_ = os.Remove(destinationPath)
-			return nil, fmt.Errorf("%w: %w", errCampaignAttachmentStorage, err)
 		}
-
-		_ = dst.Close()
-		_ = src.Close()
 
 		items = append(items, uploadedCampaignFile{
 			FileName: file.Filename,
-			FilePath: filepath.ToSlash(filepath.Join("campaigns", filename)),
+			FilePath: relKey,
 			FileType: contentType,
 			FileSize: file.Size,
 		})
 	}
 
 	return items, nil
+}
+
+func (h *CampaignsHandler) removeCampaignFiles(ctx context.Context, files []uploadedCampaignFile) {
+	for _, uploaded := range files {
+		if h.storage != nil {
+			_ = h.storage.Delete(ctx, filepath.ToSlash(uploaded.FilePath))
+		} else {
+			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(uploaded.FilePath)))
+		}
+	}
 }
 
 func sanitizeCampaignFilename(value string) string {
