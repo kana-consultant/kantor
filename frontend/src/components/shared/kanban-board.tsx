@@ -343,8 +343,11 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 				<SortableContext
 					items={columns.map((column) => column.id)}
 					strategy={horizontalListSortingStrategy}>
-					<div className="-mx-1 overflow-x-auto px-1 pb-3">
-						<div className="flex min-w-max gap-3 md:gap-5">
+					{/* No negative margin: the page <section> clips anything wider than
+					    itself, which hid the last column's edge and the end of the scrollbar.
+					    pr-3 keeps the last column clear of the page's overlay scrollbar. */}
+					<div className="overflow-x-auto pb-3">
+						<div className="flex min-w-max gap-3 pr-3 md:gap-5">
 							{columns
 								.filter(
 									(column) =>
