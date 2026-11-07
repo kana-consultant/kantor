@@ -20,6 +20,10 @@ type Config struct {
 	DataEncryptionKey         string
 	DataEncryptionKeyPrevious string
 	UploadsDir                string
+	// StorageDriver selects the storage backend: "local" (default) or "s3".
+	StorageDriver string
+	// StorageS3 holds configuration for S3-compatible object storage (AWS, Cloudflare R2, MinIO, GCP).
+	StorageS3 StorageS3Config
 	JWTAccessExpiry           time.Duration
 	JWTRefreshExpiry          time.Duration
 	CORSOrigins               []string
@@ -42,6 +46,18 @@ type Config struct {
 	// DataMaintenance holds the opt-in, irreversible clean-ups of existing
 	// rows. Both are off unless explicitly enabled.
 	DataMaintenance DataMaintenanceConfig
+}
+
+// StorageS3Config holds S3-compatible object storage options.
+type StorageS3Config struct {
+	Endpoint     string
+	Bucket       string
+	Region       string
+	AccessKey    string
+	SecretKey    string
+	UsePathStyle bool
+	UseSSL       bool
+	KeyPrefix    string
 }
 
 // DataMaintenanceConfig switches on clean-ups that rewrite existing rows and
@@ -148,6 +164,9 @@ func Load() (Config, error) {
 	}
 	dataMaintenance := loadDataMaintenanceConfig()
 
+	s3PathStyle, _ := parseBool("STORAGE_S3_PATH_STYLE", false)
+	s3UseSSL, _ := parseBool("STORAGE_S3_USE_SSL", true)
+
 	cfg := Config{
 		AppEnv:                    appEnv,
 		Port:                      port,
@@ -156,6 +175,17 @@ func Load() (Config, error) {
 		DataEncryptionKey:         dataEncryptionKey,
 		DataEncryptionKeyPrevious: dataEncryptionKeyPrevious,
 		UploadsDir:                getEnv("UPLOADS_DIR", "uploads"),
+		StorageDriver:             strings.ToLower(strings.TrimSpace(getEnv("STORAGE_DRIVER", "local"))),
+		StorageS3: StorageS3Config{
+			Endpoint:     strings.TrimSpace(os.Getenv("STORAGE_S3_ENDPOINT")),
+			Bucket:       strings.TrimSpace(os.Getenv("STORAGE_S3_BUCKET")),
+			Region:       getEnv("STORAGE_S3_REGION", "auto"),
+			AccessKey:    strings.TrimSpace(os.Getenv("STORAGE_S3_ACCESS_KEY")),
+			SecretKey:    strings.TrimSpace(os.Getenv("STORAGE_S3_SECRET_KEY")),
+			UsePathStyle: s3PathStyle,
+			UseSSL:       s3UseSSL,
+			KeyPrefix:    strings.TrimSpace(os.Getenv("STORAGE_S3_KEY_PREFIX")),
+		},
 		JWTAccessExpiry:           accessExpiry,
 		JWTRefreshExpiry:          refreshExpiry,
 		CORSOrigins:               splitCSV(getEnv("CORS_ORIGINS", "http://localhost:3000")),

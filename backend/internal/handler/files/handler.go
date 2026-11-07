@@ -3,6 +3,8 @@ package files
 import (
 	"errors"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -51,6 +53,17 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	reader, size, err := h.service.Open(r.Context(), file)
+	if err != nil {
+		if errors.Is(err, filesservice.ErrFileNotFound) {
+			response.WriteError(w, http.StatusNotFound, "FILE_NOT_FOUND", "Requested file was not found", nil)
+			return
+		}
+		response.WriteInternalError(r.Context(), w, err, "An unexpected error occurred opening file")
+		return
+	}
+	defer reader.Close()
+
 	// Force browsers to download instead of render uploaded files. Combined
 	// with X-Content-Type-Options: nosniff this neutralises polyglot files
 	// that pass our magic-byte check but also embed executable HTML/JS.
@@ -58,10 +71,20 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	if shouldForceDownload(filename) {
 		disposition = "attachment"
 	}
+	contentType := mime.TypeByExtension(filepath.Ext(filename))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	if size > 0 {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
+	}
 	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", disposition, filepath.Base(filename)))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store")
-	http.ServeFile(w, r, file.Path)
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, reader)
 }
 
 // shouldForceDownload returns true for filenames whose extension is not a

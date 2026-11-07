@@ -41,7 +41,16 @@ cp .env.example .env
 | `JWT_SECRET` | Yes | — | HMAC signing key for JWTs. Rejected if set to `change-me` in production |
 | `DATA_ENCRYPTION_KEY` | Yes | — | Encryption key for sensitive data at rest |
 | `DATA_ENCRYPTION_KEY_PREVIOUS` | No | — | Previous encryption key for key rotation (see below) |
-| `UPLOADS_DIR` | No | `uploads` | File upload directory (overridden by Docker Compose) |
+| `UPLOADS_DIR` | No | `uploads` | File upload directory (used when `STORAGE_DRIVER=local`) |
+| `STORAGE_DRIVER` | No | `local` | Storage provider: `local` or `s3` (compatible with Cloudflare R2, AWS S3, MinIO, GCP) |
+| `STORAGE_S3_ENDPOINT` | Conditional | — | S3/R2 Endpoint URL (e.g. `https://<account_id>.r2.cloudflarestorage.com` or `http://minio:9000`) |
+| `STORAGE_S3_BUCKET` | Conditional | — | Name of S3 bucket (required if `STORAGE_DRIVER=s3`) |
+| `STORAGE_S3_REGION` | No | `auto` | S3 region (defaults to `auto` for R2/MinIO, or `us-east-1` for AWS) |
+| `STORAGE_S3_ACCESS_KEY` | Conditional | — | S3 Access Key ID / R2 Token Access Key ID |
+| `STORAGE_S3_SECRET_KEY` | Conditional | — | S3 Secret Access Key / R2 Token Secret Access Key |
+| `STORAGE_S3_PATH_STYLE` | No | `false` | Set to `true` for MinIO or path-style endpoints |
+| `STORAGE_S3_USE_SSL` | No | `true` | Set to `false` for local non-SSL S3/MinIO endpoints |
+| `STORAGE_S3_KEY_PREFIX` | No | — | Optional base prefix/folder inside the bucket |
 | `JWT_ACCESS_EXPIRY` | No | `15m` | Access token TTL |
 | `JWT_REFRESH_EXPIRY` | No | `168h` | Refresh token TTL |
 | `CORS_ORIGINS` | No | `http://localhost:3000` | Comma-separated allowed origins |

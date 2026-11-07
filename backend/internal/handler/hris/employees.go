@@ -25,6 +25,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	hrisservice "github.com/kana-consultant/kantor/backend/internal/service/hris"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
@@ -34,6 +35,7 @@ type EmployeesHandler struct {
 	users        exportutil.UserLookup
 	validator    *validator.Validate
 	uploadsDir   string
+	storage      storage.Storage
 }
 
 const maxEmployeeAvatarMultipartMaxBytes = 6 << 20
@@ -50,6 +52,24 @@ func NewEmployeesHandler(
 		users:        users,
 		validator:    newValidator(),
 		uploadsDir:   uploadsDir,
+	}
+}
+
+// NewEmployeesHandlerWithStorage creates an EmployeesHandler using a storage.Storage provider.
+func NewEmployeesHandlerWithStorage(
+	service *hrisservice.EmployeesService,
+	compensation *hrisservice.CompensationService,
+	st storage.Storage,
+	uploadsDir string,
+	users exportutil.UserLookup,
+) *EmployeesHandler {
+	return &EmployeesHandler{
+		service:      service,
+		compensation: compensation,
+		users:        users,
+		validator:    newValidator(),
+		uploadsDir:   uploadsDir,
+		storage:      st,
 	}
 }
 
@@ -259,7 +279,7 @@ func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	avatarPath, err := saveEmployeeAvatar(h.uploadsDir, employeeID, fileHeader)
+	avatarPath, err := h.saveEmployeeAvatar(r.Context(), employeeID, fileHeader)
 	if err != nil {
 		switch {
 		case errors.Is(err, errEmployeeAvatarValidation):
@@ -272,7 +292,7 @@ func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.service.UpdateEmployeeAvatar(r.Context(), employeeID, avatarPath)
 	if err != nil {
-		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(avatarPath)))
+		h.removeEmployeeAvatar(r.Context(), avatarPath)
 		h.writeError(r.Context(), w, err)
 		return
 	}
@@ -280,7 +300,7 @@ func (h *EmployeesHandler) uploadAvatar(w http.ResponseWriter, r *http.Request) 
 	if current.AvatarURL != nil && strings.TrimSpace(*current.AvatarURL) != "" {
 		oldPath := filepath.ToSlash(strings.TrimSpace(*current.AvatarURL))
 		if oldPath != avatarPath && isEmployeeAvatarPath(oldPath, employeeID) {
-			_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(oldPath)))
+			h.removeEmployeeAvatar(r.Context(), oldPath)
 		}
 	}
 
@@ -358,8 +378,9 @@ var (
 	errEmployeeAvatarStorage    = errors.New("employee avatar storage failed")
 )
 
-func saveEmployeeAvatar(baseUploadsDir string, employeeID string, file *multipart.FileHeader) (string, error) {
-	if _, err := uploads.ValidateMultipartFile(uploads.KindAvatar, file); err != nil {
+func (h *EmployeesHandler) saveEmployeeAvatar(ctx context.Context, employeeID string, file *multipart.FileHeader) (string, error) {
+	validation, err := uploads.ValidateMultipartFile(uploads.KindAvatar, file)
+	if err != nil {
 		return "", fmt.Errorf("%w: %w", errEmployeeAvatarValidation, err)
 	}
 
@@ -369,12 +390,21 @@ func saveEmployeeAvatar(baseUploadsDir string, employeeID string, file *multipar
 	}
 	defer src.Close()
 
-	dir := filepath.Join(baseUploadsDir, "employees", employeeID)
+	filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitizeEmployeeAvatarFilename(file.Filename)
+	relKey := filepath.ToSlash(filepath.Join("employees", employeeID, filename))
+
+	if h.storage != nil {
+		if err := h.storage.Put(ctx, relKey, src, file.Size, validation.ContentType); err != nil {
+			return "", fmt.Errorf("%w: %w", errEmployeeAvatarStorage, err)
+		}
+		return relKey, nil
+	}
+
+	dir := filepath.Join(h.uploadsDir, "employees", employeeID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("%w: %w", errEmployeeAvatarStorage, err)
 	}
 
-	filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitizeEmployeeAvatarFilename(file.Filename)
 	destinationPath := filepath.Join(dir, filename)
 
 	dst, err := os.Create(destinationPath)
@@ -393,7 +423,15 @@ func saveEmployeeAvatar(baseUploadsDir string, employeeID string, file *multipar
 		return "", fmt.Errorf("%w: %w", errEmployeeAvatarStorage, err)
 	}
 
-	return filepath.ToSlash(filepath.Join("employees", employeeID, filename)), nil
+	return relKey, nil
+}
+
+func (h *EmployeesHandler) removeEmployeeAvatar(ctx context.Context, path string) {
+	if h.storage != nil {
+		_ = h.storage.Delete(ctx, filepath.ToSlash(path))
+	} else {
+		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(path)))
+	}
 }
 
 func sanitizeEmployeeAvatarFilename(value string) string {

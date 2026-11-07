@@ -2,6 +2,7 @@ package hris
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kana-consultant/kantor/backend/internal/security"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 	"github.com/kana-consultant/kantor/backend/internal/uploads"
 )
 
@@ -61,12 +63,18 @@ type StoredDocument struct {
 
 type DocumentStore struct {
 	uploadsDir string
+	storage    storage.Storage
 	encrypter  *security.Encrypter
 	random     io.Reader
 }
 
 func NewDocumentStore(uploadsDir string, encrypter *security.Encrypter) *DocumentStore {
 	return &DocumentStore{uploadsDir: uploadsDir, encrypter: encrypter, random: rand.Reader}
+}
+
+// NewDocumentStoreWithStorage creates a DocumentStore using a storage.Storage provider.
+func NewDocumentStoreWithStorage(st storage.Storage, encrypter *security.Encrypter) *DocumentStore {
+	return &DocumentStore{storage: st, encrypter: encrypter, random: rand.Reader}
 }
 
 // Write encrypts pdf and stores it for (tenantID, kind, id, part).
@@ -97,12 +105,19 @@ func (s *DocumentStore) Write(tenantID string, kind string, id string, part stri
 	if err != nil {
 		return StoredDocument{}, fmt.Errorf("encrypt document: %w", err)
 	}
-	abs, err := s.resolve(tenantUUID.String(), rel)
-	if err != nil {
-		return StoredDocument{}, err
-	}
-	if err := uploads.WriteFileAtomic(abs, cipher, documentFileMode, documentDirMode); err != nil {
-		return StoredDocument{}, fmt.Errorf("write document: %w", err)
+
+	if s.storage != nil {
+		if err := s.storage.Put(context.Background(), rel, bytes.NewReader(cipher), int64(len(cipher)), "application/octet-stream"); err != nil {
+			return StoredDocument{}, fmt.Errorf("write document: %w", err)
+		}
+	} else {
+		abs, err := s.resolve(tenantUUID.String(), rel)
+		if err != nil {
+			return StoredDocument{}, err
+		}
+		if err := uploads.WriteFileAtomic(abs, cipher, documentFileMode, documentDirMode); err != nil {
+			return StoredDocument{}, fmt.Errorf("write document: %w", err)
+		}
 	}
 
 	sum := sha256.Sum256(pdf)
@@ -112,24 +127,49 @@ func (s *DocumentStore) Write(tenantID string, kind string, id string, part stri
 // Read decrypts a stored PDF of the given tenant. When wantSHA256 is
 // non-empty the plaintext must match it.
 func (s *DocumentStore) Read(tenantID string, rel string, wantSHA256 string) ([]byte, error) {
-	abs, err := s.resolve(tenantID, rel)
-	if err != nil {
+	if _, err := s.validateRel(tenantID, rel); err != nil {
 		return nil, err
 	}
-	info, err := os.Stat(abs)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrDocumentNotFound
+
+	var cipher []byte
+	if s.storage != nil {
+		rc, meta, err := s.storage.Get(context.Background(), rel)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, ErrDocumentNotFound
+			}
+			return nil, err
 		}
-		return nil, err
+		defer rc.Close()
+
+		if meta.ContentLength > maxStoredDocumentLen {
+			return nil, ErrDocumentPathInvalid
+		}
+		cipher, err = io.ReadAll(rc)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		abs, err := s.resolve(tenantID, rel)
+		if err != nil {
+			return nil, err
+		}
+		info, err := os.Stat(abs)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, ErrDocumentNotFound
+			}
+			return nil, err
+		}
+		if !info.Mode().IsRegular() || info.Size() > maxStoredDocumentLen {
+			return nil, ErrDocumentPathInvalid
+		}
+		cipher, err = os.ReadFile(abs)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if !info.Mode().IsRegular() || info.Size() > maxStoredDocumentLen {
-		return nil, ErrDocumentPathInvalid
-	}
-	cipher, err := os.ReadFile(abs)
-	if err != nil {
-		return nil, err
-	}
+
 	pdf, err := s.encrypter.DecryptBytes(cipher)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt document: %w", err)
@@ -146,6 +186,13 @@ func (s *DocumentStore) Read(tenantID string, rel string, wantSHA256 string) ([]
 // Delete removes a stored PDF of the given tenant. A file that is already
 // gone is not an error.
 func (s *DocumentStore) Delete(tenantID string, rel string) error {
+	if _, err := s.validateRel(tenantID, rel); err != nil {
+		return err
+	}
+	if s.storage != nil {
+		return s.storage.Delete(context.Background(), rel)
+	}
+
 	abs, err := s.resolve(tenantID, rel)
 	if err != nil {
 		return err
@@ -154,6 +201,36 @@ func (s *DocumentStore) Delete(tenantID string, rel string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *DocumentStore) validateRel(tenantID string, rel string) (string, error) {
+	if rel == "" || strings.Contains(rel, "\\") || strings.HasPrefix(rel, "/") {
+		return "", ErrDocumentPathInvalid
+	}
+	cleaned := path.Clean(rel)
+	if cleaned != rel {
+		return "", ErrDocumentPathInvalid
+	}
+	segments := strings.Split(cleaned, "/")
+	if len(segments) != 4 || segments[0] != documentsRootDir {
+		return "", ErrDocumentPathInvalid
+	}
+	pathTenant, err := uuid.Parse(segments[1])
+	if err != nil || segments[1] != pathTenant.String() {
+		return "", ErrDocumentPathInvalid
+	}
+	wantTenant, err := uuid.Parse(tenantID)
+	if err != nil || wantTenant != pathTenant {
+		return "", ErrDocumentPathInvalid
+	}
+	if !documentNamePattern.MatchString(segments[2]) {
+		return "", ErrDocumentPathInvalid
+	}
+	name := segments[3]
+	if !strings.HasSuffix(name, documentFileSuffix) || strings.HasPrefix(name, ".") || name == ".." {
+		return "", ErrDocumentPathInvalid
+	}
+	return cleaned, nil
 }
 
 // resolve maps a stored relative path to an absolute one, accepting only

@@ -18,6 +18,7 @@ import (
 	platformmiddleware "github.com/kana-consultant/kantor/backend/internal/middleware"
 	"github.com/kana-consultant/kantor/backend/internal/response"
 	authservice "github.com/kana-consultant/kantor/backend/internal/service/auth"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 )
 
 const refreshTokenCookie = "refresh_token"
@@ -32,6 +33,7 @@ type Handler struct {
 	cookiePath     string
 	refreshExpiry  time.Duration
 	uploadsDir     string
+	storage        storage.Storage
 }
 
 func New(service *authservice.Service, cfg config.Config) *Handler {
@@ -42,6 +44,19 @@ func New(service *authservice.Service, cfg config.Config) *Handler {
 		cookiePath:    "/api/v1/auth",
 		refreshExpiry: cfg.JWTRefreshExpiry,
 		uploadsDir:    cfg.UploadsDir,
+	}
+}
+
+// NewWithStorage creates an auth Handler with a storage.Storage provider.
+func NewWithStorage(service *authservice.Service, st storage.Storage, cfg config.Config) *Handler {
+	return &Handler{
+		service:       service,
+		validator:     validator.New(validator.WithRequiredStructEnabled()),
+		cookieSecure:  cfg.AppEnv == "production",
+		cookiePath:    "/api/v1/auth",
+		refreshExpiry: cfg.JWTRefreshExpiry,
+		uploadsDir:    cfg.UploadsDir,
+		storage:       st,
 	}
 }
 

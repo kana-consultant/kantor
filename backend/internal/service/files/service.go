@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/kana-consultant/kantor/backend/internal/model"
 	hrisrepo "github.com/kana-consultant/kantor/backend/internal/repository/hris"
 	marketingrepo "github.com/kana-consultant/kantor/backend/internal/repository/marketing"
+	"github.com/kana-consultant/kantor/backend/internal/storage"
 )
 
 var (
@@ -20,6 +22,7 @@ var (
 
 type ResolvedFile struct {
 	Path        string
+	StorageKey  string
 	Permission  string
 	OwnerUserID *string
 }
@@ -39,6 +42,7 @@ type filesEmployeesRepository interface {
 
 type Service struct {
 	uploadsDir         string
+	storage            storage.Storage
 	reimbursementsRepo filesReimbursementsRepository
 	campaignsRepo      filesCampaignsRepository
 	employeesRepo      filesEmployeesRepository
@@ -52,6 +56,23 @@ func New(
 ) *Service {
 	return &Service{
 		uploadsDir:         uploadsDir,
+		reimbursementsRepo: reimbursementsRepo,
+		campaignsRepo:      campaignsRepo,
+		employeesRepo:      employeesRepo,
+	}
+}
+
+// NewWithStorage creates a files Service using a storage.Storage provider.
+func NewWithStorage(
+	st storage.Storage,
+	uploadsDir string,
+	reimbursementsRepo filesReimbursementsRepository,
+	campaignsRepo filesCampaignsRepository,
+	employeesRepo filesEmployeesRepository,
+) *Service {
+	return &Service{
+		uploadsDir:         uploadsDir,
+		storage:            st,
 		reimbursementsRepo: reimbursementsRepo,
 		campaignsRepo:      campaignsRepo,
 		employeesRepo:      employeesRepo,
@@ -104,13 +125,31 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 		ownerUserID = employee.UserID
 	case "profiles":
 		permission = ""
-		relativePath = filepath.Join("profiles", resourceID, filename)
+		relativePath = filepath.ToSlash(filepath.Join("profiles", resourceID, filename))
 		trimmedResourceID := strings.TrimSpace(resourceID)
 		if trimmedResourceID != "" {
 			ownerUserID = &trimmedResourceID
 		}
 	default:
 		return ResolvedFile{}, ErrUnsupportedType
+	}
+
+	normRelative := filepath.ToSlash(relativePath)
+
+	if s.storage != nil {
+		exists, err := s.storage.Exists(ctx, normRelative)
+		if err != nil {
+			return ResolvedFile{}, err
+		}
+		if !exists {
+			return ResolvedFile{}, ErrFileNotFound
+		}
+		return ResolvedFile{
+			Path:        normRelative,
+			StorageKey:  normRelative,
+			Permission:  permission,
+			OwnerUserID: ownerUserID,
+		}, nil
 	}
 
 	absolutePath, err := s.safeJoin(relativePath)
@@ -126,9 +165,38 @@ func (s *Service) Resolve(ctx context.Context, fileType string, resourceID strin
 
 	return ResolvedFile{
 		Path:        absolutePath,
+		StorageKey:  normRelative,
 		Permission:  permission,
 		OwnerUserID: ownerUserID,
 	}, nil
+}
+
+// Open retrieves an io.ReadCloser and metadata for the resolved file.
+func (s *Service) Open(ctx context.Context, file ResolvedFile) (io.ReadCloser, int64, error) {
+	if s.storage != nil {
+		rc, meta, err := s.storage.Get(ctx, file.StorageKey)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, 0, ErrFileNotFound
+			}
+			return nil, 0, err
+		}
+		return rc, meta.ContentLength, nil
+	}
+
+	f, err := os.Open(file.Path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, 0, ErrFileNotFound
+		}
+		return nil, 0, err
+	}
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, 0, err
+	}
+	return f, info.Size(), nil
 }
 
 func (s *Service) safeJoin(relativePath string) (string, error) {

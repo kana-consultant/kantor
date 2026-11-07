@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -155,14 +156,14 @@ func (h *Handler) UploadProfileAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	avatarPath, err := saveProfileAvatar(h.uploadsDir, principal.UserID, fileHeader)
+	avatarPath, err := h.saveProfileAvatar(r.Context(), principal.UserID, fileHeader)
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "AVATAR_UPLOAD_FAILED", err.Error(), nil)
 		return
 	}
 
 	if err := h.service.UpdateProfileAvatar(r.Context(), principal.UserID, avatarPath); err != nil {
-		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(avatarPath)))
+		h.removeProfileAvatar(r.Context(), avatarPath)
 		response.WriteInternalError(r.Context(), w, err, "Gagal menyimpan avatar")
 		return
 	}
@@ -172,8 +173,9 @@ func (h *Handler) UploadProfileAvatar(w http.ResponseWriter, r *http.Request) {
 
 var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
-func saveProfileAvatar(baseDir string, userID string, file *multipart.FileHeader) (string, error) {
-	if _, err := uploads.ValidateMultipartFile(uploads.KindAvatar, file); err != nil {
+func (h *Handler) saveProfileAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (string, error) {
+	validation, err := uploads.ValidateMultipartFile(uploads.KindAvatar, file)
+	if err != nil {
 		return "", fmt.Errorf("avatar tidak valid: %w", err)
 	}
 
@@ -183,13 +185,22 @@ func saveProfileAvatar(baseDir string, userID string, file *multipart.FileHeader
 	}
 	defer src.Close()
 
-	dir := filepath.Join(baseDir, "profiles", userID)
+	sanitized := unsafeCharsRe.ReplaceAllString(filepath.Base(file.Filename), "_")
+	filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitized
+	relKey := filepath.ToSlash(filepath.Join("profiles", userID, filename))
+
+	if h.storage != nil {
+		if err := h.storage.Put(ctx, relKey, src, file.Size, validation.ContentType); err != nil {
+			return "", fmt.Errorf("gagal menyimpan file: %w", err)
+		}
+		return relKey, nil
+	}
+
+	dir := filepath.Join(h.uploadsDir, "profiles", userID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("gagal membuat direktori: %w", err)
 	}
 
-	sanitized := unsafeCharsRe.ReplaceAllString(filepath.Base(file.Filename), "_")
-	filename := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + sanitized
 	destPath := filepath.Join(dir, filename)
 
 	dst, err := os.Create(destPath)
@@ -204,5 +215,13 @@ func saveProfileAvatar(baseDir string, userID string, file *multipart.FileHeader
 	}
 	_ = dst.Close()
 
-	return filepath.ToSlash(filepath.Join("profiles", userID, filename)), nil
+	return relKey, nil
+}
+
+func (h *Handler) removeProfileAvatar(ctx context.Context, path string) {
+	if h.storage != nil {
+		_ = h.storage.Delete(ctx, filepath.ToSlash(path))
+	} else {
+		_ = os.Remove(filepath.Join(h.uploadsDir, filepath.FromSlash(path)))
+	}
 }
