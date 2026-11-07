@@ -61,11 +61,32 @@ func NewVPSMonitorService(repo vpsRepository, notifs vpsMonitorNotifications, au
 		// Single shared client; per-call timeout is set on the request itself.
 		// DisableKeepAlives keeps probe latency honest by not measuring a
 		// reused connection.
-		httpClient: &http.Client{
-			Transport: &http.Transport{
-				DisableKeepAlives:   true,
-				MaxIdleConnsPerHost: -1,
-			},
+		httpClient: newProbeHTTPClient(),
+	}
+}
+
+// probeRedirectResolveTimeout bounds the DNS re-validation of a redirect hop.
+// The probe request context (probeHTTP's per-check timeout) still caps the
+// total work, so this only needs to be a sane upper bound of its own.
+const probeRedirectResolveTimeout = 5 * time.Second
+
+// newProbeHTTPClient builds the shared probe client. probeHTTP validates only
+// the initial target host, so every redirect hop the client itself dials must
+// pass the same public-host guard — otherwise a public check target that 302s
+// to an internal address turns the monitor into an SSRF probe. The default
+// 10-hop limit is preserved explicitly because installing CheckRedirect
+// replaces Go's default redirect policy.
+func newProbeHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives:   true,
+			MaxIdleConnsPerHost: -1,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return ensureProbeHostIsPublic(req.Context(), req.URL.Hostname(), probeRedirectResolveTimeout)
 		},
 	}
 }
