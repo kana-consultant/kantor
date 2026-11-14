@@ -19,8 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Upstream Dockerfile hardcodes GOARCH=amd64; Oracle is arm64.
-      - name: Patch Dockerfile.backend for arm64
-        run: sed -i 's/GOARCH=amd64/GOARCH=arm64/' Dockerfile.backend && grep -n GOARCH Dockerfile.backend
+      - name: Patch Dockerfile.backend (arm64 + seedadmin binary)
+        run: |
+          sed -i 's/GOARCH=amd64/GOARCH=arm64/' Dockerfile.backend
+          # also build ./cmd/seedadmin (production bootstrap, no demo users) into the image
+          sed -i '/go build -o \/out\/server/a RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /out/seedadmin ./cmd/seedadmin' Dockerfile.backend
+          sed -i '/^COPY --from=build \/out\/server /a COPY --from=build /out/seedadmin /usr/local/bin/seedadmin' Dockerfile.backend
+          grep -nE 'GOARCH|seedadmin' Dockerfile.backend
+          test "$(grep -c 'seedadmin' Dockerfile.backend)" -eq 2
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
